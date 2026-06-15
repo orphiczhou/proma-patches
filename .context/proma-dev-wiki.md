@@ -241,7 +241,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 ### MCP Server：`session`
 
-提供 5 个 Agent 可调用的工具：
+提供 6 个 Agent 可调用的工具：
 
 | 工具名 | 功能 | 只读 |
 |---|---|---|
@@ -250,6 +250,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 | `get_session_info` | 查询单个会话详情 | ✅ |
 | `create_session` | 创建新会话，指定渠道/模型/标题/工作区 | ❌ |
 | `fork_session` | Fork 已有会话，支持切换渠道和模型 | ❌ |
+| `get_session_context` | 查询会话当前 token 用量（input/output/cache/total） | ✅ |
 
 ### 架构
 
@@ -261,7 +262,7 @@ main.cjs
        ├─ 读取 global.__proma__ 调用主进程序 API
        ├─ 使用 sendMessage 传入的 sdk 创建 MCP server
        ├─ 注册到 global.__proma_getMcpServers__
-       └─ 5 个会话管理工具
+       └─ 6 个会话管理工具
 ```
 
 ---
@@ -352,6 +353,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
 | 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
 | 2026-06-15 | v0.6 | 方案 A 完成：插件化 MCP 工具系统，5 个会话管理工具（list_channels/sessions、create/fork/get_session_info）；补丁 A/B/C；频道+模型元数据覆盖；验证 esbuild 源构建不可行 |
 | 2026-06-15 | v0.5 | 重构 dev 版：基于正式版 0.12.23 重新提取 main.cjs，sed 打补丁 1/2/3/4；废弃源构建方案（缺 cloudAuth 模块） |
