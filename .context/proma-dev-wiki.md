@@ -192,7 +192,36 @@ sed -i 's@let resolvedModel = modelId || DEFAULT_MODEL_ID;@let resolvedModel = g
 sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' main.cjs
 ```
 
-**效果：** 通过 MCP 工具创建的会话，即使 UI 选择器显示旧模型，实际 API 请求也会走元数据中存储的正确频道和模型。
+**效果：** 通过 MCP 工具创建的会话，API 请求走元数据中存储的正确频道和模型（后端层面）。结合补丁 D+E，UI 模型选择器也与元数据同步。
+
+---
+
+### 渲染器补丁
+
+#### 补丁 D：Renderer 版本同步
+
+**问题：** dev 版 renderer 停留在旧版本（如 0.12.1），与 main.cjs（0.12.23）版本不匹配，IPC 协议可能不一致。
+
+**修复：** 每次正式版升级后，同步 renderer 文件：
+
+```bash
+npx asar extract D:/Proma/resources/app.asar /tmp/app
+cp -r /tmp/app/dist/renderer/* D:/Proma-dev/resources/app/dist/renderer/
+```
+
+#### 补丁 E：渲染器 hydration 幂等守卫移除
+
+**文件：** `renderer/assets/index-*.js`（主 bundle，约 4.1MB）
+
+**问题：** AgentView 的 hydration effect 在初始化模型 Map 时有幂等守卫 `if(qe.has(e))return qe`。当 metadata 有 modelId 但 Map 已被其他代码路径（如 auto-select first model）预先填充时，metadata 的 modelId 被跳过。
+
+**修复：** 移除幂等守卫，让 hydration 始终用 metadata 更新：
+
+```bash
+sed -i 's/if(qe.has(e))return qe;//g' D:/Proma-dev/resources/app/dist/renderer/assets/index-*.js
+```
+
+**效果：** 打开 MCP 创建的会话时，UI 模型选择器自动显示正确的模型名称（与 metadata 同步）。
 
 ---
 
@@ -257,7 +286,9 @@ D:\
         │       ├── main.cjs              # 已打 7 个 sed 补丁
         │       ├── preload.cjs           # 商业版原版
         │       ├── proma-dev-patches.cjs # ★ 插件文件
-        │       └── renderer/             # 商业版原版
+        │       └── renderer/             # 商业版原版（补丁 E）
+        │           └── assets/
+        │               └── index-*.js    # 主 bundle（hydrate 守卫已移除）
         └── app.asar.unpacked/
 ```
 
@@ -287,13 +318,19 @@ cp /tmp/new-app/dist/main.cjs /tmp/main-patched.cjs
 # 3. 部署
 cp /tmp/main-patched.cjs D:/Proma-dev/resources/app/dist/main.cjs
 
-# 4. 对齐版本号
+# 4. 同步 renderer 文件（补丁 D）
+cp -r /tmp/new-app/dist/renderer/* D:/Proma-dev/resources/app/dist/renderer/
+
+# 5. 重新打 renderer 补丁 E
+sed -i 's/if(qe.has(e))return qe;//g' D:/Proma-dev/resources/app/dist/renderer/assets/index-*.js
+
+# 6. 对齐版本号
 sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app/package.json
 
-# 5. 重启验证
+# 7. 重启验证
 ```
 
-**原则：每次正式版升级后，重新从最新版提取 main.cjs 打补丁，不跨版本复用。**
+**原则：每次正式版升级后，重新从最新版提取 main.cjs + renderer 打补丁，不跨版本复用。**
 
 ---
 
@@ -307,7 +344,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 4. **DeepSeek 频道会话 Fork 失败：** SDK 层 bug——会话的 `sdkSessionId` 存在 Proma 元数据中，但 SDK 内部找不到对应会话数据。非 DeepSeek 频道 Fork 正常。
 
-5. **UI 模型选择器不反映 MCP 创建的会话模型：** 补丁 C 已覆盖后端，实际 API 请求走正确频道/模型，但 UI 选择器显示可能是旧值。手动切换一次即可同步。
+5. **正式版升级后 renderer 版本漂移：** 补丁 D 解决，升级后需同步 renderer 文件。
 
 ---
 
@@ -315,9 +352,143 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
 | 2026-06-15 | v0.6 | 方案 A 完成：插件化 MCP 工具系统，5 个会话管理工具（list_channels/sessions、create/fork/get_session_info）；补丁 A/B/C；频道+模型元数据覆盖；验证 esbuild 源构建不可行 |
 | 2026-06-15 | v0.5 | 重构 dev 版：基于正式版 0.12.23 重新提取 main.cjs，sed 打补丁 1/2/3/4；废弃源构建方案（缺 cloudAuth 模块） |
 | 2026-06-15 | v0.4 | 源码从 v0.10.28 rebase 到 v0.12.23；新增源码备份；明确"源码≠运行版本"关系 |
 | 2026-06-15 | v0.3 | 新增 Dev发行版；渐变色图标；三版架构确立 |
 | 2026-06-15 | v0.2 | 开发版更换白色应用图标；托盘图标修复 |
 | 2026-06-15 | v0.1 | 初始创建开发版；补丁1（deepseek-v4-pro）+ 补丁2（PROMA_DEV userData隔离）；双开支持 |
+
+---
+
+## 十二、插件化改造体系：Agent 会话管理能力
+
+### 12.1 核心设计思想
+
+**命题**：如何在不重编译商业版 `main.cjs` 的前提下，给 Agent 增加任意新能力？
+
+**答案**：插件模式。商业版 `main.cjs` 只注入一个 `require("./proma-dev-patches.cjs")`，所有新能力写入独立插件文件。
+
+```
+main.cjs (sed 注入 3 处，其余不动)
+  ├─ 补丁 A: sendMessage() 中插入 MCP 钩子（检查 global.__proma_getMcpServers__）
+  ├─ 补丁 B: init_index() 后导出核心函数到 global.__proma__，并 require 插件
+  ├─ 补丁 C: sendMessage() 中优先使用 metadata.modelId
+  └─ proma-dev-patches.cjs (独立文件，TypeScript 级别的复杂度，随便写)
+```
+
+### 12.2 插件能力总览
+
+插件通过 SDK 的 `sdk.createSdkMcpServer()` 创建一个名为 `session` 的进程内 MCP Server，包含 6 个工具：
+
+| 工具 | 类型 | 功能 |
+|---|---|---|
+| `list_channels` | 只读 | 列出所有 AI 渠道及 Agent 可用模型 |
+| `list_sessions` | 只读 | 列出所有 Agent 会话（标题/渠道/模型/归档状态） |
+| `get_session_info` | 只读 | 查询单个会话详情（渠道、模型、工作区） |
+| `create_session` | 写入 | 创建新会话，指定渠道/模型/标题/工作区 |
+| `fork_session` | 写入 | Fork 已有会话，保留上下文，可切换渠道/模型 |
+| `send_message` | 写入 | 向目标会话发送消息，支持三种执行模式 |
+
+### 12.3 send_message 三种执行模式
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    send_message                          │
+│                                                         │
+│  wait=true (默认)    wait=false + notify     纯 fire-   │
+│  同步等待            异步回调通知             and-forget │
+│                                                         │
+│  调用──────返回      调用──→返回             调用──→返回  │
+│   ████████████       ██                        ██       │
+│  (阻塞等完成)        │ onComplete             (无回调)   │
+│                      ↓ runAgentHeadless                 │
+│                     源会话收到通知                        │
+│                                                         │
+│  适用: 短任务        适用: 并行多任务        适用: 不关心  │
+│       需要即时结果         需要异步通知            结果    │
+└──────────────────────────────────────────────────────────┘
+```
+
+**异步回调模式的完整流程**：
+
+1. 源 Agent 调用 `send_message(target, msg, notify=true)`
+2. MCP 工具 handler 调用 `runAgentHeadless(目标)` 并在 `onComplete` 中注册回调
+3. MCP 立即返回 `{ status: "started" }`，源会话不阻塞，Agent 可以继续处理其他任务
+4. 目标会话在后台 headless 执行（`permissionModeOverride: "bypassPermissions"`）
+5. 目标完成 → `onComplete` 回调触发
+6. 回调内调用 `runAgentHeadless(源会话, "[系统通知] 目标已完成")`
+7. 源 Agent 收到通知消息 → 处理 → 告知用户
+
+**关键技术点**：源会话 ID 通过 MCP Server 创建时的闭包捕获（`createSessionMcpServer(sdk, z, sourceSessionId)`），无需额外的 IPC 通道。
+
+### 12.4 多会话并行调度模型
+
+源会话作为"调度中心"，异步分派任务给多个目标会话：
+
+```
+源 Agent
+  ├─ send_message(A, notify) → 立即返回
+  ├─ send_message(B, notify) → 立即返回
+  ├─ send_message(C, notify) → 立即返回
+  └─ 回复用户: "三个任务已启动"
+源会话空闲
+  │
+  ├─ B 完成 → 回调通知源 → Agent 处理
+  ├─ A 完成 → 回调通知源 → Agent 处理
+  └─ C 完成 → 回调通知源 → Agent 处理
+```
+
+**限制与注意事项**：
+- 源会话正在处理用户消息时，通知消息会排队等待当前轮结束
+- 大量并发目标会话时注意 API 配额消耗（每个目标会话一个 Agent 进程）
+- `runAgentHeadless` 有并发守卫，同一会话同时只能有一个 run
+
+### 12.5 完整补丁清单
+
+| 补丁 | 位置 | sed 操作 | 功能 |
+|---|---|---|---|
+| 补丁 1 | `agent-model-routing` | 字符串替换 | `deepseek-v4-flash` → `deepseek-v4-pro` |
+| 补丁 2 | `index.ts` ×4 | 正则替换 | `PROMA_DEV=1` 触发 userData 隔离 |
+| 补丁 3 | `tray.ts` | 字符串替换 | 托盘图标 → `proma-white.png` |
+| 补丁 4 | `package.json` | 字符串替换 | 版本号 0.12.1 → 0.12.23（防升级提示） |
+| 补丁 A | `sendMessage()` | 在 `const dynamicCtx` 前插入 | MCP 钩子：检查 `global.__proma_getMcpServers__` |
+| 补丁 B | `init_index()` 后 | 替换该行 | API 桥接 + `require` 插件 |
+| 补丁 C | `sendMessage()` | 替换该行 | `metadata.modelId` 优先于 UI 传入的 modelId |
+
+### 12.6 模型指定策略
+
+**问题**：MCP `create_session` 将 modelId 存入 `AgentSessionMeta`，但 UI 渲染器不读这个字段。用户打开会话时，UI 显示的是全局默认模型。
+
+**解决方案（补丁 C）**：在 `sendMessage()` 的模型解析处插入元数据优先逻辑：
+
+```javascript
+// 原代码
+let resolvedModel = modelId || DEFAULT_MODEL_ID;
+
+// 补丁后
+const __sessionMeta = getAgentSessionMeta(sessionId);
+let resolvedModel = __sessionMeta?.modelId || modelId || DEFAULT_MODEL_ID;
+```
+
+**效果**：无论 UI 显示什么模型名，实际 API 调用使用元数据中存储的模型。UI 模型选择器可能显示旧值，但功能正确。
+
+### 12.7 部署文件结构
+
+```
+D:\Proma-dev\resources\app\dist\
+├── main.cjs                    # 商业版 0.12.23 + 7 个 sed 补丁
+├── proma-dev-patches.cjs       # 插件文件（~350 行，含 6 个 MCP 工具）
+└── renderer/                   # 保持商业版原版不动
+    └── assets/
+        └── index-DHbUm1xm.js
+```
+
+### 12.8 后续方向
+
+- **模型 UI 同步**：修正渲染器 `AgentSessionMeta.modelId` 读取，消除 UI 与实际不一致
+- **多模型协作链**：A 完成 → 通知 B 继续 → B 完成 → 通知 C
+- **会话模板**：`create_session` 支持从模板复制上下文
+- **成果聚合**：源会话定期检查目标会话输出，自动汇总
+- **会话池管理**：预创建一批不同模型的会话，按需分配任务
