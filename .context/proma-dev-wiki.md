@@ -8,13 +8,19 @@
 
 在日常使用 Proma 正式版的同时，维护一个独立的**开发版**用于代码修改和功能验证。两个版本可同时运行，用户数据完全隔离。
 
-| | 正式版 | 开发版 |
-|---|---|---|
-| **路径** | `D:\Proma\` | `D:\Proma-dev\` |
-| **启动方式** | 正常双击 | 双击 `start-dev.bat` |
-| **用户数据** | `~/.proma/` | `~/.proma-dev/` |
-| **Electron userData** | `%APPDATA%/@proma/electron/` | `%APPDATA%/@proma/electron-dev/` |
-| **代码加载** | `app.asar`（打包） | `app/` 目录（解包，方便热替换） |
+### 三版架构
+
+| | 正式版 | Dev发行版 | 调试版 |
+|---|---|---|---|
+| **路径** | `D:\Proma\` | `D:\Proma-release\` | `D:\Proma-dev\` |
+| **用途** | 官方原版 | 日常使用（补丁版） | 开发调试 |
+| **启动方式** | 正常双击 | `start-release.bat` | `start-dev.bat` |
+| **用户数据** | `~/.proma/` | `~/.proma/`（共享） | `~/.proma-dev/`（独立） |
+| **PROMA_DEV** | - | - | `=1` |
+| **双开** | - | ❌（与正式版互斥） | ✅（可同时） |
+| **代码加载** | `app.asar`（原版） | `app.asar`（补丁） | `app/` 目录（解包） |
+| **图标** | 黑色 | 渐变色（proma-gradient） | 白色 |
+| **Electron userData** | `@proma/electron/` | `@proma/electron/`（共享） | `@proma/electron-dev/`
 
 ---
 
@@ -247,5 +253,6 @@ ren D:\Proma\Proma-white.exe Proma.exe
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-15 | v0.3 | 新增 Dev发行版（D:\Proma-release\）；渐变色图标；三版架构确立 |
 | 2026-06-15 | v0.2 | 开发版更换白色应用图标（proma-white）；EXE 嵌入方法（png-to-ico + rcedit） |
 | 2026-06-15 | v0.1 | 初始创建开发版；应用补丁1（deepseek-v4-pro）和补丁2（PROMA_DEV userData隔离）；双开支持 |
