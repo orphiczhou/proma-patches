@@ -4,9 +4,25 @@
 
 ---
 
-## 一、概述
+## 一、核心概念：源码 ≠ 运行版本
 
-在日常使用 Proma 正式版的同时，维护一个独立的**开发版**用于代码修改和功能验证。两个版本可同时运行，用户数据完全隔离。
+**重要区分：**
+
+| | 源码仓库 | 运行版本 |
+|---|---|---|
+| **位置** | `proma-source/` | `D:\Proma\`、`D:\Proma-dev\`、`D:\Proma-release\` |
+| **来源** | GitHub `ErlichLiu/Proma` | 商业版安装包 |
+| **版本** | v0.12.23（开源） | v0.12.1（商业，含闭源模块） |
+| **用途** | 学习架构、理解代码逻辑 | 实际运行和调试 |
+| **修改方式** | `git` 管理 TypeScript 改动 | `sed` 在编译后的 `main.cjs` 上打补丁 |
+
+**关键事实：dev 版和 release 版不是从源码构建的，而是从商业正式版 `D:\Proma\` 拷贝 → 解包 → sed 打补丁生成的。** 源码仓库仅用于理解代码，修改记录在 Git 中，但实际部署走的是 sed 补丁流程。
+
+---
+
+## 二、概述
+
+在日常使用 Proma 正式版的同时，维护**调试版**（开发用）和**发行版**（日常用补丁版）。三版分工明确，用户数据按需共享或隔离。
 
 ### 三版架构
 
@@ -221,7 +237,49 @@ D:\
 
 ---
 
-## 七、已知问题
+## 七、正式版升级后的影响分析
+
+### dev 版和 release 版会不会失效？
+
+**不会直接失效，但需要注意版本漂移问题。**
+
+正式版（`D:\Proma\`）由 electron-updater 自动升级，升级时会替换：
+- `Proma.exe`
+- `resources/app.asar`
+- `resources/app.asar.unpacked/`
+
+我们的 dev 版和 release 版是**独立副本**，不会被自动升级触碰，所以：
+
+| 场景 | dev 版 | release 版 |
+|---|---|---|
+| **正式版升级后能否运行** | ✅ 能（独立副本） | ✅ 能（独立副本） |
+| **版本漂移** | 停在 v0.12.1，正式版变新 | 停在 v0.12.1，正式版变新 |
+| **数据兼容性** | 无影响（`~/.proma-dev/` 独立） | ⚠️ 风险：如果新版改了数据格式，旧版 release 读写 `~/.proma/` 可能出错 |
+| **cloud-auth token** | 独立，不影响 | 共享 `~/.proma/`，正式版刷新后 token 变化，release 版需重新同步 |
+
+### 升级后的操作步骤
+
+当正式版自动升级到新版本后：
+
+```bash
+# 1. 从新正式版提取最新 main.cjs
+npx asar extract D:\Proma\resources\app.asar /tmp/new-app
+
+# 2. 对最新 main.cjs 重新打补丁
+sed -i 's/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-flash"/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-pro"/g' /tmp/new-app/dist/main.cjs
+sed -i 's/"iconTemplate\.png"/"proma-gradient.png"/g' /tmp/new-app/dist/main.cjs
+
+# 3. 重新打包到 release 版
+npx asar pack /tmp/new-app D:\Proma-release\resources\app.asar
+
+# 4. （如需要）同步 dev 版：解包 + 打补丁 + 放回 app/ 目录
+```
+
+**原则：每次正式版升级后，重新从最新版提取 main.cjs 打补丁，不跨版本复用旧的 main.cjs。**
+
+---
+
+## 九、已知问题
 
 1. **cloud-auth token 共享冲突：** 两个版本共用同一套 token，一方刷新后另一方会失效。临时方案：重新同步 `cloud-auth.json`。长期方案：dev 版独立登录 Google OAuth。
 
@@ -249,10 +307,11 @@ ren D:\Proma\Proma-white.exe Proma.exe
 
 ---
 
-## 八、版本记录
+## 十、版本记录
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-15 | v0.4 | 源码从 v0.10.28 rebase 到 v0.12.23；新增源码备份；明确"源码≠运行版本"关系 |
 | 2026-06-15 | v0.3 | 新增 Dev发行版（D:\Proma-release\）；渐变色图标；三版架构确立 |
-| 2026-06-15 | v0.2 | 开发版更换白色应用图标（proma-white）；EXE 嵌入方法（png-to-ico + rcedit） |
+| 2026-06-15 | v0.2 | 开发版更换白色应用图标（proma-white）；托盘图标修复 |
 | 2026-06-15 | v0.1 | 初始创建开发版；应用补丁1（deepseek-v4-pro）和补丁2（PROMA_DEV userData隔离）；双开支持 |
