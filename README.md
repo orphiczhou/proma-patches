@@ -1,7 +1,6 @@
 # Proma 定制补丁集
 
 > 基于 Proma 商业版 v0.12.23，通过 sed 补丁 + 插件文件增强 Agent 能力。
-> 适用于 **Proma 0.12.x 系列**，其他版本需验证注入点。
 > **给人看也给 Agent 看 — Agent 读完后能交互式帮用户安装。**
 
 ---
@@ -20,36 +19,37 @@
 
 | 模块 | 适用场景 | 与正式版关系 | 需重新登录？ |
 |---|---|---|---|
-| **A. 双开开发版** | 开发调试，两者同时用 | 隔离，`~/.proma-dev/` 独立 | ✅ 需同步登录态 |
-| **B. Release 并行版** | 日常替代使用，不双开 | 共享 `~/.proma/`，互斥运行 | ❌ 不需要 |
-| **C. 直接改正式版** | 不想维护多份副本 | 直接修改原版 | ❌ 不需要（不推荐） |
+| **A. 双开开发版** | 开发调试，两者同时用 | 隔离，`~/.proma-dev/` 独立 | 需同步登录态 |
+| **B. Release 并行版** | 日常替代使用 | 共享 `~/.proma/`，互斥运行 | 不需要 |
+| **C. 直接改正式版** | 不想维护多份副本 | 直接修改原版 | 不需要（不推荐） |
 
-> **推荐：** 日常用选 B，开发调试选 A。
+> 推荐：日常用选 B，开发调试选 A。
 
-### 第三步：让用户选增强模块（可选）
+### 第三步：让用户选增强模块
 
 | 模块 | 功能 | 
 |---|---|
 | **1. DeepSeek 子Agent 升级** | 子Agent `flash` → `pro` |
 | **2. 会话管理 MCP 工具** | 10 个 session 工具（创建/查询/Fork/发消息/上下文） |
-| **3. 频道+模型元数据覆盖** | MCP 创建的会话后端自动走正确模型 |
+| **3. 频道+模型元数据覆盖** | MCP 创建会话后端自动走正确模型 |
 | **4. UI 模型同步** | 模型选择器自动显示正确模型名 |
 | **5. 外部 MCP 服务** | 跨实例调用（任何 MCP 客户端可操控 Proma 会话） |
 | **6. Windows 托盘图标** | 替换为白色图标 |
 
-**推荐组合：**
+推荐组合：
 - 只想强子Agent → 1
 - Agent 管理多会话 → 2+3+4
 - 外部操控 Proma → 2+3+5
-- 全都要 → B+2+3+4+5+6（1 已含）
+- 全都要 → 2+3+4+5（1 已含）
 
 ### 第四步：执行安装
 
-按所选模块逐一执行（见下方详细步骤）。
+方式一：运行 `bash apply-patches.sh` 一键安装。
+方式二：按所选模块手动执行下方命令。
 
 ### 第五步：验证
 
-安装完成后告知验证方法。
+安装后验证：双击 `start-dev.bat` 启动 → 开 Agent 会话 → 说"用 list_channels 列出可用渠道"。
 
 ---
 
@@ -62,99 +62,49 @@ cp /tmp/proma-app/dist/main.cjs /tmp/main-patched.cjs
 
 ---
 
-## 模块 A：双开开发版（D:\Proma-dev）
+## 模块 A：双开开发版
 
-独立数据目录，可与正式版同时运行。基于商业版拷贝。
+独立数据目录（`~/.proma-dev/`），可与正式版同时运行。
 
 ```bash
-# === 1. 复制正式版 ===
+# 1. 复制正式版
 cp -r D:/Proma D:/Proma-dev
 
-# === 2. 解包 ASAR ===
+# 2. 解包 ASAR
 cd D:/Proma-dev/resources
 npx asar extract app.asar app
 mv app.asar app.asar.disabled
 
-# === 3. 合并原生模块（关键！ASAR 解包后缺少） ===
+# 3. 合并原生模块
 cp -r app.asar.unpacked/node_modules/* app/node_modules/
 
-# === 4. 创建启动脚本 ===
+# 4. 创建启动脚本
 cat > D:/Proma-dev/start-dev.bat << 'BAT'
 @echo off
 set PROMA_DEV=1
 start "" "D:\Proma-dev\Proma-white.exe"
 BAT
 
-# === 5a. 同步认证配置 ===
+# 5. 同步认证数据
 cp ~/.proma/cloud-auth.json ~/.proma-dev/
 cp ~/.proma/channels.json ~/.proma-dev/
 cp ~/.proma/user-profile.json ~/.proma-dev/
-
-# === 5b. 同步 Electron 会话数据（关键！跳过需重新登录 Google OAuth） ===
-# 正式版运行时 Session Storage/LOCK 被锁，需先关正式版再执行：
-cp -r "$APPDATA/@proma/electron/Network" "$APPDATA/@proma/electron-dev/"
-cp -r "$APPDATA/@proma/electron/Session Storage" "$APPDATA/@proma/electron-dev/"
-cp -r "$APPDATA/@proma/electron/Local Storage" "$APPDATA/@proma/electron-dev/"
-
-# === 6. PROMA_DEV 隔离补丁 ===
-sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged) {/if (!\1.app.isPackaged || process.env.PROMA_DEV === "1") {/g' /tmp/main-patched.cjs
-
-# === 7. 对齐版本号（防升级提示） ===
-sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app/package.json
 ```
-
-> **注意：** 5b 步必须先关正式版再执行。如果 LOCK 文件被锁，重启电脑后执行，或单独登录 dev 版 Google OAuth。
 
 ---
 
-## 模块 B：Release 并行版（D:\Proma-release）
+## 模块 B：Release 并行版
 
-**共享正式版数据**（`~/.proma/`），不需要重新登录。与正式版互斥运行（关一个开另一个）。
+共享正式版数据（`~/.proma/`），无需重新登录。与正式版互斥。
 
 ```bash
-# === 1. 复制正式版 ===
 cp -r D:/Proma D:/Proma-release
-
-# === 2. 提取 main.cjs（asar 不解包） ===
 npx asar extract D:/Proma-release/resources/app.asar /tmp/release-app
 cp /tmp/release-app/dist/main.cjs /tmp/main-patched.cjs
-
-# === 3. 打补丁（在 /tmp/main-patched.cjs 上打全部需要的补丁） ===
-# 注意：不需要 PROMA_DEV 补丁（共享数据无需隔离）
-
-# === 4. 替换 asar 中的 main.cjs ===
+# ... 在 /tmp/main-patched.cjs 上打补丁 ...
 cp /tmp/main-patched.cjs /tmp/release-app/dist/main.cjs
-cd /tmp/release-app
-npx asar pack . D:/Proma-release/resources/app.asar
-
-# === 5. 创建启动脚本 ===
-cat > D:/Proma-release/start-release.bat << 'BAT'
-@echo off
-start "" "D:\Proma-release\Proma.exe"
-BAT
-
-# === 6. 对齐版本号 ===
-# 提取 package.json → 改版本 → 重新打包到 asar
-sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-release/resources/app.asar
+cd /tmp/release-app && npx asar pack . D:/Proma-release/resources/app.asar
 ```
-
-> **优势：** 共享 `~/.proma/` 和 `@proma/electron/`，所有登录态、渠道配置、会话历史与正式版完全一致。**关闭正式版 → 双击 start-release.bat → 无缝切换。**
-
----
-
-## 模块 C：直接改正式版（不推荐）
-
-```bash
-# 备份
-cp D:/Proma/resources/app.asar D:/Proma/resources/app.asar.bak
-
-# 提取 → 打补丁 → 打包回
-npx asar extract D:/Proma/resources/app.asar /tmp/direct-app
-# ... 在 /tmp/direct-app/dist/main.cjs 上打补丁 ...
-npx asar pack /tmp/direct-app D:/Proma/resources/app.asar
-```
-
-> **风险：** 正式版自动升级会覆盖补丁，每次升级需重新操作。
 
 ---
 
@@ -175,38 +125,60 @@ sed -i 's|          const dynamicCtx = buildDynamicContext({|if(typeof global.__
 
 #### 补丁 B — API 桥接 + 加载插件
 ```bash
-sed -i 's|^init_index();$|init_index();\nglobal.__proma__={createAgentSession,forkAgentSession,listAgentSessions,getAgentSessionMeta,updateAgentSessionMeta,deleteAgentSession,listChannels,getChannelById,getAgentWorkspace,getAgentSessionSDKMessages,runAgentHeadless,listAgentWorkspaces};\ntry{require("./proma-dev-patches.cjs");}catch(e){console.error("[Plugin] load failed:",e);}|' /tmp/main-patched.cjs
+sed -i 's|^init_index();$|init_index();\nglobal.__proma__={createAgentSession,forkAgentSession,listAgentSessions,getAgentSessionMeta,updateAgentSessionMeta,deleteAgentSession,listChannels,getChannelById,getAgentWorkspace,listAgentWorkspaces,getAgentSessionSDKMessages,runAgentHeadless};\ntry{require("./proma-dev-patches.cjs");}catch(e){console.error("[Plugin] load failed:",e);}|' /tmp/main-patched.cjs
 ```
 
 #### 部署插件文件
-从本仓库下载 `proma-dev-patches.cjs`，放到 `[安装目录]/resources/app/dist/proma-dev-patches.cjs`
+
+将仓库中的 `proma-dev-patches.cjs` 放到 `[安装目录]/resources/app/dist/proma-dev-patches.cjs`
+
+**10 个工具：**
+| 工具 | 功能 |
+|---|---|
+| `get_my_session_id` | Agent 获取自己的会话 ID |
+| `list_channels` | 列出所有 AI 渠道及模型 |
+| `list_workspaces` | 列出所有工作区 |
+| `list_sessions` | 列出会话（支持工作区过滤） |
+| `get_session_info` | 查询会话详情 |
+| `get_session_context` | Token 用量/上下文窗口 |
+| `list_messages` | 消息历史（UUID/角色/文本/分页） |
+| `create_session` | 创建新会话 |
+| `fork_session` | Fork 会话（支持精确 UUID 截断） |
+| `send_message` | 向会话发消息（返回 Agent 输出） |
 
 ### 模块 3：频道+模型元数据覆盖
 
 ```bash
+# C1: 频道查询优先用元数据
 sed -i 's@const channel = getChannelById(channelId);@const __effChannelId = getAgentSessionMeta(sessionId)?.channelId || channelId;\n        const channel = getChannelById(__effChannelId);@' /tmp/main-patched.cjs
-sed -i '405686,405695{s@apiKey = decryptApiKey(channelId);@apiKey = decryptApiKey(__effChannelId);@}' /tmp/main-patched.cjs
-sed -i '405150,406160{s@this.autoGenerateTitle(sessionId, userMessage, channelId,@this.autoGenerateTitle(sessionId, userMessage, __effChannelId,@}' /tmp/main-patched.cjs
+
+# C2: API Key 解密用覆盖后的 channelId（行号可能漂移，失败不中断）
+sed -i '405686,405695{s@apiKey = decryptApiKey(channelId);@apiKey = decryptApiKey(__effChannelId);@}' /tmp/main-patched.cjs 2>/dev/null || true
+
+# C3: 标题生成用覆盖后的 channelId
+sed -i '405150,406160{s@this.autoGenerateTitle(sessionId, userMessage, channelId,@this.autoGenerateTitle(sessionId, userMessage, __effChannelId,@}' /tmp/main-patched.cjs 2>/dev/null || true
+
+# C4: modelId 优先用元数据
 sed -i 's@let resolvedModel = modelId || DEFAULT_MODEL_ID;@let resolvedModel = getAgentSessionMeta(sessionId)?.modelId || modelId || DEFAULT_MODEL_ID;@' /tmp/main-patched.cjs
+
+# C5: SDK 查询用 resolvedModel
 sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' /tmp/main-patched.cjs
 ```
 
-> C2/C3 行范围可能随版本微调。若失败，搜索 `decryptApiKey(channelId)` 和 `autoGenerateTitle(sessionId` 定位实际行号。
-
-### 模块 4：UI 模型同步
+### 模块 4：UI 模型同步（Renderer 补丁）
 
 ```bash
-npx asar extract D:/Proma/resources/app.asar /tmp/app
-cp -r /tmp/app/dist/renderer/* [安装目录]/resources/app/dist/renderer/
-sed -i 's/if(qe.has(e))return qe;//g' [安装目录]/resources/app/dist/renderer/assets/index-*.js
+# 同步 renderer 文件
+cp -r /tmp/app/dist/renderer/* D:/Proma-dev/resources/app/dist/renderer/
+# 移除 hydration 幂等守卫
+sed -i 's/if(qe.has(e))return qe;//g' D:/Proma-dev/resources/app/dist/renderer/assets/index-*.js
 ```
 
-### 模块 5：外部 MCP 服务（跨实例）
+### 模块 5：外部 MCP 服务
 
-插件内置 HTTP bridge（Proma 启动时自动在 127.0.0.1:19876-19895 启动）。
+将 `proma-mcp-server.cjs` 放到 `[安装目录]/resources/app/dist/`。插件会自动启动 localhost HTTP bridge（端口 19876-19895 自动选择，写入 `~/.proma-dev/mcp-bridge-port.json`）。
 
-配合 `proma-mcp-server.cjs`（从本仓库下载），在 Claude Code 中配置：
-
+Claude Code 配置（`.claude/mcp.json`）：
 ```json
 {
   "mcpServers": {
@@ -218,65 +190,77 @@ sed -i 's/if(qe.has(e))return qe;//g' [安装目录]/resources/app/dist/renderer
 }
 ```
 
-### 模块 6：Windows 托盘/任务栏图标
+### 模块 6：托盘图标替换
 
-#### 6a. 托盘图标（运行时显示）
 ```bash
 sed -i 's/"iconTemplate.png"/"proma-white.png"/g' /tmp/main-patched.cjs
 ```
-
-#### 6b. 任务栏图标（Proma-white.exe）
-Windows 任务栏图标嵌入在 EXE 资源中，需替换：
-
-```bash
-# 1. 安装工具（首次）
-npm install -g png-to-ico rcedit
-
-# 2. PNG → ICO
-png-to-ico D:/Proma-dev/resources/proma-logos/proma-white.png > /tmp/proma-white.ico
-
-# 3. 嵌入 EXE（关掉 Proma-dev 后执行）
-cp D:/Proma-dev/Proma.exe D:/Proma-dev/Proma-white.exe
-rcedit D:/Proma-dev/Proma-white.exe --set-icon /tmp/proma-white.ico
-
-# 4. start-dev.bat 指向 Proma-white.exe
-```
-
-> **注意：** EXE 运行时被锁，需先关进程再改。改完用新文件名 `Proma-white.exe`，保留原 `Proma.exe` 不动。
 
 ---
 
 ## 最终部署
 
-### 开发版（模块 A）
 ```bash
+# Dev 版
+mkdir -p D:/Proma-dev/resources/app/dist
 cp /tmp/main-patched.cjs D:/Proma-dev/resources/app/dist/main.cjs
-cp proma-dev-patches.cjs D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs
-cp proma-mcp-server.cjs D:/Proma-dev/resources/app/dist/proma-mcp-server.cjs
-# 启动: 双击 D:\Proma-dev\start-dev.bat
-```
+cp proma-dev-patches.cjs D:/Proma-dev/resources/app/dist/
+cp proma-mcp-server.cjs D:/Proma-dev/resources/app/dist/
 
-### Release 版（模块 B）
-```bash
-# main.cjs 已在打包 asar 时放入
-# 启动: 双击 D:\Proma-release\start-release.bat
+# 对齐版本号
+sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app/package.json
 ```
 
 ---
 
-## 补丁速查
+## 补丁速查表
 
-| 补丁 | 作用 | 适用 A/B |
+| 补丁 | 功能 | 适用 |
 |---|---|---|
-| PROMA_DEV | userData 隔离 | 仅 A |
+| A | MCP 钩子 | A/B |
+| B | API 桥接 + 插件加载 | A/B |
+| C1-5 | 频道+模型覆盖 | A/B |
+| D+E | Renderer 同步 | A/B |
 | 1 | DeepSeek 子Agent v4-pro | 通用 |
-| A+B | MCP 钩子+API 桥接 | 通用 |
-| C1-5 | 频道+模型覆盖 | 通用 |
-| D+E | Renderer 同步+幂等守卫 | 通用 |
-| 6 | 托盘+任务栏图标 | 通用 |
-| 版本号 | package.json 对齐 | 通用 |
+| 2 | PROMA_DEV 隔离 | 仅 A |
+| 3 | 托盘图标 | 通用 |
+| V | 版本号对齐 | 通用 |
 
 ---
+
+## 使用示例
+
+安装后，Agent 可执行：
+
+```
+Agent（在你的 Proma 会话中）:
+  ├─ list_channels → 看有哪些模型可用
+  ├─ list_workspaces → 看有哪些工作区
+  ├─ create_session → 开开发会话用便宜模型
+  ├─ send_message → 给开发会话发任务
+  ├─ get_session_context → 监控 token 用量
+  ├─ list_messages → 查对话历史 + 获取 UUID
+  ├─ fork_session(uuid) → 从某轮截断重试
+  └─ 汇总所有产出
+```
+
+## 验证结果
+
+- ✅ 10 个 MCP 工具全部可用
+- ✅ 内部 Agent 间三层联动（老板→小弟→子小弟）
+- ✅ 多轮对话 + 任选一轮 Fork
+- ✅ 并行调度 + 轮询回收
+- ✅ 外部 stdio MCP 全部可用
+- ✅ DeepSeek / ZLM / Proma 官方 Fork 正常
+
+## 卸载
+
+```bash
+bash uninstall.sh
+# 或手动：
+rm -rf D:/Proma-dev
+rm -rf ~/.proma-dev
+```
 
 ## 许可证
 
