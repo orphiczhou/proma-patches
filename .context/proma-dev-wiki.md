@@ -370,9 +370,11 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 3. **Windows esbuild 构建：** 通过 Git Bash 会 segfault，需用 `node_modules/@esbuild/win32-x64/esbuild.exe`。
 
-4. ~~**DeepSeek 频道会话 Fork 失败：** SDK 层 bug——会话的 `sdkSessionId` 存在 Proma 元数据中，但 SDK 内部找不到对应会话数据。~~ v0.7 渲染器补丁（D+E）后已修复。
+4. **DeepSeek 频道会话 Fork 失败：** SDK 层 bug——会话的 `sdkSessionId` 存在 Proma 元数据中，但 SDK 内部找不到对应会话数据。v0.7 渲染器补丁后部分缓解，v0.11 实测仍存在（同渠道内 Fork OK，跨渠道报 `Session not found`）。根因待排查：JSONL 路径或 SDK session 索引不一致。
 
 5. **正式版升级后 renderer 版本漂移：** 补丁 D 解决，升级后需同步 renderer 文件。
+
+6. **MCP 创建的会话在 UI 中打开时 session 丢失/上下文回填（v0.11 新发现）：** 通过 `create_session` MCP 工具创建的会话，`send_message(headless)` 后可正常使用，但在 Dev 版 UI 中切换到该会话时，Render 进程可能无法正确恢复 SDK session 状态，触发"Session 已失效，切换到上下文回填模式"，重新载入上下文浪费 token。疑似 `sdkSessionId` 在 main 进程和 renderer 进程间同步不一致，或 `agent-sessions.json` 中 `sdkSessionId` 字段在 headless 运行后未正确更新。
 
 ---
 
