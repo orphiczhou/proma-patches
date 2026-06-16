@@ -2,10 +2,10 @@
 name: session-management
 description: Agent 会话管理能力。当用户需要创建/查询/Fork会话、给其他会话发消息、监控token用量、归档会话、跨工作区操作、并行调度多个Agent协作、配置外部MCP连接Proma实例、管理Dev/Release双实例时触发。触发信号：多会话、开小弟、Fork、分身、并行、批量、派任务、监控进度、上下文甜点、竹节交接、工作区切换、归档、清理会话、外部MCP、Claude Code连接Proma、Dev实例、Release实例、远端实例、双实例。
 group: proma
-version: "1.2.1"
+version: "1.2.2"
 ---
 
-# Agent 会话管理 (v1.2.1)
+# Agent 会话管理 (v1.2.2)
 
 你拥有 **11 个会话管理 MCP 工具**（`session` MCP server）。这些工具提供了完整的 Proma Agent 会话管理能力——创建、Fork、发消息、查用量、查消息历史、归档等。
 
@@ -149,6 +149,23 @@ Proma 实例 (Dev 或 Release)
 
 > 以下模式适用于**方式 B（外部工具）**。内部 Agent 请参考"内部 Agent 使用模式"章节。
 
+### 黄金规则：curl 中文编码
+
+**任何含中文的 curl JSON 请求必须用 `printf` + `--data-binary @-` 管道方式。** Windows Bash 下 `curl -d '...中文...'` 会将 UTF-8 转为 GBK 导致远端接收乱码。此规则适用于所有工具调用（`create_session` 标题、`send_message` 消息、`archive_session` 等），不限于某个步骤。
+
+```bash
+# ✅ 正确：管道方式，UTF-8 无损（所有含中文的 JSON 请求都用这个模式）
+printf '{"title":"中文标题","channel_id":"xxx","workspace_id":"yyy"}' | \
+  curl -s -X POST http://127.0.0.1:PORT/create_session \
+  -H "Content-Type: application/json" --data-binary @-
+
+# ❌ 错误：-d 参数含中文（Windows Bash 转 GBK → 远端乱码）
+curl -X POST http://127.0.0.1:PORT/create_session -d '{"title":"中文标题",...}'
+
+# ✅ 无中文的简单 JSON 仍可单行
+curl -s -X POST http://127.0.0.1:PORT/list_channels --data-binary '{}'
+```
+
 ### 模式 6：外部轮询回收
 
 外部调用者不支持 `notify=true`，用 fire-and-forget + 轮询实现并行调度：
@@ -180,25 +197,20 @@ Dev 实例（测试/调试）           Release 实例（日常使用）
 
 ### 模式 8：脚本自动化
 
-外部脚本可以顺序调用工具实现工作流自动化：
+外部脚本可顺序调用工具，严格遵守上述黄金规则：
 
 ```bash
-# 用 curl 通过 HTTP bridge 直接调用（Proma 运行时）
-curl -s -X POST http://127.0.0.1:19876/list_channels | jq .
-curl -s -X POST http://127.0.0.1:19876/list_sessions --data-binary '{"include_archived":true}' | jq .
+# 无中文请求 → --data-binary 单行即可
+curl -s -X POST http://127.0.0.1:PORT/list_channels --data-binary '{}'
+curl -s -X POST http://127.0.0.1:PORT/list_sessions --data-binary '{"include_archived":true}'
+
+# 含中文请求 → 必须 printf + 管道
+printf '{"channel_id":"xxx","model_id":"deepseek-v4-flash","title":"中文标题","workspace_id":"yyy"}' | \
+  curl -s -X POST http://127.0.0.1:PORT/create_session -H "Content-Type: application/json" --data-binary @-
+
+printf '{"session_id":"xxx","message":"你好世界请回复OK","wait":true}' | \
+  curl -s -X POST http://127.0.0.1:PORT/send_message -H "Content-Type: application/json" --data-binary @- --max-time 120
 ```
-
-**重要：curl 中文编码** — Windows Bash 下 `curl -d '...中文...'` 会将中文转 GBK 导致乱码。含中文内容的 JSON 必须用 `printf` + `--data-binary @-` 方式：
-
-```bash
-# ✅ 正确：管道方式，UTF-8 无损
-printf '{"message":"你好世界","session_id":"xxx","wait":true}' | curl -s -X POST http://127.0.0.1:19876/send_message -H "Content-Type: application/json" --data-binary @- --max-time 120
-
-# ❌ 错误：-d 参数含中文会被 Windows Bash 转码
-curl -X POST http://127.0.0.1:19876/send_message -d '{"message":"你好世界",...}'
-```
-
-非中文内容的简单 JSON 仍可用 `-d` / `--data-binary '...'` 单行写法。
 
 端口号从 `GET /get_instance_info` 获取，或查看 Proma 控制台日志 `External MCP HTTP bridge: http://127.0.0.1:XXXXX`。
 
