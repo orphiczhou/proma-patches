@@ -1,4 +1,4 @@
-# Proma 定制补丁集
+# Proma 定制补丁集 (v0.12)
 
 > 基于 Proma 商业版 v0.12.23，通过 sed 补丁 + 插件文件增强 Agent 能力。
 > **给人看也给 Agent 看 — Agent 读完后能交互式帮用户安装。**
@@ -30,13 +30,14 @@
 | 模块 | 功能 | 
 |---|---|
 | **1. DeepSeek 子Agent 升级** | 子Agent `flash` → `pro` |
-| **2. 会话管理 MCP 工具** | 10 个 session 工具（创建/查询/Fork/发消息/上下文） |
+| **2. 会话管理 MCP 工具** | 11 个 session 工具（创建/查询/Fork/发消息/归档/上下文） |
 | **3. 频道+模型元数据覆盖** | MCP 创建会话后端自动走正确模型 |
 | **4. UI 模型同步** | 模型选择器自动显示正确模型名 |
 | **5. 外部 MCP 服务** | 跨实例调用（任何 MCP 客户端可操控 Proma 会话） |
 | **6. Windows 托盘图标** | 替换为白色图标 |
+| **7. 跨渠道防护 (v0.12)** | 跨渠道切换模型不触发 "Session 已失效" |
 
-推荐组合：只想强子Agent→1 / Agent管理多会话→2+3+4 / 外部操控Proma→2+3+5 / 全都要→2+3+4+5（1已含）
+推荐组合：只想强子Agent→1 / Agent管理多会话→2+3+4+7 / 外部操控Proma→2+3+5+7 / 全都要→2+3+4+5+7（1已含）
 
 ### 第四步：执行安装
 
@@ -159,7 +160,7 @@ cp /tmp/release-app/dist/main.cjs /tmp/main-patched.cjs
 
 ### B2. 打补丁
 
-在 `/tmp/main-patched.cjs` 上打需要的补丁（见增强模块 1-6），**但跳过补丁 E（PROMA_DEV 隔离）**——Release 版共享数据无需隔离。
+在 `/tmp/main-patched.cjs` 上打需要的补丁（见增强模块 1-7），**但跳过补丁 E（PROMA_DEV 隔离）**——Release 版共享数据无需隔离。**补丁 F（跨渠道防护）必须打**，适用于所有版本。
 
 ```bash
 # 按增强模块顺序逐一执行 sed 命令
@@ -220,6 +221,7 @@ BAT
 | 需重新登录 | 需同步数据 | 不需要 |
 | ASAR 状态 | 解包 (app/) | 保持打包 (app.asar) |
 | 补丁 E (PROMA_DEV) | 需要 | 不需要 |
+| 补丁 F (跨渠道防护) | 需要 | 需要 |
 | 适用场景 | 开发调试 | 日常替代使用 |
 | 启动脚本 | start-dev.bat | start-release.bat |
 
@@ -233,7 +235,7 @@ BAT
 sed -i 's/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-flash"/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-pro"/g' /tmp/main-patched.cjs
 ```
 
-### 模块 2：会话管理 MCP 工具（10 个）
+### 模块 2：会话管理 MCP 工具（11 个）
 
 #### 补丁 A — MCP 钩子
 ```bash
@@ -249,7 +251,7 @@ sed -i 's|^init_index();$|init_index();\nglobal.__proma__={createAgentSession,fo
 
 将仓库中的 `proma-dev-patches.cjs` 放到 `[安装目录]/resources/app/dist/proma-dev-patches.cjs`
 
-**10 个工具：** get_my_session_id / list_channels / list_workspaces / list_sessions / get_session_info / get_session_context / list_messages / create_session / fork_session / send_message
+**11 个工具：** get_my_session_id / list_channels / list_workspaces / list_sessions / get_session_info / get_session_context / list_messages / create_session / fork_session / send_message / archive_session
 
 ### 模块 3：频道+模型元数据覆盖
 
@@ -260,6 +262,8 @@ sed -i '405150,406160{s@this.autoGenerateTitle(sessionId, userMessage, channelId
 sed -i 's@let resolvedModel = modelId || DEFAULT_MODEL_ID;@let resolvedModel = getAgentSessionMeta(sessionId)?.modelId || modelId || DEFAULT_MODEL_ID;@' /tmp/main-patched.cjs
 sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' /tmp/main-patched.cjs
 ```
+
+> **注意：** C2/C3 补丁的行号范围（405686-405695）是 v0.12.23 的值。其他版本行号可能漂移，脚本会自动跳过并通过 `|| true` 继续执行。跳过不影响核心功能。
 
 ### 模块 4：UI 模型同步
 
@@ -275,25 +279,33 @@ sed -i 's/if(qe.has(e))return qe;//g' /tmp/release-app/dist/renderer/assets/inde
 
 ### 模块 5：外部 MCP 服务
 
-将 `proma-mcp-server.cjs` 放到 `[安装目录]/resources/app/dist/`。插件自动启动 localhost HTTP bridge（端口 19876-19895 自动选择）。
+将 `proma-mcp-server.cjs` 放到 `[安装目录]/resources/app/dist/`。插件自动启动 localhost HTTP bridge（端口 19876-19895 自动选择）。MCP server 启动时自动扫描端口发现目标实例（`--dev` / `--release` 参数）。
 
 Claude Code 配置（`.claude/mcp.json`）：
 ```json
 {
   "mcpServers": {
-    "proma-session": {
+    "proma-dev-session": {
       "command": "node",
-      "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs"]
+      "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs", "--dev"]
     }
   }
 }
 ```
-Release 版将路径改为 `D:\\Proma-release\\...`
+Release 版改用 `--release` 并修正路径。
 
 ### 模块 6：托盘图标替换
 
 ```bash
 sed -i 's/"iconTemplate.png"/"proma-white.png"/g' /tmp/main-patched.cjs
+```
+
+### 模块 7：跨渠道 sdkSessionId 断裂防护（v0.12 新增）
+
+防止 UI 中跨渠道切换模型时 SDK 报告 "Session 已失效"。检测到 renderer 渠道与元数据不一致时自动清除 `sdkSessionId` 走上下文回填。
+
+```bash
+sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId\&\&sessionMeta?.channelId\&\&channelId!==sessionMeta.channelId){existingSdkSessionId=void 0;}@' /tmp/main-patched.cjs
 ```
 
 ---
@@ -308,6 +320,7 @@ sed -i 's/"iconTemplate.png"/"proma-white.png"/g' /tmp/main-patched.cjs
 | D+E | Renderer 同步 + 守卫移除 | ✅ | ✅ |
 | 1 | DeepSeek 子Agent → V4 Pro | ✅ | ✅ |
 | E (PROMA_DEV) | userData 隔离 | ✅ | ❌ 不需要 |
+| F (v0.12) | 跨渠道 sdkSessionId 防护 | ✅ | ✅ |
 | 3 | 托盘图标白色 | ✅ | ✅ |
 | V | 版本号对齐 | ✅ | ✅ |
 
