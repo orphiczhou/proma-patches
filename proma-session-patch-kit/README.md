@@ -133,6 +133,90 @@ ls "$APPDATA/@proma/electron-dev/Local Storage" >/dev/null 2>&1 && echo "  ✅ L
 
 ---
 
+---
+
+## 四-B、备选方案：Release 并行版（共享数据，免重新登录）
+
+如果你不想维护两套独立数据，可以用 Release 并行版。它**共享正式版的 `~/.proma/` 和 Electron session 数据**，不需要重新登录。与正式版互斥运行（关一个开另一个）。
+
+### 步骤 R1：复制 + 提取
+
+```bash
+# 复制正式版
+cp -r D:/Proma D:/Proma-release
+
+# 提取 main.cjs（不需解包整个 ASAR）
+npx asar extract D:/Proma-release/resources/app.asar /tmp/release-app
+cp /tmp/release-app/dist/main.cjs /tmp/main-patched.cjs
+```
+
+### 步骤 R2：打补丁
+
+在 `/tmp/main-patched.cjs` 上打所有需要的补丁（见 §五），**跳过补丁 E（PROMA_DEV 隔离）**——Release 版共享数据无需隔离。
+
+```bash
+# 打补丁 A（MCP 钩子）、B（API 桥接）、C（元数据覆盖）、D（子Agent升级）
+# 在 /tmp/main-patched.cjs 上执行 §五 中的对应 sed 命令
+# 注意：不打补丁 E！
+```
+
+### 步骤 R3：替换 asar 中的 main.cjs 并重新打包
+
+```bash
+# 替换
+cp /tmp/main-patched.cjs /tmp/release-app/dist/main.cjs
+
+# 重新打包 asar
+cd /tmp/release-app
+npx asar pack . D:/Proma-release/resources/app.asar
+
+# 验证 asar 已更新
+ls -la D:/Proma-release/resources/app.asar
+echo "检查时间戳应显示刚刚"
+```
+
+### 步骤 R4：部署插件文件
+
+Release 版 ASAR 不解包，插件文件需放在 asar 外部。Proma 的 `require()` 会先查 asar 再查文件系统。
+
+```bash
+# 插件文件放在 asar 同级目录的 dist/ 下
+mkdir -p D:/Proma-release/resources/app/dist
+cp proma-dev-patches.cjs D:/Proma-release/resources/app/dist/
+cp proma-mcp-server.cjs D:/Proma-release/resources/app/dist/
+```
+
+**注意：** Release 版的 `require("./proma-dev-patches.cjs")` 路径需要对应。如果 asar 内 `main.cjs` 在 `dist/` 目录，`require("./proma-dev-patches.cjs")` 会先在 asar 内查找，找不到再查文件系统。确保两个文件在同一相对路径。
+
+### 步骤 R5：创建启动脚本
+
+```bash
+cat > D:/Proma-release/start-release.bat << 'BAT'
+@echo off
+start "" "D:\Proma-release\Proma.exe"
+BAT
+```
+
+### 步骤 R6：对齐版本号
+
+```bash
+# Release 版的 package.json 在 asar 内，需要重新打包
+# 如果之前已经打过版本号补丁，这一步已在 R3 中完成
+```
+
+### Release 版 vs Dev 版对比
+
+| | Dev 版 | Release 版 |
+|---|---|---|
+| 数据目录 | `~/.proma-dev/` 独立 | `~/.proma/` 共享 |
+| 与正式版双开 | ✅ 可以 | ❌ 互斥 |
+| 需重新登录 | 需同步数据 | 不需要 |
+| ASAR | 解包 | 保持打包 |
+| 适用场景 | 开发调试 | 日常替代使用 |
+| 补丁 E | 需要 | 不需要 |
+
+---
+
 ## 五、步骤 2：打 sed 补丁
 
 从正式版提取最新 `main.cjs`：
