@@ -169,7 +169,17 @@ sed -i 's|          const dynamicCtx = buildDynamicContext({|if(typeof global.__
 sed -i 's|^init_index();$|init_index();\nglobal.__proma__={createAgentSession,forkAgentSession,listAgentSessions,getAgentSessionMeta,updateAgentSessionMeta,deleteAgentSession,listChannels,getChannelById,getAgentWorkspace};\ntry{require("./proma-dev-patches.cjs");}catch(e){console.error("[Plugin] load failed:",e);}|' main.cjs
 ```
 
-**效果：** 导出主进程 API 到 `global.__proma__`，加载插件文件。
+**效果：** 导出主进程 API 到 `global.__proma__`（11 个函数），加载插件文件。
+
+#### 补丁 B2：runAgentHeadless 桥接（v0.9 新增）
+
+`send_message` 工具通过 `runAgentHeadless` 实现目标会话的 headless 执行，但补丁 B 最初未将其加入 API 桥接，导致外部 MCP 调用 `send_message` 时报 `runAgentHeadless is not a function`。
+
+```bash
+sed -i 's/getAgentSessionSDKMessages};/getAgentSessionSDKMessages,runAgentHeadless};/' main.cjs
+```
+
+**效果：** 补丁 B 导出的函数从 10 个扩展到 11 个。
 
 #### 补丁 C：频道 + 模型元数据覆盖
 
