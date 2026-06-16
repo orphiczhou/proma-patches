@@ -34,7 +34,7 @@
 | **3. 频道+模型元数据覆盖** | MCP 创建会话后端自动走正确模型 |
 | **4. UI 模型同步** | 模型选择器自动显示正确模型名 |
 | **5. 外部 MCP 服务** | 跨实例调用（任何 MCP 客户端可操控 Proma 会话） |
-| **6. Windows 托盘图标** | 替换为白色图标 |
+| **6. EXE + 托盘图标** | 自定义颜色图标（png-to-ico + rcedit） |
 | **7. 跨渠道防护 (v0.12)** | 跨渠道切换模型不触发 "Session 已失效" |
 
 推荐组合：只想强子Agent→1 / Agent管理多会话→2+3+4+7 / 外部操控Proma→2+3+5+7 / 全都要→2+3+4+5+7（1已含）
@@ -294,10 +294,30 @@ Claude Code 配置（`.claude/mcp.json`）：
 ```
 Release 版改用 `--release` 并修正路径。
 
-### 模块 6：托盘图标替换
+### 模块 6：EXE + 托盘图标改色
 
+Proma 安装目录 `resources/proma-logos/` 下有 16 种预置颜色（`proma-coral.png`, `proma-blue.png`, `proma-emerald.png`, `proma-purple.png`, `proma-gradient.png` 等），可直接选用。
+
+**前置：** `npm install -g png-to-ico rcedit`
+
+**托盘图标**（sed 补丁）：
 ```bash
-sed -i 's/"iconTemplate.png"/"proma-white.png"/g' /tmp/main-patched.cjs
+sed -i 's/"iconTemplate.png"/"proma-color.png"/g' /tmp/main-patched.cjs
+```
+
+**EXE 图标**（png-to-ico + rcedit）：
+```bash
+# 1. PNG → ICO
+png-to-ico resources/proma-logos/proma-coral.png > icon.ico
+
+# 2. 注入 EXE — 关键：必须 cp 到新文件再注入！
+#    直接 rcedit 原文件会报 "Unable to commit changes"（进程锁）
+cp Proma.exe Proma-new.exe
+rcedit Proma-new.exe --set-icon icon.ico
+
+# 3. 窗口/任务栏图标
+cp resources/proma-logos/proma-coral.png resources/icon.png
+cp icon.ico resources/icon.ico
 ```
 
 ### 模块 7：跨渠道 sdkSessionId 断裂防护（v0.12 新增）
@@ -322,6 +342,7 @@ sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkS
 | E (PROMA_DEV) | userData 隔离 | ✅ | ❌ 不需要 |
 | F (v0.12) | 跨渠道 sdkSessionId 防护 | ✅ | ✅ |
 | 3 | 托盘图标白色 | ✅ | ✅ |
+| 6 | EXE 图标改色 (png-to-ico) | ✅ | ✅ |
 | V | 版本号对齐 | ✅ | ✅ |
 
 ---
