@@ -356,6 +356,10 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 | 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
 | 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
 | 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
+| 2026-06-16 | v0.9 | 外部 MCP 服务：插件重构抽取 `createToolHandlers()`；新增 HTTP bridge（127.0.0.1:19876-19895 自动选端口）；新建 `proma-mcp-server.cjs`（零依赖 MCP JSON-RPC stdio 桥接，206 行）。外部 Claude Code / 脚本可通过 stdio 调用全部 7 个会话管理工具 |
+| 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
+| 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
+| 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
 | 2026-06-15 | v0.6 | 方案 A 完成：插件化 MCP 工具系统，5 个会话管理工具（list_channels/sessions、create/fork/get_session_info）；补丁 A/B/C；频道+模型元数据覆盖；验证 esbuild 源构建不可行 |
 | 2026-06-15 | v0.5 | 重构 dev 版：基于正式版 0.12.23 重新提取 main.cjs，sed 打补丁 1/2/3/4；废弃源构建方案（缺 cloudAuth 模块） |
 | 2026-06-15 | v0.4 | 源码从 v0.10.28 rebase 到 v0.12.23；新增源码备份；明确"源码≠运行版本"关系 |
@@ -495,3 +499,87 @@ D:\Proma-dev\resources\app\dist\
 - **会话模板**：`create_session` 支持从模板复制上下文
 - **成果聚合**：源会话定期检查目标会话输出，自动汇总
 - **会话池管理**：预创建一批不同模型的会话，按需分配任务
+
+---
+
+## 十三、外部 MCP 服务（v0.9）
+
+### 13.1 概述
+
+将 7 个会话管理工具暴露为独立 stdio MCP server，让外部工具（Claude Code、脚本等）也能调用。分为两层：
+
+```
+外部工具 (Claude Code / 脚本)
+    │ stdio (MCP JSON-RPC)
+    ▼
+proma-mcp-server.cjs          ← 独立进程，零外部依赖（206 行）
+    │ HTTP POST /:tool_name
+    ▼
+proma-dev-patches.cjs         ← Electron 主进程内 localhost HTTP bridge
+  createExternalHttpBridge()
+```
+
+### 13.2 架构设计
+
+| 组件 | 文件 | 位置 | 说明 |
+|---|---|---|---|
+| HTTP Bridge | `proma-dev-patches.cjs` | `app/dist/` | `createExternalHttpBridge()`，启动 localhost HTTP server |
+| MCP stdio 桥接 | `proma-mcp-server.cjs` | `app/dist/` | MCP JSON-RPC over stdio → HTTP 转发 |
+
+### 13.3 HTTP Bridge
+
+- **端口范围**：19876-19895（20 个连续端口），启动时自动选择第一个空闲端口
+- **监听地址**：`127.0.0.1`（仅 loopback，外部网络不可达）
+- **端口文件**：`~/.proma-dev/mcp-bridge-port.json`（`{ "port": 19876 }`）
+- **协议**：`POST /:tool_name`，body 为 JSON arguments，返回 JSON result
+- **CORS**：允许任意来源（`Access-Control-Allow-Origin: *`）
+- **Handler 共享**：与内部 MCP server 共用 `createToolHandlers(null)`（`null` = 无源会话）
+- **`send_message` 限制**：外部调用 `notify=true` 返回明确错误（无源会话无法接收通知）
+
+### 13.4 MCP stdio 桥接
+
+- **零外部依赖**：纯 Node.js 内置模块（`http`, `fs`, `path`, `os`, `readline`）
+- **协议**：手动实现 MCP JSON-RPC over stdio（`initialize`, `tools/list`, `tools/call`）
+- **端口发现**：启动时读 `~/.proma-dev/mcp-bridge-port.json`，未找到则用默认 19876
+- **超时**：`send_message(wait=true)` 请求超时 10 分钟（适应长任务）
+- **错误信息**：stderr 输出启动信息，stdout 专用于 MCP 协议
+
+### 13.5 Claude Code 配置
+
+```json
+{
+  "mcpServers": {
+    "proma-session": {
+      "command": "node",
+      "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs"]
+    }
+  }
+}
+```
+
+放在 `%USERPROFILE%/.claude/claude_desktop_config.json` 或项目 `.claude/mcp.json`。
+
+### 13.6 插件重构（v0.9）
+
+- **抽取 `createToolHandlers(sourceSessionId)`**：7 个纯 handler 函数，内部 MCP server 和 HTTP bridge 共享
+- **`createSessionMcpServer(sdk, z, sourceSessionId)`**：仅负责用 `sdk.tool()` 包装 handler
+- **`createExternalHttpBridge()`**：在插件末尾自动启动
+- **备份更新**：`workspace-files/.context/proma-dev-patches.cjs` 已同步到 546 行
+- **新增备份**：`workspace-files/.context/proma-mcp-server.cjs`（206 行）
+
+### 13.7 验证
+
+```bash
+# 语法检查
+node -c D:/Proma-dev/resources/app/dist/proma-mcp-server.cjs
+
+# 集成测试（mock HTTP bridge + MCP server 子进程）
+# initialize → tools/list (7 工具) → tools/call → 3/3 响应正确
+```
+
+### 13.8 已知限制
+
+- Proma 不运行时，外部 MCP server 连接失败（HTTP bridge 不存在）
+- `send_message` 外部调用不支持 `notify=true`
+- `send_message(wait=true)` 只返回 `{ status: "completed" }`，不含 Agent 输出内容（待 P1）
+- 端口范围硬编码在插件中，不通过配置文件
