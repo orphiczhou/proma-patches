@@ -1,49 +1,105 @@
 ---
 name: session-management
-description: Agent 会话管理能力。当用户需要创建/查询/Fork会话、给其他会话发消息、监控token用量、归档会话、跨工作区操作、并行调度多个Agent协作时触发。触发信号：多会话、开小弟、Fork、分身、并行、批量、派任务、监控进度、上下文甜点、竹节交接、工作区切换、归档、清理会话。
+description: Agent 会话管理能力。当用户需要创建/查询/Fork会话、给其他会话发消息、监控token用量、归档会话、跨工作区操作、并行调度多个Agent协作、配置外部MCP连接Proma实例、管理Dev/Release双实例时触发。触发信号：多会话、开小弟、Fork、分身、并行、批量、派任务、监控进度、上下文甜点、竹节交接、工作区切换、归档、清理会话、外部MCP、Claude Code连接Proma、Dev实例、Release实例、远端实例、双实例。
 group: proma
-version: "1.1.0"
+version: "1.2.0"
 ---
 
-# Agent 会话管理 (v1.1.0)
+# Agent 会话管理 (v1.2.0)
 
-你拥有 **11 个会话管理 MCP 工具**（`session` MCP server），可以管理 Proma 中的 Agent 会话——创建、Fork、发消息、查用量、查消息历史、归档等。你不是被困在自己的会话里；你可以像"老板"一样调度多个"小弟"协作完成复杂任务。
+你拥有 **11 个会话管理 MCP 工具**（`session` MCP server）。这些工具提供了完整的 Proma Agent 会话管理能力——创建、Fork、发消息、查用量、查消息历史、归档等。
 
-这些工具同时暴露为**外部 stdio MCP server**，让 Claude Code 等外部工具也能调用。
+---
 
-## 工具速览
+## 两种使用方式
 
-| 工具 | 用途 | 只读 |
+这套工具通过**两个不同的入口**暴露，功能完全相同，但调用方式不同：
+
+### 方式 A：内部 Agent（你是 Proma 的 Agent）
+
+你是 Proma 桌面应用中运行的 Agent。`session` MCP server 以进程内方式注入到你的工具列表中，你可以**直接调用**这 11 个工具，无需任何配置。
+
+```
+Proma Agent（你）
+    │ 直接调用 session MCP 工具
+    ▼
+proma-dev-patches.cjs → global.__proma__ API
+```
+
+**特征：** `get_my_session_id` 返回你的实际会话 ID。`send_message(notify=true)` 可用。
+
+### 方式 B：外部工具（Claude Code / 脚本 / 其他 MCP 客户端）
+
+你是独立于 Proma 运行的外部工具。通过 `proma-mcp-server.cjs` stdio 桥接，**间接调用**这 11 个工具。需要配置 MCP client 才能使用。
+
+```
+外部工具 (Claude Code / 脚本)
+    │ stdio (MCP JSON-RPC)
+    ▼
+proma-mcp-server.cjs          ← 零依赖桥接，启动时自动端口扫描
+    │ HTTP POST /:tool_name
+    ▼
+Proma 实例 (Dev 或 Release)
+  promp-dev-patches.cjs → localhost HTTP bridge (127.0.0.1:19876-19895)
+```
+
+**特征：** `get_my_session_id` 返回 `null`（无源会话）。`send_message(notify=true)` 不可用（返回错误），需用模式 6 轮询回收。
+
+### 两种方式的区别
+
+| | 内部 Agent（方式 A） | 外部工具（方式 B） |
 |---|---|---|
-| `get_my_session_id` | 获取你自己的会话 ID | ✅ |
-| `list_channels` | 列出所有 AI 渠道及可用模型 | ✅ |
-| `list_workspaces` | 列出所有工作区 | ✅ |
-| `list_sessions` | 列出会话（支持按工作区过滤、含工作区名） | ✅ |
-| `get_session_info` | 查询任意会话详情（渠道/模型/工作区） | ✅ |
-| `get_session_context` | 查询会话 token 用量/上下文窗口/使用率 | ✅ |
-| `list_messages` | 列出消息历史（含 UUID，用于 Fork） | ✅ |
-| `create_session` | 创建新会话（指定渠道/模型/工作区） | ❌ |
-| `fork_session` | Fork 会话（支持精确 UUID 截断，跨渠道 Fork） | ❌ |
-| `send_message` | 向目标会话发消息（wait=true 返回 Agent 输出） | ❌ |
-| `archive_session` | 归档/取消归档会话（归档后默认隐藏） | ❌ |
+| 入口 | 进程内 MCP server | `proma-mcp-server.cjs` stdio |
+| 配置 | 零配置，自动可用 | 需在 `.claude/mcp.json` 中配置 |
+| `get_my_session_id` | 返回实际会话 ID | 返回 `null` |
+| `send_message(notify=true)` | ✅ 可用 | ❌ 不可用（用轮询代替） |
+| 多实例支持 | 仅当前实例 | 可同时连接 Dev + Release |
+| 适用场景 | Agent 自主调度小弟 | 外部编排、脚本自动化、跨实例管理 |
 
-## 核心使用模式
+---
+
+## 11 个工具完整参考
+
+### 只读工具
+
+| 工具 | 参数 | 返回 |
+|---|---|---|
+| `get_my_session_id` | 无 | `{ session_id, is_external, hint }` — 内部返回实际 ID，外部返回 null |
+| `list_channels` | 无 | `{ channels: [{ id, name, provider, enabled, agent_models }] }` |
+| `list_workspaces` | 无 | `{ workspaces: [{ id, name, slug, created_at, updated_at }] }` |
+| `list_sessions` | `include_archived?` (bool), `workspace_id?` (string), `limit?` (1-200, 默认 50) | `{ count, total, sessions: [{ id, title, channel_id, model_id, workspace_id, workspace_name, pinned, archived, permission_mode, created_at, updated_at }] }` |
+| `get_session_info` | `session_id` (必填) | `{ id, title, channel_id, model_id, channel: {id, name, provider}, workspace: {id, name, slug}, pinned, archived, permission_mode, attached_directories, attached_files, created_at, updated_at }` |
+| `get_session_context` | `session_id` (必填) | `{ session_id, title, model, context_window, usage: { input_tokens, output_tokens, cache_tokens, total, usage_pct } }` — 含渠道 fallback 和 billing_error 检测 |
+| `list_messages` | `session_id` (必填), `offset?` (≥0), `limit?` (1-200, 默认 50) | `{ session_id, count, total, offset, messages: [{ index, type, uuid, timestamp, role, text, text_full_length, usage?, error_code?, error_title?, subtype?, duration_ms?, result_text? }] }`；读取失败 → `{ error }` |
+
+### 写入工具
+
+| 工具 | 参数 | 返回 |
+|---|---|---|
+| `create_session` | `channel_id` (必填), `model_id?`, `title?`, `workspace_id?` | `{ session: { id, title, channel_id, model_id, workspace_id, created_at }, message }` |
+| `fork_session` | `source_session_id` (必填), `up_to_message_uuid?`, `title?`, `new_channel_id?`, `new_model_id?`, `new_workspace_id?` | `{ session: { id, title, channel_id, model_id, workspace_id, source_session_id, fork_source_sdk_session_id, created_at }, message }` |
+| `send_message` | `session_id` (必填), `message` (必填), `wait?` (默认 true), `notify?`, `model_id?`, `channel_id?` | wait=true → `{ session_id, status: "completed", reply, message }`; wait=false → `{ session_id, status: "started", notify, message }`; 出错 → `{ session_id, status: "error", error }` |
+| `archive_session` | `session_id` (必填), `archived?` (默认 true) | `{ session_id, title, archived }` |
+
+---
+
+## 内部 Agent 使用模式
+
+> 以下模式适用于**方式 A（内部 Agent）**。外部工具用户请参考"外部 MCP 使用模式"章节。
 
 ### 模式 1：开小弟并行干活
 
 ```
 1. list_channels → 看有哪些模型可用
-2. create_session × N → 开 N 个"小弟"会话（用便宜模型省钱）
+2. create_session × N → 开 N 个"小弟"会话
+   - 复杂分析/架构 → Claude Opus / DeepSeek V4 Pro
+   - 简单实现/CRUD → DeepSeek V4 Flash
+   - 最便宜 → GLM-4.5-Air
 3. send_message(wait=false) × N → 同时给所有小弟派任务
-4. 轮询 get_session_context → 监控每个小弟的 token 是否稳定（完成了）
+4. 轮询 get_session_context → token 连续两次不变且非零 → 任务完成（详见模式 6）
 5. list_messages → 取每个小弟的最后回复
 6. fork_session → 开"整合会话"汇总所有产出
 ```
-
-**省钱技巧：**
-- 复杂分析/架构 → Claude Opus / DeepSeek V4 Pro
-- 简单实现/CRUD → DeepSeek V4 Flash
-- 最便宜 → GLM-4.5-Air
 
 ### 模式 2：深度探索 — 从任意轮 Fork
 
@@ -61,8 +117,8 @@ version: "1.1.0"
 
 ```
 1. get_session_context(自己) → 看 usage_pct
-2. 如果接近模型甜点区上限（如 DeepSeek V4 Pro 60%+）：
-   a. 先总结当前进度 → send_message(自己, "总结进度和关键发现")
+2. 如果接近模型甜点区上限：
+   a. 先总结进度 → send_message(自己, "总结当前进度和关键发现")
    b. fork_session(自己) → 新会话
    c. send_message(新会话, 简报 + "继续任务")
    d. 旧会话保留为检查点，新会话继续
@@ -85,11 +141,17 @@ version: "1.1.0"
 3. list_sessions(include_archived=true) → 查看含归档的完整列表
 ```
 
-归档的会话默认不在 `list_sessions` 中显示，但数据不丢失、可随时恢复。适合清理测试会话、整理历史记录。
+归档的会话默认不在 `list_sessions` 中显示，但数据不丢失、可随时恢复。
 
-### 模式 6：外部轮询回收（外部 MCP 调用者用）
+---
 
-外部调用者（如 Claude Code）不支持 `notify=true`，用 fire-and-forget + 轮询实现并行调度：
+## 外部 MCP 使用模式
+
+> 以下模式适用于**方式 B（外部工具）**。内部 Agent 请参考"内部 Agent 使用模式"章节。
+
+### 模式 6：外部轮询回收
+
+外部调用者不支持 `notify=true`，用 fire-and-forget + 轮询实现并行调度：
 
 ```
 1. send_message(wait=false) × N → 立即返回 "started"
@@ -98,47 +160,41 @@ version: "1.1.0"
 3. list_messages(target, limit=1) → 取最后一条 assistant 文本
 ```
 
-## 消息历史与 UUID
+轮询间隔建议 3-5 秒。`get_session_context` 返回的 `usage.total` 为 0 表示尚未开始推理。
 
-`list_messages` 返回每条消息的：
-- `index` — 序号
-- `type` — user / assistant / result
-- `uuid` — SDK 消息唯一标识（**用于 fork_session 的 up_to_message_uuid**）
-- `role` — user / assistant
-- `text` — 文本内容（截取前 500 字）
-- `text_full_length` — 完整文本长度
-- `timestamp` — 时间戳
-- `usage` — token 用量（仅 result 类型）
-- `error_code` / `error_title` — 错误信息（如有）
+### 模式 7：跨实例会话管理
 
-## send_message 三模式
-
-| 参数 | 行为 | 适用场景 |
-|---|---|---|
-| `wait=true` (默认) | 阻塞等小弟完成，返回 `reply` 字段含 Agent 输出 | 短任务，需要即时结果 |
-| `wait=false, notify=true` | 立即返回，完成后通知源会话 | **仅内部 Agent 可用**，异步协作 |
-| `wait=false` | 纯 fire-and-forget | 不关心结果，或配合轮询回收 |
-
-**`notify=true` 仅内部 Agent 可用**（外部 MCP 调用返回明确错误）。
-
-## 外部 MCP 服务
-
-工具同时暴露为独立 stdio MCP server（`proma-mcp-server.cjs`），外部工具可调用。
-
-### 架构
+如果你同时配置了 Dev 和 Release 两个 MCP server，可以跨实例操作：
 
 ```
-外部工具 (Claude Code / 脚本)
-    │ stdio (MCP JSON-RPC)
-    ▼
-proma-mcp-server.cjs          ← 零依赖，端口扫描 + 自动发现
-    │ HTTP POST /:tool_name
-    ▼
-Proma 实例 (Dev 或 Release)
-  promp-dev-patches.cjs → localhost HTTP bridge
+Dev 实例（测试/调试）           Release 实例（日常使用）
+  ├─ create_session              ├─ create_session
+  ├─ send_message(wait=false)    ├─ send_message(wait=true)
+  └─ archive_session（清理）      └─ list_sessions（日常管理）
 ```
 
-### 端口发现流程
+**典型场景：**
+- Dev 实例开一批小弟并行测试 → 确认没问题 → 在 Release 实例上执行正式任务
+- Release 实例积累太多测试会话 → `archive_session` 批量清理
+- Dev 上验证新补丁 → Fork 一个正式会话到 Release 上继续
+
+### 模式 8：脚本自动化
+
+外部脚本可以顺序调用工具实现工作流自动化：
+
+```bash
+# 用 curl 通过 HTTP bridge 直接调用（Proma 运行时）
+curl -s -X POST http://127.0.0.1:19876/list_channels | jq .
+curl -s -X POST http://127.0.0.1:19876/list_sessions -d '{"include_archived":true}' | jq .
+```
+
+端口号从 `GET /get_instance_info` 获取，或查看 Proma 控制台日志 `External MCP HTTP bridge: http://127.0.0.1:XXXXX`。
+
+---
+
+## 外部 MCP 配置详解
+
+### 端口发现机制
 
 每个 Proma 实例启动时自动占用 19876-19895 范围内第一个空闲端口，并暴露身份端点：
 
@@ -163,7 +219,10 @@ node proma-mcp-server.cjs --dev     # 连接 Dev 实例
 node proma-mcp-server.cjs --release # 连接 Release 实例
 ```
 
-**Claude Code 配置（`.claude/mcp.json`）：**
+### 单实例配置（仅 Dev 或仅 Release）
+
+**`.claude/mcp.json`（项目级）或 `%USERPROFILE%/.claude/claude_desktop_config.json`（全局）：**
+
 ```json
 {
   "mcpServers": {
@@ -175,21 +234,107 @@ node proma-mcp-server.cjs --release # 连接 Release 实例
 }
 ```
 
+Release 版将 `--dev` 改为 `--release`，名称改为 `proma-release-session`。
+
+### 双实例配置（Dev + Release 同时连接）
+
+```json
+{
+  "mcpServers": {
+    "proma-dev-session": {
+      "command": "node",
+      "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs", "--dev"]
+    },
+    "proma-release-session": {
+      "command": "node",
+      "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs", "--release"]
+    }
+  }
+}
+```
+
+两个 MCP server 各自独立扫描端口、各自连接对应实例。工具名称相同但 `serverInfo.name` 不同（`proma-dev-session` vs `proma-release-session`），方便区分。
+
+**注意：** 两个实例必须**同时运行**。如果目标实例未启动，MCP server 会在 `initialize` 时报错。
+
+### 验证连接
+
+配置完成后，在 Claude Code 中：
+1. 调用 `list_channels` → 返回该实例的渠道列表
+2. 调用 `get_my_session_id` → 外部调用返回 `{ session_id: null, is_external: true }`
+3. 调用 `list_sessions` → 返回该实例的所有会话
+
+---
+
+## 消息历史与 UUID
+
+`list_messages` 返回每条消息的：
+- `index` — 序号
+- `type` — user / assistant / result
+- `uuid` — SDK 消息唯一标识（**用于 fork_session 的 up_to_message_uuid**）
+- `role` — user / assistant
+- `text` — 文本内容（截取前 500 字）
+- `text_full_length` — 完整文本长度
+- `timestamp` — 时间戳
+- `usage` — token 用量（仅 result 类型）
+- `error_code` / `error_title` — 错误信息（如有）
+
+**UUID 注意事项：**
+- headless 会话（通过 send_message 启动的）的 user 消息可能没有 UUID
+- Fork 时用 **assistant** 或 **result** 消息的 UUID，不要用 user 消息的
+- `up_to_message_uuid` 指定的消息**包含**在新会话的上下文中（即 Fork 后新会话能看到这条消息）
+
+---
+
+## send_message 三模式
+
+| 参数 | 行为 | 适用场景 | 可用范围 |
+|---|---|---|---|
+| `wait=true` (默认) | 阻塞等目标完成，返回 `reply` 字段含 Agent 输出文本 | 短任务，需要即时结果 | 内部 + 外部 |
+| `wait=false, notify=true` | 立即返回 `"started"`，目标完成后通知源会话 | 内部 Agent 异步协作 | **仅内部 Agent** |
+| `wait=false` | 纯 fire-and-forget，无通知 | 不关心结果，或配合模式 6 轮询回收 | 内部 + 外部 |
+
+**外部调用 `notify=true` 返回错误：** `"notify=true is not supported from external MCP (no source session). Use wait=true (default) or wait=false without notify."`
+
+**出错时** 返回 `{ session_id, status: "error", error: "错误描述" }`，无论 wait 参数如何。
+
+---
+
 ## 模型甜点区参考
 
-| 模型 | 甜点区 | 建议交接线 |
-|---|---|---|
-| DeepSeek V4 Pro | 150K-250K | 200K (20%) |
-| DeepSeek V4 Flash | 80K-150K | 120K |
-| Claude Sonnet 4.6 | 100K-200K | 150K |
-| GLM-5-Turbo | 50K-80K | 60K |
+| 模型 | 上下文窗口 | 甜点区 | 建议交接线 |
+|---|---|---|---|
+| DeepSeek V4 Pro | 1M | 150K-250K | 200K (20%) |
+| DeepSeek V4 Flash | 1M | 80K-150K | 120K |
+| Claude Sonnet 4.6 | 1M | 100K-200K | 150K |
+| GLM-5-Turbo | 128K | 50K-80K | 60K |
+| GLM-4.5-Air | 128K | 40K-70K | 55K |
+
+**甜点区说明：** 在此范围内推理质量最佳。超出甜点区后注意力稀释、质量下降。`usage_pct` 达到 60-85% 时考虑竹节交接（模式 3）。
+
+---
 
 ## 注意事项
 
-- `get_my_session_id` 首先调用，获取自己的会话 ID
+### 通用
+- **内部 Agent** 第一步调用 `get_my_session_id` 获取自己的会话 ID
+- **外部工具** `get_my_session_id` 返回 `null`，这是正常的
 - 创建/fork 的会话在 Proma 侧边栏需手动刷新才能看到
-- headless 会话（send_message 启动的）的 usage 数据可能不完整，正常现象
+- 省钱优先：能用 deepseek-v4-flash 就别用 deepseek-v4-pro
+
+### 内部 Agent 特有
+- `send_message(notify=true)` 可用，源会话 ID 通过 MCP server 闭包自动捕获
+- `runAgentHeadless` 有并发守卫，同一会话同时只能有一个 headless run
+- 通知消息在源会话空闲时送达，正在处理用户消息时会排队
+
+### 外部 MCP 特有
+- `send_message` 外部不支持 `notify=true`，用模式 6（轮询回收）替代
+- Proma 实例必须运行中，否则 MCP server 在 `initialize` 时报错
+- Dev 和 Release 可同时连接，但它们是**独立的**两个 MCP server
+- 端口范围 19876-19895 硬编码，不通过配置文件
+
+### 已知限制
 - 跨渠道 Fork（如 DeepSeek→GLM）一般可用，个别情况可能因 SDK session GC 失败
 - 跨渠道 UI 切换模型已通过补丁 F 修复，不再触发 "Session 已失效"
-- `send_message` 外部调用不支持 `notify=true`，可用模式 6（轮询回收）替代
-- 省钱优先：能用 deepseek-v4-flash 就别用 deepseek-v4-pro
+- headless 会话的 usage 数据可能不完整（无 context_window），正常现象
+- cloud-auth token 在 Dev/Release 间共享，一方刷新后另一方可能失效
