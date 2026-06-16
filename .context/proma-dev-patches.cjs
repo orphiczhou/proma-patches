@@ -332,14 +332,15 @@ function createToolHandlers(sourceSessionId) {
 
         const updates = {};
         if (args.title) updates.title = args.title;
-        if (args.new_channel_id) updates.channelId = args.new_channel_id;
-        if (args.new_model_id) updates.modelId = args.new_model_id;
+        // Fork 必须继承源会话的 channelId/modelId（若无覆盖）——否则 metadata 丢失
+        const effectiveChannelId = args.new_channel_id || source.channelId;
+        if (effectiveChannelId) updates.channelId = effectiveChannelId;
+        const effectiveModelId = args.new_model_id || source.modelId;
+        if (effectiveModelId) updates.modelId = effectiveModelId;
         if (args.new_workspace_id) updates.workspaceId = args.new_workspace_id;
 
-        if (Object.keys(updates).length > 0) {
-          a.updateAgentSessionMeta(forked.id, updates);
-          Object.assign(forked, updates);
-        }
+        a.updateAgentSessionMeta(forked.id, updates);
+        Object.assign(forked, updates);
 
         log(`Session forked: ${forked.id.slice(0, 8)} from ${args.source_session_id.slice(0, 8)}`);
         return jsonResult({
@@ -490,6 +491,16 @@ function createToolHandlers(sourceSessionId) {
       }
     },
 
+    archive_session: async (args) => {
+      const a = api();
+      const meta = a.getAgentSessionMeta(args.session_id);
+      if (!meta) return jsonResult({ error: `Session not found: ${args.session_id}` });
+      const archived = args.archived !== false; // default true
+      a.updateAgentSessionMeta(args.session_id, { archived });
+      log(`Session ${archived ? "archived" : "unarchived"}: ${args.session_id.slice(0, 8)} "${meta.title}"`);
+      return jsonResult({ session_id: args.session_id, title: meta.title, archived });
+    },
+
   };
 }
 
@@ -606,6 +617,16 @@ function createSessionMcpServer(sdk, z, sourceSessionId) {
         h.send_message
       ),
 
+      sdk.tool(
+        "archive_session",
+        "Archive (or unarchive) an agent session. Archived sessions are hidden from default list_sessions. Use include_archived=true to see them.",
+        {
+          session_id: z.string().describe("The session ID to archive/unarchive."),
+          archived: z.boolean().optional().describe("Set to false to unarchive. Default: true (archive)."),
+        },
+        h.archive_session
+      ),
+
     ],
   });
 
@@ -619,7 +640,6 @@ function createExternalHttpBridge() {
 
   const PORT_START = 19876;
   const PORT_END = 19895;
-  const portFile = path.join(require("os").homedir(), ".proma-dev", "mcp-bridge-port.json");
 
   function startServer(port) {
     return new Promise((resolve, reject) => {
@@ -628,13 +648,23 @@ function createExternalHttpBridge() {
         if (req.method === "OPTIONS") {
           res.writeHead(204, {
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
           });
           return res.end();
         }
 
-        const toolName = (req.url || "/").slice(1).split("?")[0];
+        // GET /get_instance_info — 用于 MCP 客户端自动发现实例身份
+        const urlPath = (req.url || "/").slice(1).split("?")[0];
+        if (req.method === "GET" && urlPath === "get_instance_info") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({
+            proma_dev: process.env.PROMA_DEV === "1",
+            port: port,
+          }));
+        }
+
+        const toolName = urlPath;
         const handler = handlers[toolName];
 
         if (!handler) {
@@ -676,9 +706,7 @@ function createExternalHttpBridge() {
     for (let p = PORT_START; p <= PORT_END; p++) {
       try {
         const server = await startServer(p);
-        fs.mkdirSync(path.dirname(portFile), { recursive: true });
-        fs.writeFileSync(portFile, JSON.stringify({ port: p }));
-        log(`External MCP HTTP bridge: http://127.0.0.1:${p}`);
+        log(`External MCP HTTP bridge: http://127.0.0.1:${p} (PROMA_DEV=${process.env.PROMA_DEV || "0"})`);
         return;
       } catch (e) {
         if (e.code === "EADDRINUSE") continue;
@@ -708,5 +736,5 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
 // ---- 启动外部 MCP HTTP bridge ----
 createExternalHttpBridge();
 
-log("Agent session management MCP tools loaded (10 tools: get_my_session_id, list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message)");
+log("Agent session management MCP tools loaded (11 tools: get_my_session_id, list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message, archive_session)");
 log("External MCP bridge available (read ~/.proma-dev/mcp-bridge-port.json for port)");

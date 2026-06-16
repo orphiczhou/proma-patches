@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-15 | 维护者: 周星星
+> 最后更新: 2026-06-16 14:30 | 维护者: 周星星
 
 ---
 
@@ -265,15 +265,17 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 工具名 | 功能 | 只读 |
 |---|---|---|
+| `get_my_session_id` | Agent 自指——获取当前会话的 ID | ✅ |
 | `list_channels` | 列出所有 AI 渠道及可用模型 | ✅ |
 | `list_workspaces` | 列出所有工作区（id/name/slug） | ✅ |
 | `list_sessions` | 列出 Agent 会话（含工作区名、支持 workspace_id 过滤） | ✅ |
 | `get_session_info` | 查询单个会话详情 | ✅ |
-| `get_session_context` | 查询会话当前 token 用量（含上下文窗口/使用率） | ✅ |
-| `list_messages` | 列出会话消息历史（UUID/角色/文本），支持 offset/limit 分页 | ✅ |
+| `get_session_context` | 查询会话当前 token 用量（含上下文窗口/使用率，多渠道配置 fallback） | ✅ |
+| `list_messages` | 列出会话消息历史（UUID/角色/文本/usage），支持 offset/limit 分页 | ✅ |
 | `create_session` | 创建新会话，指定渠道/模型/标题/工作区 | ❌ |
 | `fork_session` | Fork 已有会话，支持 up_to_message_uuid 精确截断 | ❌ |
-| `send_message` | 向目标会话发消息，wait=true 返回 `reply` 字段（Agent 输出文本） | ❌ |
+| `send_message` | 向目标会话发消息，wait=true 返回 `reply` 字段（Agent 实际输出文本） | ❌ |
+| `archive_session` | 归档/取消归档会话（不删除数据），归档后默认隐藏 | ❌ |
 
 ### 架构
 
@@ -282,10 +284,11 @@ main.cjs
   ├─ 补丁 A: MCP 钩子（检查 global.__proma_getMcpServers__）
   ├─ 补丁 B: API 桥接（global.__proma__）+ require 插件
   └─ proma-dev-patches.cjs
-       ├─ 读取 global.__proma__ 调用主进程序 API
-       ├─ 使用 sendMessage 传入的 sdk 创建 MCP server
+       ├─ createToolHandlers(sourceSessionId) → 11 个纯 handler
+       ├─ createSessionMcpServer(sdk, z, sessionId) → 内部 Agent MCP server
+       ├─ createExternalHttpBridge() → localhost:19876-19895 + GET /get_instance_info
        ├─ 注册到 global.__proma_getMcpServers__
-       └─ 6 个会话管理工具
+       └─ promp-mcp-server.cjs ← 外部 stdio MCP 桥接（自动端口扫描+实例发现）
 ```
 
 ---
@@ -307,9 +310,10 @@ D:\
         ├── app/                          # 解包代码
         │   ├── package.json              # 版本号已对齐
         │   └── dist/
-        │       ├── main.cjs              # 已打 7 个 sed 补丁
+        │       ├── main.cjs              # 已打 8 个 sed 补丁
         │       ├── preload.cjs           # 商业版原版
-        │       ├── proma-dev-patches.cjs # ★ 插件文件
+        │       ├── proma-dev-patches.cjs # ★ 插件文件（713 行，10 工具）
+        │       ├── proma-mcp-server.cjs  # ★ 外部 MCP stdio 桥接（230 行）
         │       └── renderer/             # 商业版原版（补丁 E）
         │           └── assets/
         │               └── index-*.js    # 主 bundle（hydrate 守卫已移除）
@@ -379,6 +383,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 | 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
 | 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
 | 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
+| 2026-06-16 | v0.11 | 实例自动发现：新增 `GET /get_instance_info` 端点；`proma-mcp-server.cjs` 重写为端口扫描+实例发现（`--dev`/`--release` 参数），废弃端口文件；新增 `archive_session` 工具（11 工具体系）；修复 Fork 不传 model 时 modelId 丢失；修复 MCP server 启动时序导致连错实例；Release 版图标改彩色（`Proma-black.exe` 实际为渐变色 + `rcedit` 注入图标 + 托盘 `proma-color.png`）；清理 Release 测试会话 |
 | 2026-06-16 | v0.10.1 | 新增 `get_my_session_id` 工具（Agent 自指）；10 工具体系；内部 Agent 间调用全链路验证（老板→小弟→子小弟三层，9/9 通过） |
 | 2026-06-16 | v0.10 | P1 多工作区+消息列表+结果回传：补丁 B3（`listAgentWorkspaces` 12 函数导出）；新增 `list_workspaces` / `list_messages` 工具（共 9 工具）；`list_sessions` 加 workspace_id 过滤+workspace_name；`send_message` wait=true 返回 `reply` 字段含 Agent 实际输出；多轮对话+Fork at UUID 全链路验证；插件 696 行，MCP server 225 行 |
 | 2026-06-16 | v0.9.1 | 补丁 B2：`runAgentHeadless` 加入 API 桥接；`get_session_context` 增强 fallback 从渠道配置查 `contextWindow` + billing_error 检测；DeepSeek Fork 验证通过（v0.7 渲染器修复后已可用）；插件更新至 569 行 |
@@ -413,16 +418,20 @@ main.cjs (sed 注入 3 处，其余不动)
 
 ### 12.2 插件能力总览
 
-插件通过 SDK 的 `sdk.createSdkMcpServer()` 创建一个名为 `session` 的进程内 MCP Server，包含 6 个工具：
+插件通过 SDK 的 `sdk.createSdkMcpServer()` 创建一个名为 `session` 的进程内 MCP Server（内部 Agent 用），同时通过 `createExternalHttpBridge()` 启动 localhost HTTP server 供外部 MCP 桥接调用。共 10 个工具：
 
 | 工具 | 类型 | 功能 |
 |---|---|---|
+| `get_my_session_id` | 只读 | Agent 自指——获取当前会话 ID |
 | `list_channels` | 只读 | 列出所有 AI 渠道及 Agent 可用模型 |
-| `list_sessions` | 只读 | 列出所有 Agent 会话（标题/渠道/模型/归档状态） |
+| `list_workspaces` | 只读 | 列出所有工作区（id/name/slug） |
+| `list_sessions` | 只读 | 列出所有 Agent 会话（含工作区名、支持 workspace_id 过滤） |
 | `get_session_info` | 只读 | 查询单个会话详情（渠道、模型、工作区） |
+| `get_session_context` | 只读 | 查询会话 token 用量（含上下文窗口、多渠道 fallback） |
+| `list_messages` | 只读 | 列出消息历史（UUID/角色/文本/usage），支持分页 |
 | `create_session` | 写入 | 创建新会话，指定渠道/模型/标题/工作区 |
 | `fork_session` | 写入 | Fork 已有会话，保留上下文，可切换渠道/模型 |
-| `send_message` | 写入 | 向目标会话发送消息，支持三种执行模式 |
+| `send_message` | 写入 | 向目标会话发消息，三种模式；外部不支持 notify=true |
 
 ### 12.3 send_message 三种执行模式
 
@@ -511,20 +520,21 @@ let resolvedModel = __sessionMeta?.modelId || modelId || DEFAULT_MODEL_ID;
 
 ```
 D:\Proma-dev\resources\app\dist\
-├── main.cjs                    # 商业版 0.12.23 + 7 个 sed 补丁
-├── proma-dev-patches.cjs       # 插件文件（~350 行，含 6 个 MCP 工具）
+├── main.cjs                    # 商业版 0.12.23 + 8 个 sed 补丁
+├── proma-dev-patches.cjs       # 插件文件（713 行，含 10 个 MCP 工具 + HTTP bridge）
+├── proma-mcp-server.cjs        # 外部 MCP stdio 桥接（230 行，零外部依赖）
 └── renderer/                   # 保持商业版原版不动
     └── assets/
-        └── index-DHbUm1xm.js
+        └── index-*.js          # 主 bundle（hydration 守卫已移除）
 ```
 
 ### 12.8 后续方向
 
-- **模型 UI 同步**：修正渲染器 `AgentSessionMeta.modelId` 读取，消除 UI 与实际不一致
-- **多模型协作链**：A 完成 → 通知 B 继续 → B 完成 → 通知 C
-- **会话模板**：`create_session` 支持从模板复制上下文
-- **成果聚合**：源会话定期检查目标会话输出，自动汇总
-- **会话池管理**：预创建一批不同模型的会话，按需分配任务
+- **模型 UI 同步**：✅ 已完成（补丁 D+E，v0.7）
+- **多模型协作链**：✅ 已完成（`send_message(notify)` 异步回调，v0.10 全链路验证通过）
+- **成果聚合**：✅ 已完成（轮询 `get_session_context` + `list_messages` 回收，v0.10.1 验证）
+- **会话模板**：待做 —— `create_session` 支持从模板复制上下文
+- **会话池管理**：待做 —— 预创建一批不同模型的会话，按需分配任务
 
 ---
 
@@ -647,3 +657,108 @@ C: 狗、猫、大象、老鹰、海豚                    8s, 29K tokens
 - 调用方控制轮询频率、超时、目标数量
 - 多目标并行时自然支持不同完成时间
 - 纯组合已有工具，无需改代码
+
+---
+
+## 十五、实例自动发现与多实例 MCP（v0.11）
+
+### 15.1 问题
+
+此前 `proma-mcp-server.cjs` 通过读端口文件（`~/.proma-dev/mcp-bridge-port.json`）来确定 Dev 实例的 HTTP bridge 端口。存在以下问题：
+
+1. **启动时序 race condition**：MCP server 启动时端口文件可能还不存在 → fallback 到 19876 → 连错实例
+2. **端口文件与进程不同步**：Dev 重启后端口可能变化，文件内容是旧值
+3. **维护负担**：端口文件需要两个实例分别写、分别读，排查困难
+
+### 15.2 解决方案：端口扫描 + 实例身份发现
+
+**设计：**
+
+```
+proma-mcp-server.cjs --dev 启动
+    │
+    ├─ 1. 扫描 19876-19895 每个端口
+    │      GET /get_instance_info → { proma_dev: true/false, port: N }
+    │
+    ├─ 2. 根据 --dev/--release 标志筛选
+    │      --dev    → proma_dev === true  的实例
+    │      --release → proma_dev === false 的实例
+    │
+    └─ 3. 连接筛选出的端口，提供服务
+```
+
+**新增端点：**
+
+`GET /get_instance_info` — 在 HTTP bridge 中新增，返回实例身份：
+
+```json
+{ "proma_dev": true, "port": 19876 }
+```
+
+- `proma_dev: true` — 该实例设置了 `PROMA_DEV=1`（Dev 版）
+- `proma_dev: false` — 未设置 `PROMA_DEV`（Release/正式版）
+
+**CLI 参数：**
+
+```bash
+node proma-mcp-server.cjs           # 默认 --dev
+node proma-mcp-server.cjs --dev     # 连接 Dev 实例
+node proma-mcp-server.cjs --release # 连接 Release 实例
+```
+
+**MCP 配置示例：**
+
+```json
+{
+  "proma-dev-session": {
+    "command": "node",
+    "args": ["D:\\Proma-dev\\...\\proma-mcp-server.cjs", "--dev"]
+  },
+  "proma-release-session": {
+    "command": "node",
+    "args": ["D:\\Proma-release\\...\\proma-mcp-server.cjs", "--release"]
+  }
+}
+```
+
+### 15.3 端口文件已废弃
+
+`~/.proma-dev/mcp-bridge-port.json` 和 `~/.proma/mcp-bridge-port.json` 不再需要，已从代码中移除。`createExternalHttpBridge()` 不再写入端口文件，`proma-mcp-server.cjs` 不再读取。
+
+---
+
+## 十六、Bug 修复记录（v0.11）
+
+### 16.1 Fork 不传 model 时 modelId 丢失
+
+**根因：** `fork_session` handler 只在显式传了 `new_model_id` 时才写 metadata。不传时 Fork 出的会话 `modelId` 为 `undefined`。
+
+**修复：** 始终从源会话继承 `channelId` / `modelId`（无覆盖时）：
+
+```javascript
+const effectiveChannelId = args.new_channel_id || source.channelId;
+const effectiveModelId = args.new_model_id || source.modelId;
+```
+
+### 16.2 MCP Server 启动时序端口错配
+
+**现象：** Release 先启动占 19876，Dev 后启动占 19877。但 MCP server 启动时 Dev 未运行 → 端口文件不存在 → fallback 19876 → 连到 Release。
+
+**修复：** 改为端口扫描 + 实例发现（见 §15），彻底消除端口文件依赖。
+
+### 16.3 Release 版图标黑色
+
+**根因：** `Proma.exe` 被替换为 `Proma-black.exe`（名为"black"但实际是黑色图标版本），`start-release.bat` 指向了 `Proma-release.exe`。
+
+**修复：**
+- 程序图标：`start-release.bat` → `Proma-black.exe`（核实为渐变色图标）
+- 窗口/任务栏图标：用 `rcedit` 注入正式版彩色 `icon.ico` 到 EXE
+- 托盘图标：`main.cjs` 中 `proma-white.png` → `proma-color.png`（渐变彩色）
+
+---
+
+## 十七、新工具：archive_session
+
+`archive_session(session_id, archived=true)` — 归档/取消归档会话。归档后默认不在 `list_sessions` 中显示（仍可通过 `include_archived=true` 查看）。
+
+与删除相比，归档不丢数据、可恢复，适合清理测试会话、整理历史记录。
