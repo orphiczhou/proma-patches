@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-16 19:28 | 维护者: 周星星
+> 最后更新: 2026-06-16 19:58 | 维护者: 周星星
 
 ---
 
@@ -392,6 +392,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-16 | v0.12.2 | 纯本地 Skill 驱动验证完成：小弟在无规则提示下自主读取 session-management Skill v1.2.3，完成全部 6 步本地操作（create→send→fork→archive→list→context），实查 6/6 通过。Skill 两条黄金规则（本地/远端隔离、curl 中文编码）覆盖内部 Agent 和外部 MCP 双入口，全链路验证闭环 |
 | 2026-06-16 | v0.12.1 | HTTP bridge UTF-8 编码修复：`req.on("data", c => body += c)` 在 TCP 分包时会把多字节 UTF-8 字符拦腰截断。改为 `Buffer.concat(chunks).toString("utf-8")` 从根本上解决。Session-management Skill v1.2.2 收敛：curl 中文编码黄金规则提升为章首全局强制（`printf + --data-binary @-`）。Dev + Release + 补丁工具包全部同步 |
 | 2026-06-16 | v0.11 | 实例自动发现：新增 `GET /get_instance_info` 端点；`proma-mcp-server.cjs` 重写为端口扫描+实例发现（`--dev`/`--release` 参数），废弃端口文件；新增 `archive_session` 工具（11 工具体系）；修复 Fork 不传 model 时 modelId 丢失；修复 MCP server 启动时序导致连错实例；Release 版图标改彩色（`Proma-black.exe` 实际为渐变色 + `rcedit` 注入图标 + 托盘 `proma-color.png`）；清理 Release 测试会话 |
 | 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
