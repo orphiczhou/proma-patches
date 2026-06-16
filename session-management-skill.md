@@ -2,10 +2,10 @@
 name: session-management
 description: Agent 会话管理能力。当用户需要创建/查询/Fork会话、给其他会话发消息、监控token用量、归档会话、跨工作区操作、并行调度多个Agent协作、配置外部MCP连接Proma实例、管理Dev/Release双实例时触发。触发信号：多会话、开小弟、Fork、分身、并行、批量、派任务、监控进度、上下文甜点、竹节交接、工作区切换、归档、清理会话、外部MCP、Claude Code连接Proma、Dev实例、Release实例、远端实例、双实例。
 group: proma
-version: "1.2.2"
+version: "1.2.3"
 ---
 
-# Agent 会话管理 (v1.2.2)
+# Agent 会话管理 (v1.2.3)
 
 你拥有 **11 个会话管理 MCP 工具**（`session` MCP server）。这些工具提供了完整的 Proma Agent 会话管理能力——创建、Fork、发消息、查用量、查消息历史、归档等。
 
@@ -149,7 +149,18 @@ Proma 实例 (Dev 或 Release)
 
 > 以下模式适用于**方式 B（外部工具）**。内部 Agent 请参考"内部 Agent 使用模式"章节。
 
-### 黄金规则：curl 中文编码
+### 黄金规则 1：本地 vs 远端数据隔离
+
+**本地 MCP 工具（`mcp__session__*`）只能操作本机 Proma 实例。远端 Dev/Release 实例的会话、消息、工作区等数据，必须通过 curl/HTTP 直接调用远端 HTTP bridge 获取。** 用本地 `get_session_info` 查 Dev 上的 session ID 会返回 "Session not found"——这不是 bug，是实例隔离。
+
+```
+本地 Proma ← mcp__session__* 工具（你在这个实例里）
+远端 Dev  ← curl http://127.0.0.1:PORT/*（完全独立的另一个进程）
+```
+
+验证远端数据时，**每一步都必须用 curl**，不可混用本地 MCP 工具。
+
+### 黄金规则 2：curl 中文编码
 
 **任何含中文的 curl JSON 请求必须用 `printf` + `--data-binary @-` 管道方式。** Windows Bash 下 `curl -d '...中文...'` 会将 UTF-8 转为 GBK 导致远端接收乱码。此规则适用于所有工具调用（`create_session` 标题、`send_message` 消息、`archive_session` 等），不限于某个步骤。
 
