@@ -8,10 +8,11 @@
 
 ```
 Layer 1: MCP 基础设施（当前）
-  ├─ 会话管理工具（7 个）
-  ├─ 外部 MCP 服务（stdio）
-  ├─ 会话间通信（send_message）
-  └─ 补丁自动化
+  ├─ 会话管理工具（11 个）
+  ├─ 外部 MCP 服务（stdio，实例自动发现）
+  ├─ 会话间通信（send_message + reply + notify）
+  ├─ Release 并行版（彩色图标，独立部署）
+  └─ 补丁工具包（apply-patches.sh）
 
         ↓ 支撑
 
@@ -39,63 +40,65 @@ Layer 2: 时间线的剪枝者（未来）
 | **补丁 B** | API 桥接 + 插件加载 | `global.__proma__` 导出 10 个函数 + `require("./proma-dev-patches.cjs")` |
 | **补丁 C1-5** | 频道+模型元数据覆盖 | MCP 创建的会话走后端正确频道/模型/API Key |
 | **补丁 D+E** | Renderer 同步 | 版本同步 + hydration 幂等守卫移除 → UI 模型选择器正确显示 |
-| **插件** | proma-dev-patches.cjs | 7 个 MCP 工具（见 1.2） |
+| **插件** | proma-dev-patches.cjs | 11 个 MCP 工具（见 1.2） |
+| **外部 MCP** | proma-mcp-server.cjs | 零依赖 stdio 桥接，`--dev`/`--release` 参数，实例自动发现 |
+| **Release 版** | `D:\Proma-release\` | 与正式版双开，彩色图标，独立部署 |
 | **Wiki** | proma-dev-wiki.md | 完整技术文档（补丁命令、架构、流程） |
+| **Skill** | session-management | Agent 内置技能，5 大使用模式，自动触发 |
 
-### 1.2 7 个 MCP 工具（均为 Agent 可用）
+### 1.2 11 个 MCP 工具（Agent + 外部 MCP 均可用）
 
 | 工具 | 功能 | 只读 | 状态 |
 |---|---|---|---|
+| `get_my_session_id` | Agent 自指——获取当前会话 ID | ✅ | 完成 |
 | `list_channels` | 列出所有 AI 渠道及可用模型 | ✅ | 完成 |
-| `list_sessions` | 列出 Agent 会话（标题/渠道/模型/归档） | ✅ | 完成 |
+| `list_workspaces` | 列出所有工作区（id/name/slug） | ✅ | 完成 |
+| `list_sessions` | 列出 Agent 会话（含工作区名、支持 workspace_id 过滤） | ✅ | 完成 |
 | `get_session_info` | 查询单个会话详情（含渠道名、工作区） | ✅ | 完成 |
-| `get_session_context` | 查询会话 token 用量（含上下文窗口/使用率） | ✅ | 完成 |
-| `create_session` | 创建新会话，指定渠道/模型/标题 | ❌ | 完成 |
-| `fork_session` | Fork 会话，保留上下文，支持切换渠道/模型 | ❌ | 完成（DeepSeek 频道有 bug） |
-| `send_message` | 向目标会话发送消息，三种执行模式 | ❌ | 完成（仅内部 Agent 可用） |
+| `get_session_context` | 查询会话 token 用量（含上下文窗口/使用率、渠道 fallback） | ✅ | 完成 |
+| `list_messages` | 列出消息历史（UUID/角色/文本/usage），支持分页 | ✅ | 完成 |
+| `create_session` | 创建新会话，指定渠道/模型/标题/工作区 | ❌ | 完成 |
+| `fork_session` | Fork 会话，正确继承 channel/modelId；支持 UUID 截断 | ❌ | 完成 |
+| `send_message` | 向目标会话发消息，wait=true 返回 reply 字段；外部不支持 notify | ❌ | 完成 |
+| `archive_session` | 归档/取消归档会话（归档后默认隐藏） | ❌ | 完成（v0.11） |
 
 ### 1.3 待做 🔨
 
-#### 1.3.1 外部 MCP 服务（当前任务）⭐
+#### 1.3.1 外部 MCP 服务 ✅ 完成 (v0.9 → v0.11 增强)
 
-把 7 个工具暴露为独立 stdio MCP server，外部可调用。
+把 11 个工具暴露为独立 stdio MCP server。已完成：
 
-**架构：**
-```
-Claude Code / 外部脚本
-    │ stdio (JSON-RPC)
-    ▼
-proma-mcp-server.cjs          ← 纯 Node.js，零外部依赖
-    │ HTTP POST /:tool_name
-    ▼
-proma-dev-patches.cjs         ← localhost HTTP bridge
-  localhost:19876-19895
-```
+- **实现：**
+- [x] 插件内抽取 `createToolHandlers(sourceSessionId)` → 11 个纯 handler
+- [x] 插件内新增 `createExternalHttpBridge()` → localhost HTTP server，端口自动选择（19876-19895 范围）
+- [x] `GET /get_instance_info` 端点 → 返回 `{ proma_dev, port }`，废弃端口文件
+- [x] 新建 `proma-mcp-server.cjs` → 零依赖 MCP JSON-RPC stdio 桥接（153 行）
+- [x] `--dev`/`--release` 参数 → 端口扫描 + 自动发现目标实例
+- [x] `send_message` 外部调用时 `notify=true` 返回明确错误
 
-**实现：**
-- [x] 插件内抽取 `createToolHandlers(sourceSessionId)` → 7 个纯 handler
-- [x] 插件内新增 `createExternalHttpBridge()` → localhost HTTP server，端口自动选择（19876-19895 范围），写入 `~/.proma-dev/mcp-bridge-port.json`
-- [x] 新建 `proma-mcp-server.cjs` → 零依赖 MCP JSON-RPC stdio 桥接（206 行），读端口文件 → HTTP 转发
-- [x] `send_message` 外部调用时 `notify=true` 返回明确错误（无源会话）
-- [x] 校验：集成测试通过（initialize → tools/list → tools/call，7 工具全部正确）
+#### 1.3.2 send_message 结果回传 ✅ 完成 (v0.10)
 
-#### 1.3.2 send_message 结果回传
+- [x] `wait=true` 完成后返回最后一条 assistant 消息的文本（`reply` 字段）
+- [x] 内部 Agent 间 notify 正常工作
+- [x] 外部 MCP server 同理
 
-**当前问题：** `wait=true` 模式下只返回 `{ status: "completed" }`，不包含 Agent 的实际输出内容。
+#### 1.3.3 Release 并行版 ✅ 完成 (v0.11)
 
-**改进方向：**
-- `wait=true` 完成后返回最后一条 assistant 消息的文本内容
-- `notify=true` 的系统通知中包含目标会话产出的摘要（而非仅"已完成"）
-- 外部 MCP server 同理
+`D:\Proma-release\` 与正式版/Dev 三开。彩色图标（`rcedit` 注入 + 托盘 `proma-color.png`）。独立 userData（`~/.proma-release/`）。
 
-#### 1.3.3 补丁自动化脚本
+#### 1.3.4 补丁工具包 ✅ 完成
 
-写 `apply-patches.sh`：一键执行 `asar extract → sed × 8 → cp plugin → cp renderer → sed renderer → 完成`。
+- [x] `apply-patches.sh` — 一键部署脚本
+- [x] `uninstall.sh` — 卸载脚本
+- [x] `AGENT-PROMPT.md` — Agent 安装提示词
+- [x] 发布到 GitHub: `orphiczhou/proma-patches`
 
-#### 1.3.4 已知 Bug 修复
+#### 1.3.5 已知 Bug / 遗留问题
 
-- **DeepSeek 频道 Fork 失败**：SDK 层 `sdkSessionId` 存在但内部找不到，需排查 JSONL 路径
-- **插件备份更新**：`workspace-files/.context/proma-dev-patches.cjs` 仍是 v0.6（453 行），需同步到当前部署版
+- **UI session 丢失**（v0.11 新发现）：`create_session` MCP 创建的会话，headless 后可用，但在 UI 中切换时触发 "Session 已失效"，重新载入上下文浪费 token。疑似 `sdkSessionId` 在 main/renderer 进程间不同步。
+- **DeepSeek 跨渠道 Fork 失败**（v0.11 重新开启）：同渠道内 Fork OK，跨渠道报 `Session not found`。根因待排查：JSONL 路径或 SDK session 索引不一致。
+- **cloud-auth token 共享冲突**：Dev 和 Release 共用 token，一方刷新后另一方失效。
+- **正式版升级后需重打补丁**：每次升级需重新提取 main.cjs + renderer，重打全部补丁。
 
 ---
 
@@ -149,13 +152,17 @@ get_session_context = 监控叶子是否接近枯竭
 
 | 优先级 | 任务 | 状态 |
 |---|---|---|
-| P0 | 外部 MCP 服务（7 工具 stdio 暴露） | ✅ 完成 (v0.9) |
+| P0 | 外部 MCP 服务（11 工具 stdio 暴露 + 实例自动发现） | ✅ 完成 (v0.9 → v0.11) |
+| P0 | Release 并行版部署 | ✅ 完成 (v0.11) |
 | P1 | send_message 结果回传 + list_messages + 多工作区 | ✅ 完成 (v0.10) |
-| P1 | 插件备份同步到 workspace-files | ✅ 完成 (v0.10) |
-| P2 | 补丁自动化脚本 `apply-patches.sh` | ⏳ 待做 |
-| P2 | DeepSeek Fork bug 排查 | ⏳ 待做 |
+| P1 | archive_session 工具 | ✅ 完成 (v0.11) |
+| P1 | 补丁工具包（apply-patches.sh + AGENT-PROMPT.md） | ✅ 完成 |
+| P2 | UI session 丢失问题（MCP 创建的会话） | ⏳ 待排查 |
+| P2 | DeepSeek 跨渠道 Fork bug | ⏳ 待排查 |
 | P3 | 模型列表缓存 | ⏳ 待做 |
 
 ### 下一步
 
-**今天：实现外部 MCP 服务。** 具体改动见 `1.3.1` 节。
+- **高优先**：排查 UI session 丢失问题（影响 MCP 创建的会话的用户体验）
+- **中优先**：DeepSeek 跨渠道 Fork 根因分析
+- **低优先**：模型列表缓存优化
