@@ -764,14 +764,31 @@ const effectiveModelId = args.new_model_id || source.modelId;
 
 **修复：** 改为端口扫描 + 实例发现（见 §15），彻底消除端口文件依赖。
 
-### 16.3 Release 版图标黑色
+### 16.3 Release 版图标改色
 
-**根因：** `Proma.exe` 被替换为 `Proma-black.exe`（名为"black"但实际是黑色图标版本），`start-release.bat` 指向了 `Proma-release.exe`。
+**根因：** `Proma.exe` 默认黑色图标，需改为彩色。
 
-**修复：**
-- 程序图标：`start-release.bat` → `Proma-black.exe`（核实为渐变色图标）
-- 窗口/任务栏图标：用 `rcedit` 注入正式版彩色 `icon.ico` 到 EXE
-- 托盘图标：`main.cjs` 中 `proma-white.png` → `proma-color.png`（渐变彩色）
+**工具：** `png-to-ico`（PNG→ICO 转换）+ `rcedit`（EXE 资源注入），均为 npm 全局安装。
+
+**修复流程：**
+
+```bash
+# 1. PNG → ICO
+png-to-ico resources/proma-logos/proma-coral.png > icon.ico
+
+# 2. 注入 EXE（关键：必须输出到新文件，不能覆盖原文件！）
+cp Proma.exe Proma-new.exe
+rcedit Proma-new.exe --set-icon icon.ico
+
+# 3. 窗口/任务栏图标
+cp resources/proma-logos/proma-coral.png resources/icon.png
+cp icon.ico resources/icon.ico
+
+# 4. 托盘图标
+sed -i 's/"iconTemplate.png"/"proma-coral.png"/g' main.cjs
+```
+
+**`rcedit` 直接改原文件会报 `Unable to commit changes`（进程锁）。** 必须先 `cp` 到新文件再注入。
 
 ---
 
