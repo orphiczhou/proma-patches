@@ -1,7 +1,7 @@
-# Proma 会话管理补丁工具包
+# Proma 会话管理补丁工具包 (v0.12)
 
-> 给 Proma Agent 装上管理会话的双手。10 个 MCP 工具，内部 Agent 间协作 + 外部工具调用。
-> 适用于 Proma v0.12.x 商业版。无需重编译，sed 补丁 + 插件文件即可。
+> 给 Proma Agent 装上管理会话的双手。11 个 MCP 工具，内部 Agent 间协作 + 外部工具调用。
+> 适用于 Proma v0.12.x 商业版。无需重编译，6 个 sed 补丁 + 2 个插件文件即可。
 
 ---
 
@@ -9,7 +9,7 @@
 
 Proma 本身支持 Fork 会话，但 Agent **无法自己操作这些能力**。Agent 被困在自己的会话里，不能创建新会话、不能 Fork 自己、不能给其他会话发消息。
 
-本工具包通过在主进程上打 **5 个 sed 补丁** + 放入 **2 个插件文件**，给 Agent 注入 **10 个会话管理 MCP 工具**：
+本工具包通过在主进程上打 **6 个 sed 补丁** + 放入 **2 个插件文件**，给 Agent 注入 **11 个会话管理 MCP 工具**：
 
 | 工具 | 功能 |
 |---|---|
@@ -23,6 +23,7 @@ Proma 本身支持 Fork 会话，但 Agent **无法自己操作这些能力**。
 | `create_session` | 创建新会话 |
 | `fork_session` | Fork 会话（支持精确 UUID 截断） |
 | `send_message` | 向会话发消息（返回 Agent 输出） |
+| `archive_session` | 归档/取消归档会话 |
 
 同时暴露为**独立 stdio MCP server**，让外部工具（Claude Code 等）也能调用。
 
@@ -152,7 +153,7 @@ cp /tmp/release-app/dist/main.cjs /tmp/main-patched.cjs
 
 ### 步骤 R2：打补丁
 
-在 `/tmp/main-patched.cjs` 上打所有需要的补丁（见 §五），**跳过补丁 E（PROMA_DEV 隔离）**——Release 版共享数据无需隔离。
+在 `/tmp/main-patched.cjs` 上打所有需要的补丁（见 §五），**跳过补丁 E（PROMA_DEV 隔离）**——Release 版共享数据无需隔离。**补丁 F 必须打**（跨渠道防护适用于所有版本）。
 
 ```bash
 # 打补丁 A（MCP 钩子）、B（API 桥接）、C（元数据覆盖）、D（子Agent升级）
@@ -277,6 +278,14 @@ sed -i 's/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-flash"/DEEPSEEK_SUBAGENT_MOD
 sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged) {/if (!\1.app.isPackaged || process.env.PROMA_DEV === "1") {/g' /tmp/main-patched.cjs
 ```
 
+### 补丁 F：跨渠道 sdkSessionId 断裂防护（v0.12）
+
+防止 UI 中跨渠道切换模型时 SDK 报告 "Session 已失效"。检测到 renderer 请求的渠道与元数据不一致时，自动清除 `sdkSessionId` 走上下文回填路径，避免浪费 token 重建上下文。
+
+```bash
+sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId\&\&sessionMeta?.channelId\&\&channelId!==sessionMeta.channelId){existingSdkSessionId=void 0;}@' /tmp/main-patched.cjs
+```
+
 ---
 
 ## 六、步骤 3：部署文件
@@ -365,12 +374,13 @@ bash apply-patches.sh
 
 以下场景已在 v0.12.23 上验证通过：
 
-- ✅ 10 个 MCP 工具全部可用
+- ✅ 11 个 MCP 工具全部可用（含 `archive_session`）
 - ✅ 内部 Agent 间三层联动（老板→小弟→子小弟）
 - ✅ 多轮对话 + 任选一轮 Fork（通过 `list_messages` 获取 UUID）
 - ✅ 并行调度 + 轮询回收（3 小弟并行，8-12 秒完成）
-- ✅ 外部 stdio MCP 10 工具全部可用
+- ✅ 外部 stdio MCP 11 工具全部可用
 - ✅ DeepSeek / ZLM / Proma 官方渠道 Fork 正常
+- ✅ 补丁 F：跨渠道 UI 切换模型不再触发 "Session 已失效"（v0.12 新增）
 
 ---
 
@@ -397,8 +407,10 @@ Agent（在你的 Proma 会话中）:
 | 文件 | 说明 |
 |---|---|
 | `apply-patches.sh` | 一键安装脚本 |
-| `proma-dev-patches.cjs` | 插件主文件（710+ 行） |
-| `proma-mcp-server.cjs` | 外部 MCP stdio 桥接（230+ 行） |
+| `proma-dev-patches.cjs` | 插件主文件（740+ 行，11 个 MCP 工具） |
+| `proma-mcp-server.cjs` | 外部 MCP stdio 桥接（153 行，零依赖） |
+| `apply-patches.sh` | 一键安装脚本（6 个补丁） |
+| `uninstall.sh` | 卸载脚本 |
 | `README.md` | 本文档 |
 
 ---

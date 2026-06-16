@@ -1,7 +1,7 @@
 #!/bin/bash
-# Proma 会话管理补丁 — 一键安装脚本
+# Proma 会话管理补丁 — 一键安装脚本 (v0.12)
 # 用法: bash apply-patches.sh
-# 在 Proma 商业版 v0.12.x 上创建 Dev 版并打上所有补丁
+# 在 Proma 商业版 v0.12.x 上创建 Dev 版并打上全部 6 个补丁
 
 set -e
 
@@ -86,6 +86,10 @@ sed -i 's/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-flash"/DEEPSEEK_SUBAGENT_MOD
 echo "  补丁 E: userData 隔离..."
 sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged) {/if (!\1.app.isPackaged || process.env.PROMA_DEV === "1") {/g' "$TMPDIR/main-patched.cjs"
 
+# 补丁 F: 跨渠道 sdkSessionId 断裂防护 (v0.12)
+echo "  补丁 F: 跨渠道防护..."
+sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId\\&\\&sessionMeta?.channelId\\&\\&channelId!==sessionMeta.channelId){existingSdkSessionId=void 0;}@' "$TMPDIR/main-patched.cjs"
+
 echo "  补丁全部完成"
 
 # ---- 步骤 4: 部署 ----
@@ -126,7 +130,7 @@ rm -rf "$TMPDIR"
 # ---- 完成 ----
 echo ""
 echo "============================================"
-echo " 安装完成！"
+echo " 安装完成！(v0.12, 6 个补丁, 11 个 MCP 工具)"
 echo ""
 echo " 启动方式: 双击 D:\\Proma-dev\\start-dev.bat"
 echo ""

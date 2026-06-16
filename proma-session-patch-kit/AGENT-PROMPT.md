@@ -30,7 +30,7 @@ bash apply-patches.sh
 2. 确认 D:\Proma-dev\start-dev.bat 已创建
 3. 确认 D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs 存在
 
-## 10 个 MCP 工具
+## 11 个 MCP 工具
 
 安装后 Agent 自动获得以下工具：
 - get_my_session_id: 获取自己会话 ID
@@ -43,6 +43,7 @@ bash apply-patches.sh
 - create_session: 创建新会话
 - fork_session: Fork 会话（支持 UUID 截断）
 - send_message: 向会话发消息（wait=true 返回 Agent 输出）
+- archive_session: 归档/取消归档会话
 ```
 
 ---
