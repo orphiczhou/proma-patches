@@ -57,6 +57,11 @@ function callTool(name, args) {
 // ---- 7 个工具定义 ----
 const TOOLS = [
   {
+    name: "get_my_session_id",
+    description: "Get YOUR CURRENT session ID. Use this to reference yourself when checking context, listing messages, or passing your ID for async callbacks.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
     name: "list_channels",
     description: "List all configured AI channels and their available agent models. Use this FIRST before creating a session to find valid channel_id and model_id values.",
     inputSchema: { type: "object", properties: {}, required: [] },
@@ -222,4 +227,4 @@ async function handle(msg) {
 
 // 向 stderr 输出启动信息（stdio 的 stdout 被 MCP 协议独占）
 process.stderr.write(`[proma-mcp-server] Bridge port: ${PORT}\n`);
-process.stderr.write(`[proma-mcp-server] Ready. 9 tools available.\n`);
+process.stderr.write(`[proma-mcp-server] Ready. 10 tools available.\n`);

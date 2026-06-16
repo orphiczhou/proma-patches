@@ -379,6 +379,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 | 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
 | 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
 | 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
+| 2026-06-16 | v0.10.1 | 新增 `get_my_session_id` 工具（Agent 自指）；10 工具体系；内部 Agent 间调用全链路验证（老板→小弟→子小弟三层，9/9 通过） |
 | 2026-06-16 | v0.10 | P1 多工作区+消息列表+结果回传：补丁 B3（`listAgentWorkspaces` 12 函数导出）；新增 `list_workspaces` / `list_messages` 工具（共 9 工具）；`list_sessions` 加 workspace_id 过滤+workspace_name；`send_message` wait=true 返回 `reply` 字段含 Agent 实际输出；多轮对话+Fork at UUID 全链路验证；插件 696 行，MCP server 225 行 |
 | 2026-06-16 | v0.9.1 | 补丁 B2：`runAgentHeadless` 加入 API 桥接；`get_session_context` 增强 fallback 从渠道配置查 `contextWindow` + billing_error 检测；DeepSeek Fork 验证通过（v0.7 渲染器修复后已可用）；插件更新至 569 行 |
 | 2026-06-16 | v0.9 | 外部 MCP 服务：插件重构抽取 `createToolHandlers()`；新增 HTTP bridge（127.0.0.1:19876-19895 自动选端口）；新建 `proma-mcp-server.cjs`（零依赖 MCP JSON-RPC stdio 桥接，206 行）。外部 Claude Code / 脚本可通过 stdio 调用全部 7 个会话管理工具 |

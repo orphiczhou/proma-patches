@@ -26,6 +26,14 @@ function api() {
 function createToolHandlers(sourceSessionId) {
   return {
 
+    get_my_session_id: async (_args) => {
+      return jsonResult({
+        session_id: sourceSessionId || null,
+        is_external: !sourceSessionId,
+        hint: sourceSessionId ? "This is your own session ID. Use it with get_session_context, list_messages, etc." : "No session ID available (external MCP caller).",
+      });
+    },
+
     list_channels: async (_args) => {
       const a = api();
       const channels = a.listChannels();
@@ -495,6 +503,14 @@ function createSessionMcpServer(sdk, z, sourceSessionId) {
     tools: [
 
       sdk.tool(
+        "get_my_session_id",
+        "Get YOUR CURRENT session ID. Use this whenever you need to reference yourself — checking your own context usage, listing your own messages, or passing your ID to other sessions for async callbacks.",
+        {},
+        h.get_my_session_id,
+        { annotations: { readOnlyHint: true } }
+      ),
+
+      sdk.tool(
         "list_channels",
         "List all configured AI channels and their available agent models. Use this FIRST before creating a session to find valid channel_id and model_id values.",
         {},
@@ -692,5 +708,5 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
 // ---- 启动外部 MCP HTTP bridge ----
 createExternalHttpBridge();
 
-log("Agent session management MCP tools loaded (9 tools: list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message)");
+log("Agent session management MCP tools loaded (10 tools: get_my_session_id, list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message)");
 log("External MCP bridge available (read ~/.proma-dev/mcp-bridge-port.json for port)");
