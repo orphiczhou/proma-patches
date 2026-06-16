@@ -737,4 +737,4 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
 createExternalHttpBridge();
 
 log("Agent session management MCP tools loaded (11 tools: get_my_session_id, list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message, archive_session)");
-log("External MCP bridge available (read ~/.proma-dev/mcp-bridge-port.json for port)");
+log("External MCP bridge available (use instance auto-discovery on ports 19876-19895)");

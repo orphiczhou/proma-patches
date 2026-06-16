@@ -26,9 +26,9 @@ bash apply-patches.sh
 
 ## 安装后验证
 
-1. 检查 ~/.proma-dev/mcp-bridge-port.json 是否存在
-2. 确认 D:\Proma-dev\start-dev.bat 已创建
-3. 确认 D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs 存在
+1. 确认 D:\Proma-dev\start-dev.bat 已创建
+2. 确认 D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs 存在
+3. 确认 D:\Proma-dev\resources\app\dist\proma-mcp-server.cjs 存在
 
 ## 11 个 MCP 工具
 

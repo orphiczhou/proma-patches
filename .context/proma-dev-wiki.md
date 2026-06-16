@@ -579,7 +579,7 @@ proma-dev-patches.cjs         ← Electron 主进程内 localhost HTTP bridge
 
 - **端口范围**：19876-19895（20 个连续端口），启动时自动选择第一个空闲端口
 - **监听地址**：`127.0.0.1`（仅 loopback，外部网络不可达）
-- **端口文件**：`~/.proma-dev/mcp-bridge-port.json`（`{ "port": 19876 }`）
+- **身份识别端点**：`GET /get_instance_info` → `{ "proma_dev": true/false, "port": 19876 }`。`proma_dev=true` 表示 Dev 实例（`PROMA_DEV=1`），`false` 表示 Release 实例
 - **协议**：`POST /:tool_name`，body 为 JSON arguments，返回 JSON result
 - **CORS**：允许任意来源（`Access-Control-Allow-Origin: *`）
 - **Handler 共享**：与内部 MCP server 共用 `createToolHandlers(null)`（`null` = 无源会话）
@@ -587,23 +587,28 @@ proma-dev-patches.cjs         ← Electron 主进程内 localhost HTTP bridge
 
 ### 13.4 MCP stdio 桥接
 
-- **零外部依赖**：纯 Node.js 内置模块（`http`, `fs`, `path`, `os`, `readline`）
+- **零外部依赖**：纯 Node.js 内置模块（`http`, `readline`）
 - **协议**：手动实现 MCP JSON-RPC over stdio（`initialize`, `tools/list`, `tools/call`）
-- **端口发现**：启动时读 `~/.proma-dev/mcp-bridge-port.json`，未找到则用默认 19876
+- **端口发现**：启动时扫描 19876-19895，对每个端口调 `GET /get_instance_info` 获取实例身份（`proma_dev` 字段）。根据 `--dev` / `--release` 参数匹配目标实例。无需端口文件
+- **`--dev` / `--release` 参数**：指定连接到 Dev 还是 Release 实例。默认 `--dev`
 - **超时**：`send_message(wait=true)` 请求超时 10 分钟（适应长任务）
-- **错误信息**：stderr 输出启动信息，stdout 专用于 MCP 协议
+- **错误信息**：stderr 输出启动信息（含发现的实例列表），stdout 专用于 MCP 协议
 
 ### 13.5 Claude Code 配置
 
+Dev 版：
 ```json
 {
   "mcpServers": {
-    "proma-session": {
+    "proma-dev-session": {
       "command": "node",
-      "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs"]
+      "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs", "--dev"]
     }
   }
 }
+```
+
+Release 版改用 `--release` 并修正路径。`--dev` 匹配 `PROMA_DEV=1` 的实例，`--release` 匹配 `PROMA_DEV=0` 的实例。
 ```
 
 放在 `%USERPROFILE%/.claude/claude_desktop_config.json` 或项目 `.claude/mcp.json`。

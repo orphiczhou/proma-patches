@@ -322,9 +322,10 @@ start "" "D:\Proma-dev\Proma-white.exe"
 
 双击启动后验证：
 
-1. 检查 `~/.proma-dev/mcp-bridge-port.json` 已生成
+1. 确认 `D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs` 存在
 2. 打开 Proma Agent 会话，输入"用 list_channels 列出可用的 AI 渠道"
 3. Agent 应该能调用 MCP 工具并返回渠道列表
+4. 可选：`node proma-mcp-server.cjs --dev` 测试外部 MCP 自动发现（扫描 19876-19895）
 
 ---
 
