@@ -45,7 +45,7 @@ Layer 2: 时间线的剪枝者（未来）
 | **外部 MCP** | proma-mcp-server.cjs | 零依赖 stdio 桥接（153 行），`--dev`/`--release` 参数，实例自动发现 |
 | **Release 版** | `D:\Proma-release\` | 与正式版双开，彩色图标，独立部署（v0.12 已同步） |
 | **Wiki** | proma-dev-wiki.md | 完整技术文档（补丁命令、架构、流程） |
-| **Skill** | session-management v1.1.0 | Agent 内置技能，6 大使用模式，外部 MCP 端口发现文档 |
+| **Skill** | session-management v1.3.0 | Agent 内置技能，9 大使用模式，"第一判断"远端隔离机制，外部 MCP 端口发现文档 |
 
 ### 1.2 11 个 MCP 工具（Agent + 外部 MCP 均可用）
 

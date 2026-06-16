@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-16 20:07 | 维护者: 周星星
+> 最后更新: 2026-06-16 20:30 | 维护者: 周星星
 
 ---
 
@@ -392,6 +392,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-16 | v0.13.0 | Skill v1.3.0：新增"⚠️ 第一判断"关卡（工具列表后第一章节，强制区分本实例 vs 远端实例）；新增"模式 9：内部 Agent 操作远端实例"（curl 七步走）；frontmatter 触发词扩充 20+ 远端相关关键词；`mcp__session__*` 只认本进程、远端一律 curl 提升为 Skill 第一优先规则 |
 | 2026-06-16 | v0.12.2 | Skill 驱动全链路验证完成：小弟在零规则提示下自主读取 session-management Skill v1.2.3，完成远端 Dev curl（实例发现→创建含中文标题会话→发中文消息→Fork→归档→实查 6/6）和本地 MCP（create→send→fork→archive→list→context 6/6），共计 13/13 全部通过；远端中文零乱码。两条黄金规则（本地/远端隔离、curl 中文编码）在内部 Agent + 外部 MCP 双入口全覆盖 |
 | 2026-06-16 | v0.12.1 | HTTP bridge UTF-8 编码修复：`req.on("data", c => body += c)` 在 TCP 分包时会把多字节 UTF-8 字符拦腰截断。改为 `Buffer.concat(chunks).toString("utf-8")` 从根本上解决。Session-management Skill v1.2.2 收敛：curl 中文编码黄金规则提升为章首全局强制（`printf + --data-binary @-`）。Dev + Release + 补丁工具包全部同步 |
 | 2026-06-16 | v0.11 | 实例自动发现：新增 `GET /get_instance_info` 端点；`proma-mcp-server.cjs` 重写为端口扫描+实例发现（`--dev`/`--release` 参数），废弃端口文件；新增 `archive_session` 工具（11 工具体系）；修复 Fork 不传 model 时 modelId 丢失；修复 MCP server 启动时序导致连错实例；Release 版图标改彩色（`Proma-black.exe` 实际为渐变色 + `rcedit` 注入图标 + 托盘 `proma-color.png`）；清理 Release 测试会话 |

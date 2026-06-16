@@ -1,13 +1,48 @@
 ---
 name: session-management
-description: Agent 会话管理能力。当用户需要创建/查询/Fork会话、给其他会话发消息、监控token用量、归档会话、跨工作区操作、并行调度多个Agent协作、配置外部MCP连接Proma实例、管理Dev/Release双实例时触发。触发信号：多会话、开小弟、Fork、分身、并行、批量、派任务、监控进度、上下文甜点、竹节交接、工作区切换、归档、清理会话、外部MCP、Claude Code连接Proma、Dev实例、Release实例、远端实例、双实例。
+description: Agent 会话管理能力。当用户需要创建/查询/Fork会话、给其他会话发消息、监控token用量、归档会话、跨工作区操作、并行调度多个Agent协作、配置外部MCP连接Proma实例、管理Dev/Release双实例时触发。触发信号：多会话、开小弟、Fork、分身、并行、批量、派任务、监控进度、上下文甜点、竹节交接、工作区切换、归档、清理会话、外部MCP、Claude Code连接Proma、Dev实例、Release实例、远端实例、双实例、其他Proma进程、另一个实例、远端操作、远端Dev、远程实例、跨进程、不同Proma、那个实例、另一台、远端会话、远端验证、操作远端。
 group: proma
-version: "1.2.3"
+version: "1.3.0"
 ---
 
-# Agent 会话管理 (v1.2.3)
+# Agent 会话管理 (v1.3.0)
 
 你拥有 **11 个会话管理 MCP 工具**（`session` MCP server）。这些工具提供了完整的 Proma Agent 会话管理能力——创建、Fork、发消息、查用量、查消息历史、归档等。
+
+---
+
+## ⚠️ 第一判断：目标在哪个 Proma 实例？
+
+**调用任何工具之前，先判断目标是本实例还是其他实例。选错路径会查到空数据或错误结果——这是最常见的验证失败原因。**
+
+```
+你要操作的会话/数据在哪个 Proma 进程？
+
+  本实例（你所在的进程）    │  其他实例（另一个 Proma 进程）
+  ────────────────────────│──────────────────────────────
+  用 mcp__session__* 工具  │  用 curl http://127.0.0.1:PORT/工具名
+  create_session           │  curl -X POST .../create_session
+  send_message             │  curl -X POST .../send_message
+  fork_session 等          │  fork_session 等
+```
+
+**判断方法——看任务描述中的关键词：**
+
+| 关键词 | 目标实例 | 用哪种工具 |
+|--------|----------|-----------|
+| "本地"、"当前工作区"、"在这里"、"我这个"、"我的" | **本实例** | `mcp__session__*` |
+| "远端 Dev"、"远端 Release"、"另一个 Proma"、"其他实例"、"远端"、"那个实例"、"另一台"、"那个 Proma"、"远端操作" | **其他 Proma 进程** | `curl http://127.0.0.1:PORT/...` |
+| 不确定 | 先探测 | `curl -s http://127.0.0.1:19876/get_instance_info` 扫端口 |
+
+**为什么必须区分？** `mcp__session__*` 工具通过进程内 API 直连当前 Proma。用本地工具查远端实例的 session ID 会返回 "Session not found"——不是 bug，是进程隔离。两个 Proma 进程的会话、消息、工作区完全独立，不可交叉访问。
+
+**远端操作就是 curl 四步走：**
+1. **探测端口** — `curl -s http://127.0.0.1:19876/get_instance_info`（19876-19895 范围内逐个试，返回 `{"proma_dev":true/false,"port":N}` 即命中）
+2. **全部 curl** — 创建/发消息/Fork/归档/列表/查详情 一律 `curl -X POST http://127.0.0.1:PORT/工具名 --data-binary '{...}'`
+3. **中文编码** — 含中文的 JSON 必须 `printf` + `--data-binary @-` 管道（Windows Bash 下 `-d '...中文...'` 会转 GBK 乱码）
+4. **实查验证** — 远端操作完成后用 curl 直接查结果，**严禁用本地 `mcp__session__*` 交叉验证远端数据**
+
+> **一句话：`mcp__session__*` 只认当前进程。提到"远端/另一个/Dev/Release/其他实例"就切到 curl。**
 
 ---
 
@@ -53,7 +88,7 @@ Proma 实例 (Dev 或 Release)
 | 配置 | 零配置，自动可用 | 需在 `.claude/mcp.json` 中配置 |
 | `get_my_session_id` | 返回实际会话 ID | 返回 `null` |
 | `send_message(notify=true)` | ✅ 可用 | ❌ 不可用（用轮询代替） |
-| 多实例支持 | 仅当前实例 | 可同时连接 Dev + Release |
+| 多实例支持 | 本实例用 MCP 工具，远端实例用 curl | 可同时连接 Dev + Release（stdio MCP） |
 | 适用场景 | Agent 自主调度小弟 | 外部编排、脚本自动化、跨实例管理 |
 
 ---
@@ -85,7 +120,7 @@ Proma 实例 (Dev 或 Release)
 
 ## 内部 Agent 使用模式
 
-> 以下模式适用于**方式 A（内部 Agent）**。外部工具用户请参考"外部 MCP 使用模式"章节。
+> 以下模式适用于**方式 A（内部 Agent）**。**⚠️ 先做第一判断：目标是本实例还是其他实例？如果是其他实例，用下面的"模式 9：内部 Agent 操作远端实例"。** 外部工具用户请参考"外部 MCP 使用模式"章节。
 
 ### 模式 1：开小弟并行干活
 
@@ -142,6 +177,27 @@ Proma 实例 (Dev 或 Release)
 ```
 
 归档的会话默认不在 `list_sessions` 中显示，但数据不丢失、可随时恢复。
+
+### 模式 9：内部 Agent 操作远端实例
+
+你是内部 Agent，但任务要求操作**另一个 Proma 进程**（远端 Dev、Release、或任何其他实例）时，**不能**用 `mcp__session__*`——那些工具只认当前进程。必须走 curl：
+
+```
+1. curl -s http://127.0.0.1:19876/get_instance_info → 探测远端实例端口
+   （19876-19895 逐个试，返回 {"proma_dev":true/false,"port":N} 即命中）
+2. curl -X POST http://127.0.0.1:PORT/list_channels → 看远端有哪些渠道可用
+3. curl -X POST http://127.0.0.1:PORT/create_session → 远端创建会话
+4. curl -X POST http://127.0.0.1:PORT/send_message → 远端发消息
+5. curl -X POST http://127.0.0.1:PORT/fork_session → 远端 Fork
+6. curl -X POST http://127.0.0.1:PORT/archive_session → 远端归档
+7. curl -X POST http://127.0.0.1:PORT/get_session_info → 实查验证
+```
+
+**核心规则：**
+- 端口从 `GET /get_instance_info` 获取，不要写死 19876
+- 含中文的 JSON 必须 `printf` + `--data-binary @-` 管道
+- 远端操作完成后用 **curl** 实查，不用本地工具交叉验证
+- 本实例的本地操作继续用 `mcp__session__*`，两边不混用
 
 ---
 
