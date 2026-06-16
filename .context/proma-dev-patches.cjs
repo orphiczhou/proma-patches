@@ -43,20 +43,44 @@ function createToolHandlers(sourceSessionId) {
       });
     },
 
+    list_workspaces: async (_args) => {
+      const a = api();
+      const workspaces = a.listAgentWorkspaces();
+      return jsonResult({
+        workspaces: workspaces.map(w => ({
+          id: w.id,
+          name: w.name,
+          slug: w.slug,
+          created_at: w.createdAt,
+          updated_at: w.updatedAt,
+        })),
+      });
+    },
+
     list_sessions: async (args) => {
       const a = api();
-      const all = a.listAgentSessions();
-      const filtered = args.include_archived ? all : all.filter(s => !s.archived);
-      const limited = filtered.slice(0, args.limit ?? 50);
+      let all = a.listAgentSessions();
+      all = args.include_archived ? all : all.filter(s => !s.archived);
+      if (args.workspace_id) all = all.filter(s => s.workspaceId === args.workspace_id);
+      const limited = all.slice(0, args.limit ?? 50);
+
+      // 批量查工作区名
+      const wsNames = {};
+      try {
+        const wss = a.listAgentWorkspaces();
+        wss.forEach(w => { wsNames[w.id] = w.name; });
+      } catch (_) { /* best-effort */ }
+
       return jsonResult({
         count: limited.length,
-        total: filtered.length,
+        total: all.length,
         sessions: limited.map(s => ({
           id: s.id,
           title: s.title,
           channel_id: s.channelId,
           model_id: s.modelId,
           workspace_id: s.workspaceId,
+          workspace_name: wsNames[s.workspaceId] || null,
           pinned: !!s.pinned,
           archived: !!s.archived,
           permission_mode: s.permissionMode,
@@ -179,6 +203,64 @@ function createToolHandlers(sourceSessionId) {
             total: input + output + cache,
             usage_pct: pct,
           },
+        });
+    },
+
+    list_messages: async (args) => {
+      const a = api();
+      const meta = a.getAgentSessionMeta(args.session_id);
+      if (!meta) return jsonResult({ error: `Session not found: ${args.session_id}` });
+
+      try {
+        const msgs = a.getAgentSessionSDKMessages(args.session_id);
+        if (!msgs || msgs.length === 0) {
+          return jsonResult({ session_id: args.session_id, messages: [], count: 0, total: 0 });
+        }
+
+        const offset = args.offset ?? 0;
+        const limit = Math.min(args.limit ?? 50, 200);
+        const slice = msgs.slice(offset, offset + limit);
+
+        const result = slice.map((m, i) => {
+          const entry = {
+            index: offset + i,
+            type: m.type,
+            uuid: m.uuid || null, // headless 的 user 消息可能没有 uuid
+            timestamp: m._createdAt || m.timestamp || null,
+            role: (m.message && m.message.role) ? m.message.role : (m.type === "user" ? "user" : m.type === "assistant" ? "assistant" : null),
+          };
+          if (m.type === "result") {
+            entry.subtype = m.subtype || null;
+            entry.duration_ms = m.duration_ms || null;
+            if (m.usage) {
+              entry.usage = {
+                input_tokens: m.usage.input_tokens || 0,
+                output_tokens: m.usage.output_tokens || 0,
+                cache_tokens: (m.usage.cache_read_input_tokens || 0) + (m.usage.cache_creation_input_tokens || 0),
+              };
+            }
+            if (m.result) entry.result_text = String(m.result).slice(0, 500);
+          }
+          if (m.message && m.message.content) {
+            const texts = m.message.content.filter(c => c.type === "text").map(c => c.text);
+            // DeepSeek 的 thinking block 不走 text，跳过
+            const realTexts = m.message.content.filter(c => c.type === "text" && c.text).map(c => c.text);
+            if (realTexts.length > 0) {
+              entry.text = realTexts.join("\n").slice(0, 500);
+              entry.text_full_length = realTexts.join("\n").length;
+            }
+          }
+          if (m._errorCode) entry.error_code = m._errorCode;
+          if (m._errorTitle) entry.error_title = m._errorTitle;
+          return entry;
+        });
+
+        return jsonResult({
+          session_id: args.session_id,
+          count: result.length,
+          total: msgs.length,
+          offset,
+          messages: result,
         });
       } catch (err) {
         return jsonResult({ error: `Read failed: ${err instanceof Error ? err.message : String(err)}` });
@@ -362,10 +444,34 @@ function createToolHandlers(sourceSessionId) {
           });
         }
 
+        // wait=true 完成：读取最终输出
+        let replyText = null;
+        try {
+          const msgs = a.getAgentSessionSDKMessages(args.session_id);
+          if (msgs && msgs.length > 0) {
+            // 取最后一条 assistant 消息
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              const m = msgs[i];
+              if (m.type === "assistant" && m.message && m.message.content) {
+                const texts = m.message.content.filter(c => c.type === "text").map(c => c.text);
+                if (texts.length > 0) replyText = texts.join("\n");
+                break;
+              }
+              if (m.type === "result" && m.result) {
+                replyText = String(m.result);
+                break;
+              }
+            }
+          }
+        } catch (_) { /* best-effort */ }
+
         return jsonResult({
           session_id: args.session_id,
           status: "completed",
-          message: `Target session "${meta.title}" has finished processing.`,
+          reply: replyText,
+          message: replyText
+            ? `Target session "${meta.title}" completed. See "reply" field for output.`
+            : `Target session "${meta.title}" has finished processing (no text output captured).`,
         });
       } catch (err) {
         return jsonResult({
@@ -397,10 +503,19 @@ function createSessionMcpServer(sdk, z, sourceSessionId) {
       ),
 
       sdk.tool(
+        "list_workspaces",
+        "List all agent workspaces. Use this to find workspace IDs for create_session / fork_session / list_sessions filtering.",
+        {},
+        h.list_workspaces,
+        { annotations: { readOnlyHint: true } }
+      ),
+
+      sdk.tool(
         "list_sessions",
-        "List all agent sessions with their metadata (title, channel, model, workspace, archived status).",
+        "List all agent sessions with their metadata (title, channel, model, workspace name/ID, archived status).",
         {
           include_archived: z.boolean().optional().describe("Include archived sessions (default: false)"),
+          workspace_id: z.string().optional().describe("Filter by workspace ID (from list_workspaces). Omit to see all workspaces."),
           limit: z.number().min(1).max(200).optional().describe("Max results to return (default: 50)"),
         },
         h.list_sessions,
@@ -420,6 +535,18 @@ function createSessionMcpServer(sdk, z, sourceSessionId) {
         "Get the CURRENT context/token usage of an agent session. Returns input tokens, output tokens, total tokens, and context window size from the latest message.",
         { session_id: z.string().describe("The session ID to check context usage for.") },
         h.get_session_context,
+        { annotations: { readOnlyHint: true } }
+      ),
+
+      sdk.tool(
+        "list_messages",
+        "List messages (conversation history) for an agent session. Each message includes its UUID (use with fork_session), role, timestamp, and text content. Use this to inspect what a session has done and find the right message UUID to fork at.",
+        {
+          session_id: z.string().describe("The session ID to list messages for."),
+          limit: z.number().min(1).max(200).optional().describe("Max messages to return (default: 50)"),
+          offset: z.number().min(0).optional().describe("Skip first N messages for pagination (default: 0)"),
+        },
+        h.list_messages,
         { annotations: { readOnlyHint: true } }
       ),
 
@@ -451,7 +578,7 @@ function createSessionMcpServer(sdk, z, sourceSessionId) {
 
       sdk.tool(
         "send_message",
-        "Send a user message to an EXISTING agent session for autonomous processing. Three modes:\n- wait=true (default): blocks until target completes, returns result directly.\n- notify=true: fire-and-forget, but when target finishes, pushes a notification message back to the calling session via runAgentHeadless (async callback).\n- neither: pure fire-and-forget, no notification.",
+        "Send a user message to an EXISTING agent session for autonomous processing. Three modes:\n- wait=true (default): blocks until target completes, returns result with \"reply\" field containing the assistant's final response text.\n- notify=true: fire-and-forget, but when target finishes, pushes a notification message back to the calling session (async callback). Not supported from external MCP.\n- neither: pure fire-and-forget, no notification.",
         {
           session_id: z.string().describe("Target session ID to send the message to."),
           message: z.string().describe("The user message / task to send to the session."),
@@ -565,5 +692,5 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
 // ---- 启动外部 MCP HTTP bridge ----
 createExternalHttpBridge();
 
-log("Agent session management MCP tools loaded (7 tools: list_channels, list_sessions, get_session_info, get_session_context, create_session, fork_session, send_message)");
+log("Agent session management MCP tools loaded (9 tools: list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message)");
 log("External MCP bridge available (read ~/.proma-dev/mcp-bridge-port.json for port)");

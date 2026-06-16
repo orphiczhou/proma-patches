@@ -62,12 +62,18 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
+    name: "list_workspaces",
+    description: "List all agent workspaces. Use this to find workspace IDs for create_session / fork_session / list_sessions filtering.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
     name: "list_sessions",
-    description: "List all agent sessions with their metadata (title, channel, model, workspace, archived status).",
+    description: "List all agent sessions with their metadata (title, channel, model, workspace name/ID, archived status).",
     inputSchema: {
       type: "object",
       properties: {
         include_archived: { type: "boolean", description: "Include archived sessions (default: false)" },
+        workspace_id: { type: "string", description: "Filter by workspace ID (from list_workspaces). Omit to see all workspaces." },
         limit: { type: "number", description: "Max results to return (default: 50, max: 200)" },
       },
     },
@@ -87,6 +93,19 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: { session_id: { type: "string", description: "The session ID to check context usage for." } },
+      required: ["session_id"],
+    },
+  },
+  {
+    name: "list_messages",
+    description: "List messages (conversation history) for an agent session. Each message includes its UUID (use with fork_session), role, timestamp, and text content.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_id: { type: "string", description: "The session ID to list messages for." },
+        limit: { type: "number", description: "Max messages to return (default: 50, max: 200)" },
+        offset: { type: "number", description: "Skip first N messages for pagination (default: 0)" },
+      },
       required: ["session_id"],
     },
   },
@@ -122,7 +141,7 @@ const TOOLS = [
   },
   {
     name: "send_message",
-    description: "Send a user message to an EXISTING agent session for autonomous processing. Three modes:\n- wait=true (default): blocks until target completes, returns result directly.\n- notify=true: fire-and-forget, but when target finishes, pushes a notification message back to the calling session (async callback). NOTE: notify=true is not supported from external MCP.\n- neither: pure fire-and-forget, no notification.",
+    description: "Send a user message to an EXISTING agent session for autonomous processing. Three modes:\n- wait=true (default): blocks until target completes, returns result with \"reply\" field containing the assistant's final response text.\n- notify=true: fire-and-forget, but when target finishes, pushes a notification message back to the calling session (async callback). NOTE: notify=true is not supported from external MCP.\n- neither: pure fire-and-forget, no notification.",
     inputSchema: {
       type: "object",
       properties: {
@@ -203,4 +222,4 @@ async function handle(msg) {
 
 // 向 stderr 输出启动信息（stdio 的 stdout 被 MCP 协议独占）
 process.stderr.write(`[proma-mcp-server] Bridge port: ${PORT}\n`);
-process.stderr.write(`[proma-mcp-server] Ready. 7 tools available.\n`);
+process.stderr.write(`[proma-mcp-server] Ready. 9 tools available.\n`);

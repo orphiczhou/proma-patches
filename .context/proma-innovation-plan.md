@@ -150,8 +150,8 @@ get_session_context = 监控叶子是否接近枯竭
 | 优先级 | 任务 | 状态 |
 |---|---|---|
 | P0 | 外部 MCP 服务（7 工具 stdio 暴露） | ✅ 完成 (v0.9) |
-| P1 | send_message 结果回传（返回实际 Agent 输出） | ⏳ 待做 |
-| P1 | 插件备份同步到 workspace-files | ⏳ 待做 |
+| P1 | send_message 结果回传 + list_messages + 多工作区 | ✅ 完成 (v0.10) |
+| P1 | 插件备份同步到 workspace-files | ✅ 完成 (v0.10) |
 | P2 | 补丁自动化脚本 `apply-patches.sh` | ⏳ 待做 |
 | P2 | DeepSeek Fork bug 排查 | ⏳ 待做 |
 | P3 | 模型列表缓存 | ⏳ 待做 |

@@ -181,6 +181,16 @@ sed -i 's/getAgentSessionSDKMessages};/getAgentSessionSDKMessages,runAgentHeadle
 
 **效果：** 补丁 B 导出的函数从 10 个扩展到 11 个。
 
+#### 补丁 B3：listAgentWorkspaces 桥接（v0.10 新增）
+
+`list_workspaces` 工具需要列出所有工作区，但 `listAgentWorkspaces` 未在补丁 B 中导出。
+
+```bash
+sed -i 's/listChannels,getChannelById,getAgentWorkspace/listChannels,getChannelById,getAgentWorkspace,listAgentWorkspaces/' main.cjs
+```
+
+**效果：** 补丁 B 导出的函数从 11 个扩展到 12 个。
+
 #### 补丁 C：频道 + 模型元数据覆盖
 
 **注入点：** `sendMessage()` 方法内，channel 解析处（`const channel = getChannelById(channelId);`）
@@ -256,11 +266,14 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 | 工具名 | 功能 | 只读 |
 |---|---|---|
 | `list_channels` | 列出所有 AI 渠道及可用模型 | ✅ |
-| `list_sessions` | 列出 Agent 会话（含标题/渠道/模型/归档） | ✅ |
+| `list_workspaces` | 列出所有工作区（id/name/slug） | ✅ |
+| `list_sessions` | 列出 Agent 会话（含工作区名、支持 workspace_id 过滤） | ✅ |
 | `get_session_info` | 查询单个会话详情 | ✅ |
+| `get_session_context` | 查询会话当前 token 用量（含上下文窗口/使用率） | ✅ |
+| `list_messages` | 列出会话消息历史（UUID/角色/文本），支持 offset/limit 分页 | ✅ |
 | `create_session` | 创建新会话，指定渠道/模型/标题/工作区 | ❌ |
-| `fork_session` | Fork 已有会话，支持切换渠道和模型 | ❌ |
-| `get_session_context` | 查询会话当前 token 用量（input/output/cache/total） | ✅ |
+| `fork_session` | Fork 已有会话，支持 up_to_message_uuid 精确截断 | ❌ |
+| `send_message` | 向目标会话发消息，wait=true 返回 `reply` 字段（Agent 输出文本） | ❌ |
 
 ### 架构
 
@@ -366,6 +379,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 | 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
 | 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
 | 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
+| 2026-06-16 | v0.10 | P1 多工作区+消息列表+结果回传：补丁 B3（`listAgentWorkspaces` 12 函数导出）；新增 `list_workspaces` / `list_messages` 工具（共 9 工具）；`list_sessions` 加 workspace_id 过滤+workspace_name；`send_message` wait=true 返回 `reply` 字段含 Agent 实际输出；多轮对话+Fork at UUID 全链路验证；插件 696 行，MCP server 225 行 |
 | 2026-06-16 | v0.9.1 | 补丁 B2：`runAgentHeadless` 加入 API 桥接；`get_session_context` 增强 fallback 从渠道配置查 `contextWindow` + billing_error 检测；DeepSeek Fork 验证通过（v0.7 渲染器修复后已可用）；插件更新至 569 行 |
 | 2026-06-16 | v0.9 | 外部 MCP 服务：插件重构抽取 `createToolHandlers()`；新增 HTTP bridge（127.0.0.1:19876-19895 自动选端口）；新建 `proma-mcp-server.cjs`（零依赖 MCP JSON-RPC stdio 桥接，206 行）。外部 Claude Code / 脚本可通过 stdio 调用全部 7 个会话管理工具 |
 | 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
