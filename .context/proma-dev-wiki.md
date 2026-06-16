@@ -606,6 +606,44 @@ node -c D:/Proma-dev/resources/app/dist/proma-mcp-server.cjs
 ### 13.8 已知限制
 
 - Proma 不运行时，外部 MCP server 连接失败（HTTP bridge 不存在）
-- `send_message` 外部调用不支持 `notify=true`
-- `send_message(wait=true)` 只返回 `{ status: "completed" }`，不含 Agent 输出内容（待 P1）
+- `send_message` 外部调用不支持 `notify=true`（可用轮询代替，见 §14）
 - 端口范围硬编码在插件中，不通过配置文件
+
+---
+
+## 十四、并行调度 + 轮询回收（v0.10.1 验证）
+
+### 14.1 模式
+
+外部调用者无需异步回调，通过 **fire-and-forget + 轮询** 实现并行调度：
+
+```
+send_message(target, wait=false)  → 立即返回 "started"
+    │
+    ├─ 定时轮询 get_session_context(target)
+    │    token 连续两次不变且非零 → 任务完成
+    │
+    └─ list_messages(target, limit=1) → 取最后一条 assistant 文本
+```
+
+### 14.2 验证结果
+
+3 个小弟并行（A/C: deepseek-v4-flash, B: glm-4.5-air），轮询间隔 4 秒：
+
+```
+Poll #1   A=29983t   B=0t       C=0t         ← A 最快完成
+Poll #2   A=29983t   B=0t       C=29983t     ← C 完成, A 稳定
+Poll #3   A=done     B=47040t   C=done       ← B 完成
+Poll #4   A=done     B=done     C=done       ← 全部回收
+
+A: Python, JavaScript, Rust, Go, TypeScript   8s, 29K tokens
+B: 苹果、香蕉、橙子、草莓、葡萄                12s, 47K tokens
+C: 狗、猫、大象、老鹰、海豚                    8s, 29K tokens
+```
+
+### 14.3 优势
+
+- 不需要异步回调基础设施
+- 调用方控制轮询频率、超时、目标数量
+- 多目标并行时自然支持不同完成时间
+- 纯组合已有工具，无需改代码
