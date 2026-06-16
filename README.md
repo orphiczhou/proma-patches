@@ -45,7 +45,7 @@
 
 ### 第五步：验证
 
-安装后验证：双击 `start-dev.bat` 启动 → 开 Agent 会话 → 说"用 list_channels 列出可用渠道"。
+安装后验证：双击启动脚本 → 开 Agent 会话 → 说"用 list_channels 列出可用渠道"。
 
 ---
 
@@ -58,7 +58,7 @@ cp /tmp/proma-app/dist/main.cjs /tmp/main-patched.cjs
 
 ---
 
-## 模块 A：双开开发版
+## 模块 A：双开开发版（`D:\Proma-dev`）
 
 独立数据目录（`~/.proma-dev/`），可与正式版同时运行。
 
@@ -86,7 +86,7 @@ BAT
 
 **这一步是 Agent 最容易失败的地方。请仔细执行。**
 
-#### A5a. 同步 Proma 配置文件（始终可执行）
+#### A5a. 同步 Proma 配置文件（始终可执行，正式版运行时也能复制）
 
 ```bash
 mkdir -p ~/.proma-dev
@@ -127,35 +127,101 @@ cp -r "$APPDATA/@proma/electron/Local Storage" "$APPDATA/@proma/electron-dev/" 2
 
 ```bash
 echo "=== 数据同步验证 ==="
-ls ~/.proma-dev/cloud-auth.json >/dev/null 2>&1 && echo "  ✅ cloud-auth.json" || echo "  ⚠️  缺失"
-ls ~/.proma-dev/channels.json >/dev/null 2>&1 && echo "  ✅ channels.json" || echo "  ⚠️  缺失"
-ls "$APPDATA/@proma/electron-dev/Network" >/dev/null 2>&1 && echo "  ✅ Network (免登录)" || echo "  ⚠️  Network 缺失（需在 dev 版手动登录 OAuth）"
-ls "$APPDATA/@proma/electron-dev/Local Storage" >/dev/null 2>&1 && echo "  ✅ Local Storage" || echo "  ⚠️  Local Storage 缺失"
+ls ~/.proma-dev/cloud-auth.json >/dev/null 2>&1 && echo "  ✅ cloud-auth.json" || echo "  ⚠️  缺失（需登录 Google）"
+ls ~/.proma-dev/channels.json >/dev/null 2>&1 && echo "  ✅ channels.json" || echo "  ⚠️  缺失（需重新配渠道）"
+ls "$APPDATA/@proma/electron-dev/Network" >/dev/null 2>&1 && echo "  ✅ Network (免登录)" || echo "  ⚠️  Network 缺失（手动登录 OAuth 即可）"
 ```
 
 #### Agent 常见失败速查
 
 | 错误 | 原因 | 修复 |
 |---|---|---|
-| `cp: cannot stat .../Network` | `$APPDATA` 没展开 | 用 `echo $APPDATA` 确认，或用绝对路径替换 |
-| `cp: Permission denied` | 正式版未关，文件被锁 | 关正式版 → 任务管理器确认无 Proma.exe → 重试 |
-| dev 版启动后要求重新登录 | Network 目录没复制成功 | **不是大问题**——手动登录一次 Google OAuth 即可，不影响补丁功能 |
-| `~/.proma-dev/` 目录不存在 | 没执行 mkdir | 先执行 `mkdir -p ~/.proma-dev` |
+| `cp: cannot stat .../Network` | `$APPDATA` 没展开 | `echo $APPDATA` 确认，或用绝对路径 |
+| `cp: Permission denied` | 正式版未关 | 关正式版 → 任务管理器确认 → 重试 |
+| dev 版启动后要求重新登录 | Network 没复制成功 | 手动登录一次 Google OAuth 即可 |
+| `~/.proma-dev/` 不存在 | 没建目录 | `mkdir -p ~/.proma-dev` |
 
 ---
 
-## 模块 B：Release 并行版
+## 模块 B：Release 并行版（`D:\Proma-release`）
 
-共享正式版数据（`~/.proma/`），无需重新登录。与正式版互斥。
+**共享正式版数据（`~/.proma/`），不需要重新登录。** 与正式版互斥运行（关一个开另一个）。
+
+### B1. 复制正式版 + 提取
 
 ```bash
 cp -r D:/Proma D:/Proma-release
+
+# 提取 main.cjs（ASAR 保持打包不解开）
 npx asar extract D:/Proma-release/resources/app.asar /tmp/release-app
 cp /tmp/release-app/dist/main.cjs /tmp/main-patched.cjs
-# ... 在 /tmp/main-patched.cjs 上打补丁 ...
-cp /tmp/main-patched.cjs /tmp/release-app/dist/main.cjs
-cd /tmp/release-app && npx asar pack . D:/Proma-release/resources/app.asar
 ```
+
+### B2. 打补丁
+
+在 `/tmp/main-patched.cjs` 上打需要的补丁（见增强模块 1-6），**但跳过补丁 E（PROMA_DEV 隔离）**——Release 版共享数据无需隔离。
+
+```bash
+# 按增强模块顺序逐一执行 sed 命令
+# 注意：跳过 PROMA_DEV 补丁（仅模块 A 需要）
+```
+
+### B3. 替换 main.cjs 并重新打包 ASAR
+
+```bash
+# 替换
+cp /tmp/main-patched.cjs /tmp/release-app/dist/main.cjs
+
+# 重新打包
+cd /tmp/release-app
+npx asar pack . D:/Proma-release/resources/app.asar
+
+echo "asar 更新时间:"
+ls -la D:/Proma-release/resources/app.asar | awk '{print $6,$7,$8}'
+```
+
+### B4. 部署插件文件（放在 ASAR 外部）
+
+Release 版 ASAR 不解包，插件文件需放在 asar 同级 `dist/` 目录。`require("./proma-dev-patches.cjs")` 先查 asar 内部，找不到则查文件系统。
+
+```bash
+mkdir -p D:/Proma-release/resources/app/dist
+cp proma-dev-patches.cjs D:/Proma-release/resources/app/dist/
+cp proma-mcp-server.cjs D:/Proma-release/resources/app/dist/
+
+# 验证
+ls D:/Proma-release/resources/app/dist/proma-dev-patches.cjs \
+  && echo "✅ 插件已部署" || echo "❌ 插件部署失败"
+```
+
+### B5. 创建启动脚本
+
+```bash
+cat > D:/Proma-release/start-release.bat << 'BAT'
+@echo off
+start "" "D:\Proma-release\Proma.exe"
+BAT
+```
+
+### B6. 对齐版本号
+
+```bash
+# 需要在 asar 打包前修改 package.json 版本号
+# 如果在 B3 打包前已执行过版本号 sed，此步已完成
+```
+
+### Dev 版 vs Release 版
+
+| | Dev 版 (A) | Release 版 (B) |
+|---|---|---|
+| 安装路径 | `D:\Proma-dev` | `D:\Proma-release` |
+| 数据目录 | `~/.proma-dev/` 独立 | `~/.proma/` 共享 |
+| 与正式版双开 | ✅ 可以 | ❌ 互斥 |
+| 需重新登录 | 需同步数据 | 不需要 |
+| ASAR 状态 | 解包 (app/) | 保持打包 (app.asar) |
+| 补丁 E (PROMA_DEV) | 需要 | 不需要 |
+| 适用场景 | 开发调试 | 日常替代使用 |
+| 启动脚本 | start-dev.bat | start-release.bat |
 
 ---
 
@@ -198,14 +264,20 @@ sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' /tmp/main-
 ### 模块 4：UI 模型同步
 
 ```bash
+# Dev 版（ASAR 已解包）
 cp -r /tmp/app/dist/renderer/* D:/Proma-dev/resources/app/dist/renderer/
 sed -i 's/if(qe.has(e))return qe;//g' D:/Proma-dev/resources/app/dist/renderer/assets/index-*.js
+
+# Release 版（需在 B3 打包前放入 /tmp/release-app/dist/renderer/）
+cp -r /tmp/app/dist/renderer/* /tmp/release-app/dist/renderer/
+sed -i 's/if(qe.has(e))return qe;//g' /tmp/release-app/dist/renderer/assets/index-*.js
 ```
 
 ### 模块 5：外部 MCP 服务
 
-将 `proma-mcp-server.cjs` 放到 `[安装目录]/resources/app/dist/`。插件自动启动 localhost HTTP bridge（端口 19876-19895 自动选择，写入 `~/.proma-dev/mcp-bridge-port.json`）。
+将 `proma-mcp-server.cjs` 放到 `[安装目录]/resources/app/dist/`。插件自动启动 localhost HTTP bridge（端口 19876-19895 自动选择）。
 
+Claude Code 配置（`.claude/mcp.json`）：
 ```json
 {
   "mcpServers": {
@@ -216,6 +288,7 @@ sed -i 's/if(qe.has(e))return qe;//g' D:/Proma-dev/resources/app/dist/renderer/a
   }
 }
 ```
+Release 版将路径改为 `D:\\Proma-release\\...`
 
 ### 模块 6：托盘图标替换
 
@@ -225,30 +298,18 @@ sed -i 's/"iconTemplate.png"/"proma-white.png"/g' /tmp/main-patched.cjs
 
 ---
 
-## 最终部署
-
-```bash
-mkdir -p D:/Proma-dev/resources/app/dist
-cp /tmp/main-patched.cjs D:/Proma-dev/resources/app/dist/main.cjs
-cp proma-dev-patches.cjs D:/Proma-dev/resources/app/dist/
-cp proma-mcp-server.cjs D:/Proma-dev/resources/app/dist/
-sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app/package.json
-```
-
----
-
 ## 补丁速查表
 
-| 补丁 | 功能 | 适用 |
-|---|---|---|
-| A | MCP 钩子 | A/B |
-| B | API 桥接 + 插件加载 | A/B |
-| C1-5 | 频道+模型覆盖 | A/B |
-| D+E | Renderer 同步 | A/B |
-| 1 | DeepSeek 子Agent v4-pro | 通用 |
-| 2 | PROMA_DEV 隔离 | 仅 A |
-| 3 | 托盘图标 | 通用 |
-| V | 版本号对齐 | 通用 |
+| 补丁 | 功能 | Dev(A) | Release(B) |
+|---|---|---|---|
+| A | MCP 钩子注入 | ✅ | ✅ |
+| B | API 桥接 + 插件加载 | ✅ | ✅ |
+| C1-5 | 频道+模型元数据覆盖 | ✅ | ✅ |
+| D+E | Renderer 同步 + 守卫移除 | ✅ | ✅ |
+| 1 | DeepSeek 子Agent → V4 Pro | ✅ | ✅ |
+| E (PROMA_DEV) | userData 隔离 | ✅ | ❌ 不需要 |
+| 3 | 托盘图标白色 | ✅ | ✅ |
+| V | 版本号对齐 | ✅ | ✅ |
 
 ---
 
@@ -256,8 +317,8 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 ```bash
 bash uninstall.sh
-# 或手动：
-rm -rf D:/Proma-dev && rm -rf ~/.proma-dev
+# 或手动：rm -rf D:/Proma-dev ~/.proma-dev（Dev 版）
+# 或手动：rm -rf D:/Proma-release（Release 版）
 ```
 
 ## 许可证
