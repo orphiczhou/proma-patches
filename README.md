@@ -36,11 +36,7 @@
 | **5. 外部 MCP 服务** | 跨实例调用（任何 MCP 客户端可操控 Proma 会话） |
 | **6. Windows 托盘图标** | 替换为白色图标 |
 
-推荐组合：
-- 只想强子Agent → 1
-- Agent 管理多会话 → 2+3+4
-- 外部操控 Proma → 2+3+5
-- 全都要 → 2+3+4+5（1 已含）
+推荐组合：只想强子Agent→1 / Agent管理多会话→2+3+4 / 外部操控Proma→2+3+5 / 全都要→2+3+4+5（1已含）
 
 ### 第四步：执行安装
 
@@ -84,12 +80,67 @@ cat > D:/Proma-dev/start-dev.bat << 'BAT'
 set PROMA_DEV=1
 start "" "D:\Proma-dev\Proma-white.exe"
 BAT
-
-# 5. 同步认证数据
-cp ~/.proma/cloud-auth.json ~/.proma-dev/
-cp ~/.proma/channels.json ~/.proma-dev/
-cp ~/.proma/user-profile.json ~/.proma-dev/
 ```
+
+### 模块 A-续：同步认证和会话数据（关键！）
+
+**这一步是 Agent 最容易失败的地方。请仔细执行。**
+
+#### A5a. 同步 Proma 配置文件（始终可执行）
+
+```bash
+mkdir -p ~/.proma-dev
+cp ~/.proma/cloud-auth.json ~/.proma-dev/ 2>/dev/null \
+  || echo "[SKIP] cloud-auth.json 不存在，dev 版需重新登录 Google"
+cp ~/.proma/channels.json ~/.proma-dev/ 2>/dev/null \
+  || echo "[SKIP] channels.json 不存在，dev 版需重新配渠道"
+cp ~/.proma/user-profile.json ~/.proma-dev/ 2>/dev/null \
+  || echo "[SKIP] user-profile.json 不存在，不影响使用"
+```
+
+#### A5b. 同步 Electron session 数据（必须先关正式版！）
+
+**正式版运行时文件被锁定，必须先关闭正式版，否则此步一定失败。**
+
+路径说明：
+- `%APPDATA%` = `C:\Users\<你的用户名>\AppData\Roaming`
+- `@proma/electron/` = 正式版数据
+- `@proma/electron-dev/` = dev 版数据（PROMA_DEV=1 时启用）
+
+```bash
+echo "正在同步 Electron session 数据（正式版必须已关闭！）..."
+
+echo "  [1/3] Network (cookies, Google OAuth tokens)..."
+cp -r "$APPDATA/@proma/electron/Network" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
+  && echo "    ✅ OK" || echo "    ❌ FAIL — 正式版可能未关，关闭后重试"
+
+echo "  [2/3] Session Storage..."
+cp -r "$APPDATA/@proma/electron/Session Storage" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
+  && echo "    ✅ OK" || echo "    ❌ FAIL"
+
+echo "  [3/3] Local Storage..."
+cp -r "$APPDATA/@proma/electron/Local Storage" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
+  && echo "    ✅ OK" || echo "    ❌ FAIL"
+```
+
+#### A5c. 验证
+
+```bash
+echo "=== 数据同步验证 ==="
+ls ~/.proma-dev/cloud-auth.json >/dev/null 2>&1 && echo "  ✅ cloud-auth.json" || echo "  ⚠️  缺失"
+ls ~/.proma-dev/channels.json >/dev/null 2>&1 && echo "  ✅ channels.json" || echo "  ⚠️  缺失"
+ls "$APPDATA/@proma/electron-dev/Network" >/dev/null 2>&1 && echo "  ✅ Network (免登录)" || echo "  ⚠️  Network 缺失（需在 dev 版手动登录 OAuth）"
+ls "$APPDATA/@proma/electron-dev/Local Storage" >/dev/null 2>&1 && echo "  ✅ Local Storage" || echo "  ⚠️  Local Storage 缺失"
+```
+
+#### Agent 常见失败速查
+
+| 错误 | 原因 | 修复 |
+|---|---|---|
+| `cp: cannot stat .../Network` | `$APPDATA` 没展开 | 用 `echo $APPDATA` 确认，或用绝对路径替换 |
+| `cp: Permission denied` | 正式版未关，文件被锁 | 关正式版 → 任务管理器确认无 Proma.exe → 重试 |
+| dev 版启动后要求重新登录 | Network 目录没复制成功 | **不是大问题**——手动登录一次 Google OAuth 即可，不影响补丁功能 |
+| `~/.proma-dev/` 目录不存在 | 没执行 mkdir | 先执行 `mkdir -p ~/.proma-dev` |
 
 ---
 
@@ -132,53 +183,29 @@ sed -i 's|^init_index();$|init_index();\nglobal.__proma__={createAgentSession,fo
 
 将仓库中的 `proma-dev-patches.cjs` 放到 `[安装目录]/resources/app/dist/proma-dev-patches.cjs`
 
-**10 个工具：**
-| 工具 | 功能 |
-|---|---|
-| `get_my_session_id` | Agent 获取自己的会话 ID |
-| `list_channels` | 列出所有 AI 渠道及模型 |
-| `list_workspaces` | 列出所有工作区 |
-| `list_sessions` | 列出会话（支持工作区过滤） |
-| `get_session_info` | 查询会话详情 |
-| `get_session_context` | Token 用量/上下文窗口 |
-| `list_messages` | 消息历史（UUID/角色/文本/分页） |
-| `create_session` | 创建新会话 |
-| `fork_session` | Fork 会话（支持精确 UUID 截断） |
-| `send_message` | 向会话发消息（返回 Agent 输出） |
+**10 个工具：** get_my_session_id / list_channels / list_workspaces / list_sessions / get_session_info / get_session_context / list_messages / create_session / fork_session / send_message
 
 ### 模块 3：频道+模型元数据覆盖
 
 ```bash
-# C1: 频道查询优先用元数据
 sed -i 's@const channel = getChannelById(channelId);@const __effChannelId = getAgentSessionMeta(sessionId)?.channelId || channelId;\n        const channel = getChannelById(__effChannelId);@' /tmp/main-patched.cjs
-
-# C2: API Key 解密用覆盖后的 channelId（行号可能漂移，失败不中断）
 sed -i '405686,405695{s@apiKey = decryptApiKey(channelId);@apiKey = decryptApiKey(__effChannelId);@}' /tmp/main-patched.cjs 2>/dev/null || true
-
-# C3: 标题生成用覆盖后的 channelId
 sed -i '405150,406160{s@this.autoGenerateTitle(sessionId, userMessage, channelId,@this.autoGenerateTitle(sessionId, userMessage, __effChannelId,@}' /tmp/main-patched.cjs 2>/dev/null || true
-
-# C4: modelId 优先用元数据
 sed -i 's@let resolvedModel = modelId || DEFAULT_MODEL_ID;@let resolvedModel = getAgentSessionMeta(sessionId)?.modelId || modelId || DEFAULT_MODEL_ID;@' /tmp/main-patched.cjs
-
-# C5: SDK 查询用 resolvedModel
 sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' /tmp/main-patched.cjs
 ```
 
-### 模块 4：UI 模型同步（Renderer 补丁）
+### 模块 4：UI 模型同步
 
 ```bash
-# 同步 renderer 文件
 cp -r /tmp/app/dist/renderer/* D:/Proma-dev/resources/app/dist/renderer/
-# 移除 hydration 幂等守卫
 sed -i 's/if(qe.has(e))return qe;//g' D:/Proma-dev/resources/app/dist/renderer/assets/index-*.js
 ```
 
 ### 模块 5：外部 MCP 服务
 
-将 `proma-mcp-server.cjs` 放到 `[安装目录]/resources/app/dist/`。插件会自动启动 localhost HTTP bridge（端口 19876-19895 自动选择，写入 `~/.proma-dev/mcp-bridge-port.json`）。
+将 `proma-mcp-server.cjs` 放到 `[安装目录]/resources/app/dist/`。插件自动启动 localhost HTTP bridge（端口 19876-19895 自动选择，写入 `~/.proma-dev/mcp-bridge-port.json`）。
 
-Claude Code 配置（`.claude/mcp.json`）：
 ```json
 {
   "mcpServers": {
@@ -201,13 +228,10 @@ sed -i 's/"iconTemplate.png"/"proma-white.png"/g' /tmp/main-patched.cjs
 ## 最终部署
 
 ```bash
-# Dev 版
 mkdir -p D:/Proma-dev/resources/app/dist
 cp /tmp/main-patched.cjs D:/Proma-dev/resources/app/dist/main.cjs
 cp proma-dev-patches.cjs D:/Proma-dev/resources/app/dist/
 cp proma-mcp-server.cjs D:/Proma-dev/resources/app/dist/
-
-# 对齐版本号
 sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app/package.json
 ```
 
@@ -228,38 +252,12 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 ---
 
-## 使用示例
-
-安装后，Agent 可执行：
-
-```
-Agent（在你的 Proma 会话中）:
-  ├─ list_channels → 看有哪些模型可用
-  ├─ list_workspaces → 看有哪些工作区
-  ├─ create_session → 开开发会话用便宜模型
-  ├─ send_message → 给开发会话发任务
-  ├─ get_session_context → 监控 token 用量
-  ├─ list_messages → 查对话历史 + 获取 UUID
-  ├─ fork_session(uuid) → 从某轮截断重试
-  └─ 汇总所有产出
-```
-
-## 验证结果
-
-- ✅ 10 个 MCP 工具全部可用
-- ✅ 内部 Agent 间三层联动（老板→小弟→子小弟）
-- ✅ 多轮对话 + 任选一轮 Fork
-- ✅ 并行调度 + 轮询回收
-- ✅ 外部 stdio MCP 全部可用
-- ✅ DeepSeek / ZLM / Proma 官方 Fork 正常
-
 ## 卸载
 
 ```bash
 bash uninstall.sh
 # 或手动：
-rm -rf D:/Proma-dev
-rm -rf ~/.proma-dev
+rm -rf D:/Proma-dev && rm -rf ~/.proma-dev
 ```
 
 ## 许可证
