@@ -353,7 +353,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 3. **Windows esbuild 构建：** 通过 Git Bash 会 segfault，需用 `node_modules/@esbuild/win32-x64/esbuild.exe`。
 
-4. **DeepSeek 频道会话 Fork 失败：** SDK 层 bug——会话的 `sdkSessionId` 存在 Proma 元数据中，但 SDK 内部找不到对应会话数据。非 DeepSeek 频道 Fork 正常。
+4. ~~**DeepSeek 频道会话 Fork 失败：** SDK 层 bug——会话的 `sdkSessionId` 存在 Proma 元数据中，但 SDK 内部找不到对应会话数据。~~ v0.7 渲染器补丁（D+E）后已修复。
 
 5. **正式版升级后 renderer 版本漂移：** 补丁 D 解决，升级后需同步 renderer 文件。
 
@@ -366,6 +366,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 | 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
 | 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
 | 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
+| 2026-06-16 | v0.9.1 | 补丁 B2：`runAgentHeadless` 加入 API 桥接；`get_session_context` 增强 fallback 从渠道配置查 `contextWindow` + billing_error 检测；DeepSeek Fork 验证通过（v0.7 渲染器修复后已可用）；插件更新至 569 行 |
 | 2026-06-16 | v0.9 | 外部 MCP 服务：插件重构抽取 `createToolHandlers()`；新增 HTTP bridge（127.0.0.1:19876-19895 自动选端口）；新建 `proma-mcp-server.cjs`（零依赖 MCP JSON-RPC stdio 桥接，206 行）。外部 Claude Code / 脚本可通过 stdio 调用全部 7 个会话管理工具 |
 | 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
 | 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |

@@ -105,39 +105,62 @@ function createToolHandlers(sourceSessionId) {
       const meta = a.getAgentSessionMeta(args.session_id);
       if (!meta) return jsonResult({ error: `Session not found: ${args.session_id}` });
 
+      // 从渠道配置中查模型的上下文窗口（作为 fallback）
+      let configContextWindow = null;
+      let configModelName = null;
+      if (meta.channelId && meta.modelId) {
+        try {
+          const ch = a.getChannelById(meta.channelId);
+          if (ch && ch.models) {
+            const cm = ch.models.find(m => m.id === meta.modelId);
+            if (cm) {
+              configModelName = cm.name || meta.modelId;
+              configContextWindow = cm.contextWindow || null;
+            }
+          }
+        } catch (_) { /* channel lookup best-effort */ }
+      }
+
+      let usage = null, lastModel = null, contextWindow = null;
+      let fallbackMsg = null;
+
       try {
         const msgs = a.getAgentSessionSDKMessages(args.session_id);
-        if (!msgs || msgs.length === 0) {
-          return jsonResult({
-            session_id: args.session_id,
-            title: meta.title,
-            message: "No messages yet. Send a message first to get context usage.",
-          });
-        }
-
-        let usage = null, lastModel = null, contextWindow = null;
-        for (let i = msgs.length - 1; i >= 0; i--) {
-          if (msgs[i].type === "result") {
-            usage = msgs[i].usage || null;
-            const mu = msgs[i].modelUsage;
-            if (mu) {
-              const keys = Object.keys(mu);
-              if (keys.length > 0) {
-                lastModel = keys[0];
-                contextWindow = mu[lastModel].contextWindow || null;
+        if (msgs && msgs.length > 0) {
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].type === "result") {
+              usage = msgs[i].usage || null;
+              const mu = msgs[i].modelUsage;
+              if (mu) {
+                const keys = Object.keys(mu);
+                if (keys.length > 0) {
+                  lastModel = keys[0];
+                  contextWindow = mu[lastModel].contextWindow || null;
+                }
               }
+              break;
             }
-            break;
+            // 检查是否有 billing_error
+            if (msgs[i]._errorCode === "billing_error" && !fallbackMsg) {
+              fallbackMsg = "Last turn failed: billing error (余额不足).";
+            }
           }
         }
+      } catch (_) { /* message read best-effort */ }
 
-        if (!usage) {
-          return jsonResult({
-            session_id: args.session_id,
-            title: meta.title,
-            message: "No usage data found — the session may not have completed a turn yet.",
-          });
-        }
+      // Fallback: 用渠道配置补充 contextWindow
+      if (!contextWindow) contextWindow = configContextWindow;
+      if (!lastModel) lastModel = configModelName || meta.modelId;
+
+      if (!usage) {
+        return jsonResult({
+          session_id: args.session_id,
+          title: meta.title,
+          model: lastModel || null,
+          context_window: contextWindow,
+          message: fallbackMsg || "No usage data yet. Send a message and wait for it to complete.",
+        });
+      }
 
         const input = usage.input_tokens || 0;
         const output = usage.output_tokens || 0;
