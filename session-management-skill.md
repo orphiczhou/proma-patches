@@ -2,10 +2,10 @@
 name: session-management
 description: Agent 会话管理能力。当用户需要创建/查询/Fork会话、给其他会话发消息、监控token用量、归档会话、跨工作区操作、并行调度多个Agent协作、配置外部MCP连接Proma实例、管理Dev/Release双实例时触发。触发信号：多会话、开小弟、Fork、分身、并行、批量、派任务、监控进度、上下文甜点、竹节交接、工作区切换、归档、清理会话、外部MCP、Claude Code连接Proma、Dev实例、Release实例、远端实例、双实例。
 group: proma
-version: "1.2.0"
+version: "1.2.1"
 ---
 
-# Agent 会话管理 (v1.2.0)
+# Agent 会话管理 (v1.2.1)
 
 你拥有 **11 个会话管理 MCP 工具**（`session` MCP server）。这些工具提供了完整的 Proma Agent 会话管理能力——创建、Fork、发消息、查用量、查消息历史、归档等。
 
@@ -185,8 +185,20 @@ Dev 实例（测试/调试）           Release 实例（日常使用）
 ```bash
 # 用 curl 通过 HTTP bridge 直接调用（Proma 运行时）
 curl -s -X POST http://127.0.0.1:19876/list_channels | jq .
-curl -s -X POST http://127.0.0.1:19876/list_sessions -d '{"include_archived":true}' | jq .
+curl -s -X POST http://127.0.0.1:19876/list_sessions --data-binary '{"include_archived":true}' | jq .
 ```
+
+**重要：curl 中文编码** — Windows Bash 下 `curl -d '...中文...'` 会将中文转 GBK 导致乱码。含中文内容的 JSON 必须用 `printf` + `--data-binary @-` 方式：
+
+```bash
+# ✅ 正确：管道方式，UTF-8 无损
+printf '{"message":"你好世界","session_id":"xxx","wait":true}' | curl -s -X POST http://127.0.0.1:19876/send_message -H "Content-Type: application/json" --data-binary @- --max-time 120
+
+# ❌ 错误：-d 参数含中文会被 Windows Bash 转码
+curl -X POST http://127.0.0.1:19876/send_message -d '{"message":"你好世界",...}'
+```
+
+非中文内容的简单 JSON 仍可用 `-d` / `--data-binary '...'` 单行写法。
 
 端口号从 `GET /get_instance_info` 获取，或查看 Proma 控制台日志 `External MCP HTTP bridge: http://127.0.0.1:XXXXX`。
 
