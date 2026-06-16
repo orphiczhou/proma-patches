@@ -677,10 +677,11 @@ function createExternalHttpBridge() {
           return res.end(JSON.stringify({ error: "Method not allowed. Use POST." }));
         }
 
-        let body = "";
-        req.on("data", c => body += c);
+        const chunks = [];
+        req.on("data", c => chunks.push(c));
         req.on("end", async () => {
           try {
+            const body = Buffer.concat(chunks).toString("utf-8");
             let args = {};
             try { args = JSON.parse(body || "{}"); } catch (_) { /* keep {} */ }
             const result = await handler(args);
