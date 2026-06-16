@@ -79,10 +79,56 @@ mv app.asar app.asar.disabled
 # 合并原生模块
 cp -r app.asar.unpacked/node_modules/* app/node_modules/
 
-# 同步认证数据
-cp ~/.proma/cloud-auth.json ~/.proma-dev/
-cp ~/.proma/channels.json ~/.proma-dev/
-cp ~/.proma/user-profile.json ~/.proma-dev/
+# ═══════════════════════════════════════════
+# 同步认证和会话数据（关键步骤！Agent 最容易失败）
+# ═══════════════════════════════════════════
+
+# ── A. 必须先关正式版 ──
+# 正式版运行时会锁住 Electron session 文件，导致复制失败。
+# 关掉正式版后再执行 C 部分。如果不方便关，可跳过 C（dev 版手动登录即可）。
+
+# ── B. 同步 Proma 配置文件（始终可执行，不会被锁）──
+mkdir -p ~/.proma-dev
+cp ~/.proma/cloud-auth.json ~/.proma-dev/ 2>/dev/null \
+  || echo "[SKIP] cloud-auth.json 不存在，dev 版需重新登录 Google"
+cp ~/.proma/channels.json ~/.proma-dev/ 2>/dev/null \
+  || echo "[SKIP] channels.json 不存在，dev 版需重新配渠道"
+cp ~/.proma/user-profile.json ~/.proma-dev/ 2>/dev/null \
+  || echo "[SKIP] user-profile.json 不存在，不影响使用"
+
+# ── C. 同步 Electron session 数据 ──
+# 正式版必须关闭！否则 LOCK 文件会导致 cp 失败。
+# 路径：%APPDATA% = C:\Users\<用户名>\AppData\Roaming
+#   @proma/electron/       = 正式版
+#   @proma/electron-dev/   = dev 版（PROMA_DEV=1 时启用）
+
+echo "正在同步 Electron session 数据..."
+
+echo "  [1/3] Network (cookies, OAuth tokens)..."
+cp -r "$APPDATA/@proma/electron/Network" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
+  && echo "    OK" || echo "    FAIL — 正式版可能未关。关闭后重试此命令"
+
+echo "  [2/3] Session Storage..."
+cp -r "$APPDATA/@proma/electron/Session Storage" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
+  && echo "    OK" || echo "    FAIL"
+
+echo "  [3/3] Local Storage..."
+cp -r "$APPDATA/@proma/electron/Local Storage" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
+  && echo "    OK" || echo "    FAIL"
+
+# ── D. 验证 ──
+echo "=== 数据同步验证 ==="
+ls ~/.proma-dev/cloud-auth.json >/dev/null 2>&1 && echo "  ✅ cloud-auth.json" || echo "  ⚠️  cloud-auth.json 缺失（需在 dev 版登录 Google）"
+ls ~/.proma-dev/channels.json >/dev/null 2>&1 && echo "  ✅ channels.json" || echo "  ⚠️  channels.json 缺失（需在 dev 版重新配置渠道）"
+ls "$APPDATA/@proma/electron-dev/Network" >/dev/null 2>&1 && echo "  ✅ Network" || echo "  ⚠️  Network 缺失（需在 dev 版重新登录 OAuth）"
+ls "$APPDATA/@proma/electron-dev/Local Storage" >/dev/null 2>&1 && echo "  ✅ Local Storage" || echo "  ⚠️  Local Storage 缺失"
+
+# ── E. Agent 常见失败速查 ──
+# | 错误现象                          | 原因                | 修复                                         |
+# | cp: cannot stat ... Network       | APPDATA 路径未展开   | echo $APPDATA 确认，或用绝对路径替换           |
+# | cp: Permission denied             | 正式版未关，文件被锁  | 关正式版 → 任务管理器杀 Proma.exe → 重试      |
+# | dev 版启动后让重新登录             | Network 未复制       | 手动登录一次 Google OAuth，不影响补丁功能      |
+# | ~/.proma-dev/ 目录不存在           | 没建目录             | mkdir -p ~/.proma-dev                        |
 ```
 
 ---
