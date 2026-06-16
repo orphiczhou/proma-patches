@@ -125,14 +125,43 @@ version: "1.1.0"
 
 工具同时暴露为独立 stdio MCP server（`proma-mcp-server.cjs`），外部工具可调用。
 
+### 架构
+
+```
+外部工具 (Claude Code / 脚本)
+    │ stdio (MCP JSON-RPC)
+    ▼
+proma-mcp-server.cjs          ← 零依赖，端口扫描 + 自动发现
+    │ HTTP POST /:tool_name
+    ▼
+Proma 实例 (Dev 或 Release)
+  promp-dev-patches.cjs → localhost HTTP bridge
+```
+
+### 端口发现流程
+
+每个 Proma 实例启动时自动占用 19876-19895 范围内第一个空闲端口，并暴露身份端点：
+
+```
+GET /get_instance_info
+→ { "proma_dev": true, "port": 19876 }    ← Dev 实例 (PROMA_DEV=1)
+→ { "proma_dev": false, "port": 19877 }   ← Release 实例
+```
+
+`proma-mcp-server.cjs` 启动时：
+1. 扫描 19876-19895 全部端口（2 秒超时/端口）
+2. 对每个端口调用 `GET /get_instance_info` 获取身份
+3. 根据 `--dev` / `--release` 参数匹配目标实例
+4. 匹配规则：`--dev` → `proma_dev=true` 的端口；`--release` → `proma_dev=false`
+5. 无精确匹配时 fallback 到第一个找到的实例
+6. 扫描结果输出到 stderr（不影响 MCP 协议）
+
 **启动参数：**
 ```bash
 node proma-mcp-server.cjs          # 默认 --dev
 node proma-mcp-server.cjs --dev     # 连接 Dev 实例
 node proma-mcp-server.cjs --release # 连接 Release 实例
 ```
-
-**自动发现：** 启动时扫描端口 19876-19895，通过 `GET /get_instance_info` 识别 Dev（`proma_dev=true`）和 Release（`proma_dev=false`）实例。
 
 **Claude Code 配置（`.claude/mcp.json`）：**
 ```json
