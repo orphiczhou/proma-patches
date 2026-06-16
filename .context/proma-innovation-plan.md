@@ -39,12 +39,13 @@ Layer 2: 时间线的剪枝者（未来）
 | **补丁 A** | MCP 钩子 | `global.__proma_getMcpServers__` → 注入 session MCP server |
 | **补丁 B** | API 桥接 + 插件加载 | `global.__proma__` 导出 10 个函数 + `require("./proma-dev-patches.cjs")` |
 | **补丁 C1-5** | 频道+模型元数据覆盖 | MCP 创建的会话走后端正确频道/模型/API Key |
+| **补丁 F** | 跨渠道 sdkSessionId 断裂防护 | UI 跨渠道切换模型时检测差异，清除旧 session 走上下文回填，避免 "Session 已失效" |
 | **补丁 D+E** | Renderer 同步 | 版本同步 + hydration 幂等守卫移除 → UI 模型选择器正确显示 |
-| **插件** | proma-dev-patches.cjs | 11 个 MCP 工具（见 1.2） |
-| **外部 MCP** | proma-mcp-server.cjs | 零依赖 stdio 桥接，`--dev`/`--release` 参数，实例自动发现 |
-| **Release 版** | `D:\Proma-release\` | 与正式版双开，彩色图标，独立部署 |
+| **插件** | proma-dev-patches.cjs | 11 个 MCP 工具（713 行，见 1.2） |
+| **外部 MCP** | proma-mcp-server.cjs | 零依赖 stdio 桥接（153 行），`--dev`/`--release` 参数，实例自动发现 |
+| **Release 版** | `D:\Proma-release\` | 与正式版双开，彩色图标，独立部署（v0.12 已同步） |
 | **Wiki** | proma-dev-wiki.md | 完整技术文档（补丁命令、架构、流程） |
-| **Skill** | session-management | Agent 内置技能，5 大使用模式，自动触发 |
+| **Skill** | session-management v1.1.0 | Agent 内置技能，6 大使用模式，外部 MCP 端口发现文档 |
 
 ### 1.2 11 个 MCP 工具（Agent + 外部 MCP 均可用）
 
@@ -155,14 +156,14 @@ get_session_context = 监控叶子是否接近枯竭
 | P0 | 外部 MCP 服务（11 工具 stdio 暴露 + 实例自动发现） | ✅ 完成 (v0.9 → v0.11) |
 | P0 | Release 并行版部署 | ✅ 完成 (v0.11) |
 | P1 | send_message 结果回传 + list_messages + 多工作区 | ✅ 完成 (v0.10) |
-| P1 | archive_session 工具 | ✅ 完成 (v0.11) |
 | P1 | 补丁工具包（apply-patches.sh + AGENT-PROMPT.md） | ✅ 完成 |
-| P2 | UI session 丢失问题（MCP 创建的会话） | ⏳ 待排查 |
-| P2 | DeepSeek 跨渠道 Fork bug | ⏳ 待排查 |
+| P1 | UI session 丢失问题 → 补丁 F | ✅ 完成 (v0.12) |
+| P1 | archive_session 工具 | ✅ 完成 (v0.11) |
+| P2 | DeepSeek 跨渠道 Fork（同渠道OK，跨渠道有 SDK GC 风险） | ⏳ 临时方案可用，长期方案待补丁 G |
 | P3 | 模型列表缓存 | ⏳ 待做 |
 
 ### 下一步
 
-- **高优先**：排查 UI session 丢失问题（影响 MCP 创建的会话的用户体验）
-- **中优先**：DeepSeek 跨渠道 Fork 根因分析
-- **低优先**：模型列表缓存优化
+- **高优先**：DeepSeek 跨渠道 Fork 长期修复（补丁 G：fork 失败时自动重建 SDK session 后重试）
+- **中优先**：模型列表缓存优化
+- **Layer 2**：时间线剪枝者——树形任务编排、竹节式自动交接
