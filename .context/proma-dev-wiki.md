@@ -214,6 +214,16 @@ sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' main.cjs
 
 **效果：** 通过 MCP 工具创建的会话，API 请求走元数据中存储的正确频道和模型（后端层面）。结合补丁 D+E，UI 模型选择器也与元数据同步。
 
+#### 补丁 F：跨渠道 sdkSessionId 断裂防护
+
+**注入点：** `agent-orchestrator` 中 `let existingSdkSessionId = sessionMeta?.sdkSessionId;` 之后
+
+```bash
+sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId\\&\\&sessionMeta?.channelId\\&\\&channelId!==sessionMeta.channelId){existingSdkSessionId=void 0;}@' main.cjs
+```
+
+**效果：** UI 中跨渠道切换模型时，renderer 请求的 `channelId` 与 metadata 中存储的不同。补丁 F 在 SDK 查询前检测到此差异，清除 `sdkSessionId`，走"新会话 + 上下文回填"路径，避免 SDK 抛出 "Session not found" 触发完整的 "Session 已失效" 恢复流程（重新载入历史浪费 token）。同渠道内模型切换不受影响。
+
 ---
 
 ### 渲染器补丁
@@ -374,7 +384,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 5. **正式版升级后 renderer 版本漂移：** 补丁 D 解决，升级后需同步 renderer 文件。
 
-6. **MCP 创建的会话在 UI 中打开时 session 丢失/上下文回填（v0.11 新发现）：** 通过 `create_session` MCP 工具创建的会话，`send_message(headless)` 后可正常使用，但在 Dev 版 UI 中切换到该会话时，Render 进程可能无法正确恢复 SDK session 状态，触发"Session 已失效，切换到上下文回填模式"，重新载入上下文浪费 token。疑似 `sdkSessionId` 在 main 进程和 renderer 进程间同步不一致，或 `agent-sessions.json` 中 `sdkSessionId` 字段在 headless 运行后未正确更新。
+6. **MCP 创建的会话在 UI 中打开时 session 丢失/上下文回填（v0.11 发现，v0.12 修复）：** 跨渠道切换模型时，renderer 请求的 channelId 与 metadata 不一致，SDK 尝试 resume 但找不到旧 session。补丁 F 检测跨渠道差异后清除 `sdkSessionId`，走上下文回填路径避免硬撞 "Session 已失效"。
 
 ---
 
@@ -382,7 +392,8 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
-| 2026-06-16 | v0.8.1 | 修复 `get_session_context` 的 `context_window` 和 `usage_pct` 返回 null：modelUsage 的 key 是模型名（如 `glm-5-turbo`）不是 session metadata 的 modelId |
+| 2026-06-16 | v0.12 | 补丁 F：UI 跨渠道切换 session 丢失修复。在 `sendMessage` 中检测 renderer 请求的 channelId 与 metadata.channelId 不一致时，自动清除 `sdkSessionId` 走上下文回填路径，避免 SDK "session not found" 错误。修复 `fork_session` 大小写匹配 bug（"Session" vs "session"）。Dev + Release 版均已部署 |
+| 2026-06-16 | v0.11 | 实例自动发现：新增 `GET /get_instance_info` 端点；`proma-mcp-server.cjs` 重写为端口扫描+实例发现（`--dev`/`--release` 参数），废弃端口文件；新增 `archive_session` 工具（11 工具体系）；修复 Fork 不传 model 时 modelId 丢失；修复 MCP server 启动时序导致连错实例；Release 版图标改彩色（`Proma-black.exe` 实际为渐变色 + `rcedit` 注入图标 + 托盘 `proma-color.png`）；清理 Release 测试会话 |
 | 2026-06-15 | v0.8 | 新增 `get_session_context` 工具（查询会话 token 用量，支持多会话管理时的上下文甜点区控制）；补丁 B 扩展：`getAgentSessionSDKMessages` 加入 API 桥接 |
 | 2026-06-15 | v0.7 | 修复 UI 模型同步：补丁 D（renderer 版本同步 0.12.1→0.12.23）+ 补丁 E（移除 hydration 幂等守卫）；MCP 创建的会话模型选择器自动显示正确模型 |
 | 2026-06-16 | v0.11 | 实例自动发现：新增 `GET /get_instance_info` 端点；`proma-mcp-server.cjs` 重写为端口扫描+实例发现（`--dev`/`--release` 参数），废弃端口文件；新增 `archive_session` 工具（11 工具体系）；修复 Fork 不传 model 时 modelId 丢失；修复 MCP server 启动时序导致连错实例；Release 版图标改彩色（`Proma-black.exe` 实际为渐变色 + `rcedit` 注入图标 + 托盘 `proma-color.png`）；清理 Release 测试会话 |

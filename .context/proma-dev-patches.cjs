@@ -362,8 +362,8 @@ function createToolHandlers(sourceSessionId) {
           require("path").join(require("os").homedir(), ".proma-dev", "fork-debug.log"),
           JSON.stringify({ ts: new Date().toISOString(), action: "fork_error", error: msg, stack: err?.stack?.slice(0, 500) }) + "\n"
         );
-        if (msg.includes("没有 SDK session") || msg.includes("session not found")) {
-          return jsonResult({ error: `Fork failed: the source session may not have been started. Send a message in "${source.title}" first, then retry.` });
+        if (msg.includes("没有 SDK session") || msg.includes("session not found") || (msg.includes("Session") && msg.includes("not found"))) {
+          return jsonResult({ error: `Fork failed: the source session "${source.title}" has no active SDK runtime session (likely GC'd or channel mismatch). Send a new message in the source session first to recreate the SDK session, then retry fork.` });
         }
         return jsonResult({ error: `Fork failed: ${msg}` });
       }

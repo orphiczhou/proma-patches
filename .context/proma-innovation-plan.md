@@ -95,8 +95,8 @@ Layer 2: 时间线的剪枝者（未来）
 
 #### 1.3.5 已知 Bug / 遗留问题
 
-- **UI session 丢失**（v0.11 新发现）：`create_session` MCP 创建的会话，headless 后可用，但在 UI 中切换时触发 "Session 已失效"，重新载入上下文浪费 token。疑似 `sdkSessionId` 在 main/renderer 进程间不同步。
-- **DeepSeek 跨渠道 Fork 失败**（v0.11 重新开启）：同渠道内 Fork OK，跨渠道报 `Session not found`。根因待排查：JSONL 路径或 SDK session 索引不一致。
+- ~~UI session 丢失~~ → ✅ v0.12 补丁 F：跨渠道检测 + 清除 sdkSessionId 走上下文回填
+- **DeepSeek 跨渠道 Fork 失败**：同渠道 Fork OK，跨渠道 SDK session 可能 GC 导致 not found。临时方案：fork 前先给源会话发消息重建 SDK session；长期方案：补丁 G（fork 失败时自动重建 SDK session 后重试）
 - **cloud-auth token 共享冲突**：Dev 和 Release 共用 token，一方刷新后另一方失效。
 - **正式版升级后需重打补丁**：每次升级需重新提取 main.cjs + renderer，重打全部补丁。
 
