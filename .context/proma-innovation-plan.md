@@ -98,8 +98,8 @@ Layer 2: 时间线的剪枝者（未来）
 
 - ~~UI session 丢失~~ → ✅ v0.12 补丁 F：跨渠道检测 + 清除 sdkSessionId 走上下文回填
 - **DeepSeek 跨渠道 Fork 失败**：同渠道 Fork OK，跨渠道 SDK session 可能 GC 导致 not found。临时方案：fork 前先给源会话发消息重建 SDK session；长期方案：补丁 G（fork 失败时自动重建 SDK session 后重试）
+- **远端操作为二等公民**：内部 Agent 操作远端实例需手动 curl 四步走（端口探测→printf 中文编码→全部 curl→实查）。已写提案 `proposal-remote-session-mcp.md`（`mcp__remote-session__*` 11 个工具），待实施。
 - **cloud-auth token 共享冲突**：Dev 和 Release 共用 token，一方刷新后另一方失效。
-- **正式版升级后需重打补丁**：每次升级需重新提取 main.cjs + renderer，重打全部补丁。
 
 ---
 
@@ -157,13 +157,17 @@ get_session_context = 监控叶子是否接近枯竭
 | P0 | Release 并行版部署 | ✅ 完成 (v0.11) |
 | P1 | send_message 结果回传 + list_messages + 多工作区 | ✅ 完成 (v0.10) |
 | P1 | 补丁工具包（apply-patches.sh + AGENT-PROMPT.md） | ✅ 完成 |
+| P1 | HTTP bridge UTF-8 编码修复 + 全链路验证 13/13 | ✅ 完成 (v0.12.1/v0.12.2) |
+| P1 | Skill v1.3.0（第一判断关卡 + 模式 9 远端 curl） | ✅ 完成 (v0.13.0) |
 | P1 | UI session 丢失问题 → 补丁 F | ✅ 完成 (v0.12) |
 | P1 | archive_session 工具 | ✅ 完成 (v0.11) |
 | P2 | DeepSeek 跨渠道 Fork（同渠道OK，跨渠道有 SDK GC 风险） | ⏳ 临时方案可用，长期方案待补丁 G |
+| P3 | `mcp__remote-session__*` 工具（11 个远端 MCP 工具，Agent 无需手动 curl） | ⏳ 提案已写 (`proposal-remote-session-mcp.md`)，待实施 |
 | P3 | 模型列表缓存 | ⏳ 待做 |
 
 ### 下一步
 
-- **高优先**：DeepSeek 跨渠道 Fork 长期修复（补丁 G：fork 失败时自动重建 SDK session 后重试）
-- **中优先**：模型列表缓存优化
+- **高优先**：`mcp__remote-session__*` 工具——让 Agent 像调本地工具一样操作远端实例，消除 Skill 中冗长的 curl 四步走
+- **中优先**：DeepSeek 跨渠道 Fork 长期修复（补丁 G：fork 失败时自动重建 SDK session 后重试）
+- **低优先**：模型列表缓存优化
 - **Layer 2**：时间线剪枝者——树形任务编排、竹节式自动交接
