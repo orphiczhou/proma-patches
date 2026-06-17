@@ -1,6 +1,6 @@
 # 改进提案：远端会话 MCP 内建工具 + 通用实例命名
 
-> 日期: 2026-06-16 | 状态: 草稿 | 版本: v0.1
+> 日期: 2026-06-17 | 状态: 阶段1完成，阶段2待做 | 版本: v0.3
 
 ---
 
@@ -92,36 +92,78 @@ v1.0 (目标)：
 | `南大专用` | 某个项目的独立实例 |
 | `demo-客户名` | 客户演示 |
 
-### 3.3 启动脚本更新
+### 3.3 实例隔离策略（方案 B：显式隔离标记）
 
-```bat
-# start-dev.bat（改前）
-set PROMA_DEV=1
+**两个环境变量，职责分离：**
 
-# start-dev.bat（改后）
-set PROMA_INSTANCE_NAME=dev
-set PROMA_DEV=1                ← 保留向后兼容：插件检测到 PROMA_DEV=1 但无 PROMA_INSTANCE_NAME 时，默认 instance="dev"
+| 变量 | 职责 | 示例 |
+|------|------|------|
+| `PROMA_INSTANCE_NAME` | 实例身份标识，对外可见 | `dev`、`release`、`staging` |
+| `PROMA_INSTANCE_ISOLATED` | 是否使用独立的 userData 目录 | `1` = 隔离，`0` = 共享正式版 |
 
-# start-release.bat（改后）
-set PROMA_INSTANCE_NAME=release
+**隔离规则（无歧义）：**
 
-# 将来任意新增
-set PROMA_INSTANCE_NAME=staging
+```
+PROMA_INSTANCE_ISOLATED=1  →  @proma/electron-{NAME}/ + ~/.proma-{NAME}/
+PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/        + ~/.proma/       (共享正式版)
+未设置                       →  @proma/electron/        + ~/.proma/       (默认共享，兼容旧脚本)
 ```
 
-> **向后兼容策略**：`createExternalHttpBridge()` 读取 `process.env.PROMA_INSTANCE_NAME`，若不存在则 fallback 到检查 `PROMA_DEV`（`=1` → `"dev"`，否则 `"release"`）。`get_instance_info` 同时返回 `instance`（新）和 `proma_dev`（旧，标记 deprecated），给 proma-mcp-server.cjs 和外部调用者一个过渡期。
+**各实例配置：**
 
-### 3.4 涉及改动的文件和行
+| 实例 | PROMA_INSTANCE_NAME | PROMA_INSTANCE_ISOLATED | userData |
+|------|---------------------|------------------------|----------|
+| Dev | `dev` | `1` | `@proma/electron-dev/` |
+| Release | `release` | `0` | `@proma/electron/`（与正式版共享） |
+| Staging | `staging` | `1` | `@proma/electron-staging/` |
+| 南大专用 | `南大专用` | `1` | `@proma/electron-南大专用/` |
+
+**补丁 2 的 sed 改动：**
+
+```bash
+# 改前（v0.12）—— 只认 PROMA_DEV 布尔值
+sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged) {/if (!\1.app.isPackaged || process.env.PROMA_DEV === "1") {/g' main.cjs
+
+# 改后（v1.0）—— 显式 PROMA_INSTANCE_ISOLATED
+sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged) {/if (!\1.app.isPackaged || process.env.PROMA_INSTANCE_ISOLATED === "1") {/g' main.cjs
+```
+
+> **向后兼容**：旧脚本 `PROMA_DEV=1` 不再被补丁 2 识别。升级时需要同步改 `start-dev.bat`，将 `PROMA_DEV=1` 替换为 `PROMA_INSTANCE_ISOLATED=1`。这是刻意的不兼容——布尔值方案应该彻底终结。
+
+> **⚠️ 待办：userData 目录名动态化。** 当前补丁 2 的 if 条件进了隔离分支后，目录名 `electron-dev` 是 main.cjs 里硬编码的，不会随 `PROMA_INSTANCE_NAME` 变化。需要找到硬编码字符串的生成逻辑，改为 `electron-{NAME}` 动态拼接。实现时从源码搜索 `"electron-dev"` 或 `"proma-dev"` 相关字面量，确认改动点后再加一条 sed。
+
+### 3.4 启动脚本
+
+```bat
+:: start-dev.bat（改后）
+set PROMA_INSTANCE_NAME=dev
+set PROMA_INSTANCE_ISOLATED=1
+set PROMA_DEV=1                    ← 保留：插件 fallback 逻辑在过渡期仍需此值推导 instance="dev"
+start "" "D:\Proma-dev\Proma-white.exe"
+
+:: start-release.bat（改后）
+set PROMA_INSTANCE_NAME=release
+set PROMA_INSTANCE_ISOLATED=0
+start "" "D:\Proma-release\Proma-black.exe"
+
+:: 将来任意新增——例如一个完全独立的 staging 实例
+set PROMA_INSTANCE_NAME=staging
+set PROMA_INSTANCE_ISOLATED=1
+start "" "D:\Proma-staging\Proma.exe"
+```
+
+### 3.5 涉及改动的文件
 
 | 文件 | 改动 |
 |------|------|
-| `proma-dev-patches.cjs` — `createExternalHttpBridge()` | `get_instance_info` 返回值：增加 `instance` 字段，保留 `proma_dev` deprecated |
-| `proma-dev-patches.cjs` — `createExternalHttpBridge()` | 启动日志：`External MCP HTTP bridge: http://127.0.0.1:XXXXX (instance: dev)` |
-| `proma-mcp-server.cjs` — 端口扫描匹配 | `--dev`/`--release` 改为 `--instance <name>`，匹配 `get_instance_info` 的 `instance` 字段 |
-| `proma-mcp-server.cjs` — CLI 参数 | 新增 `--instance` 参数，保留 `--dev`/`--release` 作别名 |
-| `start-dev.bat` | `PROMA_DEV=1` → `PROMA_INSTANCE_NAME=dev` |
-| `start-release.bat` | 增加 `PROMA_INSTANCE_NAME=release` |
-| `proma-dev-wiki.md` | 更新补丁说明 |
+| `main.cjs`（补丁 2 sed） | `PROMA_DEV === "1"` → `PROMA_INSTANCE_ISOLATED === "1"` |
+| `proma-dev-patches.cjs` — `createExternalHttpBridge()` | `get_instance_info` 返回 `instance`(新) + `proma_dev`(deprecated)；启动日志含 instance 名 |
+| `proma-dev-patches.cjs` — `createExternalHttpBridge()` | 读 `PROMA_INSTANCE_NAME`，fallback：`PROMA_DEV=1` → `"dev"`，否则 `"release"` |
+| `proma-mcp-server.cjs` — 端口扫描匹配 | `--instance <name>` 参数，匹配 `instance` 字段 |
+| `proma-mcp-server.cjs` — CLI | 新增 `--instance`，保留 `--dev`/`--release` 作别名 |
+| `start-dev.bat` | `PROMA_DEV=1` → `PROMA_INSTANCE_NAME=dev` + `PROMA_INSTANCE_ISOLATED=1` |
+| `start-release.bat` | 增加 `PROMA_INSTANCE_NAME=release` + `PROMA_INSTANCE_ISOLATED=0` |
+| `proma-dev-wiki.md` | 更新补丁 2 说明 + 启动脚本示例 |
 
 ---
 
@@ -237,14 +279,16 @@ global.__proma_getMcpServers__ = (sId, ws) => {
 
 ## 五、实施计划
 
-### 阶段 1：实例命名改造（基础设施）
+### 阶段 1：实例命名 + 隔离改造（基础设施）
 
 | 步骤 | 文件 | 改动 |
 |------|------|------|
-| 1.1 | `proma-dev-patches.cjs` | `createExternalHttpBridge()`: 读 `PROMA_INSTANCE_NAME`，fallback `PROMA_DEV`，`get_instance_info` 返回 `instance`+`proma_dev`(deprecated) |
-| 1.2 | `proma-mcp-server.cjs` | `--instance <name>` 参数，端口扫描匹配 `instance` 字段 |
-| 1.3 | `start-dev.bat` / `start-release.bat` | 设置 `PROMA_INSTANCE_NAME` |
-| 1.4 | 验证 | 启动 Dev → `curl /get_instance_info` 确认返回 `instance: "dev"` |
+| 1.1 | `main.cjs`（补丁 2 sed） | `PROMA_DEV === "1"` → `PROMA_INSTANCE_ISOLATED === "1"` |
+| 1.2 | `proma-dev-patches.cjs` | `createExternalHttpBridge()`: 读 `PROMA_INSTANCE_NAME`，fallback `PROMA_DEV`；`get_instance_info` 返回 `instance`+`proma_dev`(deprecated) |
+| 1.3 | `proma-mcp-server.cjs` | `--instance <name>` 参数，端口扫描匹配 `instance` 字段；保留 `--dev`/`--release` 别名 |
+| 1.4 | `start-dev.bat` / `start-release.bat` | 设置 `PROMA_INSTANCE_NAME` + `PROMA_INSTANCE_ISOLATED` |
+| 1.5 | 重新部署 | 提取正式版 main.cjs → 打全部补丁 → 部署插件 + MCP server |
+| 1.6 | 验证 | 启动 Dev → `curl /get_instance_info` 返回 `instance:"dev"`；Release 返回 `instance:"release"`；Dev userData 隔离、Release 共享正式版 |
 
 ### 阶段 2：remote-session MCP server（核心功能）
 
@@ -273,6 +317,7 @@ global.__proma_getMcpServers__ = (sId, ws) => {
 | `PROMA_INSTANCE_NAME` 未设置 | 旧启动脚本不兼容 | fallback 到 `PROMA_DEV` 检测，确保向后兼容 |
 | 端口扫描耗时（首次调用） | 首次调用慢 ~2 秒 | 缓存 + 并行扫描（同时发 20 个 GET，取最快响应） |
 | MCP server 工具名冲突 | `session` 和 `remote-session` 有同名工具 | 前缀区分：`remote_` vs 本地无前缀 |
+| `PROMA_INSTANCE_ISOLATED` 误设为 1 | Release 无法访问正式版数据 | 启动时显式打印 userData 路径到控制台，便于排查 |
 | 两个实例同时重启端口互换 | 缓存指向错误实例 | 每次 HTTP 请求前调 `get_instance_info` 验证 instance 名是否一致 |
 
 ---

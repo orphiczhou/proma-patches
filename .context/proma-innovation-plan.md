@@ -41,7 +41,7 @@ Layer 2: 时间线的剪枝者（未来）
 | **补丁 C1-5** | 频道+模型元数据覆盖 | MCP 创建的会话走后端正确频道/模型/API Key |
 | **补丁 F** | 跨渠道 sdkSessionId 断裂防护 | UI 跨渠道切换模型时检测差异，清除旧 session 走上下文回填，避免 "Session 已失效" |
 | **补丁 D+E** | Renderer 同步 | 版本同步 + hydration 幂等守卫移除 → UI 模型选择器正确显示 |
-| **插件** | proma-dev-patches.cjs | 11 个 MCP 工具（713 行，见 1.2） |
+| **插件** | proma-dev-patches.cjs | 22 个 MCP 工具（11 本地 + 11 远端 remote-session），实例自动发现，HTTP bridge |
 | **外部 MCP** | proma-mcp-server.cjs | 零依赖 stdio 桥接（153 行），`--dev`/`--release` 参数，实例自动发现 |
 | **Release 版** | `D:\Proma-release\` | 与正式版双开，彩色图标，独立部署（v0.12 已同步） |
 | **Wiki** | proma-dev-wiki.md | 完整技术文档（补丁命令、架构、流程） |

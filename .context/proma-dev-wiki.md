@@ -392,6 +392,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-17 | v0.14.0 | 提案 Phase 1 完成：① `get_instance_info` 新增 `instance` 字符串字段（从 `PROMA_INSTANCE_NAME` 读取，fallback `PROMA_DEV`），`proma_dev` 保留 deprecated；② 新增 `remote-session` MCP server（11 工具：`remote_list_channels/sessions/workspaces`、`remote_get_session_info/context`、`remote_list_messages`、`remote_create/fork/send/archive_session`、`remote_get_my_session_id`），内置实例发现+端口缓存+HTTP 代理，Agent 远端操作无需 curl；③ `proma-mcp-server.cjs` 新增 `--instance <name>` 参数，`--dev`/`--release` 保留别名；④ 启动脚本引入 `PROMA_INSTANCE_NAME` + `PROMA_INSTANCE_ISOLATED` 双变量。Dev + Release 插件已同步 |
 | 2026-06-16 | v0.13.0 | Skill v1.3.0：新增"⚠️ 第一判断"关卡（工具列表后第一章节，强制区分本实例 vs 远端实例）；新增"模式 9：内部 Agent 操作远端实例"（curl 七步走）；frontmatter 触发词扩充 20+ 远端相关关键词；`mcp__session__*` 只认本进程、远端一律 curl 提升为 Skill 第一优先规则 |
 | 2026-06-16 | v0.12.2 | Skill 驱动全链路验证完成：小弟在零规则提示下自主读取 session-management Skill v1.2.3，完成远端 Dev curl（实例发现→创建含中文标题会话→发中文消息→Fork→归档→实查 6/6）和本地 MCP（create→send→fork→archive→list→context 6/6），共计 13/13 全部通过；远端中文零乱码。两条黄金规则（本地/远端隔离、curl 中文编码）在内部 Agent + 外部 MCP 双入口全覆盖 |
 | 2026-06-16 | v0.12.1 | HTTP bridge UTF-8 编码修复：`req.on("data", c => body += c)` 在 TCP 分包时会把多字节 UTF-8 字符拦腰截断。改为 `Buffer.concat(chunks).toString("utf-8")` 从根本上解决。Session-management Skill v1.2.2 收敛：curl 中文编码黄金规则提升为章首全局强制（`printf + --data-binary @-`）。Dev + Release + 补丁工具包全部同步 |
