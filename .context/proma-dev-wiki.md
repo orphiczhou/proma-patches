@@ -58,13 +58,30 @@ mv app.asar app.asar.disabled   # 让 Electron 加载 app/ 目录
 cp -r app.asar.unpacked/node_modules/* app/node_modules/
 ```
 
-### 4. 创建启动脚本 `start-dev.bat`
+### 4. 创建启动脚本
 
-```bat
-@echo off
-set PROMA_DEV=1
-start "" "D:\Proma-dev\Proma-white.exe"
+推荐 VBS 启动（双击无控制台窗口残留）：
+
+**`start-dev.vbs`：**
+```vbscript
+Set WshShell = CreateObject("WScript.Shell")
+Set Env = WshShell.Environment("Process")
+Env("PROMA_INSTANCE_NAME") = "dev"
+Env("PROMA_INSTANCE_ISOLATED") = "1"
+Env("PROMA_DEV") = "1"
+WshShell.Run """D:\Proma-dev\Proma-white.exe""", 1, False
 ```
+
+**`start-release.vbs`：**
+```vbscript
+Set WshShell = CreateObject("WScript.Shell")
+Set Env = WshShell.Environment("Process")
+Env("PROMA_INSTANCE_NAME") = "release"
+Env("PROMA_INSTANCE_ISOLATED") = "0"
+WshShell.Run """D:\Proma-release\Proma-black.exe""", 1, False
+```
+
+`.bat` 备选（但双击会残留 CMD 窗口，关掉窗口会杀进程）：
 
 ### 5. 同步认证数据
 
@@ -224,6 +241,19 @@ sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkS
 
 **效果：** UI 中跨渠道切换模型时，renderer 请求的 `channelId` 与 metadata 中存储的不同。补丁 F 在 SDK 查询前检测到此差异，清除 `sdkSessionId`，走"新会话 + 上下文回填"路径，避免 SDK 抛出 "Session not found" 触发完整的 "Session 已失效" 恢复流程（重新载入历史浪费 token）。同渠道内模型切换不受影响。
 
+#### 补丁 G：CLAUDE_CONFIG_DIR 无条件覆盖（v0.15.0 新增）
+
+**注入点：** `agent-session-manager.ts` 模块加载时的条件守卫
+
+**问题：** Shell 环境预置了 `CLAUDE_CONFIG_DIR`（如 `~/.proma/sdk-config`），`if (!process.env.CLAUDE_CONFIG_DIR)` 守卫阻止了 Dev 实例用 `getSdkConfigDir()` 纠正为 `~/.proma-dev/sdk-config/`。导致 SDK CLI 子进程与会话元数据读写的配置目录不一致——CLI 写到正确的 Dev 目录，但 `forkAgentSession` 从 Release 目录查找 → "Session not found"。
+
+```bash
+# 去掉条件守卫，强制无条件覆盖
+sed -i 's/if (!process.env.CLAUDE_CONFIG_DIR) {\n      process.env.CLAUDE_CONFIG_DIR = getSdkConfigDir();\n    }/process.env.CLAUDE_CONFIG_DIR = getSdkConfigDir();/' main.cjs
+```
+
+**效果：** Dev 实例上 fork 从 0/3 修复为 3/3 通过，远端 fork（Release→Dev）同步生效。
+
 ---
 
 ### 渲染器补丁
@@ -380,7 +410,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 3. **Windows esbuild 构建：** 通过 Git Bash 会 segfault，需用 `node_modules/@esbuild/win32-x64/esbuild.exe`。
 
-4. **DeepSeek 频道会话 Fork 失败：** SDK 层 bug——会话的 `sdkSessionId` 存在 Proma 元数据中，但 SDK 内部找不到对应会话数据。v0.7 渲染器补丁后部分缓解，v0.11 实测仍存在（同渠道内 Fork OK，跨渠道报 `Session not found`）。根因待排查：JSONL 路径或 SDK session 索引不一致。
+4. **DeepSeek 频道会话 Fork 失败：** ✅ v0.15.0 补丁 G 修复。根因：`CLAUDE_CONFIG_DIR` 条件守卫导致 Dev 实例读写路径不一致。
 
 5. **正式版升级后 renderer 版本漂移：** 补丁 D 解决，升级后需同步 renderer 文件。
 
@@ -392,6 +422,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-17 | v0.15.0 | 补丁 G：`CLAUDE_CONFIG_DIR` 无条件覆盖——修复 Dev 实例上 headless 会话 fork 失败（0/3→3/3）。根因：Shell 预置 `CLAUDE_CONFIG_DIR`，`if (!process.env.CLAUDE_CONFIG_DIR)` 条件守卫阻止 Dev 用 `getSdkConfigDir()` 纠正为 `~/.proma-dev/sdk-config/`，导致 `forkAgentSession` 查找路径与 CLI 子进程写入路径不一致。修复：去掉条件守卫，强制无条件覆盖 |
 | 2026-06-17 | v0.14.0 | 提案 Phase 1 完成：① `get_instance_info` 新增 `instance` 字符串字段（从 `PROMA_INSTANCE_NAME` 读取，fallback `PROMA_DEV`），`proma_dev` 保留 deprecated；② 新增 `remote-session` MCP server（11 工具：`remote_list_channels/sessions/workspaces`、`remote_get_session_info/context`、`remote_list_messages`、`remote_create/fork/send/archive_session`、`remote_get_my_session_id`），内置实例发现+端口缓存+HTTP 代理，Agent 远端操作无需 curl；③ `proma-mcp-server.cjs` 新增 `--instance <name>` 参数，`--dev`/`--release` 保留别名；④ 启动脚本引入 `PROMA_INSTANCE_NAME` + `PROMA_INSTANCE_ISOLATED` 双变量。Dev + Release 插件已同步 |
 | 2026-06-16 | v0.13.0 | Skill v1.3.0：新增"⚠️ 第一判断"关卡（工具列表后第一章节，强制区分本实例 vs 远端实例）；新增"模式 9：内部 Agent 操作远端实例"（curl 七步走）；frontmatter 触发词扩充 20+ 远端相关关键词；`mcp__session__*` 只认本进程、远端一律 curl 提升为 Skill 第一优先规则 |
 | 2026-06-16 | v0.12.2 | Skill 驱动全链路验证完成：小弟在零规则提示下自主读取 session-management Skill v1.2.3，完成远端 Dev curl（实例发现→创建含中文标题会话→发中文消息→Fork→归档→实查 6/6）和本地 MCP（create→send→fork→archive→list→context 6/6），共计 13/13 全部通过；远端中文零乱码。两条黄金规则（本地/远端隔离、curl 中文编码）在内部 Agent + 外部 MCP 双入口全覆盖 |
