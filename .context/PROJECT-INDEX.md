@@ -25,12 +25,13 @@
 - **session-management Skill v1.3.0**：9 大使用模式 + "第一判断"远端隔离关卡
 - **GitHub 仓库**：`orphiczhou/proma-patches`，`apply-patches.sh` 一键部署
 
-### Layer 2 — 树形会话执行体系 ✅ v0.2.0 已发布
+### Layer 2 — 树形会话执行体系 ✅ v0.2.1（Q1 v1.1 落地）
 
-- **发布包**：`release/tree-system-v0.2.0/`（17 文件，7000+ 行）
-- **核心交付**：tree-state.js v1.0、tree-commander SKILL v2.0、tree-worker SKILL v2.0、commander-methodology v1.0、tree-audit-methodology v1.0
-- **4 次验证**：B任务(4子会话)、S1重测(25命令)、L2验证(3子会话0偏差)、L1Fix(3worker 进行中)
-- **已知限制**：notify未验证、心跳/内审仅方案、竹节交接未实现、并发竞态
+- **发布包**：`release/tree-system-v0.2.0/`（17 文件，7000+ 行）+ v0.2.1 Q1修订
+- **核心交付**：tree-state.js v0.2.1（~1680行，role枚举+深度限制+E_CHILDREN_NOT_DONE+E_DEPTH_EXCEEDED+migrate）、tree-commander SKILL v2.2、tree-worker SKILL v2.2、commander-methodology v1.2（13原则含Leaf Purity+分布式写入+三层深度）、tree-commander-design v1.3
+- **v0.2.1 新增**：role正式化为 root/commander/worker、三层Commander深度限制、子/孙Commander有权leaf add、叶子create_session干净上下文、migrate子命令（28旧role映射）、worker禁有子节点、根唯一性校验
+- **5 次验证**：B任务(4子会话)、S1重测(25命令)、L2验证(3子会话)、v1.1 S1回归(全通过)、v1.1 migrate(bverify通过)
+- **已知限制**：notify未验证、心跳/内审仅方案、竹节交接未实现、并发竞态、Commander prune级联未定义
 
 ---
 
@@ -82,9 +83,12 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 |---|---|---|
 | **本索引** | `workspace-files/.context/PROJECT-INDEX.md` | 入口 |
 | 总路线图 | `workspace-files/.context/proma-innovation-plan.md` | 两层架构总览 + 优先级 |
-| 完整技术 Wiki | `workspace-files/.context/proma-dev-wiki.md`（833 行） | 补丁命令、架构、测试记录 |
+| 完整技术 Wiki | `workspace-files/.context/proma-dev-wiki.md` | 补丁命令、架构、测试记录 |
 | Layer 2 设计 | `workspace-files/.context/proma-dev-wiki-timeline-pruner.md` | 时间线剪枝者完整方案 |
-| Layer 2 发布包 | `workspace-files/release/tree-system-v0.2.0/` | **v0.2.0 初始版本（17 文件）** |
+| Layer 2 发布包 | `workspace-files/release/tree-system-v0.2.0/` | v0.2.0 初始版本（17 文件） |
+| **Q1 架构方案** | `workspace-files/.context/plan/q1-state-architecture.md` | **v1.1 role枚举+深度限制+分布式写入** |
+| **Q2 UI方案** | `workspace-files/.context/plan/q2-tree-ui-panel.md` | **v1.0 侧边栏树形可视化面板** |
+| **进度报告** | `workspace-files/.context/progress-report-2026-06-19.md` | **v0.1/v0.2 完成度全面审计** |
 | 树形审计方法论 | `workspace-files/.context/tree-audit-methodology.md` | 终局验证 × 树形体系强制执行版 |
 | remote-session 提案 | `workspace-files/.context/proposal-remote-session-mcp.md` | 远端工具设计 + 实例命名 |
 | 商业化路线 | `proma-business-plan.md` | 闭源模块清单 + 合规 + 定价 |

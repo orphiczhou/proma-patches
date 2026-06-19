@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-19 18:25 | 维护者: 周星星
+> 最后更新: 2026-06-19 23:06 | 维护者: 周星星
 
 ---
 
@@ -930,9 +930,9 @@ sed -i 's/"iconTemplate.png"/"proma-coral.png"/g' main.cjs
 
 ---
 
-## 十八、Layer 2：树形会话执行体系 v0.2.0
+## 十八、Layer 2：树形会话执行体系 v0.2.1
 
-> 完整发布包：`release/tree-system-v0.2.0/` | 17 文件 | 7000+ 行 | 2026-06-19
+> Q1 v1.1 架构落地 | 2026-06-19 | 审计驱动修订
 
 ### 18.1 一句话定位
 
@@ -940,51 +940,80 @@ sed -i 's/"iconTemplate.png"/"proma-coral.png"/g' main.cjs
 
 ### 18.2 核心组件
 
-| 组件 | 文件 | 行数 | 说明 |
-|------|------|------|------|
-| **状态引擎** | `core/tree-state.js` | 1551 | JSON 持久化 + 内存缓存，树拓扑/事件日志/版本追踪/自审/自动备份 |
-| **指挥官 SKILL** | `skills/tree-commander/SKILL.md` | 577 | 14条铁律、5件套契约模板、偏差检测、竹节交接 |
-| **工人 SKILL** | `skills/tree-worker/SKILL.md` | 368 | 9条铁律、4种上行消息、契约解读、上下文最小化 |
-| **指挥官方法论** | `methodologies/commander-methodology.md` | 298 | 双轨执行、铁律详解、事件路由、偏差分类 |
-| **审计方法论** | `methodologies/tree-audit-methodology.md` | ~250 | 融合终局验证，7 leaf 强制、5铁律、收敛三条件、违规检测 |
-| **设计文档** | `design/tree-commander-design.md` | 1413 | 完整架构设计、命名规范、v0.2 新增能力 spec |
+| 组件 | 文件 | 行数 | 版本 | 说明 |
+|------|------|------|------|------|
+| **状态引擎** | `trees/tree-state.js` | ~1680 | v0.2.1 | JSON 持久化 + 文件锁，role 枚举/深度限制/子节点检查/migrate |
+| **指挥官 SKILL** | `skills/tree-commander/SKILL.md` | 734 | v2.2 | 14条铁律、5件套契约模板、偏差检测、竹节交接 |
+| **工人 SKILL** | `skills/tree-worker/SKILL.md` | 441 | v2.2 | 9条铁律、4种上行消息、create_session 干净上下文 |
+| **指挥官方法论** | `commander-methodology.md` | ~320 | v1.2 | 13条原则（含Leaf Purity+分布式写入+三层深度限制） |
+| **设计文档** | `tree-commander-design.md` | ~1420 | v1.3 | 完整架构设计、ROLE_ENUM、E_CHILDREN_NOT_DONE/E_DEPTH_EXCEEDED |
+| **Q1 架构方案** | `plan/q1-state-architecture.md` | 547 | v1.1 | 状态架构/权限模型/role正式化/migrate |
 
-### 18.3 已验证场景
+### 18.3 v0.2.1 新增能力（Q1 v1.1）
+
+#### role 枚举正式化
+
+`role` 字段从自由文本升级为三层枚举：`root` | `commander` | `worker`
+
+| role | 语义 | 创建方式 | leaf add 权限 |
+|------|------|---------|--------------|
+| `root` | 根指挥官 | 用户手动 | commander + worker |
+| `commander` | 子/孙指挥官 | fork_session | commander(深度限制) + worker |
+| `worker` | 原子叶子 | create_session | 无 |
+
+#### 三层 Commander 深度限制
+
+```
+深度 0: root           → 可加 commander / worker
+深度 1: commander(子)  → 可加 commander / worker  
+深度 2: commander(孙)  → 只能加 worker（E_DEPTH_EXCEEDED）
+深度 3+: 不允许存在 commander
+```
+
+#### 分布式状态写入
+
+- 根 Commander：结构性变更（tree init / leaf add）
+- 子/孙 Commander：leaf add（parent=self）+ milestones/events/status（独立推进）
+- 叶子 Worker：只上报（send_message），不直接写 tree-state
+- 文件锁保障并发安全
+
+#### 叶子纯净原则
+
+叶子 = `create_session` + 首条消息注入 brief/dod。绝不 fork 叶子。fork 只用于创建子 Commander。
+
+#### 新增校验规则
+
+| 规则 | 触发条件 | 错误码 |
+|------|---------|--------|
+| role 枚举校验 | role 不在 ROLE_ENUM | `E_SCHEMA_INVALID` |
+| Commander 深度限制 | depth ≥ 3 时加 commander | `E_DEPTH_EXCEEDED` |
+| 子节点未完成检查 | commander done 前子节点非 done | `E_CHILDREN_NOT_DONE` |
+| Worker 禁有子节点 | 以 worker 为 parent 加 leaf | `E_SCHEMA_INVALID` |
+| 根唯一性 | 重复 parent=null 或非 root | `E_SCHEMA_INVALID` |
+| migrate 子命令 | 旧 role 映射 + worker→commander 提升 | — |
+| added_by 追踪 | leaf add 记录创建会话 | — |
+
+### 18.4 已验证场景
 
 | 验证任务 | 时间 | 频道 | 子会话数 | 结果 |
 |---------|------|------|---------|------|
 | B 任务 | 6/18 | GLM-5-Turbo | 4（含1孙） | ✅ 有条件通过 |
 | S1 重测 | 6/19 | 模拟 | 3 | ✅ 25/25 |
 | L2 验证 | 6/19 | DeepSeek-v4-flash | 3（含1孙） | ✅ 1次0偏差 |
+| v1.1 S1 回归 | 6/19 | 模拟 | — | ✅ 深度限制/根唯一性/Worker禁子节点 全通过 |
+| v1.1 migrate | 6/19 | — | — | ✅ bverify 28旧role映射 + F-integrate提升commander |
 
-### 18.4 与 Layer 1 的关系
+### 18.5 与 Layer 1 的关系
 
 ```
 Layer 1: MCP 基础设施 (v0.16.5)
   └─ 22 个会话管理工具 (11 本地 + 11 远端)
   └─ send_message / fork_session / create_session / ...
        ↓ 提供基础能力
-Layer 2: 树形会话执行体系 (v0.2.0)
-  └─ tree-state.js 状态管理
-  └─ tree-commander + tree-worker SKILL
+Layer 2: 树形会话执行体系 (v0.2.1)
+  └─ tree-state.js 状态管理（role枚举+深度限制+分布式写入）
+  └─ tree-commander + tree-worker SKILL（Leaf Purity）
   └─ 契约体系 + 事件通道 + 偏差检测 + 终局验证
-```
-
-Layer 2 是 Layer 1 之上的第一层上层建筑。没有 Layer 1 的 MCP 工具，指挥官无法 Fork/发消息/回收；没有 Layer 2 的编排能力，Layer 1 只能是手工单次调用。
-
-### 18.5 安装与使用
-
-```bash
-# 部署 tree-state.js
-cp release/tree-system-v0.2.0/core/tree-state.js \
-   ~/.proma/agent-workspaces/proma/workspace-files/.context/trees/
-
-# 部署 SKILL 到 Proma Skills 目录
-cp -r release/tree-system-v0.2.0/skills/* \
-   ~/.proma/agent-workspaces/proma/skills/
-
-# 初始化一个树形任务
-node tree-state.js init mytask "我的任务"
 ```
 
 ### 18.6 已知限制与 v0.3 计划
@@ -993,4 +1022,5 @@ node tree-state.js init mytask "我的任务"
 - 心跳/内审/三档纠偏仅方案未编码
 - 竹节交接仅方案（上下文 >85% 甜点时接力）
 - 并发竞态：send_message fire-and-forget 存在消息丢失风险（L1 I3）
-- v0.3 目标：心跳实现 + 内审实现 + notify 验证 + 竹节交接 + 自动化 smoke test
+- Commander prune/archive 时子树的级联行为未定义（M5）
+- v0.3 目标：心跳实现 + 内审实现 + notify 验证 + 竹节交接 + 自动化 smoke test + 级联剪枝
