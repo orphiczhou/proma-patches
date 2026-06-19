@@ -69,6 +69,7 @@ const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_rep
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
+const ROLE_ENUM = ['root', 'commander', 'worker'];
 
 // 错误码 (附录 A.1)
 const E_LOCK_TIMEOUT = 'E_LOCK_TIMEOUT';
@@ -79,6 +80,7 @@ const E_STATUS_INVALID = 'E_STATUS_INVALID';
 const E_NAME_INVALID = 'E_NAME_INVALID';
 const E_PARENT_MISSING = 'E_PARENT_MISSING';
 const E_DUPLICATE_LEAF = 'E_DUPLICATE_LEAF';
+const E_CHILDREN_NOT_DONE = 'E_CHILDREN_NOT_DONE';
 const E_BACKUP_CORRUPT = 'E_BACKUP_CORRUPT';
 const E_IO = 'E_IO';
 const E_UNKNOWN = 'E_UNKNOWN';
@@ -477,6 +479,10 @@ async function cmdLeafAdd(args) {
   }
 
   const { leaf_id, session_id, parent, path: leafPath, role, model, channel } = input;
+  const added_by = input.added_by || null;
+
+  // 0. role 枚举校验
+  assertEnum(role, ROLE_ENUM, 'role');
 
   // 1. 命名校验
   if (!LEAF_NAME_RE.test(leaf_id)) {
@@ -515,6 +521,7 @@ async function cmdLeafAdd(args) {
       channel,
       status: 'active',
       created_at: now,
+      added_by,
       last_event_ts: null,
       last_event_type: null,
       context_usage_pct: 0,
@@ -722,6 +729,22 @@ async function cmdLeafSetStatus(args) {
           throw new TreeStateError(
             E_SCHEMA_INVALID,
             `cannot set status=done: milestone "${m.id}" is not audit_pass=true`
+          );
+        }
+      }
+
+      // commander 角色额外检查：所有子 leaf 必须 done
+      if (leaf.role === 'commander') {
+        const childIds = Object.keys(state.leaves).filter(
+          (lid) => state.leaves[lid].parent === leaf_id
+        );
+        const notDone = childIds.filter(
+          (lid) => state.leaves[lid].status !== 'done'
+        );
+        if (notDone.length > 0) {
+          throw new TreeStateError(
+            E_CHILDREN_NOT_DONE,
+            `cannot set commander status=done: ${notDone.length} child leaf(s) not done: ${notDone.join(', ')}`
           );
         }
       }
@@ -1377,6 +1400,70 @@ function parseArgs(argv) {
 }
 
 // ============================================================
+// 命令: migrate（数据迁移）
+// ============================================================
+
+// 旧 role → 新 role 映射表
+const ROLE_MIGRATION_MAP = {
+  // 旧自由文本 role → 统一为 worker
+  announce: 'worker',
+  techdetail: 'worker',
+  integrate: 'worker',
+  review: 'worker',
+  eval: 'worker',
+  engine: 'worker',
+  draft: 'worker',
+};
+
+async function cmdMigrate(args) {
+  // migrate <tree_id> [--dry-run]
+  const { positional, opts } = parseArgs(args);
+  const tree_id = positional[0];
+  assertTreeExists(tree_id);
+  const dryRun = opts['dry-run'] === 'true' || opts['dry-run'] === true;
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    const changes = [];
+    const leaves = state.leaves || {};
+
+    for (const id of Object.keys(leaves)) {
+      const leaf = leaves[id];
+      const oldRole = leaf.role;
+
+      // 规则 1: 旧自由文本 role → 映射为新枚举
+      if (ROLE_MIGRATION_MAP[oldRole]) {
+        changes.push({ leaf_id: id, field: 'role', from: oldRole, to: ROLE_MIGRATION_MAP[oldRole] });
+        if (!dryRun) leaf.role = ROLE_MIGRATION_MAP[oldRole];
+      } else if (leaf.parent === null && leaf.role !== 'root' && leaf.role !== 'commander') {
+        // 规则 2: parent=null 的非 root/commander → worker（未匹配规则 1 的兜底）
+        changes.push({ leaf_id: id, field: 'role', from: leaf.role, to: 'worker', reason: 'parent=null non-root/commander → worker' });
+        if (!dryRun) leaf.role = 'worker';
+      }
+
+      // 规则 3: 补全缺失的 added_by（标记为 migrated）
+      if (leaf.added_by === undefined) {
+        changes.push({ leaf_id: id, field: 'added_by', from: undefined, to: null });
+        if (!dryRun) leaf.added_by = null;
+      }
+    }
+
+    if (!dryRun) {
+      writeState(tree_id, state);
+    }
+
+    result = {
+      tree_id,
+      dry_run: dryRun,
+      migrated: changes.length,
+      changes
+    };
+  });
+  return result;
+}
+
+// ============================================================
 // 主入口 & 路由
 // ============================================================
 
@@ -1391,6 +1478,8 @@ async function dispatch(cmd, args) {
       return await cmdRestore(args);
     case 'validate':
       return await cmdValidate(args);
+    case 'migrate':
+      return await cmdMigrate(args);
 
     // Add
     case 'leaf':
@@ -1413,7 +1502,7 @@ async function dispatch(cmd, args) {
       return await dispatchTree(args);
 
     default:
-      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, leaf, milestone, event, drift, heartbeat, segment, tree`);
+      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, migrate, leaf, milestone, event, drift, heartbeat, segment, tree`);
   }
 }
 
