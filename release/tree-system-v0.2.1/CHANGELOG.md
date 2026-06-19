@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.2.1 (2026-06-19) — Q1 v1.1 架构升级
+
+### 核心变更
+
+- **tree-state.js** v0.2.1：1551→1680 行
+  - **role 三层枚举**：root / commander / worker，正式区分指挥层级
+  - **三层深度限制**：depth 0(root)→1(commander)→2(commander)，depth≥3 禁止加 commander（E_DEPTH_EXCEEDED）
+  - **E_CHILDREN_NOT_DONE**：Commander set-status done 时子节点必须全部 done
+  - **calcCommanderDepth()**：自动计算当前节点距根 commander 的距离
+  - **migrate 子命令**：28 旧 role 映射 + worker 有子节点自动提升 commander
+  - **分布式写入**：根做结构性变更，子/孙 Commander 做 leaf add(parent=self)+milestones/events/status，Worker 只上报不写 tree
+  - **根唯一性校验**：重复 parent=null → E_SCHEMA_INVALID
+  - **Worker 禁子节点**：以 worker 为 parent 加 leaf → E_SCHEMA_INVALID
+- **commander-methodology.md** v1.0→v1.2：13 条原则（新增 Leaf Purity + 分布式写入 + 三层深度）
+- **tree-commander-design.md** v1.0→v1.3：role 枚举 + ROLE_ENUM 示例
+- **tree-commander SKILL** v2.1→v2.2：版本引用更新
+- **tree-worker SKILL** v2.1→v2.2：load_on 改为 create_session
+
+### 新增文件
+
+- `design/q1-state-architecture.md`：Q1 独立方案 v1.1（547 行）
+- `design/q2-tree-ui-panel.md`：Q2 独立方案 v1.0（298 行）
+- `verification-reports/q1-e2e-verification-report.md`：Q1 端到端验证报告
+- `progress-report-2026-06-19.md`：开发进度摸底报告
+
+### 验证记录
+
+- **Q1 e2e 验证**（2026-06-19）：3 层树（root→commander→commander+worker），全链路通过 ✅
+- **l1fix_v2 审计**：多 Agent 审计驱动修订，收敛通过 ✅
+- **v1.1 S1 回归**：全命令通过 ✅
+- **v1.1 migrate**：bverify 树迁移通过 ✅
+
 ## v0.2.0 (2026-06-19) — 初始版本
 
 ### 核心交付

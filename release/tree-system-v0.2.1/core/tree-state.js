@@ -69,6 +69,7 @@ const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_rep
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
+const ROLE_ENUM = ['root', 'commander', 'worker'];
 
 // 错误码 (附录 A.1)
 const E_LOCK_TIMEOUT = 'E_LOCK_TIMEOUT';
@@ -79,6 +80,8 @@ const E_STATUS_INVALID = 'E_STATUS_INVALID';
 const E_NAME_INVALID = 'E_NAME_INVALID';
 const E_PARENT_MISSING = 'E_PARENT_MISSING';
 const E_DUPLICATE_LEAF = 'E_DUPLICATE_LEAF';
+const E_CHILDREN_NOT_DONE = 'E_CHILDREN_NOT_DONE';
+const E_DEPTH_EXCEEDED = 'E_DEPTH_EXCEEDED';
 const E_BACKUP_CORRUPT = 'E_BACKUP_CORRUPT';
 const E_IO = 'E_IO';
 const E_UNKNOWN = 'E_UNKNOWN';
@@ -477,6 +480,10 @@ async function cmdLeafAdd(args) {
   }
 
   const { leaf_id, session_id, parent, path: leafPath, role, model, channel } = input;
+  const added_by = input.added_by || null;
+
+  // 0. role 枚举校验
+  assertEnum(role, ROLE_ENUM, 'role');
 
   // 1. 命名校验
   if (!LEAF_NAME_RE.test(leaf_id)) {
@@ -502,6 +509,50 @@ async function cmdLeafAdd(args) {
       if (!Object.prototype.hasOwnProperty.call(state.leaves, parent)) {
         throw new TreeStateError(E_PARENT_MISSING, `parent "${parent}" does not exist in leaves`);
       }
+    } else {
+      // 3.5. 根唯一性：parent=null 必须 role=root
+      if (role !== 'root') {
+        throw new TreeStateError(
+          E_SCHEMA_INVALID,
+          `leaf with parent=null must have role=root, got "${role}"`
+        );
+      }
+      // 根唯一性：只能有一个 parent=null 的 leaf
+      const existingRoot = Object.keys(state.leaves).find(
+        (lid) => state.leaves[lid].parent === null
+      );
+      if (existingRoot) {
+        throw new TreeStateError(
+          E_SCHEMA_INVALID,
+          `tree already has root leaf "${existingRoot}". Only one root (parent=null) allowed per tree.`
+        );
+      }
+    }
+
+    // 3.6. 深度限制：role=commander 时检查父节点 Commander 深度
+    // calcCommanderDepth 统计 parent 链上 root/commander 节点数（含 parent 自身）
+    // depth=1: parent 是 root → 允许（新增后为第2层 commander）
+    // depth=2: parent 是 commander（子）→ 允许（新增后为第3层 commander）
+    // depth>=3: parent 已是第3层+ → 拒绝（超三层限制）
+    if (role === 'commander' && parent !== null) {
+      const depth = calcCommanderDepth(state, parent);
+      if (depth >= 3) {
+        throw new TreeStateError(
+          E_DEPTH_EXCEEDED,
+          `cannot add commander under parent "${parent}": commander depth ${depth} >= 3 (max 3 layers: root→child→grandchild). Use role=worker instead.`
+        );
+      }
+    }
+
+    // 3.7. Worker 不能有子节点：parent leaf 如果存在且 role=worker，拒绝
+    if (parent !== null) {
+      const parentLeaf = state.leaves[parent];
+      if (parentLeaf && parentLeaf.role === 'worker') {
+        throw new TreeStateError(
+          E_SCHEMA_INVALID,
+          `cannot add leaf under parent "${parent}": parent is a worker (atomic leaf). Only commanders can have children.`
+        );
+      }
     }
 
     const now = nowIso();
@@ -515,6 +566,7 @@ async function cmdLeafAdd(args) {
       channel,
       status: 'active',
       created_at: now,
+      added_by,
       last_event_ts: null,
       last_event_type: null,
       context_usage_pct: 0,
@@ -722,6 +774,22 @@ async function cmdLeafSetStatus(args) {
           throw new TreeStateError(
             E_SCHEMA_INVALID,
             `cannot set status=done: milestone "${m.id}" is not audit_pass=true`
+          );
+        }
+      }
+
+      // commander 角色额外检查：所有子 leaf 必须 done
+      if (leaf.role === 'commander') {
+        const childIds = Object.keys(state.leaves).filter(
+          (lid) => state.leaves[lid].parent === leaf_id
+        );
+        const notDone = childIds.filter(
+          (lid) => state.leaves[lid].status !== 'done'
+        );
+        if (notDone.length > 0) {
+          throw new TreeStateError(
+            E_CHILDREN_NOT_DONE,
+            `cannot set commander status=done: ${notDone.length} child leaf(s) not done: ${notDone.join(', ')}`
           );
         }
       }
@@ -1321,7 +1389,10 @@ async function cmdValidate(args) {
     }
   }
 
-  // 输出: ok=true 仅当 issues 为空；issues 非空时 ok=false
+  // 输出: ok=true 即使有 issues 也算 ok（设计 §A.7 输出 ok:false 是 schema 故障级）
+  // 重读附录 A.7 输出格式：
+  //   {"ok":true,"issues":[]}  或  {"ok":false,"issues":[...]}
+  // → issues 非空时 ok=false
   return { ok: issues.length === 0, issues };
 }
 
@@ -1374,6 +1445,145 @@ function parseArgs(argv) {
 }
 
 // ============================================================
+// 工具: Commander 深度计算
+// ============================================================
+
+/**
+ * 沿 parent 链向上追溯，统计 role 为 root/commander 的节点数（含 parent 自身）
+ * 用于 leaf add 时判断是否超过三层 Commander 深度限制
+ */
+function calcCommanderDepth(state, parent_leaf_id) {
+  let depth = 0;
+  let currentId = parent_leaf_id;
+  while (currentId) {
+    const leaf = state.leaves[currentId];
+    if (!leaf) break;
+    if (leaf.role === 'root' || leaf.role === 'commander') {
+      depth++;
+    }
+    currentId = leaf.parent;
+  }
+  return depth;
+}
+
+// ============================================================
+// 命令: migrate（数据迁移）
+// ============================================================
+
+// 旧 role → 新 role 映射表（覆盖生产环境全部自由文本 role）
+// 不在 ROLE_ENUM 中的值统一映射为 worker
+const ROLE_MIGRATION_MAP = {
+  announce: 'worker',
+  attack: 'worker',
+  completeness: 'worker',
+  consistency: 'worker',
+  counterfactual: 'worker',
+  draft: 'worker',
+  engine: 'worker',
+  eval: 'worker',
+  evidence: 'worker',
+  fixer: 'worker',
+  integrate: 'worker',
+  polish: 'worker',
+  r1: 'worker',
+  r2: 'worker',
+  'regression-attack': 'worker',
+  'regression-evidence': 'worker',
+  report: 'worker',
+  'reverse-map': 'worker',
+  reversemap: 'worker',
+  revmap: 'worker',
+  review: 'worker',
+  standards: 'worker',
+  techdetail: 'worker',
+  test: 'worker',
+  verify: 'worker',
+  walkthrough: 'worker',
+  walkthru: 'worker',
+};
+
+async function cmdMigrate(args) {
+  // migrate <tree_id> [--dry-run]
+  const { positional, opts } = parseArgs(args);
+  const tree_id = positional[0];
+  assertTreeExists(tree_id);
+  const dryRun = opts['dry-run'] === 'true' || opts['dry-run'] === true;
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    const changes = [];
+    const leaves = state.leaves || {};
+
+    for (const id of Object.keys(leaves)) {
+      const leaf = leaves[id];
+      const oldRole = leaf.role;
+
+      // 规则 1: 旧自由文本 role → 映射为新枚举
+      if (ROLE_MIGRATION_MAP[oldRole]) {
+        changes.push({ leaf_id: id, field: 'role', from: oldRole, to: ROLE_MIGRATION_MAP[oldRole] });
+        if (!dryRun) leaf.role = ROLE_MIGRATION_MAP[oldRole];
+      } else if (leaf.parent === null && leaf.role !== 'root' && leaf.role !== 'commander') {
+        // 规则 2: parent=null 的非 root/commander → worker（未匹配规则 1 的兜底）
+        changes.push({ leaf_id: id, field: 'role', from: leaf.role, to: 'worker', reason: 'parent=null non-root/commander → worker' });
+        if (!dryRun) leaf.role = 'worker';
+      }
+
+      // 规则 3: 补全缺失的 added_by（标记为 migrated）
+      if (leaf.added_by === undefined) {
+        changes.push({ leaf_id: id, field: 'added_by', from: undefined, to: null });
+        if (!dryRun) leaf.added_by = null;
+      }
+    }
+
+    // 规则 4（第二轮）: worker 有子节点 → 提升为 commander（深度允许时）
+    // 必须先跑完规则 1-3 统一 role，再检查父子关系
+    for (const id of Object.keys(leaves)) {
+      const leaf = leaves[id];
+      if (leaf.role !== 'worker') continue;
+
+      const childIds = Object.keys(leaves).filter(
+        (lid) => leaves[lid].parent === id
+      );
+      if (childIds.length === 0) continue;
+
+      // worker 有子节点：计算深度，允许则提升为 commander
+      const depth = calcCommanderDepth(state, id);
+      if (depth < 3) {
+        changes.push({
+          leaf_id: id,
+          field: 'role',
+          from: 'worker',
+          to: 'commander',
+          reason: `has ${childIds.length} child(ren): ${childIds.join(', ')}. Depth ${depth} < 2, promoted to commander.`
+        });
+        if (!dryRun) leaf.role = 'commander';
+      } else {
+        changes.push({
+          leaf_id: id,
+          field: 'role',
+          from: 'worker',
+          to: 'worker',
+          reason: `HAS_CHILDREN_BUT_DEPTH_${depth}: has ${childIds.length} child(ren) but commander depth >= 2. Cannot promote. Manual resolution required.`
+        });
+      }
+    }
+
+    if (!dryRun) {
+      writeState(tree_id, state);
+    }
+
+    result = {
+      tree_id,
+      dry_run: dryRun,
+      migrated: changes.length,
+      changes
+    };
+  });
+  return result;
+}
+
+// ============================================================
 // 主入口 & 路由
 // ============================================================
 
@@ -1388,6 +1598,8 @@ async function dispatch(cmd, args) {
       return await cmdRestore(args);
     case 'validate':
       return await cmdValidate(args);
+    case 'migrate':
+      return await cmdMigrate(args);
 
     // Add
     case 'leaf':
@@ -1410,7 +1622,7 @@ async function dispatch(cmd, args) {
       return await dispatchTree(args);
 
     default:
-      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, leaf, milestone, event, drift, heartbeat, segment, tree`);
+      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, migrate, leaf, milestone, event, drift, heartbeat, segment, tree`);
   }
 }
 

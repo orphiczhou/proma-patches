@@ -8,11 +8,11 @@
 
 ```yaml
 skill_name: tree-commander
-version: 2.1
+version: 2.2
 target: 根会话（指挥官）
 requires:
   - tree-state.js                                          # 同目录 .context/trees/tree-state.js
-  - commander-methodology.md v1.0                          # 指挥官方法论
+  - commander-methodology.md v1.2                          # 指挥官方法论
   - tree-commander-design.md v1.1                          # 体系设计文档
   - tree-audit-methodology.md v1.0                         # 树形审计方法论（审计任务强制执行）
 mcp_dependencies:
@@ -730,5 +730,6 @@ declare done 前逐项确认：
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-06-19 | v2.2 | 审计驱动修订：requires 中 commander-methodology.md 版本引用从 v1.0 更新为 v1.2 |
 | 2026-06-19 | v2.1 | 新增 §14 审计工作流（铁律 5、最小 7 leaf 结构、审计 5 件套模板、迭代收敛流程、完成检查表）；§0 引用 tree-audit-methodology.md；铁律从 4 条扩展到 5 条 |
 | 2026-06-18 | v2.0 | 首次创建。合并 v0.1 契约/事件/剪枝 + v0.2 心跳/内审/三档纠偏/哨兵 Agent/验收 Agent。所有 tree-state.js 子命令引用来自附录 A 实现。 |
