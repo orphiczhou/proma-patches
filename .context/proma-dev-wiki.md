@@ -231,15 +231,38 @@ sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' main.cjs
 
 **效果：** 通过 MCP 工具创建的会话，API 请求走元数据中存储的正确频道和模型（后端层面）。结合补丁 D+E，UI 模型选择器也与元数据同步。
 
-#### 补丁 F：跨渠道 sdkSessionId 断裂防护
+#### 补丁 F：跨渠道 sdkSessionId 断裂防护（已被补丁 H 替代）
 
-**注入点：** `agent-orchestrator` 中 `let existingSdkSessionId = sessionMeta?.sdkSessionId;` 之后
+> **⚠️ 历史遗留**：补丁 F 在 v0.15.0 时设计为仅清空 `existingSdkSessionId`，但**实际未真正注入**到 main.cjs（grep `channelId!==sessionMeta.channelId` 无匹配）。2026-06-18 v0.16.0 调研发现该问题，由**补丁 H**（见下）作为更完整的方案 A 替代。补丁 H 不止清空 sdkSessionId，还同步更新 meta.channelId/modelId，否则补丁 C1 的"meta 优先"逻辑会让 `__effChannelId` 始终是旧频道。
 
-```bash
-sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId\\&\\&sessionMeta?.channelId\\&\\&channelId!==sessionMeta.channelId){existingSdkSessionId=void 0;}@' main.cjs
+#### 补丁 H：跨渠道/跨 provider 模型切换完整修复（v0.16.0，已迭代到 v2）
+
+**注入点：** `sendMessage()` 方法内，`let existingSdkSessionId = sessionMeta?.sdkSessionId;` 之后（main.cjs line 405956）
+
+**⚠️ 注意**：长命令含 `&&` 通过 shell 调 sed 会被解析为命令分隔符破坏文件。**必须用 Edit 工具直接修改**，或把命令写到 `.sh` 脚本里 `bash xxx.sh` 执行。已用此方式踩坑一次，文件被搞乱（每次 grep `&&` 触发 sed 重跑），通过备份 `main.cjs.bak-20260618-bug1-v2-preexpand` 回滚。
+
+**v2 检测逻辑（推荐）**：channelId 或 modelId 任一变化都触发清空。
+
+注入内容（精确字符串，不要用 sed）：
+```text
+let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId&&((sessionMeta?.channelId&&channelId&&channelId!==sessionMeta.channelId)||(sessionMeta?.modelId&&modelId&&modelId!==sessionMeta.modelId))){const __oldCh=sessionMeta.channelId;const __oldMd=sessionMeta.modelId;existingSdkSessionId=void 0;try{updateAgentSessionMeta(sessionId,{channelId,sdkSessionId:void 0,...(modelId?{modelId}:{})});console.log("[Agent 编排] 检测到模型/频道切换: "+(__oldCh||"?")+"/"+(__oldMd||"?")+" → "+(channelId||"?")+"/"+(modelId||"?")+", 已清空 sdkSessionId 并更新 meta");}catch(e){console.error("[Agent 编排] 模型/频道 meta 更新失败:",e);}}
 ```
 
-**效果：** UI 中跨渠道切换模型时，renderer 请求的 `channelId` 与 metadata 中存储的不同。补丁 F 在 SDK 查询前检测到此差异，清除 `sdkSessionId`，走"新会话 + 上下文回填"路径，避免 SDK 抛出 "Session not found" 触发完整的 "Session 已失效" 恢复流程（重新载入历史浪费 token）。同渠道内模型切换不受影响。
+**为什么必须覆盖 modelId 变化（v2 迭代根因）**：
+
+`proma-official` 是一个**超级路由频道**，包含 18+ 个不同 provider 的模型（Claude/GPT/Gemini/GLM/DeepSeek 等都挂在同一个 channelId 下）。用户在 UI 上切换"GLM-5.2 → DeepSeek V4 Pro"时：
+- **channelId 不变**（都是 `proma-official`）
+- **modelId 变了**（如 `glm-5.2` → `deepseek-v4-pro`）
+
+v1 只检测 channelId 变化 → 永远不触发 → 旧 sdkSessionId 透传 → 新 provider API 收到旧 modelId → 报 `[1211][模型不存在]` / `model not supported`，但 main.cjs 406524/406717 的**被动恢复路径**会清空 sdkSessionId，**下一轮**走"新会话+上下文回填"成功 → 用户感知"报错一次后再问就好了"。
+
+实测会话：`d6e16c7e-f826-4483-977e-02a5c53423c5`（"再答一次上面问题"），49 条消息里模型自报反复横跳（DeepSeek/Claude/GLM），多次 API Error 后被被动恢复救回。
+
+**效果（v2 双层修复）**：
+1. **清空 sdkSessionId**：channelId 或 modelId 任一变化都触发，避免 SDK 用旧 provider 的 session 调新 provider API
+2. **同步更新 meta**：调 `updateAgentSessionMeta` 把新 channelId/modelId 写入持久化 meta，让后续 `__effChannelId`/`resolvedModel` 用新值
+
+走完整"上下文回填"路径：清空 sdkSessionId → SDK 视为新会话 → `buildContextPrompt` 把全部历史 messages 注入 system prompt（无截断，main.cjs line 405292–405328）。同模型同频道的纯消息发送不受影响（条件全 false 跳过整个 if 块）。
 
 #### 补丁 G：CLAUDE_CONFIG_DIR 无条件覆盖（v0.15.0 新增）
 
@@ -253,6 +276,52 @@ sed -i 's/if (!process.env.CLAUDE_CONFIG_DIR) {\n      process.env.CLAUDE_CONFIG
 ```
 
 **效果：** Dev 实例上 fork 从 0/3 修复为 3/3 通过，远端 fork（Release→Dev）同步生效。
+
+---
+
+#### 补丁 I：禁用更新检查（v0.16.4）
+
+**注入点：** `initAutoUpdater` 函数体第一行
+
+**问题：** Dev 版和 Release 版每次启动 10 秒后弹出更新检查，正式版也在后台检查。定制版本无更新源，弹窗无意义且干扰使用。
+
+```bash
+# 在 function initAutoUpdater(mainWindow2) { 下一行插入 return;
+sed -i 's/function initAutoUpdater(mainWindow2) {\n  win = mainWindow2;/function initAutoUpdater(mainWindow2) {\n  return;\n  win = mainWindow2;/' main.cjs
+```
+
+实际上通过 Edit 工具直接修改。**效果：** 启动后不再弹更新对话框，不检查更新。
+
+---
+
+#### 补丁 J：AppUserModelId 动态隔离（v0.16.4）
+
+**注入点：** `requestSingleInstanceLock()` 调用之前
+
+**问题：** Dev/Release/正式版共用同一个 Windows AppUserModelId（由 `app.name` 推导），导致退出 Dev 时正式版桌面快捷方式短暂失效。`setAppUserModelId` 之前从未调用。
+
+```bash
+# 在 requestSingleInstanceLock 前插入
+sed -i 's/if (!import_electron48.app.requestSingleInstanceLock())/if (process.env.PROMA_INSTANCE_NAME) {\n      import_electron48.app.setAppUserModelId(`com.proma.$${process.env.PROMA_INSTANCE_NAME}`);\n    }\n    if (!import_electron48.app.requestSingleInstanceLock())/' main.cjs
+```
+
+**效果：** Dev → `com.proma.dev`，Release → `com.proma.release`，正式版保持默认。各实例 Windows 任务栏/快捷方式完全独立。
+
+---
+
+#### 补丁 K：userData 路径动态化（v0.16.4）
+
+**注入点：** `app.setPath("userData", ...)` 条件块
+
+**问题：** 旧代码硬编码 `@proma/electron-dev`，任何设置 `PROMA_INSTANCE_ISOLATED=1` 的实例都挤到同一个目录。新增实例（如 staging）会导致数据冲突。
+
+```bash
+# 旧: app.setPath("userData", ".../@proma/electron-dev")
+# 新: app.setPath("userData", `.../@proma/electron-$${PROMA_INSTANCE_NAME}`)
+sed -i 's/if (!import_electron48.app.isPackaged || process.env.PROMA_INSTANCE_ISOLATED === "1") {\n      import_electron48.app.setPath("userData", (0, import_path10.join)(import_electron48.app.getPath("appData"), "@proma/electron-dev"));\n    }/if (process.env.PROMA_INSTANCE_NAME) {\n      import_electron48.app.setPath("userData", (0, import_path10.join)(import_electron48.app.getPath("appData"), `@proma\\/electron-$${process.env.PROMA_INSTANCE_NAME}`));\n    }/' main.cjs
+```
+
+**效果：** `PROMA_INSTANCE_NAME=dev` → `@proma/electron-dev/`，`=release` → `@proma/electron-release/`，`=release-fresh` → `@proma/electron-release-fresh/`。不设变量则走默认路径（正式版兼容）。
 
 ---
 
@@ -422,6 +491,11 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-19 | v0.16.4 | 三个系统改进同步 Dev + Release：<br/>**补丁 I（禁用更新检查）** — `initAutoUpdater` 函数首行注入 `return;`，不再弹更新对话框<br/>**补丁 J（AppUserModelId 动态隔离）** — `requestSingleInstanceLock` 前注入 `setAppUserModelId`，Dev/Release/正式版各自独立<br/>**补丁 K（userData 路径动态化）** — 硬编码 `electron-dev` 改为 `electron-${PROMA_INSTANCE_NAME}`，修复已知 bug<br/>**Release 托盘图标** — `proma-white.png` → `proma-coral.png`（彩色）<br/>**启动脚本更新** — `start-release.bat` 启用隔离，新增 `start-release-fresh.bat`（空 profile 测试用） |
+| 2026-06-18 | v0.16.3 | 三个 bug 修复同步到 Dev + Release：<br/>**Bug 5 修复**（patches.cjs send_message handler）— MCP `send_message` 走 `runAgentHeadless` 路径不经过 main.cjs `sendMessage()` 入口的补丁 H。在工具层镜像补丁 H 逻辑：检测 channelId/modelId 变化时同步 meta + 清空 sdkSessionId。文件 +925 字节<br/>**Bug 4 修复**（main.cjs + patches.cjs fork_session）— SDK `forkSession` 单次只读一个 `<sdkSessionId>.jsonl`，跨 sdkSession UUID 解析失败（agent session 在补丁 H 清空/sidechain/重建后关联多 sdkSession）。① main.cjs `forkAgentSession` 入口加 `_forceSdkSessionId` 透传参数（2 处小改：387016 解构 + 387031 默认值）；② patches.cjs `fork_session` handler 收集候选 sdkSessionId（source.sdkSessionId + source.forkSourceSdkSessionId + 目标消息 session_id + 历史所有 session_id）循环试错。文件 +2243 字节<br/>**Release 同步补丁 H v2**：之前 Release 是补丁 F v0（只清 sdkSessionId 不更新 meta），升级到补丁 H v2 |
+| 2026-06-18 | v0.16.2 | SubAgent 跑矩阵 D/E/F/G 测试（10 用例 7 会话）：补丁 H v2 功能层 9/9 通过；发现 Bug 4（fork 跨 sdkSession）+ Bug 5（send_message 不同步 meta）；澄清 Bug 2（auto-compact 不存在，是 list_messages limit=50 + 感知错觉） |
+| 2026-06-18 | v0.16.1-dev | 补丁 H 迭代到 v2：扩展检测条件为 `(channelId !== meta.channelId) OR (modelId !== meta.modelId)`。根因：实测 `proma-official` 频道下同 channelId 包含 18+ 个不同 provider 模型（Claude/GPT/Gemini/GLM/DeepSeek），UI 切换"GLM-5.2 → DeepSeek V4 Pro"时 channelId 不变，v1 永不触发 → 旧 sdkSessionId 透传新 provider → API 报 `[1211][模型不存在]` 或 `model not supported`，靠 406524/406717 被动恢复兜底，**下一轮**才正常 → 用户感知"报错一次后再问就好了"。实测会话 `d6e16c7e`。同时教训：长含 `&&` 的 sed 命令被 shell 当命令分隔符破坏文件（备份 `main.cjs.bak-20260618-bug1-v2-preexpand`），后续补丁一律走 Edit 工具直接修改 |
+| 2026-06-18 | v0.16.0-dev | 补丁 H（Dev 版先行，Release 待验证后同步）：跨频道切换模型丢上下文修复。**根因双层**：① 补丁 F 此前未真正落地——`sendMessage` 入口 `let existingSdkSessionId = sessionMeta?.sdkSessionId;`（main.cjs line 405956）之后没有任何 channelId 比对，跨频道时旧 sdkSessionId 透传给 SDK 触发 "No conversation found with session"；② 更深一层：`sessionMeta.channelId/modelId` 在 sendMessage 中从不更新，补丁 C1 的 `meta.channelId || UI channelId` 让 `__effChannelId` 永远是旧频道，apiKey/baseUrl 用错。**修复（方案 A）**：line 405956 之后注入 `if(existingSdkSessionId && sessionMeta?.channelId && channelId && channelId !== sessionMeta.channelId)` 检测 UI 跨频道主动切换，三件事一起做：清空 `existingSdkSessionId`（走上下文回填）+ 调 `updateAgentSessionMeta` 同步 channelId/modelId + 写入新 sdkSessionId=void 0（持久化清空）。备份：`main.cjs.bak-20260618-bug1` |
 | 2026-06-17 | v0.15.0 | 补丁 G：`CLAUDE_CONFIG_DIR` 无条件覆盖——修复 Dev 实例上 headless 会话 fork 失败（0/3→3/3）。根因：Shell 预置 `CLAUDE_CONFIG_DIR`，`if (!process.env.CLAUDE_CONFIG_DIR)` 条件守卫阻止 Dev 用 `getSdkConfigDir()` 纠正为 `~/.proma-dev/sdk-config/`，导致 `forkAgentSession` 查找路径与 CLI 子进程写入路径不一致。修复：去掉条件守卫，强制无条件覆盖 |
 | 2026-06-17 | v0.14.0 | 提案 Phase 1 完成：① `get_instance_info` 新增 `instance` 字符串字段（从 `PROMA_INSTANCE_NAME` 读取，fallback `PROMA_DEV`），`proma_dev` 保留 deprecated；② 新增 `remote-session` MCP server（11 工具：`remote_list_channels/sessions/workspaces`、`remote_get_session_info/context`、`remote_list_messages`、`remote_create/fork/send/archive_session`、`remote_get_my_session_id`），内置实例发现+端口缓存+HTTP 代理，Agent 远端操作无需 curl；③ `proma-mcp-server.cjs` 新增 `--instance <name>` 参数，`--dev`/`--release` 保留别名；④ 启动脚本引入 `PROMA_INSTANCE_NAME` + `PROMA_INSTANCE_ISOLATED` 双变量。Dev + Release 插件已同步 |
 | 2026-06-16 | v0.13.0 | Skill v1.3.0：新增"⚠️ 第一判断"关卡（工具列表后第一章节，强制区分本实例 vs 远端实例）；新增"模式 9：内部 Agent 操作远端实例"（curl 七步走）；frontmatter 触发词扩充 20+ 远端相关关键词；`mcp__session__*` 只认本进程、远端一律 curl 提升为 Skill 第一优先规则 |
