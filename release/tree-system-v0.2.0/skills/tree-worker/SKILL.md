@@ -8,9 +8,11 @@
 
 ```yaml
 skill_name: tree-worker
-version: 2.0
+version: 2.1
 target: 子会话（叶子节点 / Fork 出的执行会话）
-requires: tree-state.js # 通过 commander 间接调用，worker 不直接调
+requires:
+  - tree-state.js                          # 通过 commander 间接调用，worker 不直接调
+  - tree-audit-methodology.md v1.0        # 当角色为审查/审计/验证时必读
 load_on: fork_session  # commander 在 Fork 时通过首条消息自动加载
 ```
 
@@ -361,8 +363,79 @@ REST
 
 ---
 
-## §9 修订历史
+## §10 审计角色（v2.1 新增）
+
+> 依据：tree-audit-methodology.md v1.0。当你的 role 或 brief.my_mission 涉及审查/审计/验证/终局时，**必须**按本节执行。
+
+### §10.1 触发判定
+
+收到 5 件套后，检查以下条件，任一满足即进入审计角色：
+- `brief.my_mission` 含 "审查/审计/验证/终局/review/audit/verify/converge"
+- `leaf_id` 的 role 段为 `C1/C2/C3/C4/A1/A2/verify/review/audit`
+- brief.in_scope 第一条含 "按方法论阶段"
+
+### §10.2 审计角色的核心区别
+
+| 常规 worker | 审计 worker |
+|------------|------------|
+| 自己产出文档/代码 | **不产出内容，只产出问题列表** |
+| 1 个 self_check 即够 | **必须 Fork 子 Agent 做多维并行审查** |
+| done 后指挥官验收 | **done 后由指挥官汇总多审计员结果** |
+| 不做反事实攻击 | **攻击角色必须构造破坏性场景** |
+
+### §10.3 审计 worker 的最小 Fork 结构
+
+**如果你是审查员（C1-C4）**：你必须 Fork 1 个子 Agent 执行具体审查。
+
+```
+审查员 worker（你）
+  └── Fork 1 个子 Agent：按你的维度执行具体审查
+        产出：结构化问题列表，每个问题含 ID/定位/严重程度/描述/修正建议
+```
+
+**如果你是攻击员（A1-A2）**：你必须 Fork 2 个子 Agent 并行攻击。
+
+```
+攻击员 worker（你）
+  ├── Fork Agent 1：角色视角攻击（每个角色 3 个"如果...怎么办"）
+  ├── Fork Agent 2：契约边界攻击（每条验收标准 1-2 个边界外输入）
+  └── 汇总产出攻击报告
+```
+
+### §10.4 审计 done 上报格式
+
+```yaml
+event: done
+deliverables:
+  - "<审查/攻击报告路径>"
+self_check:
+  - item: "已 Fork 子 Agent 执行审查（非自己直接判断）"
+    pass: true
+  - item: "问题列表含 ID/定位/严重程度/描述/修正建议 5 字段"
+    pass: true
+  - item: "标注了每个严重程度的判断理由"
+    pass: true
+milestones:
+  - { id: M1, audit_pass: true, note_path: "<note路径>" }
+  - { id: M2, audit_pass: true, note_path: "<note路径>" }
+context_usage: <数字>
+drift_declaration: false
+```
+
+### §10.5 审计禁止行为
+
+| # | 禁止行为 | 后果 |
+|---|---------|------|
+| 1 | 审查员自己读完文档直接写结论，不 Fork 子 Agent | 单维度推理惯性，审计不可采信 |
+| 2 | 攻击员和审查员是同一个子会话 | 攻击心态与建设心态冲突 |
+| 3 | 审计报告缺少结构化问题列表（无 ID/定位/严重程度） | 无法追溯，视为无效 |
+| 4 | done 上报 self_check 中未确认"已 Fork 子 Agent" | 退回重做 |
+
+---
+
+## §11 修订历史
 
 | 日期 | 版本 | 主要变更 |
-|---|---|---|
+|------|------|---------|
+| 2026-06-19 | v2.1 | 新增 §10 审计角色（触发判定、最小 Fork 结构、审计 done 格式、审计禁止行为）；§0 引用 tree-audit-methodology.md |
 | 2026-06-18 | v2.0 | 首次创建。合并 v0.1 9 条铁律 + v0.2 内部自审必须化（铁律 3 从可选升级为必须）；新增 §4 完整自审流程（含 Prompt 模板 + drift_history 写入规范）；done 模板新增 drift_declaration 字段 |

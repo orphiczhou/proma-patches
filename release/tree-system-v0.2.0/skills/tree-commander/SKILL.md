@@ -8,12 +8,13 @@
 
 ```yaml
 skill_name: tree-commander
-version: 2.0
+version: 2.1
 target: 根会话（指挥官）
 requires:
   - tree-state.js                                          # 同目录 .context/trees/tree-state.js
   - commander-methodology.md v1.0                          # 指挥官方法论
   - tree-commander-design.md v1.1                          # 体系设计文档
+  - tree-audit-methodology.md v1.0                         # 树形审计方法论（审计任务强制执行）
 mcp_dependencies:
   - mcp__session__fork_session / create_session / send_message / list_messages / archive_session
   - mcp__automation__create_automation / get_automation / update_automation
@@ -22,9 +23,9 @@ task_tools: TaskCreate / TaskUpdate / Agent
 
 ---
 
-## §1 铁律（4 条）
+## §1 铁律（5 条）
 
-> 依据：设计文档 §3 契约纪律 + §4.4 铁律 + §5.3 关键设计；方法论原则 8/9。
+> 依据：设计文档 §3 契约纪律 + §4.4 铁律 + §5.3 关键设计；方法论原则 8/9；tree-audit-methodology.md
 
 | # | 措辞 | 依据 |
 |---|------|------|
@@ -32,6 +33,7 @@ task_tools: TaskCreate / TaskUpdate / Agent
 | 2 | **必须下发 5 件套契约** — brief / dod / report / autonomy / self_audit 缺一不可 | 设计文档 §3；§3 契约纪律 |
 | 3 | **必须走三步质量门** — 实施 → 回归测试 → 审计，缺任一步不算完成 | 方法论原则 3 |
 | 4 | **必须三档递进纠偏** — 同一偏差最多 2 次纠正机会，第 3 次必剪枝 | 设计文档 §5.3；方法论原则 9 |
+| 5 | **审计任务必须并行多Agent** — 当任务涉及文档审计/验证/终局审查时，必须 Fork ≥4 个独立审查子会话（每人一个维度），禁止单 Agent 包办所有维度。详见 §14 | tree-audit-methodology.md 铁律 1 |
 
 ---
 
@@ -570,8 +572,163 @@ prompt: |
 
 ---
 
-## §13 修订历史
+## §14 审计工作流（v2.1 新增）
+
+> 依据：tree-audit-methodology.md v1.0。当任务涉及文档审计/终局验证/可信度审查时，**必须**按本节执行。
+
+### §14.1 何时触发
+
+满足任一条件即进入审计模式：
+- 任务 brief 中含 "审计/审查/验证/验收/终局/converge/audit/verify/review" 等关键词
+- 需要对一份已完成文档进行可信度评估
+- 子会话 done 上报后进入 §4 Step 4 质量门
+
+### §14.2 最小审计树结构（强制执行）
+
+```
+{tree_id} (指挥官)
+  ├── {tree_id}-fix        — 修正执行员（等审查完成后统一修改）
+  ├── {tree_id}-C1         — 一致性审查员
+  ├── {tree_id}-C2         — 完整性/闭环审查员
+  ├── {tree_id}-C3         — 规范性/格式审查员
+  ├── {tree_id}-C4         — 可验证性/证据审查员
+  ├── {tree_id}-A1         — 反向映射重构员
+  └── {tree_id}-A2         — 反事实攻击员
+```
+
+**铁腕要求**：
+- **最少 7 个审查 leaf**（4 四维 + 2 攻击 + 1 修正），缺一个都不算完成
+- C1-C4 和 A1-A2 必须并行启动（相互独立）
+- 修正员（fix）在所有审查员返回后启动
+- 禁止指挥官亲自充当审查员（"自己画靶自己打分"）
+
+### §14.3 审计 5 件套模板
+
+下发审查子会话时，在标准 §3 模板基础上，`brief.in_scope` 必须包含**该维度的具体审查问题**。以下为 6 个角色的 in_scope 模板：
+
+**C1 一致性审查员**：
+```yaml
+in_scope:
+  - "逐项比对报告与上游文档的数字/版本/环境声明是否一致"
+  - "用例计数可复算（逐行求和的每一步写出来）"
+  - "报告声称的修复项与实际问题列表逐条对照"
+  - "时间窗口声称与 session 时间戳是否吻合"
+```
+
+**C2 完整性/闭环审查员**：
+```yaml
+in_scope:
+  - "11 个工具是否全部测试（逐一核对，不跳）"
+  - "每个工具的错误用例是否覆盖（方案要求 ≥1）"
+  - "集成场景是否全部执行（逐场景检查步骤完整性）"
+  - "跳过的用例是否有充分理由和替代探索记录"
+  - "性能数据是否完整（总耗时、最慢工具精确值）"
+```
+
+**C3 规范性审查员**：
+```yaml
+in_scope:
+  - "报告格式是否符合方案模板要求"
+  - "严重程度评级是否合理（有无降级/升级）"
+  - "结论是否基于证据（非主观判断）"
+  - "统计表述是否有误导（'零失败' vs '2跳过'）"
+  - "'READY FOR RELEASE' 声明是否满足前置条件"
+```
+
+**C4 可验证性审查员**：
+```yaml
+in_scope:
+  - "每个关键声称是否有可验证证据（session ID/时间戳/原始返回值）"
+  - "性能数据是否有测量方法说明"
+  - "第三方能否根据报告复现测试"
+  - "session ID 引用是否完整（禁止短格式）"
+  - "报告是否在 git 中固化（非未提交修改）"
+```
+
+**A1 反向映射重构员**：
+```yaml
+in_scope:
+  - "忽略报告原有分组，从每条声称反向提取功能验证点"
+  - "汇总为功能清单，与上游方案逐项比对"
+  - "标记三类差异：遗漏（方案有报告无）/ 冗余（报告有方案无）/ 偏离（都有但不一致）"
+  - "特别注意：方案和报告中的编号体系是否对应"
+```
+
+**A2 反事实攻击员**：
+```yaml
+in_scope:
+  - "覆盖边界攻击：单频道/单模型的测试能否支撑全频道通用结论？"
+  - "结论逻辑攻击：跳过=未覆盖≠通过，统计数据是否误导？"
+  - "时间线攻击：声称的时间窗口与实际 session 时间戳是否吻合？报告是否经历多版本迭代但未声明？"
+  - "并发场景攻击：核心使用模式是否被跳过？"
+  - "至少 5 个具体攻击场景，每个标注：报告能否兜住/失守/部分失守"
+```
+
+### §14.4 迭代收敛流程
+
+```
+Round 1:
+  ① Fork C1-C4 + A1-A2（6 个并行）
+  ② 收集所有问题列表，去重汇总
+  ③ Fix 子会话执行修正
+  ④ tree-state 记录 round=1, issues_found=N1
+
+Round 2:
+  ⑤ 重新 Fork C1-C4 + A1-A2（6 个并行，只检查修正是否正确、是否引入新问题）
+  ⑥ 收集回归问题列表
+  ⑦ 判定收敛（三个条件全部满足）：
+     a. N2 < N1 × 0.3
+     b. 无阻断级或严重级新问题
+     c. 所有遗留问题均为"建议"级或"待人类确认"
+  ⑧ 不满足 → Fix 再修正 → Round 3
+  ⑨ 满足 → tree-state 记录 converged=true, convergence_round=N
+
+严禁行为:
+  - 一轮就 declare done
+  - 审查员和攻击员复用同一子会话
+  - 回归阶段跳过任何维度
+  - 未 commit 就声明"READY FOR RELEASE"
+```
+
+### §14.5 tree-state 审计记录
+
+每轮迭代在 `_meta` 中追加：
+
+```json
+{
+  "audit_rounds": [
+    {
+      "round": 1,
+      "issues_found": {"blocker": N, "severe": N, "suggestion": N},
+      "issues_fixed": {"blocker": N, "severe": N, "suggestion": N},
+      "regression_issues": 0
+    }
+  ],
+  "converged": true,
+  "convergence_round": 2
+}
+```
+
+### §14.6 完成检查表
+
+declare done 前逐项确认：
+
+```
+[ ] leaves ≥ 7（1 root + 4 审查 + 2 攻击 + 可选 fix/走查）
+[ ] 阶段一：4 个审查子会话全部 done，产出结构化问题列表
+[ ] 阶段二：2 个攻击子会话全部 done，产出漏洞列表
+[ ] ≥ 2 轮迭代，audit_rounds 记录完整
+[ ] 收敛三条件全部满足
+[ ] tree-state validate() = {ok: true, issues: []}
+[ ] 修正后 git commit 完成
+[ ] 最终报告头部标注审计轮次和审查子会话 ID 列表
+```
+
+---
+
+## §15 修订历史
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-06-19 | v2.1 | 新增 §14 审计工作流（铁律 5、最小 7 leaf 结构、审计 5 件套模板、迭代收敛流程、完成检查表）；§0 引用 tree-audit-methodology.md；铁律从 4 条扩展到 5 条 |
 | 2026-06-18 | v2.0 | 首次创建。合并 v0.1 契约/事件/剪枝 + v0.2 心跳/内审/三档纠偏/哨兵 Agent/验收 Agent。所有 tree-state.js 子命令引用来自附录 A 实现。 |
