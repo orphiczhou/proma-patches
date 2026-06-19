@@ -21,7 +21,7 @@ v0.1 在真实环境（非模拟）下**能端到端工作**，但存在频道/�
 
 ### 指挥官侧
 
-- 加载 tree-commander 方法论：✅（Read 方式加载，mentally apply 14 条铁律）
+- 加载 tree-commander 方法论：✅（Read 方式加载，按核心原则执行）
 - 任务规划（TaskCreate）：✅
 - tree-state 初始化：✅
 - HTTP 直连验证：✅ create_session / list_channels / send_message / archive_session / list_messages 全功能正常

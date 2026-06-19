@@ -38,12 +38,12 @@
 2. **读指挥官 SKILL**: `skills/tree-commander/SKILL.md`
 3. **初始化 tree-state**:
    ```bash
-   node core/tree-state.js init mytree "我的第一个树形任务"
+   node core/tree-state.js init mytree --root-brief '{"parent_intent":"我的第一个树形任务"}' --root-dod '{"deliverables":[]}'
    ```
 4. **规划 leaf 结构**，为每个 leaf 写 5 件套契约（brief/dod/report/autonomy/self_audit）
 5. **Fork 子会话** + **send_message 下发任务**
 6. **回收 done 事件** + **整合产出**
-7. **validate**: `node core/tree-state.js validate`
+7. **validate**: `node core/tree-state.js validate mytree`
 
 详细教程见 `QUICKSTART.md`。
 
@@ -67,7 +67,7 @@ tree-system-v0.2.0/
 │       └── SKILL.md                   # 工人操作手册 v2.0
 │
 ├── methodologies/                     # 方法论文档
-│   ├── commander-methodology.md       # 指挥官方法论（14条铁律）
+│   ├── commander-methodology.md       # 指挥官方法论（10条核心原则 + 2条元信念）
 │   ├── audit-methodology.md           # 原始终局验证方法论
 │   └── tree-audit-methodology.md      # 树形审计方法论（强制执行版）
 │
@@ -122,7 +122,7 @@ tree-system-v0.2.0/
 | plan | ↑ | 工人需要指挥官决策 |
 | done | ↑ | 工人完成任务，附交付物 |
 | blocked | ↑ | 工人遇到无法自主解决的阻塞 |
-| heartbeat | ↑ | 定期存活信号（v0.2 方案，未编码） |
+| heartbeat_reply | ↑ | 定期存活信号回应（v0.2 方案，未编码） |
 
 ### 状态管理
 

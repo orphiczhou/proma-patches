@@ -17,15 +17,15 @@
 ### Step 1: 初始化状态文件
 
 ```bash
-cd C:\Users\sir_c\.proma\agent-workspaces\proma\workspace-files\.context\trees
-node tree-state.js init mydemo "demo"
+cd <workspace>/.context/trees
+node tree-state.js init mydemo --root-brief '{"parent_intent":"demo 写一篇文档"}' --root-dod '{"deliverables":["draft.md","review.md"]}'
 ```
 
 产出：`trees/mydemo/tree-state.json`
 
 ### Step 2: 规划树结构
 
-```
+```text
 mydemo-root（指挥官，当前会话）
   ├── mydemo-A-draft   → 子会话：写文档主体
   └── mydemo-B-review  → 子会话：审查文档质量
@@ -54,8 +54,8 @@ mcp__session__create_session(
 用 tree-state.js 注册 leaf：
 
 ```bash
-node tree-state.js leaf add mydemo-A-draft root "xxx-xxx-A" draft deepseek-v4-pro
-node tree-state.js leaf add mydemo-B-review root "xxx-xxx-B" review deepseek-v4-pro
+node tree-state.js leaf add mydemo --json '{"leaf_id":"mydemo-A-draft","session_id":"xxx-xxx-A","parent":"mydemo-root","path":"A","role":"draft","model":"deepseek-v4-pro","channel":"56ecefd2-8e22-4c62-add5-16e8992c987d"}'
+node tree-state.js leaf add mydemo --json '{"leaf_id":"mydemo-B-review","session_id":"xxx-xxx-B","parent":"mydemo-root","path":"B","role":"review","model":"deepseek-v4-pro","channel":"56ecefd2-8e22-4c62-add5-16e8992c987d"}'
 ```
 
 ### Step 4: 为每个 leaf 写 5 件套契约
@@ -111,17 +111,17 @@ mcp__session__send_message(
 每个子会话完成后，用 tree-state.js 记录：
 
 ```bash
-node tree-state.js event add mydemo-A-draft done '{"deliverables":["demo/draft.md"],"lines":105,"self_check":"PASS"}'
-node tree-state.js event add mydemo-B-review done '{"deliverables":["demo/review.md"],"verdict":"PASS"}'
+node tree-state.js event append mydemo mydemo-A-draft --type done --json '{"deliverables":["demo/draft.md"],"lines":105,"self_check":"PASS"}'
+node tree-state.js event append mydemo mydemo-B-review --type done --json '{"deliverables":["demo/review.md"],"verdict":"PASS"}'
 ```
 
 ### Step 6: 验证
 
 ```bash
-node tree-state.js validate
+node tree-state.js validate mydemo
 # 期望输出: {"ok":true,"issues":[]}
 
-node tree-state.js dump
+node tree-state.js tree dump mydemo
 # 查看完整状态
 ```
 
@@ -161,6 +161,6 @@ A: 用 `list_messages` 检查子会话是否已回复。DeepSeek 长消息可能
 
 ## 下一步
 
-- 读 `methodologies/commander-methodology.md` 了解 14 条铁律
+- 读 `methodologies/commander-methodology.md` 了解核心原则
 - 读 `skills/tree-commander/SKILL.md` 了解完整指挥官操作规范
 - 看 `handoffs/` 中的示例了解真实任务 brief 怎么写

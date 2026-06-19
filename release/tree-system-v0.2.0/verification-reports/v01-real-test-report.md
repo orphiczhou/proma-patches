@@ -34,7 +34,7 @@ A 和 B 并行执行；F1 从 A fork 后在 A/B 完成后启动。
 
 ### 指挥官侧
 
-- 加载 commander-methodology.md（14 条铁律）：✅
+- 加载 commander-methodology.md（核心原则）：✅
 - 任务规划（TaskCreate）：✅ 6 个子任务，完整依赖追踪
 - tree-state 初始化：✅
 - create_session：✅ 2 个子会话（A+B），全部 deepseek-v4-flash

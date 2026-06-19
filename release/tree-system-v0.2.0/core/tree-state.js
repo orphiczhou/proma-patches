@@ -1321,10 +1321,7 @@ async function cmdValidate(args) {
     }
   }
 
-  // 输出: ok=true 即使有 issues 也算 ok（设计 §A.7 输出 ok:false 是 schema 故障级）
-  // 重读附录 A.7 输出格式：
-  //   {"ok":true,"issues":[]}  或  {"ok":false,"issues":[...]}
-  // → issues 非空时 ok=false
+  // 输出: ok=true 仅当 issues 为空；issues 非空时 ok=false
   return { ok: issues.length === 0, issues };
 }
 

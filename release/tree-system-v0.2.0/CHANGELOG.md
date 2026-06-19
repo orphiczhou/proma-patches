@@ -14,12 +14,13 @@
   - 命名规范：LEAF_NAME_RE = `[a-z][a-z0-9_]{3,7}`
 
 - **tree-commander SKILL** v2.0：指挥官操作手册
-  - 14 条铁律（根会话纯净、双轨执行、事件路由等）
+  - 4 条铁律（严禁直接读写 tree-state.json、必须下发 5 件套、三步质量门、三档递进纠偏）
+  - 12 条禁止行为（根会话亲自写代码、一句话任务等）
   - 5 件套契约模板（brief/dod/report/autonomy/self_audit）
   - 偏差检测与纠偏机制（drift_log）
   - 竹节交接流程（v0.3 实现）
 
-- **tree-worker SKILL** v2.0：工人操作手册
+- **tree-worker SKILL** v2.1：工人操作手册
   - 9 条铁律（首条 brief_echo、禁直接写 tree-state 等）
   - 4 种上行消息模板（done/blocked/plan/brief_echo）
   - 5 件套契约解读流程
@@ -27,7 +28,7 @@
 
 ### 方法论文档
 
-- **commander-methodology.md** v1.0：14 条铁律 + 双轨执行
+- **commander-methodology.md** v1.0.1：10条核心原则 + 2条元信念 + 双轨执行
 - **tree-audit-methodology.md** v1.0：融合原始终局验证方法论 + 树形体系
   - 5 条铁律（并行多Agent / 迭代收敛 / 攻击独立 / 修正回归 / 证据结论）
   - 最少 7 leaf 强制要求
@@ -42,9 +43,11 @@
 ### 已知限制
 
 - notify 异步上报未验证
-- 心跳/内审/三档纠偏仅方案未编码
+- 心跳机制仅方案（S2 测试方案已定义，代码未实现）
+- 内审/三档纠偏仅方案（v0.2 设计文档 §10 已定义，未编码）
 - 竹节交接仅方案
 - 并发竞态（send_message fire-and-forget）
+- 频道兼容性：GLM 配额不稳定，DeepSeek 偶尔长消息卡死
 
 ---
 

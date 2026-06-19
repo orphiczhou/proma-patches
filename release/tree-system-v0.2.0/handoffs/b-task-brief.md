@@ -16,7 +16,7 @@
 
 ## 树形结构
 
-```
+```text
 bverify-root（指挥所，本会话）
   ├─ bverify-A-announce    🍃 公告核心正文（背景/v0.1 回顾/v0.2 启动宣言/结构框架）
   │   └─ bverify-A1-polish  🍃 孙会话：对 A 的草稿做润色与质量把关
