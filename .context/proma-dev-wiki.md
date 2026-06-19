@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-19 17:35 | 维护者: 周星星
+> 最后更新: 2026-06-19 18:25 | 维护者: 周星星
 
 ---
 
@@ -511,6 +511,8 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-19 | **v0.2.0** | **Layer 2 树形会话执行体系初始版本**：完整发布包 `release/tree-system-v0.2.0/`（17 文件、7000+ 行）。tree-state.js v1.0（1551 行）、tree-commander SKILL v2.0、tree-worker SKILL v2.0、commander-methodology v1.0（14条铁律）、tree-audit-methodology v1.0（融合终局验证）。4 次验证：B 任务(4子会话)、S1 重测(25命令)、L2 验证(3子会话0偏差)、L1Fix(3worker 进行中)。已知限制：notify 未验证、心跳/内审仅方案 |
+| 2026-06-19 | v0.16.5 | 补丁 K 条件修正 + apply-patches.sh 升级到 A-K 全覆盖 |
 | 2026-06-19 | v0.16.4 | 三个系统改进同步 Dev + Release：<br/>**补丁 I（禁用更新检查）** — `initAutoUpdater` 函数首行注入 `return;`，不再弹更新对话框<br/>**补丁 J（AppUserModelId 动态隔离）** — `requestSingleInstanceLock` 前注入 `setAppUserModelId`，Dev/Release/正式版各自独立<br/>**补丁 K（userData 路径动态化）** — 硬编码 `electron-dev` 改为 `electron-${PROMA_INSTANCE_NAME}`，修复已知 bug<br/>**Release 托盘图标** — `proma-white.png` → `proma-coral.png`（彩色）<br/>**启动脚本更新** — `start-release.bat` 启用隔离，新增 `start-release-fresh.bat`（空 profile 测试用） |
 | 2026-06-18 | v0.16.3 | 三个 bug 修复同步到 Dev + Release：<br/>**Bug 5 修复**（patches.cjs send_message handler）— MCP `send_message` 走 `runAgentHeadless` 路径不经过 main.cjs `sendMessage()` 入口的补丁 H。在工具层镜像补丁 H 逻辑：检测 channelId/modelId 变化时同步 meta + 清空 sdkSessionId。文件 +925 字节<br/>**Bug 4 修复**（main.cjs + patches.cjs fork_session）— SDK `forkSession` 单次只读一个 `<sdkSessionId>.jsonl`，跨 sdkSession UUID 解析失败（agent session 在补丁 H 清空/sidechain/重建后关联多 sdkSession）。① main.cjs `forkAgentSession` 入口加 `_forceSdkSessionId` 透传参数（2 处小改：387016 解构 + 387031 默认值）；② patches.cjs `fork_session` handler 收集候选 sdkSessionId（source.sdkSessionId + source.forkSourceSdkSessionId + 目标消息 session_id + 历史所有 session_id）循环试错。文件 +2243 字节<br/>**Release 同步补丁 H v2**：之前 Release 是补丁 F v0（只清 sdkSessionId 不更新 meta），升级到补丁 H v2 |
 | 2026-06-18 | v0.16.2 | SubAgent 跑矩阵 D/E/F/G 测试（10 用例 7 会话）：补丁 H v2 功能层 9/9 通过；发现 Bug 4（fork 跨 sdkSession）+ Bug 5（send_message 不同步 meta）；澄清 Bug 2（auto-compact 不存在，是 list_messages limit=50 + 感知错觉） |
@@ -925,3 +927,70 @@ sed -i 's/"iconTemplate.png"/"proma-coral.png"/g' main.cjs
 `archive_session(session_id, archived=true)` — 归档/取消归档会话。归档后默认不在 `list_sessions` 中显示（仍可通过 `include_archived=true` 查看）。
 
 与删除相比，归档不丢数据、可恢复，适合清理测试会话、整理历史记录。
+
+---
+
+## 十八、Layer 2：树形会话执行体系 v0.2.0
+
+> 完整发布包：`release/tree-system-v0.2.0/` | 17 文件 | 7000+ 行 | 2026-06-19
+
+### 18.1 一句话定位
+
+基于 Proma 会话 Fork + send_message + tree-state.js 的**多层级任务编排系统**。让一个根会话（指挥官）可靠地调度 N 个子会话（工人）完成大型任务，每一步都有判断防偏题。
+
+### 18.2 核心组件
+
+| 组件 | 文件 | 行数 | 说明 |
+|------|------|------|------|
+| **状态引擎** | `core/tree-state.js` | 1551 | JSON 持久化 + 内存缓存，树拓扑/事件日志/版本追踪/自审/自动备份 |
+| **指挥官 SKILL** | `skills/tree-commander/SKILL.md` | 577 | 14条铁律、5件套契约模板、偏差检测、竹节交接 |
+| **工人 SKILL** | `skills/tree-worker/SKILL.md` | 368 | 9条铁律、4种上行消息、契约解读、上下文最小化 |
+| **指挥官方法论** | `methodologies/commander-methodology.md` | 298 | 双轨执行、铁律详解、事件路由、偏差分类 |
+| **审计方法论** | `methodologies/tree-audit-methodology.md` | ~250 | 融合终局验证，7 leaf 强制、5铁律、收敛三条件、违规检测 |
+| **设计文档** | `design/tree-commander-design.md` | 1413 | 完整架构设计、命名规范、v0.2 新增能力 spec |
+
+### 18.3 已验证场景
+
+| 验证任务 | 时间 | 频道 | 子会话数 | 结果 |
+|---------|------|------|---------|------|
+| B 任务 | 6/18 | GLM-5-Turbo | 4（含1孙） | ✅ 有条件通过 |
+| S1 重测 | 6/19 | 模拟 | 3 | ✅ 25/25 |
+| L2 验证 | 6/19 | DeepSeek-v4-flash | 3（含1孙） | ✅ 1次0偏差 |
+
+### 18.4 与 Layer 1 的关系
+
+```
+Layer 1: MCP 基础设施 (v0.16.5)
+  └─ 22 个会话管理工具 (11 本地 + 11 远端)
+  └─ send_message / fork_session / create_session / ...
+       ↓ 提供基础能力
+Layer 2: 树形会话执行体系 (v0.2.0)
+  └─ tree-state.js 状态管理
+  └─ tree-commander + tree-worker SKILL
+  └─ 契约体系 + 事件通道 + 偏差检测 + 终局验证
+```
+
+Layer 2 是 Layer 1 之上的第一层上层建筑。没有 Layer 1 的 MCP 工具，指挥官无法 Fork/发消息/回收；没有 Layer 2 的编排能力，Layer 1 只能是手工单次调用。
+
+### 18.5 安装与使用
+
+```bash
+# 部署 tree-state.js
+cp release/tree-system-v0.2.0/core/tree-state.js \
+   ~/.proma/agent-workspaces/proma/workspace-files/.context/trees/
+
+# 部署 SKILL 到 Proma Skills 目录
+cp -r release/tree-system-v0.2.0/skills/* \
+   ~/.proma/agent-workspaces/proma/skills/
+
+# 初始化一个树形任务
+node tree-state.js init mytask "我的任务"
+```
+
+### 18.6 已知限制与 v0.3 计划
+
+- notify 异步上报未验证（当前均用 wait=true 同步模式）
+- 心跳/内审/三档纠偏仅方案未编码
+- 竹节交接仅方案（上下文 >85% 甜点时接力）
+- 并发竞态：send_message fire-and-forget 存在消息丢失风险（L1 I3）
+- v0.3 目标：心跳实现 + 内审实现 + notify 验证 + 竹节交接 + 自动化 smoke test

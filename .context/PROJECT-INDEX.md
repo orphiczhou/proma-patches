@@ -1,6 +1,6 @@
 # Proma 改造项目 — 知识索引
 
-> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-18
+> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-19 18:25
 
 新会话从这里开始读，能 5 分钟拿到项目全貌和关键路径。
 
@@ -25,9 +25,12 @@
 - **session-management Skill v1.3.0**：9 大使用模式 + "第一判断"远端隔离关卡
 - **GitHub 仓库**：`orphiczhou/proma-patches`，`apply-patches.sh` 一键部署
 
-### Layer 2 — 时间线的剪枝者 ⏳ 未启动
+### Layer 2 — 树形会话执行体系 ✅ v0.2.0 已发布
 
-设计已成型（见 timeline-pruner 文档）：树形任务编排、竹节式自动交接、并行调度+剪枝、可视化侧边栏。**等 Layer 1 Release 验收通过后启动。**
+- **发布包**：`release/tree-system-v0.2.0/`（17 文件，7000+ 行）
+- **核心交付**：tree-state.js v1.0、tree-commander SKILL v2.0、tree-worker SKILL v2.0、commander-methodology v1.0、tree-audit-methodology v1.0
+- **4 次验证**：B任务(4子会话)、S1重测(25命令)、L2验证(3子会话0偏差)、L1Fix(3worker 进行中)
+- **已知限制**：notify未验证、心跳/内审仅方案、竹节交接未实现、并发竞态
 
 ---
 
@@ -81,6 +84,8 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 | 总路线图 | `workspace-files/.context/proma-innovation-plan.md` | 两层架构总览 + 优先级 |
 | 完整技术 Wiki | `workspace-files/.context/proma-dev-wiki.md`（833 行） | 补丁命令、架构、测试记录 |
 | Layer 2 设计 | `workspace-files/.context/proma-dev-wiki-timeline-pruner.md` | 时间线剪枝者完整方案 |
+| Layer 2 发布包 | `workspace-files/release/tree-system-v0.2.0/` | **v0.2.0 初始版本（17 文件）** |
+| 树形审计方法论 | `workspace-files/.context/tree-audit-methodology.md` | 终局验证 × 树形体系强制执行版 |
 | remote-session 提案 | `workspace-files/.context/proposal-remote-session-mcp.md` | 远端工具设计 + 实例命名 |
 | 商业化路线 | `proma-business-plan.md` | 闭源模块清单 + 合规 + 定价 |
 | 部署 README | `workspace-files/README.md` | 给 Agent 读的安装流程 |
@@ -145,9 +150,9 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 
 | 优先级 | 任务 |
 |---|---|
-| P0 | v0.16.3 重启 Dev + Release 实例，回归测试（验证 Bug 4/5 修复） |
-| P0 | remote-session Release 验收重测 + 修复 |
-| P1 | Layer 2 时间线剪枝者启动 |
+| P0 | L1Fix 指挥官验收（补测跨 provider + 报告修正 + 终局验证） |
+| P0 | L2 自审计按 tree-audit-methodology 重新执行（需 7 leaf 并行） |
+| P1 | v0.3 心跳/内审/竹节交接编码实现 |
 | P3 | 模型列表缓存优化 |
 
 ---
