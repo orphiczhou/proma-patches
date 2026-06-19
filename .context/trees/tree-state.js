@@ -81,6 +81,7 @@ const E_NAME_INVALID = 'E_NAME_INVALID';
 const E_PARENT_MISSING = 'E_PARENT_MISSING';
 const E_DUPLICATE_LEAF = 'E_DUPLICATE_LEAF';
 const E_CHILDREN_NOT_DONE = 'E_CHILDREN_NOT_DONE';
+const E_DEPTH_EXCEEDED = 'E_DEPTH_EXCEEDED';
 const E_BACKUP_CORRUPT = 'E_BACKUP_CORRUPT';
 const E_IO = 'E_IO';
 const E_UNKNOWN = 'E_UNKNOWN';
@@ -507,6 +508,50 @@ async function cmdLeafAdd(args) {
     if (parent !== null) {
       if (!Object.prototype.hasOwnProperty.call(state.leaves, parent)) {
         throw new TreeStateError(E_PARENT_MISSING, `parent "${parent}" does not exist in leaves`);
+      }
+    } else {
+      // 3.5. 根唯一性：parent=null 必须 role=root
+      if (role !== 'root') {
+        throw new TreeStateError(
+          E_SCHEMA_INVALID,
+          `leaf with parent=null must have role=root, got "${role}"`
+        );
+      }
+      // 根唯一性：只能有一个 parent=null 的 leaf
+      const existingRoot = Object.keys(state.leaves).find(
+        (lid) => state.leaves[lid].parent === null
+      );
+      if (existingRoot) {
+        throw new TreeStateError(
+          E_SCHEMA_INVALID,
+          `tree already has root leaf "${existingRoot}". Only one root (parent=null) allowed per tree.`
+        );
+      }
+    }
+
+    // 3.6. 深度限制：role=commander 时检查父节点 Commander 深度
+    // calcCommanderDepth 统计 parent 链上 root/commander 节点数（含 parent 自身）
+    // depth=1: parent 是 root → 允许（新增后为第2层 commander）
+    // depth=2: parent 是 commander（子）→ 允许（新增后为第3层 commander）
+    // depth>=3: parent 已是第3层+ → 拒绝（超三层限制）
+    if (role === 'commander' && parent !== null) {
+      const depth = calcCommanderDepth(state, parent);
+      if (depth >= 3) {
+        throw new TreeStateError(
+          E_DEPTH_EXCEEDED,
+          `cannot add commander under parent "${parent}": commander depth ${depth} >= 3 (max 3 layers: root→child→grandchild). Use role=worker instead.`
+        );
+      }
+    }
+
+    // 3.7. Worker 不能有子节点：parent leaf 如果存在且 role=worker，拒绝
+    if (parent !== null) {
+      const parentLeaf = state.leaves[parent];
+      if (parentLeaf && parentLeaf.role === 'worker') {
+        throw new TreeStateError(
+          E_SCHEMA_INVALID,
+          `cannot add leaf under parent "${parent}": parent is a worker (atomic leaf). Only commanders can have children.`
+        );
       }
     }
 
@@ -1400,19 +1445,61 @@ function parseArgs(argv) {
 }
 
 // ============================================================
+// 工具: Commander 深度计算
+// ============================================================
+
+/**
+ * 沿 parent 链向上追溯，统计 role 为 root/commander 的节点数（含 parent 自身）
+ * 用于 leaf add 时判断是否超过三层 Commander 深度限制
+ */
+function calcCommanderDepth(state, parent_leaf_id) {
+  let depth = 0;
+  let currentId = parent_leaf_id;
+  while (currentId) {
+    const leaf = state.leaves[currentId];
+    if (!leaf) break;
+    if (leaf.role === 'root' || leaf.role === 'commander') {
+      depth++;
+    }
+    currentId = leaf.parent;
+  }
+  return depth;
+}
+
+// ============================================================
 // 命令: migrate（数据迁移）
 // ============================================================
 
-// 旧 role → 新 role 映射表
+// 旧 role → 新 role 映射表（覆盖生产环境全部自由文本 role）
+// 不在 ROLE_ENUM 中的值统一映射为 worker
 const ROLE_MIGRATION_MAP = {
-  // 旧自由文本 role → 统一为 worker
   announce: 'worker',
-  techdetail: 'worker',
-  integrate: 'worker',
-  review: 'worker',
-  eval: 'worker',
-  engine: 'worker',
+  attack: 'worker',
+  completeness: 'worker',
+  consistency: 'worker',
+  counterfactual: 'worker',
   draft: 'worker',
+  engine: 'worker',
+  eval: 'worker',
+  evidence: 'worker',
+  fixer: 'worker',
+  integrate: 'worker',
+  polish: 'worker',
+  r1: 'worker',
+  r2: 'worker',
+  'regression-attack': 'worker',
+  'regression-evidence': 'worker',
+  report: 'worker',
+  'reverse-map': 'worker',
+  reversemap: 'worker',
+  revmap: 'worker',
+  review: 'worker',
+  standards: 'worker',
+  techdetail: 'worker',
+  test: 'worker',
+  verify: 'worker',
+  walkthrough: 'worker',
+  walkthru: 'worker',
 };
 
 async function cmdMigrate(args) {
@@ -1446,6 +1533,39 @@ async function cmdMigrate(args) {
       if (leaf.added_by === undefined) {
         changes.push({ leaf_id: id, field: 'added_by', from: undefined, to: null });
         if (!dryRun) leaf.added_by = null;
+      }
+    }
+
+    // 规则 4（第二轮）: worker 有子节点 → 提升为 commander（深度允许时）
+    // 必须先跑完规则 1-3 统一 role，再检查父子关系
+    for (const id of Object.keys(leaves)) {
+      const leaf = leaves[id];
+      if (leaf.role !== 'worker') continue;
+
+      const childIds = Object.keys(leaves).filter(
+        (lid) => leaves[lid].parent === id
+      );
+      if (childIds.length === 0) continue;
+
+      // worker 有子节点：计算深度，允许则提升为 commander
+      const depth = calcCommanderDepth(state, id);
+      if (depth < 3) {
+        changes.push({
+          leaf_id: id,
+          field: 'role',
+          from: 'worker',
+          to: 'commander',
+          reason: `has ${childIds.length} child(ren): ${childIds.join(', ')}. Depth ${depth} < 2, promoted to commander.`
+        });
+        if (!dryRun) leaf.role = 'commander';
+      } else {
+        changes.push({
+          leaf_id: id,
+          field: 'role',
+          from: 'worker',
+          to: 'worker',
+          reason: `HAS_CHILDREN_BUT_DEPTH_${depth}: has ${childIds.length} child(ren) but commander depth >= 2. Cannot promote. Manual resolution required.`
+        });
       }
     }
 

@@ -1,6 +1,6 @@
-# Proma 指挥官方法论 v1.1
+# Proma 指挥官方法论 v1.2
 
-> 沉淀日期: 2026-06-18（v1.0），更新 2026-06-19（v1.1）
+> 沉淀日期: 2026-06-18（v1.0），更新 2026-06-19（v1.2）
 > 来源: 树形会话执行体系 v0.1 验收流程实战 + Q1 架构方案
 > 适用: 任何需要协调多个子 Agent / 多个会话完成复杂任务的指挥官角色
 > 元目标: 让"指挥官"成为一个可复制、可教学的工作模式,不依赖单次会话的临场发挥
@@ -128,13 +128,22 @@
 
 ### 原则 12：分布式状态写入（Distributed State Writing）
 
-- **根 Commander**:结构性变更（tree init / leaf add）
-- **子 Commander**:自己 + 下属叶子的 milestones / events / status（独立推进）
-- **叶子 Worker**:只上报（send_message done/blocked），**不直接写 tree-state**
+- **根 Commander**：结构性变更（tree init / leaf add）
+- **子 Commander / 孙 Commander**：结构性变更（leaf add，parent=<self.leaf_id>）+ 自己 + 下属叶子的 milestones / events / status（独立推进，不依赖根）
+- 孙 Commander（深度 2）只能 leaf add role=worker，不能加 commander
+- **叶子 Worker**：只上报（send_message done/blocked），**不直接写 tree-state**
 - 文件锁保障并发安全，所有写入走 `tree-state.js`
-- `role` 字段正式化为枚举:`root` | `commander` | `worker`
 
-**为什么**:集中式写入让根 Commander 成为瓶颈。分布式写入让每个分支自主推进，根只管结构。
+### 原则 13：三层 Commander 深度限制（Three-Layer Commander Depth）
+
+- 整个树最多 **3 层 Commander**（根→子→孙）
+- 深度计算：沿 parent 链向上追溯，统计 role 为 root/commander 的节点数
+- 深度 0（根）：可加 commander 或 worker
+- 深度 1（子 Commander）：可加 commander 或 worker
+- 深度 2（孙 Commander）：**只能加 worker**，再加 commander 抛 E_DEPTH_EXCEEDED
+- 深度 ≥3：不允许存在 commander 节点
+
+**为什么**：无限嵌套会导致指挥链过深、决策延迟放大。三层足以覆盖"战略→战术→执行"的完整粒度。
 
 ---
 
@@ -230,7 +239,7 @@
 
 ```yaml
 event: handoff_to_new_commander
-methodology_version: v1.0
+methodology_version: v1.2
 required_reading:
   - ".context/commander-methodology.md"     # 本文档
   - ".context/tree-commander-design.md"     # 体系设计文档
@@ -303,6 +312,7 @@ report_format: |
 | 2026-06-18 | v1.0 | 从 v0.1 验收流程实战中首次沉淀 |
 | 2026-06-18 | v1.0.1 | §4.4 命名规范复盘改写（纠正 `(\w+)` 的歧义描述，明确两重歧义：regex 过宽放行大写/短名 + regex 不含 `-` 导致含连字符命名被拒）；S3 Windows rename 重试修复融入 v0.2 首批变更 |
 | 2026-06-19 | v1.1.0 | 新增原则 11（Leaf Purity）原则 12（分布式状态写入）；对应 tree-state.js v0.2.0 的 role 枚举 + E_CHILDREN_NOT_DONE + migrate 子命令 |
+| 2026-06-19 | v1.2.0 | 原则12修订（子Commander有权leaf add + 三层深度）；新增原则13（三层Commander深度限制）；审计驱动修订 |
 
 ---
 
