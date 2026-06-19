@@ -8,12 +8,12 @@
 
 ```yaml
 skill_name: tree-worker
-version: 2.1
-target: 子会话（叶子节点 / Fork 出的执行会话）
+version: 2.2
+target: 子会话（叶子 Worker / create_session 创建的执行会话；子 Commander 由 fork_session 创建）
 requires:
   - tree-state.js                          # 通过 commander 间接调用，worker 不直接调
   - tree-audit-methodology.md v1.0        # 当角色为审查/审计/验证时必读
-load_on: fork_session  # commander 在 Fork 时通过首条消息自动加载
+load_on: create_session  # 原则 11：叶子 = create_session；子 Commander 由 fork_session 创建
 ```
 
 ---
@@ -437,5 +437,6 @@ drift_declaration: false
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-06-19 | v2.2 | 审计驱动修订：load_on 从 fork_session 修正为 create_session（原则 11：叶子 = create_session）；target 描述明确子 Commander 由 fork_session 创建 |
 | 2026-06-19 | v2.1 | 新增 §10 审计角色（触发判定、最小 Fork 结构、审计 done 格式、审计禁止行为）；§0 引用 tree-audit-methodology.md |
 | 2026-06-18 | v2.0 | 首次创建。合并 v0.1 9 条铁律 + v0.2 内部自审必须化（铁律 3 从可选升级为必须）；新增 §4 完整自审流程（含 Prompt 模板 + drift_history 写入规范）；done 模板新增 drift_declaration 字段 |

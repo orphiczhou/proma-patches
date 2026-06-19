@@ -1,6 +1,6 @@
 # 树形会话执行体系 — 完整设计文档
 
-> **版本**: v1.0 (2026-06-18)
+> **版本**: v1.3 (2026-06-19)
 > **项目**: Proma 改造探索 / Layer 2 指挥控制层
 > **作者**: 周星星 + Proma Agent
 > **状态**: 设计完成，待 v0.1 实施
@@ -489,7 +489,7 @@ review_trigger: 课程组反馈接口散乱 > 3 次则换 RPC
 |---|---|---|
 | `prefix` | 项目代号，正则 `[a-z][a-z0-9_]{3,7}`（小写字母开头，4-8 字符，**不含连字符**） | `nanju`、`sweng`、`webv3`、`pguide` |
 | `path` | 树定位，根为空，子为 A/B/C，孙为 A1/A2，曾孙 A1a/A1b | `A`、`A1`、`A1a` |
-| `role` | 角色短名，可含连字符 | `root`、`eval`、`api`、`ui` |
+| `role` | 角色枚举，取值 `root` \| `commander` \| `worker`（不受 LEAF_NAME_RE 的 `\w+` 限制，语义校验由 tree-state.js 的 assertEnum 负责） | `root`、`commander`、`worker` |
 | `suffix` | 可选。`s\d+` 表竹节 / `i\d+` 表尝试序号 | `s2`、`i2` |
 
 **完整示例**：
@@ -538,18 +538,18 @@ review_trigger: 课程组反馈接口散乱 > 3 次则换 RPC
 
 ```
 nanju-root                                    🌳 指挥所
-  ├─ nanju-A-syllabus                         🍃 课程大纲模块
-  │  ├─ nanju-A1-topics                       🍃 知识点拆解
-  │  └─ nanju-A2-textbook                     🍃 教材选型
-  ├─ nanju-B-eval                             🍃 实验评测模块
-  │  ├─ nanju-B1-engine                       🍃 评测引擎调研
-  │  │  ├─ nanju-B1a-engine   ❌ 剪枝（Docker 太重）
-  │  │  └─ nanju-B1b-engine   🍎 WebAssembly
-  │  └─ nanju-B2-api                          🍃 评测 API 设计
-  ├─ nanju-C-grade                            🍃 成绩管理模块
-  ├─ nanju-D-interaction                      🍃 师生交互模块
-  ├─ nanju-E-resource                         🍃 教学资源模块
-  └─ nanju-F-integration                      🍃 整合会话（最后启动）
+  ├─ nanju-A-commander                        🍃 课程大纲模块
+  │  ├─ nanju-A1-worker                       🍃 知识点拆解
+  │  └─ nanju-A2-worker                       🍃 教材选型
+  ├─ nanju-B-commander                        🍃 实验评测模块
+  │  ├─ nanju-B1-worker                       🍃 评测引擎调研
+  │  │  ├─ nanju-B1a-worker   ❌ 剪枝（Docker 太重）
+  │  │  └─ nanju-B1b-worker   🍎 WebAssembly
+  │  └─ nanju-B2-worker                       🍃 评测 API 设计
+  ├─ nanju-C-commander                        🍃 成绩管理模块
+  ├─ nanju-D-commander                        🍃 师生交互模块
+  ├─ nanju-E-commander                        🍃 教学资源模块
+  └─ nanju-F-commander                        🍃 整合会话（最后启动）
 ```
 
 ### 7.2 典型时序（含一次偏差纠偏全过程）
@@ -1411,3 +1411,4 @@ S2 测试覆盖三个场景：
 | 2026-06-18 | v1.0 | 初版设计完成。4 个架构补丁 + 9 章节 + 附录 A 完整 spec |
 | 2026-06-18 | v1.1 | v0.1.1-C：§6.5 prefix 正则明确为 `[a-z][a-z0-9_]{3,7}`，同步修附录 A.4/A.8 和负例表格；添加 §10 v0.2 实施规范（S3 修复 + 心跳 + 内审 + 三档纠偏 + S2 验收草稿） |
 | 2026-06-18 | v1.2 | v0.1.1-S3 已修复到 tree-state.js（writeState 中 rename 改为 5 次重试+指数退避）；同步创建 tree-commander SKILL.md 和 tree-worker SKILL.md（v2.0，首次创建，合并 v0.1+v0.2）；code-reviewer 审计后微调 §A.6 DRIFT_ACTION_ENUM 补齐 `handoff` |
+| 2026-06-19 | v1.3 | Q1 v1.1 架构落地：ROLE_ENUM(root/commander/worker)、E_CHILDREN_NOT_DONE、E_DEPTH_EXCEEDED、migrate 子命令、Leaf Purity + 分布式写入原则；审计驱动修订 |
