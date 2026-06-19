@@ -69,7 +69,7 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 未设置                       →  默认共享（兼容旧脚本）
 ```
 
-✅ **v0.16.4 已修复**（补丁 K）：userData 路径已动态化为 `electron-${PROMA_INSTANCE_NAME}`。
+✅ **v0.16.5 已修复（补丁 K 修正）**：恢复 `ISOLATED === "1"` 条件。`NAME` 管身份，`ISOLATED` 管隔离，两变量各司其职。Release 设 `PROMA_INSTANCE_NAME=release` + `ISOLATED=0` 即可有独立身份同时共享数据。
 
 ---
 
@@ -126,7 +126,7 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 
 - **补丁 I**：禁用更新检查（Dev + Release 启动不再弹更新对话框）
 - **补丁 J**：AppUserModelId 动态隔离（修复 Dev 退出时正式版快捷方式失效）
-- **补丁 K**：userData 路径动态化（修硬编码 `electron-dev` 已知 bug）
+- **补丁 K**：userData 路径动态化（v0.16.4）→ **v0.16.5 修正**：恢复 `PROMA_INSTANCE_ISOLATED` 条件检查，防止 Release 误隔离
 - **Release 托盘图标**：白色 → 珊瑚色
 - **Release 启动脚本**：改为隔离 profile，新增 `start-release-fresh.bat`
 - **IME 卡顿问题**：已提交 proma-ai/Proma#870，待作者跟进

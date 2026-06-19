@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-16 20:30 | 维护者: 周星星
+> 最后更新: 2026-06-19 17:35 | 维护者: 周星星
 
 ---
 
@@ -322,6 +322,26 @@ sed -i 's/if (!import_electron48.app.isPackaged || process.env.PROMA_INSTANCE_IS
 ```
 
 **效果：** `PROMA_INSTANCE_NAME=dev` → `@proma/electron-dev/`，`=release` → `@proma/electron-release/`，`=release-fresh` → `@proma/electron-release-fresh/`。不设变量则走默认路径（正式版兼容）。
+
+**⚠️ v0.16.5 修复：补丁 K 条件过于宽泛。** v0.16.4 版的条件 `if (PROMA_INSTANCE_NAME)` 导致任何有名字的实例都被隔离——Release 如果设 `PROMA_INSTANCE_NAME=release` 就无法共享正式版数据。修复后恢复 `PROMA_INSTANCE_ISOLATED === "1"` 检查，与 `getConfigDirName`（行 90）保持一致：
+
+```bash
+# v0.16.5 修复：加回 ISOLATED 检查
+# 旧(v0.16.4): if (process.env.PROMA_INSTANCE_NAME) {
+# 新(v0.16.5): if (process.env.PROMA_INSTANCE_ISOLATED === "1" && process.env.PROMA_INSTANCE_NAME) {
+```
+
+**修复后行为矩阵：**
+
+| 实例 | NAME | ISOLATED | userData 路径 | 说明 |
+|------|------|----------|---------------|------|
+| Dev | `dev` | `1` | `@proma/electron-dev/` | 独立隔离 |
+| Release | `release` | `0` | `@proma/electron/` | 共享正式版 |
+| Release-Fresh | `release-fresh` | `1` | `@proma/electron-release-fresh/` | 独立隔离 |
+
+两个变量各司其职：`PROMA_INSTANCE_NAME` 管身份标识（remote-session 发现、AppUserModelId），`PROMA_INSTANCE_ISOLATED` 管数据隔离开关。
+
+**同步修改 start-release.bat：** 补上 `PROMA_INSTANCE_NAME=release`（此前因补丁 K bug 刻意省略）。
 
 ---
 

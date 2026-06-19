@@ -6,6 +6,82 @@ const { randomUUID } = require("node:crypto");
 const path = require("path");
 const fs = require("fs");
 
+// ---- 远端实例 HTTP 调用 ----
+const http = require("node:http");
+const PORT_START = 19876;
+const PORT_END = 19895;
+
+function remoteHttpGet(port, path) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: "127.0.0.1", port, path: "/" + path, method: "GET",
+      timeout: 3000,
+    }, (res) => {
+      const chunks = [];
+      res.on("data", c => chunks.push(c));
+      res.on("end", () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf-8"))); }
+        catch (_) { reject(new Error("bad json")); }
+      });
+    });
+    req.on("error", reject);
+    req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+    req.end();
+  });
+}
+
+function remoteHttpPost(port, toolName, args) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(args || {});
+    const buf = Buffer.from(body, "utf-8");
+    const req = http.request({
+      hostname: "127.0.0.1", port, path: "/" + toolName, method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": buf.length },
+      timeout: 600000,
+    }, (res) => {
+      const chunks = [];
+      res.on("data", c => chunks.push(c));
+      res.on("end", () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf-8"))); }
+        catch (_) { resolve({ error: "Invalid JSON response" }); }
+      });
+    });
+    req.on("error", reject);
+    req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+    req.write(buf);
+    req.end();
+  });
+}
+
+let instancePortCache = {};
+
+async function discoverRemoteInstance(instanceName) {
+  if (instancePortCache[instanceName]) return instancePortCache[instanceName];
+  for (let p = PORT_START; p <= PORT_END; p++) {
+    try {
+      const info = await remoteHttpGet(p, "get_instance_info");
+      if (info && info.instance === instanceName) {
+        instancePortCache[instanceName] = p;
+        return p;
+      }
+    } catch (_) { /* port not available */ }
+  }
+  // Fallback: 兼容未升级的旧实例（只有 proma_dev 布尔值，无 instance 字段）
+  const fallbackMap = { dev: true, release: false };
+  if (instanceName in fallbackMap) {
+    for (let p = PORT_START; p <= PORT_END; p++) {
+      try {
+        const info = await remoteHttpGet(p, "get_instance_info");
+        if (info && info.proma_dev === fallbackMap[instanceName] && !info.instance) {
+          instancePortCache[instanceName] = p;
+          return p;
+        }
+      } catch (_) { /* port not available */ }
+    }
+  }
+  throw new Error(`No instance named '${instanceName}' found (scanned ${PORT_START}-${PORT_END})`);
+}
+
 const LOG_PREFIX = "[proma-dev-patches]";
 
 function log(msg) {
@@ -325,14 +401,57 @@ function createToolHandlers(sourceSessionId) {
       }
 
       try {
-        const forked = await a.forkAgentSession({
-          sessionId: args.source_session_id,
-          upToMessageUuid: args.up_to_message_uuid,
-        });
+        // Bug 4 修复：SDK forkSession 单次只读一个 sdkSessionId 的 JSONL，跨 sdkSession
+        // 的 UUID 解析会失败（agent session 在补丁 H 清空/sidechain/重建后关联多个 sdkSession）。
+        // 收集候选 sdkSessionId 集合，逐一尝试 forkAgentSession，哪个成功用哪个。
+        const candidateSdkIds = new Set();
+        if (source.sdkSessionId) candidateSdkIds.add(source.sdkSessionId);
+        if (source.forkSourceSdkSessionId) candidateSdkIds.add(source.forkSourceSdkSessionId);
+        try {
+          const msgs = a.getAgentSessionSDKMessages(args.source_session_id) || [];
+          // 目标消息的 session_id 优先
+          if (args.up_to_message_uuid) {
+            const target = msgs.find(m => m.uuid === args.up_to_message_uuid);
+            if (target && typeof target.session_id === "string" && target.session_id) {
+              candidateSdkIds.add(target.session_id);
+            }
+          }
+          // 兜底：历史所有 session_id 都纳入候选
+          for (const m of msgs) {
+            if (typeof m.session_id === "string" && m.session_id) candidateSdkIds.add(m.session_id);
+          }
+        } catch (_) { /* best-effort */ }
+
+        let forked = null;
+        let lastErr = null;
+        for (const candSdk of candidateSdkIds) {
+          try {
+            forked = await a.forkAgentSession({
+              sessionId: args.source_session_id,
+              upToMessageUuid: args.up_to_message_uuid,
+              _forceSdkSessionId: candSdk,
+            });
+            if (candSdk !== source.sdkSessionId) {
+              log(`[fork_session] 跨 sdkSession fork 成功，使用 ${candSdk.slice(0, 8)} (默认是 ${source.sdkSessionId.slice(0, 8)})`);
+            }
+            break;
+          } catch (e) {
+            lastErr = e;
+            const emsg = e instanceof Error ? e.message : String(e);
+            // 候选缺失类错误继续尝试下一个；其他错误直接抛
+            if (/not found in session|Invalid|Session.*not found|没有 SDK session|session not found/i.test(emsg)) {
+              log(`[fork_session] 候选 ${candSdk.slice(0, 8)} 失败: ${emsg.slice(0, 100)}, 尝试下一个`);
+              continue;
+            }
+            throw e;
+          }
+        }
+        if (!forked) {
+          throw lastErr || new Error("All sdkSessionId candidates failed");
+        }
 
         const updates = {};
         if (args.title) updates.title = args.title;
-        // Fork 必须继承源会话的 channelId/modelId（若无覆盖）——否则 metadata 丢失
         const effectiveChannelId = args.new_channel_id || source.channelId;
         if (effectiveChannelId) updates.channelId = effectiveChannelId;
         const effectiveModelId = args.new_model_id || source.modelId;
@@ -358,12 +477,8 @@ function createToolHandlers(sourceSessionId) {
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        require("fs").appendFileSync(
-          require("path").join(require("os").homedir(), ".proma-dev", "fork-debug.log"),
-          JSON.stringify({ ts: new Date().toISOString(), action: "fork_error", error: msg, stack: err?.stack?.slice(0, 500) }) + "\n"
-        );
         if (msg.includes("没有 SDK session") || msg.includes("session not found") || (msg.includes("Session") && msg.includes("not found"))) {
-          return jsonResult({ error: `Fork failed: the source session "${source.title}" has no active SDK runtime session (likely GC'd or channel mismatch). Send a new message in the source session first to recreate the SDK session, then retry fork.` });
+          return jsonResult({ error: `Fork failed: SDK runtime GC'd (PROMA_DEV mode headless sessions are short-lived). Workaround: use remote-session tools to fork on a non-dev instance, or create the source session via the UI for a persistent runtime.` });
         }
         return jsonResult({ error: `Fork failed: ${msg}` });
       }
@@ -383,6 +498,24 @@ function createToolHandlers(sourceSessionId) {
       }
 
       const modelId = args.model_id || meta.modelId;
+
+      // 镜像补丁 H v2：跨频道/模型切换时同步 meta + 清空 sdkSessionId（修复 Bug 5）
+      // send_message 走 runAgentHeadless 路径，不经过 main.cjs sendMessage() 入口的补丁 H
+      // 这里在工具层显式同步，保证程序化切换模型时 meta 也正确更新
+      if (meta && ((meta.channelId && channelId && channelId !== meta.channelId) ||
+                   (meta.modelId && modelId && modelId !== meta.modelId))) {
+        try {
+          a.updateAgentSessionMeta(args.session_id, {
+            channelId,
+            sdkSessionId: void 0,
+            ...(modelId ? { modelId } : {}),
+          });
+          log(`[send_message] 检测到模型/频道切换: ${meta.channelId}/${meta.modelId || "?"} → ${channelId}/${modelId || "?"}, 已同步 meta 并清空 sdkSessionId`);
+        } catch (e) {
+          log(`[send_message] meta 同步失败: ${e}`);
+        }
+      }
+
       const shouldWait = args.wait !== false;
       const shouldNotify = args.notify === true;
 
@@ -502,6 +635,105 @@ function createToolHandlers(sourceSessionId) {
     },
 
   };
+}
+
+// ---- 远端 Session MCP Server（通过 HTTP 代理到其他 Proma 实例）----
+function createRemoteToolHandlers() {
+  return {
+    remote_list_channels: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "list_channels", {});
+      return jsonResult(result);
+    },
+    remote_list_workspaces: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "list_workspaces", {});
+      return jsonResult(result);
+    },
+    remote_list_sessions: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "list_sessions", args);
+      return jsonResult(result);
+    },
+    remote_get_session_info: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "get_session_info", args);
+      return jsonResult(result);
+    },
+    remote_get_session_context: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "get_session_context", args);
+      return jsonResult(result);
+    },
+    remote_list_messages: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "list_messages", args);
+      return jsonResult(result);
+    },
+    remote_create_session: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "create_session", args);
+      return jsonResult(result);
+    },
+    remote_fork_session: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "fork_session", {
+        source_session_id: args.source_session_id,
+        up_to_message_uuid: args.up_to_message_uuid,
+        title: args.title,
+        new_channel_id: args.new_channel_id,
+        new_model_id: args.new_model_id,
+        new_workspace_id: args.new_workspace_id,
+      });
+      return jsonResult(result);
+    },
+    remote_send_message: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "send_message", {
+        session_id: args.session_id,
+        message: args.message,
+        wait: args.wait !== false,
+        model_id: args.model_id,
+        channel_id: args.channel_id,
+      });
+      return jsonResult(result);
+    },
+    remote_archive_session: async (args) => {
+      const port = await discoverRemoteInstance(args.instance);
+      const result = await remoteHttpPost(port, "archive_session", args);
+      return jsonResult(result);
+    },
+    remote_get_my_session_id: async (args) => {
+      return jsonResult({
+        session_id: null,
+        is_remote: true,
+        instance: args.instance,
+        hint: "This is a remote instance call. session_id is always null for remote operations.",
+      });
+    },
+  };
+}
+
+function createRemoteSessionMcpServer(sdk, z) {
+  const h = createRemoteToolHandlers();
+  const server = sdk.createSdkMcpServer({
+    name: "remote-session",
+    version: "1.0.0",
+    tools: [
+      sdk.tool("remote_list_channels", "List all channels on a REMOTE Proma instance. Use this FIRST before creating a remote session.", { instance: z.string().describe("Instance name (e.g. 'dev', 'release')") }, h.remote_list_channels, { annotations: { readOnlyHint: true } }),
+      sdk.tool("remote_list_workspaces", "List all workspaces on a REMOTE Proma instance.", { instance: z.string().describe("Instance name (e.g. 'dev', 'release')") }, h.remote_list_workspaces, { annotations: { readOnlyHint: true } }),
+      sdk.tool("remote_list_sessions", "List sessions on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), include_archived: z.boolean().optional(), workspace_id: z.string().optional(), limit: z.number().min(1).max(200).optional() }, h.remote_list_sessions, { annotations: { readOnlyHint: true } }),
+      sdk.tool("remote_get_session_info", "Get session info from a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string().describe("Session ID on the remote instance") }, h.remote_get_session_info, { annotations: { readOnlyHint: true } }),
+      sdk.tool("remote_get_session_context", "Get token usage from a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string() }, h.remote_get_session_context, { annotations: { readOnlyHint: true } }),
+      sdk.tool("remote_list_messages", "List messages from a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string(), limit: z.number().min(1).max(200).optional(), offset: z.number().min(0).optional() }, h.remote_list_messages, { annotations: { readOnlyHint: true } }),
+      sdk.tool("remote_create_session", "Create a new session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name (e.g. 'dev', 'release')"), channel_id: z.string().describe("Channel ID on the remote instance"), model_id: z.string().optional(), title: z.string().optional(), workspace_id: z.string().optional() }, h.remote_create_session),
+      sdk.tool("remote_fork_session", "Fork a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), source_session_id: z.string(), up_to_message_uuid: z.string().optional(), title: z.string().optional(), new_channel_id: z.string().optional(), new_model_id: z.string().optional(), new_workspace_id: z.string().optional() }, h.remote_fork_session),
+      sdk.tool("remote_send_message", "Send a message to a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string(), message: z.string(), wait: z.boolean().optional(), model_id: z.string().optional(), channel_id: z.string().optional() }, h.remote_send_message),
+      sdk.tool("remote_archive_session", "Archive/unarchive a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string(), archived: z.boolean().optional() }, h.remote_archive_session),
+      sdk.tool("remote_get_my_session_id", "Get instance info for a REMOTE Proma instance. Always returns null session_id since you are not in that instance.", { instance: z.string().describe("Instance name") }, h.remote_get_my_session_id, { annotations: { readOnlyHint: true } }),
+    ],
+  });
+  return server;
 }
 
 // ---- 内部 MCP Server（Agent 内部使用）----
@@ -636,6 +868,7 @@ function createSessionMcpServer(sdk, z, sourceSessionId) {
 // ---- 外部 MCP HTTP Bridge（让外部 stdio MCP server 能调用 7 个工具）----
 function createExternalHttpBridge() {
   const http = require("node:http");
+  const instanceName = process.env.PROMA_INSTANCE_NAME || (process.env.PROMA_DEV === "1" ? "dev" : "release");
   const handlers = createToolHandlers(null); // 外部调用无源会话
 
   const PORT_START = 19876;
@@ -659,7 +892,8 @@ function createExternalHttpBridge() {
         if (req.method === "GET" && urlPath === "get_instance_info") {
           res.writeHead(200, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({
-            proma_dev: process.env.PROMA_DEV === "1",
+            instance: instanceName,
+            proma_dev: process.env.PROMA_DEV === "1",  // deprecated，保留向后兼容
             port: port,
           }));
         }
@@ -707,7 +941,7 @@ function createExternalHttpBridge() {
     for (let p = PORT_START; p <= PORT_END; p++) {
       try {
         const server = await startServer(p);
-        log(`External MCP HTTP bridge: http://127.0.0.1:${p} (PROMA_DEV=${process.env.PROMA_DEV || "0"})`);
+        log(`External MCP HTTP bridge: http://127.0.0.1:${p} (instance: ${instanceName})`);
         return;
       } catch (e) {
         if (e.code === "EADDRINUSE") continue;
@@ -726,7 +960,8 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
     try { z = require("zod").z || require("zod"); } catch(_) { z = null; }
     if (!z) return undefined;
     const server = createSessionMcpServer(sdk, z, sessionId);
-    return { session: server };
+    const remoteServer = createRemoteSessionMcpServer(sdk, z);
+    return { session: server, "remote-session": remoteServer };
   } catch (err) {
     log(`ERROR creating MCP server: ${err instanceof Error ? err.message : String(err)}`);
     console.error(err);
@@ -737,5 +972,5 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
 // ---- 启动外部 MCP HTTP bridge ----
 createExternalHttpBridge();
 
-log("Agent session management MCP tools loaded (11 tools: get_my_session_id, list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message, archive_session)");
+log("Agent session management MCP tools loaded (11 tools: get_my_session_id, list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message, archive_session) + 11 remote-session tools");
 log("External MCP bridge available (use instance auto-discovery on ports 19876-19895)");
