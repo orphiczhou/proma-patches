@@ -1,7 +1,7 @@
-# Proma 指挥官方法论 v1.0
+# Proma 指挥官方法论 v1.1
 
-> 沉淀日期: 2026-06-18
-> 来源: 树形会话执行体系 v0.1 验收流程实战
+> 沉淀日期: 2026-06-18（v1.0），更新 2026-06-19（v1.1）
+> 来源: 树形会话执行体系 v0.1 验收流程实战 + Q1 架构方案
 > 适用: 任何需要协调多个子 Agent / 多个会话完成复杂任务的指挥官角色
 > 元目标: 让"指挥官"成为一个可复制、可教学的工作模式,不依赖单次会话的临场发挥
 
@@ -116,6 +116,25 @@
   - 方法论本身
 - 跨会话可见,不只留在聊天流
 - 原则:**"删掉后未来 Agent 会犯错"** 的内容才值得沉淀
+
+### 原则 11：叶子纯净（Leaf Purity）
+
+- **叶子任务 = `create_session` + 首条消息注入 brief/dod**
+- **绝不 fork 叶子**。fork 只用于创建子 Commander（需继承战略上下文）
+- 叶子是全新会话，干净上下文，只知道自己任务
+- 重试 = 新 `create_session` + archive 旧会话，不 fork 失败的残留状态
+
+**为什么**:fork 叶子会污染上下文（token 浪费 + 历史干扰），且并行叶子的互不干扰性被破坏。
+
+### 原则 12：分布式状态写入（Distributed State Writing）
+
+- **根 Commander**:结构性变更（tree init / leaf add）
+- **子 Commander**:自己 + 下属叶子的 milestones / events / status（独立推进）
+- **叶子 Worker**:只上报（send_message done/blocked），**不直接写 tree-state**
+- 文件锁保障并发安全，所有写入走 `tree-state.js`
+- `role` 字段正式化为枚举:`root` | `commander` | `worker`
+
+**为什么**:集中式写入让根 Commander 成为瓶颈。分布式写入让每个分支自主推进，根只管结构。
 
 ---
 
@@ -283,6 +302,7 @@ report_format: |
 |---|---|---|
 | 2026-06-18 | v1.0 | 从 v0.1 验收流程实战中首次沉淀 |
 | 2026-06-18 | v1.0.1 | §4.4 命名规范复盘改写（纠正 `(\w+)` 的歧义描述，明确两重歧义：regex 过宽放行大写/短名 + regex 不含 `-` 导致含连字符命名被拒）；S3 Windows rename 重试修复融入 v0.2 首批变更 |
+| 2026-06-19 | v1.1.0 | 新增原则 11（Leaf Purity）原则 12（分布式状态写入）；对应 tree-state.js v0.2.0 的 role 枚举 + E_CHILDREN_NOT_DONE + migrate 子命令 |
 
 ---
 
