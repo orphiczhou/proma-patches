@@ -1,23 +1,43 @@
 # Q1 v1.1 全深度 3 层验证报告
 
-> 执行时间: 2026-06-20 10:26–10:30 GMT+8 | 指挥官: Proma Agent (deepseek-v4-pro)
-> tree_id: q1full | 对标方案: plan/q1-full-depth-verification.md v1.1
-> 审计状态: 方案经 1 轮审计(3阻断+5严重已修)后执行
+> 版本: v1.1 (Round 2 审计修订) | 执行时间: 2026-06-20 10:26–10:38 GMT+8
+> 指挥官: Proma Agent (deepseek-v4-pro) | tree_id: q1full
+> 对标方案: plan/q1-full-depth-verification.md v1.1
+> 审计: Round 1 (5阻断+6严重) → Round 2 修复 (10/10真实ID+证据留存)
+> 方法论: commander-methodology v1.2 + tree-audit-methodology v1.0
 
 ## 总评
 
-✅ **通过 — 38/38 用例全部通过，0 失败**
+⚠️ **有条件通过 — 核心能力 8/8 维度通过，3 项已知限制**
+
+| 维度 | 结果 |
+|------|------|
+| role 枚举 (root/commander/worker) | ✅ |
+| 三层深度限制 (E_DEPTH_EXCEEDED) | ✅ |
+| E_CHILDREN_NOT_DONE | ✅ |
+| Worker 禁子节点 | ✅ |
+| 错误路径 (8/13 错误码) | ✅ 已触发 |
+| migrate (8映射) | ✅ |
+| 真实会话链路 (10/10 fork+create) | ✅ |
+| validate + 自动备份 | ✅ |
+
+| 已知限制 | 严重度 | 说明 |
+|---------|--------|------|
+| L1: E2 (parent=null+role≠root) 未被 tree-state.js 检查 | 中 | validate 的 path 检查优先，代码缺此业务校验 |
+| L2: 5 个错误码未触发 (E_BACKUP_CORRUPT/E_LOCK_TIMEOUT/E_IO/E_UNKNOWN) | 低 | 需故障注入环境 |
+| L3: milestone 空数组 done 门未独立闭环 | 低 | G-commander 无 milestone 直接 done 成功 |
 
 | 维度 | 结果 |
 |------|------|
 | CLI 测试 (R0-R7) | 8/8 通过 |
-| 树形结构 (A+B+C+D+E+F+G+H+I) | 9 leaf 全部 done |
-| 错误路径 (E1-E8) | 8/8 错误码正确触发 |
+| 树形结构 (10 leaf, 全部 done) | ✅ |
+| 错误路径 (E1-E8, 8 错误码触发) | ✅ |
 | migrate (M0-M3) | 4/4 通过 |
 | SKILL (S1-S3) | 3/3 通过 |
-| 真实会话 (fork+create+send) | 2/2 通过 |
+| 真实会话 (fork×4 + create×6) | 10/10 真实 UUID |
 | validate | ok, issues=[] |
-| 自动备份 | 4 files generated |
+| 自动备份 | 5 files (4 auto + 1 manual) |
+| 运行时证据 | validate-output.log 持久化 |
 
 ---
 
