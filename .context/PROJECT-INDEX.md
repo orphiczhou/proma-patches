@@ -1,6 +1,6 @@
 # Proma 改造项目 — 知识索引
 
-> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-19 18:25
+> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-20 11:00
 
 新会话从这里开始读，能 5 分钟拿到项目全貌和关键路径。
 
@@ -14,24 +14,26 @@
 
 ## 二、当前完成度（v0.16）
 
-### Layer 1 — MCP 基础设施 ✅ 完工（v0.16.4）
+### Layer 1 — MCP 基础设施 ✅ 完工（v0.16.5）
 
-- **三开环境**：`D:\Proma\`（正式版不动）/ `D:\Proma-dev\`（隔离 `~/.proma-dev/`）/ `D:\Proma-release\`（**v0.16.4 起隔离** `~/.proma-release/`）
+- **三开环境**：`D:\Proma\`（正式版不动）/ `D:\Proma-dev\`（隔离 `~/.proma-dev/`）/ `D:\Proma-release\`（共享正式版数据，`ISOLATED=0`）
 - **22 个 MCP 工具**：11 本地 `mcp__session__*` + 11 远端 `mcp__remote-session__*`
 - **外部 MCP 桥接**：`proma-mcp-server.cjs`（stdio）→ localhost HTTP bridge（19876-19895 自动选端口）
-- **实例字符串命名**：`PROMA_INSTANCE_NAME` + `PROMA_INSTANCE_ISOLATED`，`--instance <name>` 自动端口扫描发现
+- **两变量体系**：`PROMA_INSTANCE_NAME` 管身份 + `PROMA_INSTANCE_ISOLATED` 管数据隔离（v0.16.5 修正）
 - **会话间通信**：`send_message` 三模式 — `wait=true` 同步返回 / `notify=true` 异步通知 / `wait=false` + 轮询回收
-- **10 个核心补丁** A-K（详见 wiki §5）：补丁 A-C/H 基础能力 + 补丁 D/E 渲染器 + 补丁 G SDK 路径 + **补丁 I 禁更新 / 补丁 J 应用 ID / 补丁 K 动态路径**（v0.16.4 新增）
-- **session-management Skill v1.3.0**：9 大使用模式 + "第一判断"远端隔离关卡
-- **GitHub 仓库**：`orphiczhou/proma-patches`，`apply-patches.sh` 一键部署
+- **11 个核心补丁** A-K（详见 wiki §5）：A-C 基础能力、D-E 渲染器、F 跨频道防护(被 H 替代)、G SDK 路径、H 跨频道/模型切换完整修复、I 禁更新、J AppUserModelId 隔离、K userData 动态路径
+- **remote-session Release 验收**：⚠️ 有条件通过（39/40，1 个 fork new_title Bug，不阻断上线）
+- **session-management Skill v1.3.0** + **GitHub 仓库** `orphiczhou/proma-patches` + `apply-patches.sh` v0.16.5
 
-### Layer 2 — 树形会话执行体系 ✅ v0.2.1（Q1 v1.1 落地）
+### Layer 2 — 树形会话执行体系 ✅ v0.2.1（Q1 v1.1 闭环，Q2 待实施，Q3 进行中）
 
-- **发布包**：`release/tree-system-v0.2.0/`（17 文件，7000+ 行）+ v0.2.1 Q1修订
-- **核心交付**：tree-state.js v0.2.1（~1680行，role枚举+深度限制+E_CHILDREN_NOT_DONE+E_DEPTH_EXCEEDED+migrate）、tree-commander SKILL v2.2、tree-worker SKILL v2.2、commander-methodology v1.2（13原则含Leaf Purity+分布式写入+三层深度）、tree-commander-design v1.3
-- **v0.2.1 新增**：role正式化为 root/commander/worker、三层Commander深度限制、子/孙Commander有权leaf add、叶子create_session干净上下文、migrate子命令（28旧role映射）、worker禁有子节点、根唯一性校验
-- **5 次验证**：B任务(4子会话)、S1重测(25命令)、L2验证(3子会话)、v1.1 S1回归(全通过)、v1.1 migrate(bverify通过)
-- **已知限制**：notify未验证、心跳/内审仅方案、竹节交接未实现、并发竞态、Commander prune级联未定义
+- **核心交付**：tree-state.js v0.2.1（~1680行，ROLE_ENUM + E_DEPTH_EXCEEDED + E_CHILDREN_NOT_DONE + migrate + 深度限制 + Worker禁子节点 + 根唯一性）、tree-commander SKILL v2.2、tree-worker SKILL v2.2、commander-methodology v1.2（13原则）
+- **架构升级（Q1 v1.1）**：role 正式化为 root/commander/worker 三层、Commander 最大深度 2（子+孙）、Worker=create_session 干净上下文、Commander=fork_session 继承战略上下文、分布式写入原则
+- **6 次验证**：B任务(4子会话) → S1重测(25命令) → L2验证(3子会话) → Q1 e2e(7 leaf, q1e2e) → Q1 S1回归+migrate → **Q1 全深度3层(10 leaf, q1full, 38/38)**
+- **发布包**：`release/tree-system-v0.2.0/`（17 文件）+ Q1 v1.1 修订
+- **Q2 方案**：侧边栏树形可视化面板（`plan/q2-tree-ui-panel.md`），需新补丁 L，**未实施**
+- **Q3 当前方向**：硬约束体系执行（进度控制）
+- **已知限制**：notify未验证、心跳/内审仅方案、竹节交接未实现、I3并发竞态、Commander prune级联未定义
 
 ---
 
@@ -46,7 +48,7 @@
 
 **铁律**：不可从开源源码重构建 main.cjs —— 商业版有 15 个闭源模块（cloudAuth/sync/billing），源构建会导致登录失败。**正确方式：商业版 main.cjs + sed 补丁 + 插件文件。**
 
-### 7 个核心补丁
+### 11 个核心补丁
 
 | 补丁 | 功能 | 关键 |
 |---|---|---|
@@ -54,8 +56,12 @@
 | B | API 桥接 + 加载插件 | `global.__proma__` 导出 12 个函数 + `require("./proma-dev-patches.cjs")` |
 | C1-5 | 频道+模型元数据覆盖 | MCP 创建会话走后端正确频道/模型/API Key |
 | D+E | Renderer 同步 + 守卫移除 | UI 模型选择器与 metadata 同步 |
-| F | 跨渠道 sdkSessionId 防护 | 避免 "Session 已失效" |
+| F | 跨渠道 sdkSessionId 防护 | **已被补丁 H 替代** |
 | G | CLAUDE_CONFIG_DIR 无条件覆盖 | 修复 Dev fork 失败 0/3 → 3/3 |
+| H | 跨频道/跨 provider 模型切换完整修复（v2） | channelId 或 modelId 任一变化 → 清 sdkSessionId + 同步 meta |
+| I | 禁用更新检查 | `initAutoUpdater` 首行 return，不弹更新对话框 |
+| J | AppUserModelId 动态隔离 | `com.proma.{NAME}`，三版任务栏独立 |
+| K | userData 路径动态化 | `electron-{NAME}`（v0.16.5 修正：双条件 ISOLATED+NAME） |
 
 ### 22 个 MCP 工具分组
 
@@ -83,20 +89,24 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 |---|---|---|
 | **本索引** | `workspace-files/.context/PROJECT-INDEX.md` | 入口 |
 | 总路线图 | `workspace-files/.context/proma-innovation-plan.md` | 两层架构总览 + 优先级 |
-| 完整技术 Wiki | `workspace-files/.context/proma-dev-wiki.md` | 补丁命令、架构、测试记录 |
-| Layer 2 设计 | `workspace-files/.context/proma-dev-wiki-timeline-pruner.md` | 时间线剪枝者完整方案 |
-| Layer 2 发布包 | `workspace-files/release/tree-system-v0.2.0/` | v0.2.0 初始版本（17 文件） |
-| **Q1 架构方案** | `workspace-files/.context/plan/q1-state-architecture.md` | **v1.1 role枚举+深度限制+分布式写入** |
-| **Q2 UI方案** | `workspace-files/.context/plan/q2-tree-ui-panel.md` | **v1.0 侧边栏树形可视化面板** |
-| **进度报告** | `workspace-files/.context/progress-report-2026-06-19.md` | **v0.1/v0.2 完成度全面审计** |
-| 树形审计方法论 | `workspace-files/.context/tree-audit-methodology.md` | 终局验证 × 树形体系强制执行版 |
+| 完整技术 Wiki | `workspace-files/.context/proma-dev-wiki.md`（更新至 v0.16.5/v0.2.1） | 补丁命令、架构、测试记录、版本历史 |
+| Layer 2 设计 | `workspace-files/.context/tree-commander-design.md` v1.3 | 树形体系完整设计文档 |
+| 树形方法论 | `workspace-files/.context/commander-methodology.md` v1.2 | 13原则（含Leaf Purity+分布式写入+三层深度） |
+| **进度审计** | `workspace-files/.context/progress-report-2026-06-19.md` | v0.1/v0.2 完成度全面摸底 |
+| **Q1 方案** | `workspace-files/.context/plan/q1-state-architecture.md` v1.1 | role枚举+深度限制+分布式写入 |
+| **Q1 e2e验证** | `workspace-files/.context/q1-e2e-verification-report.md` | 7 leaf 端到端全通过 |
+| **Q1 全深度验证** | `workspace-files/.context/q1-full-depth-report.md` | 10 leaf 3层 38/38 全通过 |
+| **Q2 方案** | `workspace-files/.context/plan/q2-tree-ui-panel.md` v1.0 | 侧边栏树形UI面板（未实施） |
+| **最新交接** | `workspace-files/.context/handoff/session-2026-06-19-handoff.md` | Q1 v1.1 完结 → Q2 推进 |
+| 树形审计方法论 | `workspace-files/.context/tree-audit-methodology.md` | 终局验证 × 树形体系强制执行 |
+| remote-session 验收 | `workspace-files/.context/remote-session-release-report.md` | Release 验收 39/40 有条件通过 |
 | remote-session 提案 | `workspace-files/.context/proposal-remote-session-mcp.md` | 远端工具设计 + 实例命名 |
-| 商业化路线 | `proma-business-plan.md` | 闭源模块清单 + 合规 + 定价 |
-| 部署 README | `workspace-files/README.md` | 给 Agent 读的安装流程 |
-| Agent 安装提示词 | `workspace-files/AGENT-PROMPT.md` | 一键安装/卸载 |
-| Skill | `skills/session-management/SKILL.md`（v1.3.0） | Agent 内置技能 |
-| 测试报告 | `workspace-files/.context/mcp-test-report.md` | MCP 工具测试 |
-| 内部测试计划 | `workspace-files/.context/internal-test-plan.md` | |
+| Layer 2 原始设计 | `workspace-files/.context/proma-dev-wiki-timeline-pruner.md` | 时间线剪枝者早期方案 |
+| 发布包 | `workspace-files/release/tree-system-v0.2.0/` | v0.2.0 初始版本（17 文件） |
+| Skill | `skills/tree-commander/SKILL.md` v2.2 / `skills/tree-worker/SKILL.md` v2.2 | Commander+Worker 操作手册 |
+| Skill | `skills/session-management/SKILL.md` v1.3.0 | 会话管理技能 |
+| 部署 README | `workspace-files/README.md` + `AGENT-PROMPT.md` | 安装流程 |
+| GitHub | `orphiczhou/proma-patches` + `apply-patches.sh` v0.16.5 | 一键部署 |
 
 ### 源码文件（部署位置）
 
@@ -111,53 +121,41 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 
 ## 五、当前卡点与待办
 
-### 🟢 v0.16.1 跨频道切换修复 Dev 验证 ✅ 通过 + 发现两个新 bug
+### 🔴 卡点
 
-- **2026-06-18 上午**：补丁 H（v1 → v2）调研→部署→实测全链路完成。SubAgent 跑矩阵 D/E/F/G（10 用例 7 会话）验证：**补丁 H v2 功能层完全生效**，9 轮跨 provider 切换（GLM↔DeepSeek↔Claude）全部第一轮就成功。
-- **同期发现 Bug 4**：fork 跨 sdkSession 失败（agent session 关联多 sdkSession 时 UUID 解析报错）
-- **同期发现 Bug 5**：send_message 走 runAgentHeadless 路径，不触发补丁 H 的 meta 同步（功能正常但 meta 仍是旧值）
-- **同期澄清 Bug 2**：用户报告"Fork 只剩 20 轮"真相是 list_messages 默认 limit=50 + 感知错觉，Dev 实例无 auto-compact
-- **下一步**：补丁 H 同步到 Release；Bug 4/5 进入修复队列
+- **I3 并发竞态丢消息**：同一会话并发 fire-and-forget send_message 存在竞态条件，3 条并发中 2 条静默丢失。需排查 `runAgentHeadless` 并发守卫
+- **cloud-auth token 共享冲突**：Release 共享正式版数据时，token 刷新互相踢下线
 
-### 🔴 卡点：remote-session Release 验收未通过
+### 🟡 已知限制
 
-- **时间**：2026-06-17，会话 `b18c436b`
-- **现象**：11/11 工具返回正常，中文无乱码，但用户判定验收不通过
-- **缺失**：具体失败原因未记录在案
-- **下一步**：重新跑验收，定位问题
+- **remote-session fork new_title 忽略**：Fork 后标题始终追加 "(fork)"，new_title 参数不生效（中等严重度，不阻断）
+- **GLM 全线配额耗尽**：ZLM-CodingPlan 和 proma-official 的 GLM 模型均不可用。已验证可用：DeepSeek官方频道的 V4 Pro/Flash + MiniMax-M3
+- **notify 异步上报未验证**：所有子会话用 wait=true 同步模式，真正的事件通道异步路由未测试
+- **Commander prune/archive 级联未定义**（M5）
 
-### ⚠️ 已知 Bug
+### ✅ 已修复（2026-06-18 ~ 2026-06-19）
 
-- **cloud-auth token 共享冲突**：Dev 和 Release 共用 token，一方刷新后另一方失效
-- **userData 目录名硬编码**：见上节"实例隔离规则"⚠️
-
-### ✅ v0.16.4 系统改进（2026-06-19）
-
-- **补丁 I**：禁用更新检查（Dev + Release 启动不再弹更新对话框）
-- **补丁 J**：AppUserModelId 动态隔离（修复 Dev 退出时正式版快捷方式失效）
-- **补丁 K**：userData 路径动态化（v0.16.4）→ **v0.16.5 修正**：恢复 `PROMA_INSTANCE_ISOLATED` 条件检查，防止 Release 误隔离
-- **Release 托盘图标**：白色 → 珊瑚色
-- **Release 启动脚本**：改为隔离 profile，新增 `start-release-fresh.bat`
-- **IME 卡顿问题**：已提交 proma-ai/Proma#870，待作者跟进
-
-### ✅ 已修复（2026-06-18 v0.16.3）
-
-- **Bug 1**（跨频道切换丢上下文）— 补丁 H v2（Dev v0.16.1 + Release v0.16.3 同步）
-- **Bug 4**（fork 跨 sdkSession）— main.cjs `forkAgentSession` 入口加 `_forceSdkSessionId` 透传 + patches.cjs `fork_session` 收集候选 sdkSessionId 循环试错
-- **Bug 5**（send_message 不同步 meta）— patches.cjs `send_message` handler 镜像补丁 H 逻辑（同步 meta + 清空 sdkSessionId）
+| 版本 | 修复内容 |
+|------|---------|
+| v0.16.3 | Bug 1（补丁 H v2：跨频道/跨provider切换）、Bug 4（fork 跨 sdkSession 候选循环试错）、Bug 5（send_message 同步 meta） |
+| v0.16.4 | 补丁 I（禁更新）、补丁 J（AppUserModelId 隔离）、补丁 K（userData 动态路径） |
+| v0.16.5 | 补丁 K 修正：恢复 `ISOLATED === "1"` 双条件检查，防止 Release 误隔离 |
+| v0.2.1 | 洁净室审计 22 项修正 + L1Fix v2 审计（7 worker × 2 round） + Q1 v1.1 架构升级（role枚举/深度限制/migrate/Leaf Purity） |
 
 ### ✅ 已澄清（不是 bug）
 
-- **Bug 2（Fork 截断 20 轮）真相 = 不存在**（2026-06-18 矩阵 F3 验证）：Dev 实例 3 个长会话（289/411/415 行 JSONL）全部没有 `compact_boundary` 标记，auto-compact 从未触发。Fork 也不丢消息（E1 实测能完整复述）。用户感知"只剩 20 轮"是 `list_messages` 默认 `limit=50` + 偏移错觉
+- **Bug 2（Fork 截断 20 轮）**：auto-compact 从未触发 → Fork 不丢消息。感知错觉来自 `list_messages` 默认 `limit=50`
 
 ### 待办优先级
 
 | 优先级 | 任务 |
 |---|---|
-| P0 | L1Fix 指挥官验收（补测跨 provider + 报告修正 + 终局验证） |
-| P0 | L2 自审计按 tree-audit-methodology 重新执行（需 7 leaf 并行） |
-| P1 | v0.3 心跳/内审/竹节交接编码实现 |
-| P3 | 模型列表缓存优化 |
+| P0 | Q3 硬约束体系设计+实施（进度控制） |
+| P1 | Q2 树形UI面板实施（补丁 L：proma-tree-view.js + IPC + index.html 注入） |
+| P1 | I3 并发竞态修复 |
+| P2 | remote-session fork new_title 修复 |
+| P2 | v0.3 心跳/内审/竹节交接编码实现 |
+| P3 | 模型列表缓存优化、IME 卡顿（已提 issue proma-ai/Proma#870） |
 
 ---
 
@@ -166,11 +164,11 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 ### 启动
 
 ```bash
-# Dev 版（双开，独立数据）
-D:\Proma-dev\start-dev.bat   # 设置 PROMA_DEV=1 + PROMA_INSTANCE_NAME=dev
+# Dev 版（双开，隔离数据）
+D:\Proma-dev\start-dev.bat   # PROMA_INSTANCE_NAME=dev + ISOLATED=1
 
-# Release 版（与正式版互斥，共享数据）
-D:\Proma-release\start-release.bat   # PROMA_INSTANCE_NAME=release
+# Release 版（日常使用，共享正式版数据）
+D:\Proma-release\start-release.bat   # PROMA_INSTANCE_NAME=release + ISOLATED=0
 ```
 
 ### 部署插件（改完代码后）
@@ -191,7 +189,7 @@ cp proma-mcp-server.cjs D:/Proma-release/resources/app/dist/
 ```bash
 npx asar extract D:/Proma/resources/app.asar /tmp/app
 cp /tmp/app/dist/main.cjs /tmp/main-patched.cjs
-# 按 wiki §5 顺序执行 sed 补丁 A-G
+# 按 wiki §5 顺序执行 sed 补丁 A-K
 cp /tmp/main-patched.cjs D:/Proma-dev/resources/app/dist/main.cjs
 ```
 
@@ -212,11 +210,13 @@ cp /tmp/main-patched.cjs D:/Proma-dev/resources/app/dist/main.cjs
 
 ## 七、关键心智模型
 
-1. **三层实例**：正式版（不可动）/ Dev（隔离双开调试）/ Release（共享数据日常用）
-2. **两层修改**：sed 改 main.cjs（轻量）/ 插件文件写复杂逻辑（自由）
-3. **两类 MCP 工具**：本地 `session`（进程内直连）/ 远端 `remote-session`（HTTP 自动发现）
-4. **三种 send_message 模式**：wait 同步 / notify 异步 / fire-and-forget + 轮询
-5. **AGPL 合规**：闭源插件通过 `global.__proma__` 桥接调用核心 API，不修改核心代码 → 不构成衍生作品（参考商业版自身 15 个闭源模块先例）
+1. **三层实例**：正式版（不可动）/ Dev（隔离双开调试）/ Release（NAME=release + ISOLATED=0，共享正式版数据）
+2. **两变量体系**：`PROMA_INSTANCE_NAME` 管身份（remote-session 发现、AppUserModelId）/ `PROMA_INSTANCE_ISOLATED` 管数据隔离（1=独立、0=共享）
+3. **两层修改**：sed 改 main.cjs（轻量）/ 插件文件写复杂逻辑（自由）
+4. **两类 MCP 工具**：本地 `session`（进程内直连）/ 远端 `remote-session`（HTTP 自动发现，instance 参数）
+5. **三种 send_message 模式**：wait 同步 / notify 异步 / fire-and-forget + 轮询
+6. **树形体系三层 role**：root（根，唯一，结构性变更）/ commander（子/孙，fork创建，受深度限制，leaf add+管理下属）/ worker（叶子，create_session 干净上下文，只上报不写 tree）
+7. **AGPL 合规**：闭源插件通过 `global.__proma__` 桥接调用核心 API，不修改核心代码 → 不构成衍生作品
 
 ---
 
@@ -224,5 +224,5 @@ cp /tmp/main-patched.cjs D:/Proma-dev/resources/app/dist/main.cjs
 
 - 重大改动后更新本索引的"当前完成度"和"卡点待办"两节
 - 新文档加入"关键文档导航"表
-- 补丁新增/修改同步到 wiki §5 和本索引"7 个核心补丁"表
+- 补丁新增/修改同步到 wiki §5 和本索引"11 个核心补丁"表
 - 旧条目失效及时清理，保持索引 < 250 行

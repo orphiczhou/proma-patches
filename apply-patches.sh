@@ -1,10 +1,11 @@
 #!/bin/bash
-# Proma 会话管理补丁 — 一键安装脚本 (v0.16.5)
+# Proma 会话管理补丁 — 一键安装脚本 (v0.16.6)
 # 用法: bash apply-patches.sh
-# 在 Proma 商业版 v0.12.x 上创建 Dev 版并打上全部补丁 A-K
+# 在 Proma 商业版 v0.12.x 上创建 Dev 版并打上全部补丁 A-K + 动态托盘图标
 #
-# 两变量体系（v0.16.5 修正）:
-#   PROMA_INSTANCE_NAME     — 实例身份标识（remote-session 发现、AppUserModelId）
+# v0.16.6 单目录多实例: 同一份 D:\Proma-dev\ 代码，不同 BAT 文件 → 不同实例
+# 两变量体系:
+#   PROMA_INSTANCE_NAME     — 实例身份标识（remote-session 发现、AppUserModelId、托盘图标）
 #   PROMA_INSTANCE_ISOLATED — 数据隔离开关（1=独立, 0=共享正式版）
 
 set -e
@@ -15,7 +16,7 @@ TMPDIR="/tmp/proma-patch-$$"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "============================================"
-echo " Proma 会话管理补丁 — 一键安装 (v0.16.5)"
+echo " Proma 会话管理补丁 — 一键安装 (v0.16.6)"
 echo " 源: $PROMA_SRC"
 echo " 目标: $PROMA_DEV"
 echo "============================================"
@@ -116,6 +117,10 @@ sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged || process.env.PROMA_I
 
 echo "  补丁 A-K 全部完成"
 
+# 补丁 3: 托盘图标动态选择（v0.16.6）
+echo "  补丁 3: 托盘图标动态选择..."
+sed -i 's@return (0, import_path[0-9]*\.join)(resourcesDir, "proma-white\.png");@const __trayIconMap={dev:"proma-white.png",release:"proma-coral.png",pro:"proma-emerald.png"};return (0, import_path9.join)(resourcesDir, __trayIconMap[process.env.PROMA_INSTANCE_NAME]||"proma-white.png");@' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (补丁 3 模式可能漂移，需手动 Edit 修复，见 wiki §5 补丁 3)"
+
 # ---- 步骤 4: 部署 ----
 echo ""
 echo "[4/6] 部署文件..."
@@ -149,6 +154,16 @@ exit
 BATEOF
 echo "  已创建 $PROMA_DEV/start-dev.bat"
 
+cat > "$PROMA_DEV/start-pro.bat" << 'BATEOF'
+@echo off
+set PROMA_INSTANCE_NAME=pro
+set PROMA_INSTANCE_ISOLATED=1
+set PROMA_DEV=1
+start "PromaPro" "D:\Proma-dev\Proma-green.exe"
+exit
+BATEOF
+echo "  已创建 $PROMA_DEV/start-pro.bat"
+
 # ---- 步骤 6: 清理 ----
 echo ""
 echo "[6/6] 清理临时文件..."
@@ -157,9 +172,15 @@ rm -rf "$TMPDIR"
 # ---- 完成 ----
 echo ""
 echo "============================================"
-echo " 安装完成！(v0.16.5, 11 个补丁 A-K, 22 个 MCP 工具)"
+echo " 安装完成！(v0.16.6, 11 个补丁 A-K + 动态托盘图标, 22 个 MCP 工具)"
 echo ""
-echo " 启动方式: 双击 D:\\Proma-dev\\start-dev.bat"
+echo " 启动方式（单目录多实例）:"
+echo "   Dev:     双击 D:\\Proma-dev\\start-dev.bat"
+echo "   Pro:     双击 D:\\Proma-dev\\start-pro.bat"
+echo "   Release: D:\\Proma-release\\start-release.bat (或 D:\\Proma-dev\\Proma-coral.exe)"
+echo ""
+echo " 图标映射: Dev=白 / Pro=绿 / Release=珊瑚"
+echo " 托盘图标: 动态选择（按 PROMA_INSTANCE_NAME 映射）"
 echo ""
 echo " 验证方式:"
 echo "   1. 确认 D:\\Proma-dev\\resources\\app\\dist\\proma-dev-patches.cjs 存在"
@@ -167,8 +188,4 @@ echo "   2. 确认 D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs 存
 echo "   3. 启动后打开 Proma Agent 会话"
 echo "   4. 输入: 用 list_channels 列出可用的 AI 渠道"
 echo "   5. 外部 MCP: node proma-mcp-server.cjs --dev 测试自动发现"
-echo ""
-echo " 两变量体系（v0.16.5 修正）:"
-echo "   PROMA_INSTANCE_NAME=dev     — 身份标识"
-echo "   PROMA_INSTANCE_ISOLATED=1  — 数据隔离（1=独立, 0=共享正式版）"
 echo "============================================"

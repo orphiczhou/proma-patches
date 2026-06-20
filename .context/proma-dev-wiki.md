@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-19 23:06 | 维护者: 周星星
+> 最后更新: 2026-06-20 14:50 | 维护者: 周星星
 
 ---
 
@@ -20,19 +20,23 @@
 
 ---
 
-## 二、三版架构
+## 二、实例架构（v0.16.6 起单目录多实例）
 
-| | 正式版 | Dev发行版 | 调试版 |
-|---|---|---|---|
-| **路径** | `D:\Proma\` | `D:\Proma-release\` | `D:\Proma-dev\` |
-| **用途** | 官方原版 | 日常使用（补丁版） | 开发调试 |
-| **启动方式** | 正常双击 | `start-release.bat` | `start-dev.bat` |
-| **用户数据** | `~/.proma/` | `~/.proma/`（共享） | `~/.proma-dev/`（独立） |
-| **PROMA_DEV** | - | - | `=1` |
-| **双开** | - | ❌（与正式版互斥） | ✅（可同时） |
-| **代码加载** | `app.asar`（原版） | `app.asar`（补丁） | `app/` 目录（解包） |
-| **图标** | 黑色 | 渐变色 | 白色 |
-| **Electron userData** | `@proma/electron/` | `@proma/electron/`（共享） | `@proma/electron-dev/` |
+**核心原则：同一 `D:\Proma-dev\` 代码目录，不同 BAT 文件 → 不同实例身份。**
+
+| | 正式版 | Dev | Release | Pro | Release-Fresh |
+|---|---|---|---|---|---|
+| **路径** | `D:\Proma\` | `D:\Proma-dev\` | `D:\Proma-dev\` | `D:\Proma-dev\` | `D:\Proma-dev\` |
+| **启动** | 正常双击 | `start-dev.bat` | `start-release.bat` | `start-pro.bat` | `start-release-fresh.bat` |
+| **EXE** | `Proma.exe`（黑） | `Proma-white.exe`（白） | `Proma-coral.exe`（珊瑚） | `Proma-green.exe`（翡翠绿） | 同 Release |
+| **NAME** | - | `dev` | `release` | `pro` | `release-fresh` |
+| **ISOLATED** | - | `1` | `0` | `1` | `1` |
+| **userData** | `~/.proma/` | `~/.proma-dev/` | `~/.proma/`（共享正式版） | `~/.proma-pro/` | `~/.proma-release-fresh/` |
+| **代码加载** | `app.asar` | `app/`（解包） | 同 Dev | 同 Dev | 同 Dev |
+| **托盘图标** | 黑色 | 白色 | 珊瑚色 | 翡翠绿 | 珊瑚色 |
+| **双开** | - | ✅ | ❌ | ✅ | ✅ |
+
+Release 版保留独立的 `D:\Proma-release\` 目录（旧版 ASAR 打包），但日常使用已迁移到 Dev 目录 + BAT 模式。代码修改只需改 `D:\Proma-dev\` 一份。
 
 ---
 
@@ -156,13 +160,19 @@ sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged) {/if (!\1.app.isPacka
 
 **效果：** `PROMA_DEV=1` 时使用 `@proma/electron-dev/` userData，实现与正式版双开。
 
-#### 补丁 3：托盘图标白色
+#### 补丁 3：托盘图标动态选择（v0.16.6）
 
-```bash
-sed -i 's/"iconTemplate.png"/"proma-white.png"/g' main.cjs
+**注入点：** `getTrayIconPath()` 函数返回值
+
+不再写死单个图标名，改为根据 `PROMA_INSTANCE_NAME` 环境变量动态映射：
+
+```js
+// 旧：return (0, import_path9.join)(resourcesDir, "proma-white.png");
+// 新：动态映射
+const __trayIconMap={dev:"proma-white.png",release:"proma-coral.png",pro:"proma-emerald.png"};return (0, import_path9.join)(resourcesDir, __trayIconMap[process.env.PROMA_INSTANCE_NAME]||"proma-white.png");
 ```
 
-**效果：** 托盘图标与任务栏 Proma-white.exe 统一为白色。
+**效果：** Dev 白 / Release 珊瑚 / Pro 翡翠绿 / 未识别实例默认白。支持后续新增实例只需在 map 里加一行。
 
 ---
 
@@ -511,6 +521,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-20 | **v0.16.6** | **单目录多实例 + Pro 实例**：① 架构简化——Release 实例改为从 `D:\Proma-dev\` 目录 + `start-release.bat` 启动（`Proma-coral.exe`），与 Dev 共享同一份代码；② 新增 **Pro 实例**（`start-pro.bat` / `Proma-green.exe` / 翡翠绿图标 / `~/.proma-pro/` 隔离 profile）；③ **补丁 3 升级为动态托盘图标**——按 `PROMA_INSTANCE_NAME` 自动选择（dev→white / release→coral / pro→emerald），不再写死；④ Release 的 `D:\Proma-release\` 目录保留不动（旧版 ASAR 打包，仍有其他用途） |
 | 2026-06-19 | **v0.2.0** | **Layer 2 树形会话执行体系初始版本**：完整发布包 `release/tree-system-v0.2.0/`（17 文件、7000+ 行）。tree-state.js v1.0（1551 行）、tree-commander SKILL v2.0、tree-worker SKILL v2.0、commander-methodology v1.0（14条铁律）、tree-audit-methodology v1.0（融合终局验证）。4 次验证：B 任务(4子会话)、S1 重测(25命令)、L2 验证(3子会话0偏差)、L1Fix(3worker 进行中)。已知限制：notify 未验证、心跳/内审仅方案 |
 | 2026-06-19 | v0.16.5 | 补丁 K 条件修正 + apply-patches.sh 升级到 A-K 全覆盖 |
 | 2026-06-19 | v0.16.4 | 三个系统改进同步 Dev + Release：<br/>**补丁 I（禁用更新检查）** — `initAutoUpdater` 函数首行注入 `return;`，不再弹更新对话框<br/>**补丁 J（AppUserModelId 动态隔离）** — `requestSingleInstanceLock` 前注入 `setAppUserModelId`，Dev/Release/正式版各自独立<br/>**补丁 K（userData 路径动态化）** — 硬编码 `electron-dev` 改为 `electron-${PROMA_INSTANCE_NAME}`，修复已知 bug<br/>**Release 托盘图标** — `proma-white.png` → `proma-coral.png`（彩色）<br/>**启动脚本更新** — `start-release.bat` 启用隔离，新增 `start-release-fresh.bat`（空 profile 测试用） |
