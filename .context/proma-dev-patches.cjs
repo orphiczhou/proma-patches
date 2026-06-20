@@ -11,10 +11,11 @@ const http = require("node:http");
 const PORT_START = 19876;
 const PORT_END = 19895;
 
-function remoteHttpGet(port, path) {
+function remoteHttpGet(port, path, host) {
+  host = host || "127.0.0.1";
   return new Promise((resolve, reject) => {
     const req = http.request({
-      hostname: "127.0.0.1", port, path: "/" + path, method: "GET",
+      hostname: host, port, path: "/" + path, method: "GET",
       timeout: 3000,
     }, (res) => {
       const chunks = [];
@@ -30,12 +31,13 @@ function remoteHttpGet(port, path) {
   });
 }
 
-function remoteHttpPost(port, toolName, args) {
+function remoteHttpPost(port, toolName, args, host) {
+  host = host || "127.0.0.1";
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(args || {});
     const buf = Buffer.from(body, "utf-8");
     const req = http.request({
-      hostname: "127.0.0.1", port, path: "/" + toolName, method: "POST",
+      hostname: host, port, path: "/" + toolName, method: "POST",
       headers: { "Content-Type": "application/json", "Content-Length": buf.length },
       timeout: 600000,
     }, (res) => {
@@ -53,16 +55,31 @@ function remoteHttpPost(port, toolName, args) {
   });
 }
 
-let instancePortCache = {};
+let instancePortCache = {};  // key=name → {host, port}
+let instanceLastScan = 0;
 
 async function discoverRemoteInstance(instanceName) {
-  if (instancePortCache[instanceName]) return instancePortCache[instanceName];
+  const cached = instancePortCache[instanceName];
+  if (cached) return cached;
+  // 支持 host:port 直连格式，跳过扫描
+  const colonIdx = instanceName.lastIndexOf(":");
+  if (colonIdx > 0) {
+    const host = instanceName.slice(0, colonIdx);
+    const port = parseInt(instanceName.slice(colonIdx + 1), 10);
+    if (isNaN(port)) throw new Error(`Invalid port in '${instanceName}'. Use 'host:port' (e.g. '192.168.1.100:19876').`);
+    // 直连验证
+    const info = await remoteHttpGet(port, "get_instance_info", host);
+    const name = (info && info.instance) || instanceName;
+    instancePortCache[name] = { host, port };
+    return { host, port };
+  }
+  // 本地端口扫描
   for (let p = PORT_START; p <= PORT_END; p++) {
     try {
       const info = await remoteHttpGet(p, "get_instance_info");
       if (info && info.instance === instanceName) {
-        instancePortCache[instanceName] = p;
-        return p;
+        instancePortCache[instanceName] = { host: "127.0.0.1", port: p };
+        return { host: "127.0.0.1", port: p };
       }
     } catch (_) { /* port not available */ }
   }
@@ -73,13 +90,69 @@ async function discoverRemoteInstance(instanceName) {
       try {
         const info = await remoteHttpGet(p, "get_instance_info");
         if (info && info.proma_dev === fallbackMap[instanceName] && !info.instance) {
-          instancePortCache[instanceName] = p;
-          return p;
+          instancePortCache[instanceName] = { host: "127.0.0.1", port: p };
+          return { host: "127.0.0.1", port: p };
         }
       } catch (_) { /* port not available */ }
     }
   }
-  throw new Error(`No instance named '${instanceName}' found (scanned ${PORT_START}-${PORT_END})`);
+  throw new Error(`No instance named '${instanceName}' found (scanned ${PORT_START}-${PORT_END}). Use 'host:port' format for LAN instances.`);
+}
+
+async function discoverInstances(opts) {
+  opts = opts || {};
+  const refresh = opts.refresh === true;
+  const hosts = opts.hosts || [];
+
+  // 缓存有效期内直接返回
+  if (!refresh && instanceLastScan > 0 && (Date.now() - instanceLastScan < 60000) && hosts.length === 0) {
+    const names = Object.keys(instancePortCache);
+    if (names.length > 0) return { instances: names.map(n => ({ name: n, ...instancePortCache[n] })), cached: true };
+  }
+
+  const found = []; // [{name, host, port}]
+  const seen = new Set();
+
+  // 1. 扫描 localhost
+  for (let p = PORT_START; p <= PORT_END; p++) {
+    try {
+      const info = await remoteHttpGet(p, "get_instance_info");
+      const name = (info && info.instance) || null;
+      if (name && !seen.has(name)) {
+        seen.add(name);
+        found.push({ name, host: "127.0.0.1", port: p });
+        instancePortCache[name] = { host: "127.0.0.1", port: p };
+      }
+    } catch (_) { /* skip */ }
+  }
+
+  // 2. 探测指定的 LAN hosts
+  for (const h of hosts) {
+    for (let p = PORT_START; p <= PORT_END; p++) {
+      try {
+        const info = await remoteHttpGet(p, "get_instance_info", h);
+        const name = (info && info.instance) || null;
+        const key = `${h}:${p}`;
+        if (name && !seen.has(name)) {
+          seen.add(name);
+          found.push({ name, host: h, port: p });
+          instancePortCache[name] = { host: h, port: p };
+        } else if (!name && info) {
+          // 旧实例无 instance 字段，用 host:port 作为 key
+          const fallbackName = `${h}:${p}`;
+          if (!seen.has(fallbackName)) {
+            seen.add(fallbackName);
+            found.push({ name: fallbackName, host: h, port: p });
+            instancePortCache[fallbackName] = { host: h, port: p };
+          }
+        }
+      } catch (_) { /* skip */ }
+    }
+  }
+
+  if (found.length === 0) return { instances: [], cached: false, message: "No instances found on localhost. Pass hosts: [\"192.168.x.x\"] to scan LAN." };
+  instanceLastScan = Date.now();
+  return { instances: found, cached: false };
 }
 
 const LOG_PREFIX = "[proma-dev-patches]";
@@ -530,6 +603,18 @@ function createToolHandlers(sourceSessionId) {
         sourceChannelId = sourceMeta?.channelId;
       }
 
+      // Bug 6 修复（预检）：调 runAgentHeadless 前先检查会话是否忙碌。
+      // main.cjs orchestrator.sendMessage 入口有 activeSessions 守卫，命中时会静默丢弃
+      // 用户消息（在 appendSDKMessages 之前 return）。预检能避免调用方被骗成 "started"。
+      if (typeof a.isAgentSessionActive === "function" && a.isAgentSessionActive(args.session_id)) {
+        return jsonResult({
+          session_id: args.session_id,
+          status: "busy",
+          error: `Session "${meta.title}" is currently processing another message. Wait for it to complete, or use a different session.`,
+          hint: "For concurrent work, use multiple sessions instead of sending multiple messages to the same session in parallel.",
+        });
+      }
+
       try {
         const result = await new Promise((resolve, reject) => {
           a.runAgentHeadless(
@@ -564,7 +649,10 @@ function createToolHandlers(sourceSessionId) {
                     );
                   } catch (e) {}
                 }
-                if (shouldWait) reject(new Error(errMsg));
+                // Bug 6 修复（兜底）：去掉 shouldWait 包裹，让 wait=false 路径也能 reject。
+                // 守卫拒绝/SDK 同步段错误时让调用方看到错误，而不是被骗成 "started"。
+                // 异步 SDK 错误时 promise 已被 resolve("started")，reject 无效，行为不变。
+                reject(new Error(errMsg));
               },
               onTitleUpdated: (title) => {
                 try { a.updateAgentSessionMeta(args.session_id, { title }); } catch (_) {}
@@ -634,74 +722,72 @@ function createToolHandlers(sourceSessionId) {
       return jsonResult({ session_id: args.session_id, title: meta.title, archived });
     },
 
+    discover_instances: async (args) => {
+      return jsonResult(await discoverInstances(args));
+    },
+
   };
 }
 
 // ---- 远端 Session MCP Server（通过 HTTP 代理到其他 Proma 实例）----
 function createRemoteToolHandlers() {
+  async function resolve(args) {
+    const r = await discoverRemoteInstance(args.instance);
+    return { host: r.host, port: r.port };
+  }
   return {
     remote_list_channels: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "list_channels", {});
-      return jsonResult(result);
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "list_channels", {}, host));
     },
     remote_list_workspaces: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "list_workspaces", {});
-      return jsonResult(result);
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "list_workspaces", {}, host));
     },
     remote_list_sessions: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "list_sessions", args);
-      return jsonResult(result);
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "list_sessions", args, host));
     },
     remote_get_session_info: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "get_session_info", args);
-      return jsonResult(result);
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "get_session_info", args, host));
     },
     remote_get_session_context: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "get_session_context", args);
-      return jsonResult(result);
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "get_session_context", args, host));
     },
     remote_list_messages: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "list_messages", args);
-      return jsonResult(result);
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "list_messages", args, host));
     },
     remote_create_session: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "create_session", args);
-      return jsonResult(result);
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "create_session", args, host));
     },
     remote_fork_session: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "fork_session", {
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "fork_session", {
         source_session_id: args.source_session_id,
         up_to_message_uuid: args.up_to_message_uuid,
         title: args.title,
         new_channel_id: args.new_channel_id,
         new_model_id: args.new_model_id,
         new_workspace_id: args.new_workspace_id,
-      });
-      return jsonResult(result);
+      }, host));
     },
     remote_send_message: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "send_message", {
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "send_message", {
         session_id: args.session_id,
         message: args.message,
         wait: args.wait !== false,
         model_id: args.model_id,
         channel_id: args.channel_id,
-      });
-      return jsonResult(result);
+      }, host));
     },
     remote_archive_session: async (args) => {
-      const port = await discoverRemoteInstance(args.instance);
-      const result = await remoteHttpPost(port, "archive_session", args);
-      return jsonResult(result);
+      const {host, port} = await resolve(args);
+      return jsonResult(await remoteHttpPost(port, "archive_session", args, host));
     },
     remote_get_my_session_id: async (args) => {
       return jsonResult({
@@ -710,6 +796,9 @@ function createRemoteToolHandlers() {
         instance: args.instance,
         hint: "This is a remote instance call. session_id is always null for remote operations.",
       });
+    },
+    remote_discover_instances: async (args) => {
+      return jsonResult(await discoverInstances(args));
     },
   };
 }
@@ -731,6 +820,7 @@ function createRemoteSessionMcpServer(sdk, z) {
       sdk.tool("remote_send_message", "Send a message to a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string(), message: z.string(), wait: z.boolean().optional(), model_id: z.string().optional(), channel_id: z.string().optional() }, h.remote_send_message),
       sdk.tool("remote_archive_session", "Archive/unarchive a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string(), archived: z.boolean().optional() }, h.remote_archive_session),
       sdk.tool("remote_get_my_session_id", "Get instance info for a REMOTE Proma instance. Always returns null session_id since you are not in that instance.", { instance: z.string().describe("Instance name") }, h.remote_get_my_session_id, { annotations: { readOnlyHint: true } }),
+      sdk.tool("remote_discover_instances", "Scan and discover Proma instances on localhost and LAN. Returns cached results unless refresh=true.", { refresh: z.boolean().optional().describe("Force re-scan (default false, uses 60s cache)"), hosts: z.array(z.string()).optional().describe("LAN host IPs to probe, e.g. ['192.168.1.100', '192.168.1.101']") }, h.remote_discover_instances, { annotations: { readOnlyHint: true } }),
     ],
   });
   return server;
@@ -859,6 +949,17 @@ function createSessionMcpServer(sdk, z, sourceSessionId) {
         h.archive_session
       ),
 
+      sdk.tool(
+        "discover_instances",
+        "Scan and discover Proma instances on localhost and LAN. Returns cached results (60s TTL) unless refresh=true. Use hosts parameter to probe specific LAN IPs.",
+        {
+          refresh: z.boolean().optional().describe("Force re-scan instead of using cache (default: false)"),
+          hosts: z.array(z.string()).optional().describe("LAN host IPs to probe, e.g. ['192.168.1.100']. Each is scanned on ports 19876-19895."),
+        },
+        h.discover_instances,
+        { annotations: { readOnlyHint: true } }
+      ),
+
     ],
   });
 
@@ -933,7 +1034,8 @@ function createExternalHttpBridge() {
         log(`HTTP bridge error: ${e.message}`);
       });
 
-      server.listen(port, "127.0.0.1", () => resolve(server));
+      const bindHost = process.env.PROMA_BRIDGE_HOST || "127.0.0.1";
+      server.listen(port, bindHost, () => resolve(server));
     });
   }
 
@@ -941,7 +1043,8 @@ function createExternalHttpBridge() {
     for (let p = PORT_START; p <= PORT_END; p++) {
       try {
         const server = await startServer(p);
-        log(`External MCP HTTP bridge: http://127.0.0.1:${p} (instance: ${instanceName})`);
+        const bindHost = process.env.PROMA_BRIDGE_HOST || "127.0.0.1";
+        log(`External MCP HTTP bridge: http://${bindHost}:${p} (instance: ${instanceName})`);
         return;
       } catch (e) {
         if (e.code === "EADDRINUSE") continue;
@@ -972,5 +1075,4 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
 // ---- 启动外部 MCP HTTP bridge ----
 createExternalHttpBridge();
 
-log("Agent session management MCP tools loaded (11 tools: get_my_session_id, list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message, archive_session) + 11 remote-session tools");
-log("External MCP bridge available (use instance auto-discovery on ports 19876-19895)");
+log("Agent session management MCP tools loaded (12 tools: get_my_session_id, list_channels, list_workspaces, list_sessions, get_session_info, get_session_context, list_messages, create_session, fork_session, send_message, archive_session, discover_instances) + 12 remote-session tools");

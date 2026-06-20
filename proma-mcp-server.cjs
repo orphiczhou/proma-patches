@@ -6,9 +6,9 @@
 //   node proma-mcp-server.cjs            → 默认找 Dev (PROMA_DEV=1)
 //   node proma-mcp-server.cjs --release  → 找 Release
 //   node proma-mcp-server.cjs --dev      → 显式找 Dev
+//   node proma-mcp-server.cjs --host 192.168.1.100  → 直连 LAN 地址（跳过扫描）
 // Claude Code 配置:
 //   { "proma-dev-session": { "command": "node", "args": ["D:\\Proma-dev\\...\\proma-mcp-server.cjs", "--dev"] } }
-//   { "proma-release-session": { "command": "node", "args": ["D:\\Proma-dev\\...\\proma-mcp-server.cjs", "--release"] } }
 
 const http = require("node:http");
 
@@ -17,13 +17,16 @@ const PORT_END = 19895;
 const CONNECT_TIMEOUT = 2000;
 
 // ---- 解析命令行参数 ----
+const hostIdx = process.argv.indexOf("--host");
+const TARGET_HOST = hostIdx >= 0 ? process.argv[hostIdx + 1] : null;
 const targetMode = process.argv.includes("--release") ? "release" : "dev";
 
 // ---- 端口扫描：获取实例信息 ----
-function getInstanceInfo(port) {
+function getInstanceInfo(port, host) {
+  host = host || "127.0.0.1";
   return new Promise((resolve, reject) => {
     const req = http.request({
-      hostname: "127.0.0.1", port, path: "/get_instance_info", method: "GET",
+      hostname: host, port, path: "/get_instance_info", method: "GET",
       timeout: CONNECT_TIMEOUT,
     }, (res) => {
       let d = "";
@@ -38,11 +41,12 @@ function getInstanceInfo(port) {
   });
 }
 
-async function discoverPort() {
+async function discoverPort(host) {
+  host = host || "127.0.0.1";
   const instances = [];
   for (let p = PORT_START; p <= PORT_END; p++) {
     try {
-      const info = await getInstanceInfo(p);
+      const info = await getInstanceInfo(p, host);
       instances.push({ port: p, ...info });
     } catch (_) { /* port not available */ }
   }
@@ -50,11 +54,12 @@ async function discoverPort() {
 }
 
 // ---- HTTP 调用 ----
-function callTool(port, name, args) {
+function callTool(port, name, args, host) {
+  host = host || "127.0.0.1";
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(args || {});
     const req = http.request({
-      hostname: "127.0.0.1", port, path: "/" + name, method: "POST",
+      hostname: host, port, path: "/" + name, method: "POST",
       headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
       timeout: 600000,
     }, (res) => {
@@ -106,25 +111,28 @@ async function handle(msg) {
   try {
     switch (method) {
       case "initialize":
-        // 启动时扫描端口发现目标实例
+        // 启动时扫描端口发现目标实例（或直连 --host）
         if (PORT === null) {
-          const instances = await discoverPort();
+          const scanHost = TARGET_HOST || "127.0.0.1";
+          const instances = await discoverPort(scanHost);
           const devs = instances.filter(i => i.proma_dev === true);
           const rels = instances.filter(i => i.proma_dev === false);
 
-          if (targetMode === "dev" && devs.length > 0) PORT = devs[0].port;
+          if (TARGET_HOST) {
+            // --host 模式：取第一个响应实例即可
+            if (instances.length > 0) PORT = instances[0].port;
+          } else if (targetMode === "dev" && devs.length > 0) PORT = devs[0].port;
           else if (targetMode === "release" && rels.length > 0) PORT = rels[0].port;
           else if (instances.length > 0) { PORT = instances[0].port; }
 
           if (PORT === null) {
             return sendError(id, -32603,
-              `No Proma ${targetMode} instance found (scanned ${PORT_START}-${PORT_END}, ` +
-              `found ${instances.length} total: ${devs.length} dev, ${rels.length} release). Is Proma running?`);
+              `No Proma instance found at ${scanHost} (scanned ${PORT_START}-${PORT_END}, ` +
+              `found ${instances.length} total). Is Proma running with PROMA_BRIDGE_HOST=0.0.0.0?`);
           }
 
           serverInfo = { name: `proma-${targetMode}-session`, version: "1.0.0" };
-          process.stderr.write(`[proma-mcp-server] Auto-discovered ${targetMode} instance on port ${PORT}\n`);
-          process.stderr.write(`[proma-mcp-server] All instances: ${JSON.stringify(instances)}\n`);
+          process.stderr.write(`[proma-mcp-server] Connected to ${scanHost}:${PORT} (${instances[0].instance || targetMode})\n`);
         }
         return send(id, {
           protocolVersion: "2024-11-05",
@@ -136,7 +144,7 @@ async function handle(msg) {
         return send(id, { tools: TOOLS });
 
       case "tools/call": {
-        const result = await callTool(PORT, params.name, params.arguments || {});
+        const result = await callTool(PORT, params.name, params.arguments || {}, TARGET_HOST);
         return send(id, result);
       }
 

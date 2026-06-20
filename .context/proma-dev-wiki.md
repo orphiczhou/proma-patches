@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-20 14:50 | 维护者: 周星星
+> 最后更新: 2026-06-20 16:40 | 维护者: 周星星
 
 ---
 
@@ -521,6 +521,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-20 | **v0.16.7** | **LAN 局域网支持 + discover_instances**：① HTTP bridge 绑定地址改为 `PROMA_BRIDGE_HOST` 环境变量控制（默认 `127.0.0.1`，设 `0.0.0.0` 开放 LAN）；② `discoverRemoteInstance` 支持 `host:port` 直连格式（跳过端口扫描）；③ 新增 **`discover_instances`** MCP 工具（12 本地 + 12 远端）——扫描 localhost + 指定 LAN hosts，60s 缓存；④ `proma-mcp-server.cjs` 新增 `--host` 参数（跨机连接）；⑤ 所有 4 个 BAT 启动文件默认开启 `PROMA_BRIDGE_HOST=0.0.0.0` |
 | 2026-06-20 | **v0.16.6** | **单目录多实例 + Pro 实例**：① 架构简化——Release 实例改为从 `D:\Proma-dev\` 目录 + `start-release.bat` 启动（`Proma-coral.exe`），与 Dev 共享同一份代码；② 新增 **Pro 实例**（`start-pro.bat` / `Proma-green.exe` / 翡翠绿图标 / `~/.proma-pro/` 隔离 profile）；③ **补丁 3 升级为动态托盘图标**——按 `PROMA_INSTANCE_NAME` 自动选择（dev→white / release→coral / pro→emerald），不再写死；④ Release 的 `D:\Proma-release\` 目录保留不动（旧版 ASAR 打包，仍有其他用途） |
 | 2026-06-19 | **v0.2.0** | **Layer 2 树形会话执行体系初始版本**：完整发布包 `release/tree-system-v0.2.0/`（17 文件、7000+ 行）。tree-state.js v1.0（1551 行）、tree-commander SKILL v2.0、tree-worker SKILL v2.0、commander-methodology v1.0（14条铁律）、tree-audit-methodology v1.0（融合终局验证）。4 次验证：B 任务(4子会话)、S1 重测(25命令)、L2 验证(3子会话0偏差)、L1Fix(3worker 进行中)。已知限制：notify 未验证、心跳/内审仅方案 |
 | 2026-06-19 | v0.16.5 | 补丁 K 条件修正 + apply-patches.sh 升级到 A-K 全覆盖 |
