@@ -64,7 +64,8 @@ const BACKUP_KEEP_RECENT = 10;
 const LEAF_NAME_RE = /^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\d*(?:[a-z]\d*)*)?-)?(\w+)(?:-(s\d+|i\d+))?$/;
 
 // 枚举 (附录 A.8)
-const STATUS_ENUM = ['active', 'done', 'pruned', 'archived', 'segment_pending'];
+// v0.2.2: 新增 pending_brief — Worker 初始状态，brief_echo 之前不可声明 done
+const STATUS_ENUM = ['active', 'done', 'pruned', 'archived', 'segment_pending', 'pending_brief'];
 const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check'];
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
@@ -85,6 +86,12 @@ const E_DEPTH_EXCEEDED = 'E_DEPTH_EXCEEDED';
 const E_BACKUP_CORRUPT = 'E_BACKUP_CORRUPT';
 const E_IO = 'E_IO';
 const E_UNKNOWN = 'E_UNKNOWN';
+const E_GATEKEEPER_REQUIRED = 'E_GATEKEEPER_REQUIRED';
+
+// v0.2.2: 真实 MCP session_id 格式校验（UUID v1-v5 不区分版本）
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// 根 leaf 在无真实 session_id 时的过渡标记（validate 仅产生 warning，需通过 leaf set-session 修正）
+const PENDING_ROOT = 'PENDING_ROOT';
 
 // 默认 audit_meta (附录 A.7 init)
 const DEFAULT_AUDIT_META = {
@@ -409,6 +416,8 @@ function doBackup(tree_id, label) {
 
 async function cmdInit(args) {
   // init <tree_id> --root-brief '<json>' --root-dod '<json>' [--audit-meta '<json>']
+  //        [--session-id <uuid>] [--model <m>] [--channel <c>]
+  // v0.2.2: 自动创建 root leaf，堵住 ROOT_PLACEHOLDER 漏洞
   const { positional, opts } = parseArgs(args);
   const tree_id = positional[0];
   if (!tree_id) throw new TreeStateError(E_SCHEMA_INVALID, 'tree_id is required');
@@ -421,13 +430,11 @@ async function cmdInit(args) {
   const audit_meta_override = opts['audit-meta'] ? parseJsonArg(opts['audit-meta'], 'audit-meta') : null;
 
   const dir = treeDir(tree_id);
-  // 如果目录已存在且已有 state 文件，报错（init 只能调一次）
   const sp = statePath(tree_id);
   if (fs.existsSync(sp)) {
     throw new TreeStateError(E_DUPLICATE_LEAF, `tree "${tree_id}" already initialized at ${sp}`);
   }
 
-  // 创建目录（递归）
   try {
     fs.mkdirSync(dir, { recursive: true });
   } catch (e) {
@@ -435,6 +442,10 @@ async function cmdInit(args) {
   }
 
   const audit_meta = Object.assign({}, DEFAULT_AUDIT_META, audit_meta_override || {});
+
+  // v0.2.2: workspace_root 写入 _meta，供天道审计 Agent 定位 workspace
+  // TREES_ROOT 是 .context/trees/，workspace_root 是其上两级
+  const workspace_root = path.resolve(TREES_ROOT, '..', '..');
 
   const state = {
     version: '1.0',
@@ -447,16 +458,53 @@ async function cmdInit(args) {
     heartbeat_log: [],
     drift_log: [],
     audit_meta,
-    // _meta 内部元数据（writeState 首次调用时填 _meta.write_count=1）
-    _meta: {}
+    _meta: {
+      workspace_root,
+      tao_version: null,
+      tao_watcher_session_id: null,
+      tao_health_check_session_id: null
+    }
   };
 
-  // 直接写入（用锁保护目录创建后的首次写入）
+  // v0.2.2: 自动创建 root leaf
+  // session_id 来源优先级: --session-id → PROMA_SESSION_ID → PENDING_ROOT（过渡标记）
+  const rootSessionId = opts['session-id'] || process.env.PROMA_SESSION_ID || PENDING_ROOT;
+  const rootLeafId = `${tree_id}-root`;
+  const rootPath = parsePathFromLeafId(rootLeafId);
+  state.leaves[rootLeafId] = {
+    leaf_id: rootLeafId,
+    session_id: rootSessionId,
+    parent: null,
+    path: rootPath === null ? '' : rootPath,
+    role: 'root',
+    model: opts.model || 'unknown',
+    channel: opts.channel || 'unknown',
+    status: 'active',
+    created_at: state.created_at,
+    added_by: null,
+    last_event_ts: null,
+    last_event_type: null,
+    context_usage_pct: 0,
+    drift_history: [],
+    milestones: [],
+    segment_chain: [],
+    autonomy_overrides: {},
+    events: [],
+    // v0.2.2 (TAO): 审计门 + 鞭策记录
+    audit_gate: { verdict: 'skip', auditor_session_id: null, ts: null },
+    nudge_count: 0,
+    nudge_log: [],
+    audit_log: []
+  };
+
   await withLock(tree_id, () => {
     writeState(tree_id, state);
   });
 
-  return { tree: { tree_id, created_at: state.created_at, dir } };
+  return {
+    tree: { tree_id, created_at: state.created_at, dir, workspace_root },
+    root_leaf: { leaf_id: rootLeafId, session_id: rootSessionId, is_pending: rootSessionId === PENDING_ROOT }
+  };
 }
 
 // ============================================================
@@ -484,6 +532,24 @@ async function cmdLeafAdd(args) {
 
   // 0. role 枚举校验
   assertEnum(role, ROLE_ENUM, 'role');
+
+  // v0.2.2-修复#4: session_id 必须是合法 UUID（堵住 CLI 手动注入占位符）
+  if (!UUID_RE.test(session_id)) {
+    throw new TreeStateError(
+      E_SCHEMA_INVALID,
+      `session_id "${session_id}" is not a valid UUID. Leaves must be created with real MCP session IDs from fork_session or create_session.`
+    );
+  }
+
+  // v0.2.2-修复#4: 非 root leaf 必须传 added_by（操作者追溯链）
+  if (role !== 'root') {
+    if (!added_by || !UUID_RE.test(added_by)) {
+      throw new TreeStateError(
+        E_SCHEMA_INVALID,
+        'added_by (operator session_id) is required for non-root leaves and must be a valid UUID'
+      );
+    }
+  }
 
   // 1. 命名校验
   if (!LEAF_NAME_RE.test(leaf_id)) {
@@ -556,6 +622,8 @@ async function cmdLeafAdd(args) {
     }
 
     const now = nowIso();
+    // v0.2.2-修复#5: Worker 初始 status=pending_brief，brief_echo 前不可声明 done
+    const initialStatus = role === 'worker' ? 'pending_brief' : 'active';
     const leaf = {
       leaf_id,
       session_id,
@@ -564,7 +632,7 @@ async function cmdLeafAdd(args) {
       role,
       model,
       channel,
-      status: 'active',
+      status: initialStatus,
       created_at: now,
       added_by,
       last_event_ts: null,
@@ -574,7 +642,12 @@ async function cmdLeafAdd(args) {
       milestones: [],
       segment_chain: [],
       autonomy_overrides: {},
-      events: []
+      events: [],
+      // v0.2.2 (TAO): 审计门 + 鞭策记录
+      audit_gate: { verdict: role === 'worker' ? 'required' : 'skip', auditor_session_id: null, ts: null },
+      nudge_count: 0,
+      nudge_log: [],
+      audit_log: []
     };
     state.leaves[leaf_id] = leaf;
 
@@ -778,6 +851,36 @@ async function cmdLeafSetStatus(args) {
         }
       }
 
+      // v0.2.2-修复#5: Worker done 前置 events 检查
+      // 必须含 ≥2 events 且包含 brief_echo + done（堵住 Events 空洞）
+      if (leaf.role === 'worker') {
+        const evs = Array.isArray(leaf.events) ? leaf.events : [];
+        if (evs.length < 2) {
+          throw new TreeStateError(
+            E_SCHEMA_INVALID,
+            `worker "${leaf_id}" must have >= 2 events (brief_echo + done) before set-status done, got ${evs.length}`
+          );
+        }
+        const hasBriefEcho = evs.some((e) => e && (e.type === 'brief_echo' || e.event_type === 'brief_echo'));
+        const hasDone = evs.some((e) => e && (e.type === 'done' || e.event_type === 'done'));
+        if (!hasBriefEcho || !hasDone) {
+          throw new TreeStateError(
+            E_SCHEMA_INVALID,
+            `worker "${leaf_id}" events must include brief_echo and done before set-status done`
+          );
+        }
+      }
+
+      // v0.2.2 (TAO): audit_gate 检查 — 非 skip 的 leaf 必须 verdict=pass 才能 done
+      // 阻止 Worker 跳过天道审计直接声明完成
+      const gate = leaf.audit_gate;
+      if (gate && gate.verdict !== 'skip' && gate.verdict !== 'pass') {
+        throw new TreeStateError(
+          E_GATEKEEPER_REQUIRED,
+          `cannot set status=done: audit_gate.verdict="${gate.verdict}" for leaf "${leaf_id}". TAO audit required before done.`
+        );
+      }
+
       // commander 角色额外检查：所有子 leaf 必须 done
       if (leaf.role === 'commander') {
         const childIds = Object.keys(state.leaves).filter(
@@ -880,6 +983,49 @@ async function cmdLeafSetLastEvent(args) {
     leaf.last_event_type = event_type;
     writeState(tree_id, state);
     result = { leaf: { leaf_id, last_event_ts: ts, last_event_type: event_type } };
+  });
+  return result;
+}
+
+// ============================================================
+// 命令: leaf set-session (v0.2.2 新增)
+// 修正 PENDING_ROOT 或恢复时更新 session_id
+// ============================================================
+
+async function cmdLeafSetSession(args) {
+  const { positional } = parseArgs(args);
+  const [tree_id, leaf_id, new_session_id] = positional;
+  assertTreeExists(tree_id);
+  if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
+  if (!new_session_id) throw new TreeStateError(E_SCHEMA_INVALID, 'new_session_id is required');
+  if (!UUID_RE.test(new_session_id)) {
+    throw new TreeStateError(
+      E_SCHEMA_INVALID,
+      `new_session_id "${new_session_id}" is not a valid UUID`
+    );
+  }
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    if (!state.leaves[leaf_id]) {
+      throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
+    }
+    // session_id 唯一性：不能与树中其他 leaf 冲突
+    const conflict = Object.values(state.leaves).find(
+      (l) => l.leaf_id !== leaf_id && l.session_id === new_session_id
+    );
+    if (conflict) {
+      throw new TreeStateError(
+        E_SCHEMA_INVALID,
+        `session_id "${new_session_id}" already used by leaf "${conflict.leaf_id}"`
+      );
+    }
+    const leaf = state.leaves[leaf_id];
+    const from = leaf.session_id;
+    leaf.session_id = new_session_id;
+    writeState(tree_id, state);
+    result = { leaf: { leaf_id, session_id: new_session_id, from } };
   });
   return result;
 }
@@ -1389,6 +1535,74 @@ async function cmdValidate(args) {
     }
   }
 
+  // 检查 6 (v0.2.2-修复#1): root session_id 必须是合法 UUID（或 PENDING_ROOT 过渡标记）
+  // ROOT_PLACEHOLDER 等非 UUID 占位符 → issue
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    if (leaf.role === 'root') {
+      if (leaf.session_id !== PENDING_ROOT && !UUID_RE.test(leaf.session_id)) {
+        issues.push({
+          type: 'root_session_not_real',
+          leaf_id: id,
+          detail: `root session_id "${leaf.session_id}" is not a valid UUID (and not PENDING_ROOT). Root must be a real Agent session. Use 'leaf set-session' to fix.`
+        });
+      }
+    }
+  }
+
+  // 检查 7 (v0.2.2-修复#4): 非 root leaf 的 added_by 必须对应树中已存在 leaf
+  // 且 added_by 指向的 leaf role ∈ {root, commander}（worker 不能加 leaf）
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    if (leaf.role === 'root') continue;
+    const addedBy = leaf.added_by;
+    if (!addedBy) {
+      // 注：cmdLeafAdd 已经强制 added_by 非 null，但 migrate 或老数据可能漏
+      issues.push({
+        type: 'added_by_missing',
+        leaf_id: id,
+        detail: `non-root leaf is missing added_by field (operator session_id required)`
+      });
+      continue;
+    }
+    if (!UUID_RE.test(addedBy)) {
+      issues.push({
+        type: 'added_by_invalid',
+        leaf_id: id,
+        detail: `added_by "${addedBy}" is not a valid UUID`
+      });
+      continue;
+    }
+    // 找树中是否有 leaf 的 session_id === added_by
+    const operatorLeaf = Object.values(leaves).find((l) => l.session_id === addedBy);
+    if (!operatorLeaf) {
+      issues.push({
+        type: 'added_by_not_in_tree',
+        leaf_id: id,
+        detail: `added_by "${addedBy}" does not match any leaf.session_id in tree (operator must be a tree member)`
+      });
+    } else if (operatorLeaf.role === 'worker') {
+      issues.push({
+        type: 'added_by_role_invalid',
+        leaf_id: id,
+        detail: `added_by "${addedBy}" points to a worker leaf "${operatorLeaf.leaf_id}". Only root/commander can add leaves.`
+      });
+    }
+  }
+
+  // 检查 8 (v0.2.2-修复#5): pending_brief 状态合法性
+  // 仅 worker 可以处于 pending_brief；其他角色处于此状态 → issue
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    if (leaf.status === 'pending_brief' && leaf.role !== 'worker') {
+      issues.push({
+        type: 'pending_brief_role_invalid',
+        leaf_id: id,
+        detail: `non-worker leaf in pending_brief status (only workers use pending_brief awaiting brief_echo)`
+      });
+    }
+  }
+
   // 输出: ok=true 即使有 issues 也算 ok（设计 §A.7 输出 ok:false 是 schema 故障级）
   // 重读附录 A.7 输出格式：
   //   {"ok":true,"issues":[]}  或  {"ok":false,"issues":[...]}
@@ -1464,6 +1678,168 @@ function calcCommanderDepth(state, parent_leaf_id) {
     currentId = leaf.parent;
   }
   return depth;
+}
+
+// ============================================================
+// 命令: audit-gate (v0.2.2 TAO) — 天道审计门
+// 控制_leaf 是否可通过 set-status done
+// verdict ∈ {required, pass, fail, skip}
+// ============================================================
+
+async function cmdAuditGate(args) {
+  // audit-gate <tree_id> <leaf_id> --verdict <required|pass|fail|skip>
+  //          [--audit-session-id <uuid>] [--reason <text>]
+  const { positional, opts } = parseArgs(args);
+  const [tree_id, leaf_id] = positional;
+  assertTreeExists(tree_id);
+  if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
+  if (!opts.verdict) throw new TreeStateError(E_SCHEMA_INVALID, '--verdict is required (required|pass|fail|skip)');
+  const verdict = opts.verdict;
+  if (!['required', 'pass', 'fail', 'skip'].includes(verdict)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `verdict "${verdict}" not in [required, pass, fail, skip]`);
+  }
+  const audit_session_id = opts['audit-session-id'] || null;
+  if (audit_session_id && !UUID_RE.test(audit_session_id)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `--audit-session-id "${audit_session_id}" is not a valid UUID`);
+  }
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    if (!state.leaves[leaf_id]) {
+      throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
+    }
+    const leaf = state.leaves[leaf_id];
+    const from = leaf.audit_gate || { verdict: null, auditor_session_id: null, ts: null };
+    leaf.audit_gate = {
+      verdict,
+      auditor_session_id: audit_session_id,
+      ts: nowIso()
+    };
+    writeState(tree_id, state);
+    result = { leaf: { leaf_id, audit_gate: leaf.audit_gate, from } };
+  });
+  return result;
+}
+
+// ============================================================
+// 命令: audit append (v0.2.2 TAO) — 审计结果落盘
+// ============================================================
+
+async function cmdAuditAppend(args) {
+  // audit append <tree_id> <leaf_id> --json '<audit_log_entry>'
+  const { positional, opts } = parseArgs(args);
+  const [tree_id, leaf_id] = positional;
+  assertTreeExists(tree_id);
+  if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
+  if (!opts.json) throw new TreeStateError(E_SCHEMA_INVALID, '--json is required');
+  const entry = parseJsonArg(opts.json, 'audit log entry');
+
+  // 必填字段
+  const required = ['auditor_session_id', 'total', 'passed', 'failed', 'results'];
+  for (const k of required) {
+    if (!(k in entry)) {
+      throw new TreeStateError(E_SCHEMA_INVALID, `audit log entry missing field "${k}"`);
+    }
+  }
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    if (!state.leaves[leaf_id]) {
+      throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
+    }
+    const leaf = state.leaves[leaf_id];
+    if (!Array.isArray(leaf.audit_log)) leaf.audit_log = [];
+    const logEntry = Object.assign({ ts: nowIso() }, entry);
+    leaf.audit_log.push(logEntry);
+    writeState(tree_id, state);
+    result = { leaf_id, audit_log_entry: logEntry, audit_log_count: leaf.audit_log.length };
+  });
+  return result;
+}
+
+// ============================================================
+// 命令: nudge append / reset (v0.2.2 TAO) — 鞭策记录
+// ============================================================
+
+async function cmdNudgeAppend(args) {
+  // nudge append <tree_id> <leaf_id> --rule-id <id> [--severity <low|mid|high>]
+  const { positional, opts } = parseArgs(args);
+  const [tree_id, leaf_id] = positional;
+  assertTreeExists(tree_id);
+  if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
+  if (!opts['rule-id']) throw new TreeStateError(E_SCHEMA_INVALID, '--rule-id is required');
+  const severity = opts.severity || 'low';
+  if (!['low', 'mid', 'high'].includes(severity)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `severity "${severity}" not in [low, mid, high]`);
+  }
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    if (!state.leaves[leaf_id]) {
+      throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
+    }
+    const leaf = state.leaves[leaf_id];
+    if (typeof leaf.nudge_count !== 'number') leaf.nudge_count = 0;
+    if (!Array.isArray(leaf.nudge_log)) leaf.nudge_log = [];
+    leaf.nudge_count += 1;
+    const entry = { ts: nowIso(), rule_id: opts['rule-id'], severity, nudge_count: leaf.nudge_count };
+    leaf.nudge_log.push(entry);
+    writeState(tree_id, state);
+    result = { leaf_id, nudge_count: leaf.nudge_count, nudge_log_entry: entry };
+  });
+  return result;
+}
+
+async function cmdNudgeReset(args) {
+  // nudge reset <tree_id> <leaf_id>
+  const { positional } = parseArgs(args);
+  const [tree_id, leaf_id] = positional;
+  assertTreeExists(tree_id);
+  if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    if (!state.leaves[leaf_id]) {
+      throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
+    }
+    const leaf = state.leaves[leaf_id];
+    const from_count = leaf.nudge_count || 0;
+    leaf.nudge_count = 0;
+    leaf.nudge_log = [];
+    writeState(tree_id, state);
+    result = { leaf_id, nudge_count: 0, from_count };
+  });
+  return result;
+}
+
+async function dispatchAudit(args) {
+  if (args.length === 0) {
+    throw new TreeStateError(E_SCHEMA_INVALID, 'audit requires a subcommand: gate | append');
+  }
+  const [sub, ...rest] = args;
+  switch (sub) {
+    case 'gate': return await cmdAuditGate(rest);
+    case 'append': return await cmdAuditAppend(rest);
+    default:
+      throw new TreeStateError(E_UNKNOWN, `unknown audit subcommand "${sub}"`);
+  }
+}
+
+async function dispatchNudge(args) {
+  if (args.length === 0) {
+    throw new TreeStateError(E_SCHEMA_INVALID, 'nudge requires a subcommand: append | reset');
+  }
+  const [sub, ...rest] = args;
+  switch (sub) {
+    case 'append': return await cmdNudgeAppend(rest);
+    case 'reset': return await cmdNudgeReset(rest);
+    default:
+      throw new TreeStateError(E_UNKNOWN, `unknown nudge subcommand "${sub}"`);
+  }
 }
 
 // ============================================================
@@ -1569,6 +1945,84 @@ async function cmdMigrate(args) {
       }
     }
 
+    // 规则 5 (v0.2.2): 补全 TAO 字段（audit_gate / nudge_count / nudge_log / audit_log）
+    for (const id of Object.keys(leaves)) {
+      const leaf = leaves[id];
+      if (!leaf.audit_gate) {
+        const verdict = leaf.role === 'worker' ? 'required' : 'skip';
+        changes.push({ leaf_id: id, field: 'audit_gate', from: null, to: { verdict, auditor_session_id: null, ts: null } });
+        if (!dryRun) leaf.audit_gate = { verdict, auditor_session_id: null, ts: null };
+      }
+      if (leaf.nudge_count === undefined) {
+        if (!dryRun) leaf.nudge_count = 0;
+        changes.push({ leaf_id: id, field: 'nudge_count', from: undefined, to: 0 });
+      }
+      if (!Array.isArray(leaf.nudge_log)) {
+        if (!dryRun) leaf.nudge_log = [];
+        changes.push({ leaf_id: id, field: 'nudge_log', from: null, to: [] });
+      }
+      if (!Array.isArray(leaf.audit_log)) {
+        if (!dryRun) leaf.audit_log = [];
+        changes.push({ leaf_id: id, field: 'audit_log', from: null, to: [] });
+      }
+    }
+
+    // 规则 6 (v0.2.2): 历史 worker 的 status=active → 若无 brief_echo event，回退为 pending_brief
+    // 已经 done 的 worker 不动；rule 5 已经把 audit_gate 设为 required
+    for (const id of Object.keys(leaves)) {
+      const leaf = leaves[id];
+      if (leaf.role !== 'worker') continue;
+      if (leaf.status !== 'active') continue;
+      const hasBriefEcho = Array.isArray(leaf.events) && leaf.events.some(
+        (e) => e && (e.type === 'brief_echo' || e.event_type === 'brief_echo')
+      );
+      if (!hasBriefEcho) {
+        changes.push({ leaf_id: id, field: 'status', from: 'active', to: 'pending_brief', reason: 'v0.2.2: worker without brief_echo event' });
+        if (!dryRun) leaf.status = 'pending_brief';
+      }
+    }
+
+    // 规则 7 (v0.2.2): 回填 added_by — 若 root 有合法 UUID session_id，
+    // 把历史 null added_by 全部回填为 root.session_id（视为根操作者创建）
+    const rootLeaf = Object.values(leaves).find((l) => l.role === 'root');
+    if (rootLeaf && UUID_RE.test(rootLeaf.session_id)) {
+      for (const id of Object.keys(leaves)) {
+        const leaf = leaves[id];
+        if (leaf.role === 'root') continue;
+        if (!leaf.added_by) {
+          changes.push({ leaf_id: id, field: 'added_by', from: null, to: rootLeaf.session_id, reason: 'v0.2.2 backfill from root.session_id' });
+          if (!dryRun) leaf.added_by = rootLeaf.session_id;
+        }
+      }
+    }
+
+    // 规则 8 (v0.2.2): 补 _meta.workspace_root（init 自动写的字段，历史数据没有）
+    if (!state._meta) state._meta = {};
+    if (!state._meta.workspace_root) {
+      const workspace_root = path.resolve(TREES_ROOT, '..', '..');
+      changes.push({ field: '_meta.workspace_root', from: null, to: workspace_root });
+      if (!dryRun) state._meta.workspace_root = workspace_root;
+    }
+
+    // 规则 9 (v0.2.2): ROOT_PLACEHOLDER → PENDING_ROOT（技术报告 #1 修复）
+    // 老数据用了 ROOT_PLACEHOLDER 作为占位符，v0.2.2 统一为 PENDING_ROOT（合法过渡标记）
+    for (const id of Object.keys(leaves)) {
+      const leaf = leaves[id];
+      if (leaf.role === 'root' && leaf.session_id === 'ROOT_PLACEHOLDER') {
+        changes.push({ leaf_id: id, field: 'session_id', from: 'ROOT_PLACEHOLDER', to: PENDING_ROOT, reason: 'v0.2.2 unified placeholder' });
+        if (!dryRun) leaf.session_id = PENDING_ROOT;
+      }
+    }
+
+    // 规则 10 (v0.2.2): 多 parent=null leaf 检测（警告，不自动修复）
+    const nullParentLeaves = Object.values(leaves).filter((l) => l.parent === null);
+    if (nullParentLeaves.length > 1) {
+      changes.push({
+        field: '_warning',
+        reason: `MULTIPLE_NULL_PARENT: ${nullParentLeaves.length} leaves have parent=null (root uniqueness violated). Manual resolution required. Leaves: ${nullParentLeaves.map((l) => l.leaf_id).join(', ')}`
+      });
+    }
+
     if (!dryRun) {
       writeState(tree_id, state);
     }
@@ -1617,18 +2071,24 @@ async function dispatch(cmd, args) {
     case 'segment':
       return await dispatchSegment(args);
 
+    // TAO (v0.2.2) — 天道审计门 + 鞭策
+    case 'audit':
+      return await dispatchAudit(args);
+    case 'nudge':
+      return await dispatchNudge(args);
+
     // Query
     case 'tree':
       return await dispatchTree(args);
 
     default:
-      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, migrate, leaf, milestone, event, drift, heartbeat, segment, tree`);
+      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, migrate, leaf, milestone, event, drift, heartbeat, segment, audit, nudge, tree`);
   }
 }
 
 async function dispatchLeaf(args) {
   if (args.length === 0) {
-    throw new TreeStateError(E_SCHEMA_INVALID, 'leaf requires a subcommand: get | list-active | list-all | add | set-status | set-context | set-last-event | autonomy-override');
+    throw new TreeStateError(E_SCHEMA_INVALID, 'leaf requires a subcommand: get | list-active | list-all | add | set-status | set-context | set-last-event | set-session | autonomy-override');
   }
   const [sub, ...rest] = args;
   switch (sub) {
@@ -1639,6 +2099,7 @@ async function dispatchLeaf(args) {
     case 'set-status': return await cmdLeafSetStatus(rest);
     case 'set-context': return await cmdLeafSetContext(rest);
     case 'set-last-event': return await cmdLeafSetLastEvent(rest);
+    case 'set-session': return await cmdLeafSetSession(rest);
     case 'autonomy-override': return await cmdLeafAutonomyOverride(rest);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown leaf subcommand "${sub}"`);
