@@ -1169,7 +1169,25 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
               events_count: Array.isArray(leaf.events) ? leaf.events.length : 0,
               audit_gate: leaf.audit_gate || null,
               nudge_count: leaf.nudge_count || 0,
-              audit_log_count: Array.isArray(leaf.audit_log) ? leaf.audit_log.length : 0
+              audit_log_count: Array.isArray(leaf.audit_log) ? leaf.audit_log.length : 0,
+              // 补丁 M: nudge_log 详细字段 (供 UI 展开违规列表)
+              nudge_log: Array.isArray(leaf.nudge_log) ? leaf.nudge_log.slice(-10).map(e => ({
+                ts: e.ts,
+                rule_id: e.rule_id,
+                severity: e.severity,
+                evidence: e.evidence,
+                suggest: e.suggest,
+                nudge_count: e.nudge_count,
+                send_message: e.send_message
+              })) : [],
+              audit_log: Array.isArray(leaf.audit_log) ? leaf.audit_log.slice(-10).map(e => ({
+                ts: e.ts,
+                auditor: e.auditor,
+                rule_id: e.rule_id,
+                pass: e.pass,
+                evidence: e.evidence,
+                degraded: e.degraded
+              })) : []
             };
           }
           trees.push({
@@ -1212,3 +1230,877 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
 
   log("[Patch L] Tree panel IPC registered: proma:get-tree-states / proma:navigate-to-session / proma:tree-view-ready");
 })();
+
+// ============================================================
+// 补丁 M (v0.18): TAO Watcher — 树形任务流程警察
+// 设计原则:
+//   1. 能用 Node.js 写的不用 LLM (零 token)
+//   2. watcher 无状态, 每轮跑完即销
+//   3. stall 检测用文件 mtime, 不调 list_messages
+//   4. 违规 send_message 上限 2 次 ("事不过三"), 第 3 次起只记录
+//   5. 生命周期跟随 Proma, 不做系统服务
+//   6. 每个 workspace 一个独立 Watcher 实例
+// ============================================================
+
+const TAO_CONFIG_PATH = path.join(
+  process.env.PROMA_TAO_CONFIG_DIR
+    ? process.env.PROMA_TAO_CONFIG_DIR
+    : path.join(homeDir(), ".proma", "agent-workspaces", "proma", "workspace-files"),
+  "tao-engine", "config.json"
+);
+
+function homeDir() {
+  try { return require("os").homedir(); } catch (_) { return process.env.USERPROFILE || process.env.HOME || "."; }
+}
+
+function loadTaoConfig() {
+  try {
+    if (fs.existsSync(TAO_CONFIG_PATH)) {
+      return JSON.parse(fs.readFileSync(TAO_CONFIG_PATH, "utf8"));
+    }
+  } catch (e) {
+    log("[Patch M] config load failed: " + (e && e.message));
+  }
+  return {
+    enabled: false,
+    interval_seconds: 300,
+    stale_tree_hours: 24,
+    nudge_send_limit: 2,
+    workspace_overrides: {},
+    rules_enabled: []
+  };
+}
+
+function saveTaoConfig(cfg) {
+  try {
+    fs.mkdirSync(path.dirname(TAO_CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(TAO_CONFIG_PATH, JSON.stringify(cfg, null, 2));
+    return true;
+  } catch (e) {
+    log("[Patch M] config save failed: " + (e && e.message));
+    return false;
+  }
+}
+
+// ============================================================
+// Workspace 发现: 扫描 ~/.proma-dev/agent-workspaces/* + ~/.proma/agent-workspaces/*
+// 每个 workspace 有独立 .context/trees/ 目录, 每个对应一个 Watcher 实例
+// ============================================================
+
+function discoverWorkspaces() {
+  const os = require("os");
+  const home = os.homedir();
+  const candidates = [
+    path.join(home, ".proma-dev", "agent-workspaces"),
+    path.join(home, ".proma", "agent-workspaces")
+  ];
+  const found = [];
+  for (const base of candidates) {
+    if (!fs.existsSync(base)) continue;
+    let entries = [];
+    try { entries = fs.readdirSync(base); } catch (_) {}
+    for (const name of entries) {
+      // 每个工作区根目录形如 agent-workspaces/<slug>/, 内含 .context/trees/
+      // 或 agent-workspaces/<slug>/workspace-files/.context/trees/
+      const wsRoot = path.join(base, name);
+      // S1 修复: statSync 包 try/catch, 防止符号链接/并发删除抛
+      let st;
+      try { st = fs.statSync(wsRoot); } catch (_) { continue; }
+      if (!st.isDirectory()) continue;
+      // 候选 trees 目录
+      const treesCandidates = [
+        path.join(wsRoot, ".context", "trees"),
+        path.join(wsRoot, "workspace-files", ".context", "trees")
+      ];
+      for (const treesDir of treesCandidates) {
+        let ts;
+        try {
+          if (!fs.existsSync(treesDir)) continue;
+          ts = fs.statSync(treesDir);
+        } catch (_) { continue; }
+        if (!ts.isDirectory()) continue;
+        found.push({
+          workspace_id: name,
+          workspace_root: path.dirname(path.dirname(treesDir)),  // 去掉 .context/trees
+          trees_dir: treesDir,
+          is_isolated: path.basename(base) === ".proma-dev"
+        });
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+// ============================================================
+// Watcher 实例: 每个 workspace 一个
+// ============================================================
+
+class TAOWatcher {
+  constructor(workspace) {
+    this.workspace = workspace;
+    this.timer = null;
+    this.last_run_at = null;
+    this.last_run_status = null;  // "ok" / "error"
+    this.last_error = null;
+    this.violations = {};  // leaf_id -> [{ rule_id, ts, evidence }]
+    this.running = false;
+  }
+
+  start(intervalSeconds) {
+    this.stop();
+    this.stopped = false;
+    const interval = Math.max(30, (intervalSeconds || 300) * 1000);
+    this.timer = setInterval(() => { this.runOnce().catch(e => { this.last_error = String(e && e.message); }); }, interval);
+    log("[Patch M] Watcher started for workspace=" + this.workspace.workspace_id + " interval=" + (interval / 1000) + "s");
+    // 立即跑一次首次检查
+    this.runOnce().catch(e => { this.last_error = String(e && e.message); });
+  }
+
+  stop() {
+    this.stopped = true;  // 标记 stop, 让正在跑的 runOnce 在下一个 await 点检查后退出
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+      log("[Patch M] Watcher stopped for workspace=" + this.workspace.workspace_id);
+    }
+  }
+
+  // 主检查流程
+  async runOnce() {
+    if (this.running) {
+      log("[Patch M] Watcher[" + this.workspace.workspace_id + "] 上一轮未结束, 跳过");
+      return;
+    }
+    this.running = true;
+    try {
+      const cfg = loadTaoConfig();
+      const staleMs = (cfg.stale_tree_hours || 24) * 3600 * 1000;
+      const now = Date.now();
+
+      // 1. 扫描 trees 目录
+      let treeEntries = [];
+      try { treeEntries = fs.readdirSync(this.workspace.trees_dir); } catch (_) {}
+      const activeTrees = [];
+      for (const name of treeEntries) {
+        if (name.endsWith(".js") || name.endsWith(".json") || name.endsWith(".md")) continue;
+        const statePath = path.join(this.workspace.trees_dir, name, "tree-state.json");
+        if (!fs.existsSync(statePath)) continue;
+        try {
+          const stat = fs.statSync(statePath);
+          const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+          const mtimeFresh = (now - stat.mtimeMs) < staleMs;
+          const hasActiveLeaf = Object.values(state.leaves || {}).some(l =>
+            ["active", "pending_brief", "segment_pending"].includes(l.status)
+          );
+          // 活跃 = mtime 24h 内 AND 有任意活跃 leaf (commander/worker 都算)
+          if (mtimeFresh && hasActiveLeaf) {
+            activeTrees.push({ tree_id: name, state, state_path: statePath, mtime: stat.mtimeMs });
+          }
+        } catch (e) {
+          // 解析失败的 tree 跳过
+        }
+      }
+
+      // 2. 对每个活跃 tree 跑规则检查
+      let totalViolations = 0;
+      for (const tree of activeTrees) {
+        if (this.stopped) return;  // B3 修复: stop 后立即退出
+        const violations = await checkAllRules(tree, this.workspace, cfg);
+        for (const v of violations) {
+          if (this.stopped) return;  // B3 修复: 在每个 nudge 前检查
+          totalViolations++;
+          // 写 nudge_log + send_message (受 nudge_send_limit 限制)
+          await applyNudge(tree, v, cfg);
+        }
+      }
+
+      this.last_run_at = new Date().toISOString();
+      this.last_run_status = "ok";
+      this.last_error = null;
+    } catch (e) {
+      this.last_run_at = new Date().toISOString();
+      this.last_run_status = "error";
+      this.last_error = String(e && e.message);
+      log("[Patch M] Watcher[" + this.workspace.workspace_id + "] error: " + this.last_error);
+    } finally {
+      this.running = false;
+    }
+  }
+}
+
+// ============================================================
+// WatcherManager: 管理 workspace -> Watcher 映射
+// ============================================================
+
+class TAOWatcherManager {
+  constructor() {
+    this.watchers = new Map();  // workspace_id -> TAOWatcher
+    this.started = false;
+  }
+
+  startAll() {
+    // S3 修复: 已启动时不再重复 start, 改为 reload
+    if (this.started) {
+      log("[Patch M] startAll called but already started, calling reload instead");
+      return this.reload();
+    }
+    const cfg = loadTaoConfig();
+    if (!cfg.enabled) {
+      log("[Patch M] WatcherManager: globally disabled by config, skip start");
+      return;
+    }
+    const workspaces = discoverWorkspaces();
+    log("[Patch M] discovered " + workspaces.length + " workspace(s) with trees");
+    for (const ws of workspaces) {
+      const override = (cfg.workspace_overrides || {})[ws.workspace_id];
+      const wsEnabled = override ? override.enabled !== false : true;
+      const wsInterval = (override && override.interval_seconds) || cfg.interval_seconds || 300;
+      if (!wsEnabled) {
+        log("[Patch M] workspace " + ws.workspace_id + " disabled by override, skip");
+        continue;
+      }
+      const watcher = new TAOWatcher(ws);
+      this.watchers.set(ws.workspace_id, watcher);
+      watcher.start(wsInterval);
+    }
+    this.started = true;
+  }
+
+  stopAll() {
+    for (const [id, w] of this.watchers) {
+      w.stop();
+    }
+    this.watchers.clear();
+    this.started = false;
+    log("[Patch M] all watchers stopped");
+  }
+
+  reload() {
+    log("[Patch M] reloading watcher manager (config changed)");
+    this.stopAll();
+    this.startAll();
+  }
+
+  status() {
+    const result = { started: this.started, watchers: [] };
+    for (const [id, w] of this.watchers) {
+      result.watchers.push({
+        workspace_id: id,
+        workspace_root: w.workspace.workspace_root,
+        trees_dir: w.workspace.trees_dir,
+        is_isolated: w.workspace.is_isolated,
+        running: w.running,
+        last_run_at: w.last_run_at,
+        last_run_status: w.last_run_status,
+        last_error: w.last_error,
+        timer_active: !!w.timer
+      });
+    }
+    return result;
+  }
+}
+
+const taoWatcherManager = new TAOWatcherManager();
+
+// ============================================================
+// 规则实现: 15 条
+// Tier 1 (零 IPC): C-02, C-03, C-06, C-13, R-01, R-03, R-04, R-05, R-06
+// Tier 2 (HTTP bridge IPC): W-01, W-08, W-11, W-12, C-11, C-15
+// ============================================================
+
+// ---- Tier 1: 零 IPC 规则 ----
+
+// C-02: 每个 milestone.expect_outputs 非空
+function ruleC02(leaf, tree) {
+  const violations = [];
+  if (!Array.isArray(leaf.milestones)) return violations;
+  for (const m of leaf.milestones) {
+    if (!Array.isArray(m.expect_outputs) || m.expect_outputs.length === 0 ||
+        m.expect_outputs.every(x => !x || !String(x).trim())) {
+      violations.push({ rule_id: "C-02", leaf_id: leaf.leaf_id, severity: "low",
+        evidence: "milestone '" + (m.id || "(no-id)") + "' has empty expect_outputs",
+        suggest: "milestone set-result 需补 expect_outputs 或 milestone add 时填写" });
+    }
+  }
+  return violations;
+}
+
+// C-03: leaf 已 done 但有 milestone 未 done
+function ruleC03(leaf, tree) {
+  if (leaf.status !== "done") return [];
+  if (!Array.isArray(leaf.milestones) || leaf.milestones.length === 0) return [];
+  const pending = leaf.milestones.filter(m => m.status !== "done");
+  if (pending.length === 0) return [];
+  return [{
+    rule_id: "C-03", leaf_id: leaf.leaf_id, severity: "high",
+    evidence: "leaf status=done 但有 " + pending.length + " 个 milestone 未 done: " + pending.map(m => m.id).join(", "),
+    suggest: "milestone set-result 把 " + pending.map(m => m.id).join(", ") + " 标 audit_pass=true"
+  }];
+}
+
+// C-06: commander 已 done 但有子 leaf 未 done (引用 tree-state.js 的 E_CHILDREN_NOT_DONE 校验, 这里只是复核)
+function ruleC06(leaf, tree) {
+  if (leaf.role !== "commander" || leaf.status !== "done") return [];
+  const childIds = Object.keys(tree.state.leaves).filter(lid => tree.state.leaves[lid].parent === leaf.leaf_id);
+  const notDone = childIds.filter(lid => tree.state.leaves[lid].status !== "done");
+  if (notDone.length === 0) return [];
+  return [{
+    rule_id: "C-06", leaf_id: leaf.leaf_id, severity: "high",
+    evidence: "commander status=done 但 " + notDone.length + " 个子 leaf 未 done: " + notDone.join(", "),
+    suggest: "tree-state.js 应已拒绝此 done, 请手动检查; 或先把子 leaf set-status done"
+  }];
+}
+
+// C-13: 文档审计场景 worker 审查 leaf >=4
+function ruleC13(leaf, tree) {
+  if (leaf.role !== "commander") return [];
+  // 检查 brief 是否含 "review/审计/审查" 关键词 (从 root_brief 或 leaf 父链上的 brief)
+  // v0.1 简化: 看 root_brief.in_scope + leaf 的所有 worker 子节点 brief
+  const rootBrief = JSON.stringify(tree.state.root_brief || {}).toLowerCase();
+  const isAuditScenario = /review|审计|审查|audit/.test(rootBrief);
+  if (!isAuditScenario) return [];
+  // 统计 role=worker 的子 leaf
+  const workerChildren = Object.values(tree.state.leaves).filter(
+    l => l.parent === leaf.leaf_id && l.role === "worker"
+  );
+  if (workerChildren.length >= 4) return [];
+  return [{
+    rule_id: "C-13", leaf_id: leaf.leaf_id, severity: "mid",
+    evidence: "审计场景下 commander 仅有 " + workerChildren.length + " 个 worker 子 leaf (需 ≥4 独立审查)",
+    suggest: "fork 至少 " + (4 - workerChildren.length) + " 个独立审查 worker"
+  }];
+}
+
+// R-01: 唯一 root (parent=null 且 role=root)
+function ruleR01(tree) {
+  const roots = Object.values(tree.state.leaves).filter(l => l.parent === null);
+  const violations = [];
+  if (roots.length === 0) {
+    violations.push({ rule_id: "R-01", leaf_id: null, severity: "high",
+      evidence: "tree 无 root leaf (parent=null 缺失)",
+      suggest: "通过 leaf add 创建 role=root leaf" });
+  } else if (roots.length > 1) {
+    violations.push({ rule_id: "R-01", leaf_id: roots[0].leaf_id, severity: "high",
+      evidence: "tree 有 " + roots.length + " 个 parent=null leaf (根唯一性违反): " + roots.map(r => r.leaf_id).join(", "),
+      suggest: "保留一个为 role=root, 其他改为有 parent" });
+  } else if (roots[0].role !== "root") {
+    violations.push({ rule_id: "R-01", leaf_id: roots[0].leaf_id, severity: "high",
+      evidence: "parent=null leaf 角色 '" + roots[0].role + "' 不是 root",
+      suggest: "leaf set-status 不行, 需通过 migrate 修复" });
+  }
+  return violations;
+}
+
+// R-03: 存在整合 leaf (done 时间最晚)
+function ruleR03(tree) {
+  const leaves = Object.values(tree.state.leaves);
+  const doneLeaves = leaves.filter(l => l.status === "done");
+  if (doneLeaves.length < 2) return [];  // 不够 2 个 done 不强求
+  // 找最晚 done
+  const sortedByTs = doneLeaves.sort((a, b) => {
+    const ta = new Date(a.last_event_ts || a.created_at).getTime() || 0;
+    const tb = new Date(b.last_event_ts || b.created_at).getTime() || 0;
+    return tb - ta;
+  });
+  const latest = sortedByTs[0];
+  // 检查它的 path/brief 是否含 "integrate/整合"
+  // v0.1 简化: 看 leaf_id 或 path 是否含 integrate
+  const looksLikeIntegrator = /integrat|整合|汇总/i.test(latest.leaf_id + " " + (latest.path || ""));
+  if (looksLikeIntegrator) return [];
+  // 警告: 最晚完成的 leaf 不像整合 leaf
+  return [{
+    rule_id: "R-03", leaf_id: latest.leaf_id, severity: "low",
+    evidence: "最晚 done 的 leaf '" + latest.leaf_id + "' 不像整合 leaf (无 integrate/整合 关键词)",
+    suggest: "如有整合 leaf 应最后完成; 或命名加 integrate 后缀"
+  }];
+}
+
+// R-04: 所有 worker milestone audit_pass=true
+function ruleR04(tree) {
+  const violations = [];
+  for (const leaf of Object.values(tree.state.leaves)) {
+    if (leaf.role !== "worker") continue;
+    if (!Array.isArray(leaf.milestones)) continue;
+    for (const m of leaf.milestones) {
+      if (m.status === "done" && m.audit_pass !== true) {
+        violations.push({ rule_id: "R-04", leaf_id: leaf.leaf_id, severity: "mid",
+          evidence: "worker milestone '" + m.id + "' status=done 但 audit_pass=" + JSON.stringify(m.audit_pass),
+          suggest: "milestone set-result " + leaf.leaf_id + " " + m.id + " --audit-pass true" });
+      }
+    }
+  }
+  return violations;
+}
+
+// R-05: 三步质量门 (实施/回归/审计 leaf 都 done)
+function ruleR05(tree) {
+  const leaves = Object.values(tree.state.leaves);
+  const doneCount = leaves.filter(l => l.status === "done").length;
+  if (doneCount < 3) return [];  // 不够 3 个 done, 还没到验收阶段
+  // v0.1 简化: 检查是否有 leaf 路径含 implement/regression/audit
+  const hasImpl = leaves.some(l => /implement|实施|开发/i.test(l.leaf_id + (l.path || "")) && l.status === "done");
+  const hasRegression = leaves.some(l => /regress|回归|test|测试/i.test(l.leaf_id + (l.path || "")) && l.status === "done");
+  const hasAudit = leaves.some(l => /audit|审计|review|审查/i.test(l.leaf_id + (l.path || "")) && l.status === "done");
+  if (hasImpl && hasRegression && hasAudit) return [];
+  const missing = [];
+  if (!hasImpl) missing.push("实施");
+  if (!hasRegression) missing.push("回归测试");
+  if (!hasAudit) missing.push("审计");
+  return [{
+    rule_id: "R-05", leaf_id: null, severity: "low",
+    evidence: "tree 已有 " + doneCount + " 个 done leaf, 但缺质量门阶段: " + missing.join(", "),
+    suggest: "整树完成前需补 " + missing.join(", ") + " 阶段的 leaf"
+  }];
+}
+
+// R-06: 关键交付物验证者 != 产出者
+function ruleR06(tree) {
+  // v0.1 简化: 检查是否有任意两个 leaf 的 path 互补 (如 X + X-verify)
+  const leaves = Object.values(tree.state.leaves);
+  const violations = [];
+  for (const leaf of leaves) {
+    if (leaf.role !== "worker" || leaf.status !== "done") continue;
+    // 看是否有 verify/audit/review leaf 关联
+    const hasVerifier = leaves.some(l =>
+      l !== leaf &&
+      l.status === "done" &&
+      l.session_id !== leaf.session_id &&
+      new RegExp(leaf.leaf_id + "|verify|audit|review", "i").test(l.leaf_id + (l.path || ""))
+    );
+    if (!hasVerifier) {
+      violations.push({ rule_id: "R-06", leaf_id: leaf.leaf_id, severity: "low",
+        evidence: "worker '" + leaf.leaf_id + "' 已 done 但无独立验证 leaf",
+        suggest: "fork 一个 verify/audit worker 独立检查" });
+    }
+  }
+  return violations;
+}
+
+// ---- Tier 2: HTTP bridge IPC 规则 ----
+// (在下个 Edit 追加, 因为需要 IPC 调用函数)
+
+// ============================================================
+// checkAllRules: 对 tree 跑所有适用规则
+// ============================================================
+
+async function checkAllRules(tree, workspace, cfg) {
+  const all = [];
+  const rulesEnabled = (cfg.rules_enabled && cfg.rules_enabled.length > 0) ? cfg.rules_enabled : null;
+
+  function maybe(ruleId, fn, ...args) {
+    if (rulesEnabled && !rulesEnabled.includes(ruleId)) return;
+    try {
+      const v = fn(...args);
+      if (Array.isArray(v)) all.push(...v);
+    } catch (e) {
+      log("[Patch M] rule " + ruleId + " error: " + (e && e.message));
+    }
+  }
+
+  // Tier 1
+  maybe("R-01", ruleR01, tree);
+  maybe("R-03", ruleR03, tree);
+  maybe("R-04", ruleR04, tree);
+  maybe("R-05", ruleR05, tree);
+  maybe("R-06", ruleR06, tree);
+  for (const leaf of Object.values(tree.state.leaves)) {
+    maybe("C-02", ruleC02, leaf, tree);
+    maybe("C-03", ruleC03, leaf, tree);
+    maybe("C-06", ruleC06, leaf, tree);
+    maybe("C-13", ruleC13, leaf, tree);
+  }
+
+  // Tier 2 (IPC)
+  for (const leaf of Object.values(tree.state.leaves)) {
+    // 只对活跃 leaf 跑 IPC 规则
+    if (!["active", "pending_brief", "segment_pending"].includes(leaf.status)) continue;
+    maybe("W-01", ruleW01, leaf, tree);
+    maybe("W-08", ruleW08, leaf, tree);
+    maybe("W-11", ruleW11, leaf, tree);
+    maybe("W-12", ruleW12, leaf, tree);
+    maybe("C-11", ruleC11, leaf, tree);
+    maybe("C-15", ruleC15, leaf, tree);
+  }
+
+  return all;
+}
+
+// ============================================================
+// applyNudge: 应用违规 (写 nudge_log + send_message 上限控制)
+// ============================================================
+
+async function applyNudge(tree, violation, cfg) {
+  try {
+    // 读最新 state (其他 Agent 可能在 watcher 跑的同时改了)
+    const freshState = JSON.parse(fs.readFileSync(tree.state_path, "utf8"));
+    const leaf = freshState.leaves[violation.leaf_id];
+    if (!leaf) return;  // leaf 已删, 跳过
+
+    // 初始化 audit_log/nudge_log/nudge_count
+    if (!Array.isArray(leaf.nudge_log)) leaf.nudge_log = [];
+    if (typeof leaf.nudge_count !== "number") leaf.nudge_count = 0;
+
+    // 幂等: 30 秒内同一 rule_id 不重复 nudge
+    const now = Date.now();
+    const recentSame = leaf.nudge_log.find(
+      e => e.rule_id === violation.rule_id && (now - new Date(e.ts).getTime()) < 30000
+    );
+    if (recentSame) return;
+
+    // 增量 nudge_count (全局, 不分 rule)
+    leaf.nudge_count += 1;
+    const nudgeEntry = {
+      ts: new Date().toISOString(),
+      rule_id: violation.rule_id,
+      severity: violation.severity,
+      evidence: violation.evidence,
+      suggest: violation.suggest,
+      nudge_count: leaf.nudge_count,
+      send_message: leaf.nudge_count <= (cfg.nudge_send_limit || 2)
+    };
+    leaf.nudge_log.push(nudgeEntry);
+
+    // 写 audit_log (区别于 nudge_log: audit_log 是审计结果, nudge_log 是鞭策)
+    if (!Array.isArray(leaf.audit_log)) leaf.audit_log = [];
+    leaf.audit_log.push({
+      ts: new Date().toISOString(),
+      auditor: "tao-watcher-script",
+      rule_id: violation.rule_id,
+      pass: false,
+      evidence: violation.evidence,
+      degraded: false  // 脚本检查不算 degraded
+    });
+
+    // 保存
+    fs.writeFileSync(tree.state_path, JSON.stringify(freshState, null, 2));
+
+    // send_message (受 nudge_send_limit 限制, "事不过三" → 上限 2 次)
+    if (nudgeEntry.send_message) {
+      try {
+        await sendWatcherNudgeMessage(leaf, violation, freshState, cfg);
+      } catch (e) {
+        log("[Patch M] send_message failed for " + leaf.leaf_id + ": " + (e && e.message));
+      }
+    } else {
+      log("[Patch M] leaf " + leaf.leaf_id + " nudge_count=" + leaf.nudge_count + " 已达上限, 仅记录不提醒");
+    }
+  } catch (e) {
+    log("[Patch M] applyNudge error: " + (e && e.message));
+  }
+}
+
+// 通过 Proma API send_message 发鞭策消息到违规 leaf 会话
+async function sendWatcherNudgeMessage(leaf, violation, state, cfg) {
+  const a = api();
+  const limit = (cfg && cfg.nudge_send_limit) || 2;
+  const msg =
+    "[TAO Watcher #" + leaf.nudge_count + "] 流程违规\n" +
+    "规则: " + violation.rule_id + " (" + violation.severity + ")\n" +
+    "证据: " + violation.evidence + "\n" +
+    "建议: " + violation.suggest + "\n" +
+    "——\n" +
+    "这是机械检查提醒, 不评价内容质量。如有疑问请通过 blocked 消息回复, 或继续执行后自动消除。" +
+    (leaf.nudge_count >= limit ? "\n已达 nudge 上限, 后续违规将仅记录不提醒。" : "");
+
+  // 调 Proma runAgentHeadless 发 user message 到 leaf.session_id
+  // 注意: 这会真正给目标会话注入消息, 让 Agent 看到
+  await new Promise((resolve, reject) => {
+    try {
+      a.runAgentHeadless(
+        {
+          sessionId: leaf.session_id,
+          userMessage: msg,
+          permissionModeOverride: "bypassPermissions",
+          triggeredBy: "tao-watcher"
+        },
+        {
+          source: "tao-watcher",
+          onError: (err) => reject(new Error(err)),
+          onComplete: () => resolve()
+        }
+      );
+    } catch (e) { reject(e); }
+  });
+}
+
+// 启动 WatcherManager (Proma 启动后 5s 延迟, 避免与主进程启动竞争)
+setTimeout(() => {
+  // B1 修复: 检查 __proma__ 是否就绪, 否则延迟重试
+  if (!global.__proma__) {
+    log("[Patch M] global.__proma__ not ready at startup, retrying in 10s");
+    setTimeout(() => {
+      if (global.__proma__) {
+        try { taoWatcherManager.startAll(); } catch (e) { log("[Patch M] retry startup error: " + (e && e.message)); }
+      } else {
+        log("[Patch M] global.__proma__ still not ready after 15s, give up");
+      }
+    }, 10000);
+    return;
+  }
+  try {
+    taoWatcherManager.startAll();
+  } catch (e) {
+    log("[Patch M] startup error: " + (e && e.message));
+  }
+}, 5000);
+
+// Proma 退出时自动停止 (L2: 用 electron.app.before-quit 而非 process.beforeExit)
+(function registerQuitHandler() {
+  try {
+    const electron = require("electron");
+    if (electron && electron.app) {
+      electron.app.on("before-quit", () => { taoWatcherManager.stopAll(); });
+      return;
+    }
+  } catch (_) {}
+  // fallback
+  process.on("beforeExit", () => { taoWatcherManager.stopAll(); });
+  process.on("exit", () => { taoWatcherManager.stopAll(); });
+})();
+
+// ============================================================
+// Tier 2 规则: HTTP bridge IPC (调 Proma API 读会话消息)
+// ============================================================
+
+// 安全读取 leaf 会话的消息 (best-effort, 失败返回空数组)
+function readLeafMessages(sessionId, limit) {
+  try {
+    const a = api();
+    const meta = a.getAgentSessionMeta(sessionId);
+    if (!meta) return [];
+    const msgs = a.getAgentSessionSDKMessages(sessionId);
+    if (!Array.isArray(msgs)) return [];
+    const slice = msgs.slice(0, limit || 50);
+    return slice;
+  } catch (e) {
+    log("[Patch M] readLeafMessages(" + sessionId + ") error: " + (e && e.message));
+    return [];
+  }
+}
+
+// 提取消息纯文本 (兼容 user/assistant/result 类型)
+function msgText(m) {
+  if (!m) return "";
+  if (m.message && m.message.content) {
+    if (typeof m.message.content === "string") return m.message.content;
+    if (Array.isArray(m.message.content)) {
+      return m.message.content.map(c => (c && c.text) ? c.text : "").join("\n");
+    }
+  }
+  if (m.result) return String(m.result);
+  return "";
+}
+
+// W-01: Worker 首条 assistant 消息含 event: brief_echo
+function ruleW01(leaf, tree) {
+  if (leaf.role !== "worker") return [];
+  if (!["active", "pending_brief"].includes(leaf.status)) return [];
+  const msgs = readLeafMessages(leaf.session_id, 10);
+  if (msgs.length === 0) return [];  // 没消息读不到, 不判违规
+  // 找第一条自身 assistant 消息
+  const firstAssistant = msgs.find(m =>
+    m.type === "assistant" ||
+    (m.message && m.message.role === "assistant")
+  );
+  if (!firstAssistant) {
+    return [{ rule_id: "W-01", leaf_id: leaf.leaf_id, severity: "high",
+      evidence: "worker 无任何 assistant 消息 (未产出 brief_echo)",
+      suggest: "Worker 首条回复必须含 event: brief_echo YAML 块" }];
+  }
+  const text = msgText(firstAssistant);
+  if (/event:\s*brief_echo|brief_echo:/i.test(text)) return [];
+  return [{ rule_id: "W-01", leaf_id: leaf.leaf_id, severity: "high",
+    evidence: "worker 首条 assistant 消息无 brief_echo",
+    suggest: "首条回复必须含 'event: brief_echo' YAML 块" }];
+}
+
+// W-08: Worker 没跑 tree-state.js 写命令 (v0.1 检查 user 消息中的 bash 命令调用)
+function ruleW08(leaf, tree) {
+  if (leaf.role !== "worker") return [];
+  const msgs = readLeafMessages(leaf.session_id, 50);
+  if (msgs.length === 0) return [];
+  // 找 user 角色的 tool_use 调用, 检查是否含 tree-state.js 写命令
+  const writeCmds = /tree-state\.js\s+(leaf\s+add|leaf\s+set-status|milestone\s+add|milestone\s+set-result|event\s+append|drift\s+append|heartbeat\s+append|segment\s+append|init|backup|restore)/i;
+  for (const m of msgs) {
+    const text = msgText(m);
+    if (writeCmds.test(text)) {
+      return [{ rule_id: "W-08", leaf_id: leaf.leaf_id, severity: "high",
+        evidence: "worker 会话含 tree-state.js 写命令调用 (违反 leaf purity)",
+        suggest: "Worker 不应直接修改 tree-state, 通过 send_message 上报让 Commander 操作" }];
+    }
+  }
+  return [];
+}
+
+// W-11: 单条 assistant 消息长度 <= 5000 字符
+function ruleW11(leaf, tree) {
+  if (leaf.role !== "worker") return [];
+  const msgs = readLeafMessages(leaf.session_id, 50);
+  if (msgs.length === 0) return [];
+  const violations = [];
+  for (const m of msgs) {
+    if (m.type !== "assistant" && !(m.message && m.message.role === "assistant")) continue;
+    const text = msgText(m);
+    if (text.length > 5000) {
+      violations.push({ rule_id: "W-11", leaf_id: leaf.leaf_id, severity: "low",
+        evidence: "assistant 消息 " + String(m.uuid || m.timestamp || "?").slice(0, 8) + " 长度 " + text.length + " > 5000",
+        suggest: "拆分长消息或先落盘文件后只引用路径" });
+    }
+  }
+  // 只报第一条违规 (避免一次 nudge 太多)
+  return violations.slice(0, 1);
+}
+
+// W-12: 上行消息 event 字段必须 ∈ {done, blocked, plan, brief_echo}
+function ruleW12(leaf, tree) {
+  if (leaf.role !== "worker") return [];
+  const msgs = readLeafMessages(leaf.session_id, 30);
+  if (msgs.length === 0) return [];
+  const validEvents = ["done", "blocked", "plan", "brief_echo"];
+  const violations = [];
+  for (const m of msgs) {
+    if (m.type !== "assistant" && !(m.message && m.message.role === "assistant")) continue;
+    const text = msgText(m);
+    const evMatch = text.match(/event:\s*(\w+)/i);
+    if (evMatch && !validEvents.includes(evMatch[1].toLowerCase())) {
+      violations.push({ rule_id: "W-12", leaf_id: leaf.leaf_id, severity: "mid",
+        evidence: "assistant 消息声明 event: " + evMatch[1] + " 不在合法集合 {done, blocked, plan, brief_echo}",
+        suggest: "上行消息只能用 done/blocked/plan/brief_echo 之一" });
+    }
+    if (violations.length >= 1) break;  // 只报第一条
+  }
+  return violations;
+}
+
+// C-11: Commander 没直接 Read/Write tree-state.json (检查 tool_use)
+function ruleC11(leaf, tree) {
+  if (leaf.role !== "commander" && leaf.role !== "root") return [];
+  const msgs = readLeafMessages(leaf.session_id, 80);
+  if (msgs.length === 0) return [];
+  // S5 修复: 精确匹配 .json (非 .js) + 排除 CLI 调用
+  // 违规模式: Read/Write/Edit 直接操作 tree-state.json (注意 .json 必须紧跟, 不能是 .js)
+  // CLI 合法: node tree-state.js xxx 或 tree-state.js <子命令>
+  const directAccessPattern = /\b(?:Read|Write|Edit)\b[^\n]{0,200}\btree-state\.json\b(?!s\b)/i;
+  const cliCallPattern = /\b(?:node\s+)?tree-state\.js\s+(?:leaf|milestone|event|drift|heartbeat|segment|init|backup|restore|validate|migrate|audit|nudge)\b/i;
+  for (const m of msgs) {
+    const text = msgText(m);
+    if (directAccessPattern.test(text) && !cliCallPattern.test(text)) {
+      return [{ rule_id: "C-11", leaf_id: leaf.leaf_id, severity: "mid",
+        evidence: "commander/root 直接 Read/Write tree-state.json (违反 Leaf Purity)",
+        suggest: "状态变更必须走 tree-state.js CLI 子命令, 不直接读写文件" }];
+    }
+  }
+  return [];
+}
+
+// C-15: role=worker leaf 必须是 create_session 创建的 (无 source_session_id)
+function ruleC15(leaf, tree) {
+  if (leaf.role !== "worker") return [];
+  try {
+    const a = api();
+    const meta = a.getAgentSessionMeta(leaf.session_id);
+    if (!meta) return [];  // 元数据找不到, 不判
+    // fork 创建的会话有 sourceSessionId, create_session 创建的没有
+    if (meta.sourceSessionId || meta.source_session_id || meta.forked_from) {
+      return [{ rule_id: "C-15", leaf_id: leaf.leaf_id, severity: "high",
+        evidence: "worker session '" + leaf.session_id.slice(0, 8) + "...' 是 fork 创建 (source_session_id=" + (meta.sourceSessionId || meta.source_session_id || "?") + ")",
+        suggest: "Worker 必须用 create_session 创建 (干净上下文), 不应用 fork_session" }];
+    }
+  } catch (e) {
+    // 元数据查不到不算违规 (best-effort)
+  }
+  return [];
+}
+
+// ============================================================
+// 补丁 M IPC handlers (供 UI 控制 watcher)
+// ============================================================
+
+(function registerWatcherIpc() {
+  let electron;
+  try { electron = require("electron"); } catch (_) { electron = null; }
+  if (!electron || !electron.ipcMain) {
+    log("[Patch M] electron.ipcMain not available, skip watcher IPC");
+    return;
+  }
+  const ipcMain = electron.ipcMain;
+
+  // proma:watcher-status — 获取所有 watcher 状态 + 配置
+  ipcMain.handle("proma:watcher-status", async () => {
+    const cfg = loadTaoConfig();
+    return {
+      ok: true,
+      config: cfg,
+      manager_started: taoWatcherManager.started,
+      watchers: taoWatcherManager.status().watchers
+    };
+  });
+
+  // proma:watcher-toggle -- 全局开关 { enabled: bool }
+  ipcMain.handle("proma:watcher-toggle", async (_event, arg) => {
+    const cfg = loadTaoConfig();
+    const newEnabled = arg && typeof arg.enabled === "boolean" ? arg.enabled : !cfg.enabled;
+    cfg.enabled = newEnabled;
+    saveTaoConfig(cfg);
+    if (newEnabled) {
+      taoWatcherManager.startAll();
+    } else {
+      taoWatcherManager.stopAll();
+    }
+    return { ok: true, enabled: newEnabled };
+  });
+
+  // proma:watcher-set-interval -- 设置默认 interval { interval_seconds: N }
+  ipcMain.handle("proma:watcher-set-interval", async (_event, arg) => {
+    if (!arg || typeof arg.interval_seconds !== "number") {
+      return { ok: false, error: "interval_seconds (number) required" };
+    }
+    const cfg = loadTaoConfig();
+    cfg.interval_seconds = Math.max(30, Math.min(3600, arg.interval_seconds));
+    saveTaoConfig(cfg);
+    // 重启 watcher 应用新 interval
+    if (cfg.enabled) {
+      taoWatcherManager.reload();
+    }
+    return { ok: true, interval_seconds: cfg.interval_seconds };
+  });
+
+  // proma:watcher-run-now -- 立即跑一次所有 watcher (手动触发, 不等 interval)
+  ipcMain.handle("proma:watcher-run-now", async (_event, arg) => {
+    const targetWsId = arg && arg.workspace_id;
+    const runs = [];
+    for (const [id, w] of taoWatcherManager.watchers) {
+      if (targetWsId && id !== targetWsId) continue;
+      // M7 修复: 检查 watcher 是否正在跑
+      if (w.running) {
+        runs.push({ workspace_id: id, ok: true, skipped: true, note: "上一轮未结束, 跳过" });
+        continue;
+      }
+      try {
+        await w.runOnce();
+        runs.push({ workspace_id: id, ok: true, last_status: w.last_run_status, last_error: w.last_error });
+      } catch (e) {
+        runs.push({ workspace_id: id, ok: false, error: String(e && e.message) });
+      }
+    }
+    return { ok: true, runs };
+  });
+
+  // proma:watcher-config-patch -- 局部更新 config (workspace_overrides / rules_enabled 等)
+  ipcMain.handle("proma:watcher-config-patch", async (_event, arg) => {
+    if (!arg || typeof arg !== "object") {
+      return { ok: false, error: "config patch object required" };
+    }
+    const cfg = loadTaoConfig();
+    for (const k of ["enabled", "interval_seconds", "stale_tree_hours", "nudge_send_limit", "workspace_overrides", "rules_enabled"]) {
+      if (k in arg) cfg[k] = arg[k];
+    }
+    saveTaoConfig(cfg);
+    if (cfg.enabled) taoWatcherManager.reload();
+    return { ok: true, config: cfg };
+  });
+
+  log("[Patch M] Watcher IPC registered: proma:watcher-status / toggle / set-interval / run-now / config-patch");
+})();
+

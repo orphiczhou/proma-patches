@@ -112,7 +112,16 @@
       meta.appendChild(h('span', { className: 'ptv-milestone' }, done + '/' + leaf.milestones.length));
     }
     if (leaf.nudge_count > 0) {
-      meta.appendChild(h('span', { className: 'ptv-nudge', title: '鞭策次数' }, '⚠' + leaf.nudge_count));
+      // 补丁 M: nudge 标记可点击展开违规列表
+      const nudgeBtn = h('span', {
+        className: 'ptv-nudge',
+        title: '点击查看 ' + leaf.nudge_count + ' 条 watcher 违规记录',
+        onClick: (ev) => {
+          ev.stopPropagation();
+          showViolations(leaf, treeId);
+        }
+      }, '⚠' + leaf.nudge_count);
+      meta.appendChild(nudgeBtn);
     }
     if (leaf.context_usage_pct > 0) {
       meta.appendChild(h('span', { className: 'ptv-context', title: '上下文使用率' }, leaf.context_usage_pct + '%'));
@@ -239,6 +248,20 @@
     header.appendChild(h('span', { className: 'ptv-panel-title' }, '🌳 任务树'));
     const actions = h('div', { className: 'ptv-panel-actions' });
 
+    // Watcher 控件 (补丁 M)
+    const watcherBtn = h('button', {
+      className: 'ptv-btn ptv-watcher-btn',
+      title: 'TAO Watcher 开关',
+      onClick: () => toggleWatcher()
+    }, '👁…');
+    const watcherRunBtn = h('button', {
+      className: 'ptv-btn',
+      title: '立即跑一次 Watcher 检查',
+      onClick: () => runWatcherNow()
+    }, '⚡');
+    actions.appendChild(watcherBtn);
+    actions.appendChild(watcherRunBtn);
+
     const refreshBtn = h('button', { className: 'ptv-btn', title: '刷新', onClick: () => fetchData() }, '↻');
     const collapseBtn = h('button', { className: 'ptv-btn', title: '折叠/展开全部', onClick: () => toggleAll() }, '⇕');
     const closeBtn = h('button', { className: 'ptv-btn ptv-btn-close', title: '折叠面板', onClick: () => panel.classList.toggle('ptv-collapsed') }, '–');
@@ -259,7 +282,9 @@
     expanded: {},           // leaf_id → bool (false=collapsed)
     lastTrees: [],
     workspaceRoot: null,
-    pollTimer: null
+    pollTimer: null,
+    watcherEnabled: null,   // null=未加载, true/false=开关状态
+    watcherWatchers: []     // [{ workspace_id, last_run_at, last_run_status, ... }]
   };
 
   function toggleAll() {
@@ -368,6 +393,7 @@
     }
     fetchData();
     startPolling();
+    fetchWatcherStatus();  // 补丁 M: 加载 watcher 状态
   }
 
   // 监听导航事件（虽然我们不直接控制 React，但可触发 UI 提示）
@@ -409,8 +435,133 @@
     // 占位，实际由 preload 决定
   }
 
+  // ============================================================
+  // 补丁 M: Watcher 控制 + 违规展示
+  // ============================================================
+
+  async function fetchWatcherStatus() {
+    const ipc = getIpc();
+    if (!ipc || !ipc.invoke) return;
+    try {
+      const result = await ipc.invoke('proma:watcher-status', {});
+      if (result && result.ok) {
+        state.watcherEnabled = !!result.config.enabled;
+        state.watcherWatchers = result.watchers || [];
+        updateWatcherBtn();
+      }
+    } catch (_) {}
+  }
+
+  function updateWatcherBtn() {
+    const btn = document.querySelector('.ptv-watcher-btn');
+    if (!btn) return;
+    if (state.watcherEnabled === null) {
+      btn.textContent = '👁…';
+      btn.style.color = '';
+    } else if (state.watcherEnabled) {
+      btn.textContent = '👁 ON';
+      btn.style.color = '#22c55e';
+    } else {
+      btn.textContent = '👁 OFF';
+      btn.style.color = '#9ca3af';
+    }
+  }
+
+  async function toggleWatcher() {
+    const ipc = getIpc();
+    if (!ipc || !ipc.invoke) {
+      showToast('IPC 不可用，无法切换 Watcher');
+      return;
+    }
+    const target = !state.watcherEnabled;
+    try {
+      const result = await ipc.invoke('proma:watcher-toggle', { enabled: target });
+      if (result && result.ok) {
+        state.watcherEnabled = !!result.enabled;
+        updateWatcherBtn();
+        showToast('Watcher: ' + (state.watcherEnabled ? 'ON' : 'OFF'));
+        if (state.watcherEnabled) {
+          setTimeout(() => runWatcherNow(), 500);  // 启用时立即跑一次
+        }
+      } else {
+        showToast('切换失败');
+      }
+    } catch (e) {
+      showToast('切换失败: ' + (e && e.message));
+    }
+  }
+
+  async function runWatcherNow() {
+    const ipc = getIpc();
+    if (!ipc || !ipc.invoke) {
+      showToast('IPC 不可用');
+      return;
+    }
+    showToast('Watcher 跑一轮...');
+    try {
+      const result = await ipc.invoke('proma:watcher-run-now', {});
+      if (result && result.ok) {
+        const count = (result.runs || []).length;
+        const errs = (result.runs || []).filter(r => !r.ok).length;
+        showToast('Watcher 完成: ' + count + ' workspace, ' + errs + ' 错误');
+        // 立即刷新数据展示违规
+        setTimeout(() => fetchData(), 500);
+      }
+    } catch (e) {
+      showToast('Watcher 失败: ' + (e && e.message));
+    }
+  }
+
+  function showViolations(leaf, treeId) {
+    // 弹出违规详情浮窗
+    const existing = document.getElementById('ptv-violations-popup');
+    if (existing) existing.remove();
+
+    const popup = h('div', { className: 'ptv-violations-popup', id: 'ptv-violations-popup' });
+    popup.appendChild(h('div', { className: 'ptv-popup-title' }, '⚠ ' + leaf.leaf_id + ' 违规记录 (' + leaf.nudge_count + ')'));
+
+    const log = leaf.nudge_log || [];
+    if (log.length === 0) {
+      popup.appendChild(h('div', { className: 'ptv-empty' }, '(无详细记录)'));
+    } else {
+      // 按时间倒序
+      const sorted = log.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+      for (const v of sorted) {
+        const entry = h('div', { className: 'ptv-violation-entry ptv-severity-' + v.severity });
+        entry.appendChild(h('div', { className: 'ptv-violation-header' }, [
+          h('span', { className: 'ptv-violation-rule' }, v.rule_id),
+          h('span', { className: 'ptv-violation-sev ptv-severity-' + v.severity }, v.severity),
+          h('span', { className: 'ptv-violation-ts' }, formatRelative(v.ts))
+        ]));
+        entry.appendChild(h('div', { className: 'ptv-violation-evidence' }, v.evidence || '(无证据)'));
+        if (v.suggest) {
+          entry.appendChild(h('div', { className: 'ptv-violation-suggest' }, '→ ' + v.suggest));
+        }
+        if (v.send_message === false) {
+          entry.appendChild(h('div', { className: 'ptv-violation-note' }, '(已超 nudge 上限, 仅记录)'));
+        }
+        popup.appendChild(entry);
+      }
+    }
+
+    const closeBtn = h('button', { className: 'ptv-btn ptv-popup-close', onClick: () => popup.remove() }, '×');
+    popup.appendChild(closeBtn);
+    document.body.appendChild(popup);
+    // 点击外部关闭
+    setTimeout(() => {
+      const handler = (ev) => {
+        if (!popup.contains(ev.target)) {
+          popup.remove();
+          document.removeEventListener('click', handler);
+        }
+      };
+      document.addEventListener('click', handler);
+    }, 100);
+  }
+
   // 暴露给外部调试
-  window.__promaTreeView = { mount, fetchData, render, state, startPolling, stopPolling };
+  window.__promaTreeView = { mount, fetchData, render, state, startPolling, stopPolling,
+                             toggleWatcher, runWatcherNow, fetchWatcherStatus };
 
   init();
 })();

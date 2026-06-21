@@ -2002,7 +2002,13 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", electronAPI);
 try {
   const promaBridge = {
     invoke: (channel, ...args) => {
+      // 补丁 L (UI 面板)
       if (channel === 'proma:get-tree-states' || channel === 'proma:tree-view-ready') {
+        return import_electron.ipcRenderer.invoke(channel, ...args);
+      }
+      // 补丁 M (Watcher 控制)
+      if (['proma:watcher-status', 'proma:watcher-toggle', 'proma:watcher-set-interval',
+           'proma:watcher-run-now', 'proma:watcher-config-patch'].includes(channel)) {
         return import_electron.ipcRenderer.invoke(channel, ...args);
       }
       return Promise.reject(new Error('unknown proma invoke channel: ' + channel));

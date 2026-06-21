@@ -289,3 +289,102 @@
   background: var(--bg-color, #1a1a1a);
   color: var(--text-color, #e5e7eb);
 }
+
+/* === 补丁 M: Watcher 按钮 === */
+.ptv-watcher-btn {
+  font-weight: bold;
+}
+.ptv-watcher-btn:hover {
+  background: #1f2937;
+  color: #22c55e;
+}
+
+/* === 补丁 M: 违规详情弹窗 === */
+.ptv-violations-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--proma-bg, #ffffff);
+  color: var(--proma-fg, #1f2937);
+  border: 1px solid var(--proma-border, #e5e7eb);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  max-width: 500px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 12px 16px;
+  z-index: 10001;
+  font-size: 12px;
+}
+.dark .ptv-violations-popup,
+[class*="dark"] .ptv-violations-popup {
+  background: #1a1a1a;
+  color: #e5e7eb;
+  border-color: #333;
+}
+.ptv-popup-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--proma-border, #e5e7eb);
+}
+.ptv-popup-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 18px;
+  line-height: 1;
+}
+.ptv-violation-entry {
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border-left: 3px solid;
+  background: var(--proma-hover, #f9fafb);
+  border-radius: 0 3px 3px 0;
+}
+.ptv-violation-entry.ptv-severity-high { border-left-color: #ef4444; }
+.ptv-violation-entry.ptv-severity-mid { border-left-color: #f59e0b; }
+.ptv-violation-entry.ptv-severity-low { border-left-color: #3b82f6; }
+
+.ptv-violation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ptv-violation-rule {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-weight: 600;
+  font-size: 11px;
+}
+.ptv-violation-sev {
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 2px;
+  color: white;
+}
+.ptv-violation-sev.ptv-severity-high { background: #ef4444; }
+.ptv-violation-sev.ptv-severity-mid { background: #f59e0b; }
+.ptv-violation-sev.ptv-severity-low { background: #3b82f6; }
+.ptv-violation-ts {
+  margin-left: auto;
+  color: var(--proma-fg-muted, #9ca3af);
+  font-size: 10px;
+}
+.ptv-violation-evidence {
+  color: var(--proma-fg, #1f2937);
+  margin: 2px 0;
+}
+.ptv-violation-suggest {
+  color: #22c55e;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.ptv-violation-note {
+  color: var(--proma-fg-muted, #9ca3af);
+  font-size: 10px;
+  font-style: italic;
+  margin-top: 2px;
+}
