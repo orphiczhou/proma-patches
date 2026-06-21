@@ -1,0 +1,59 @@
+{
+  "_meta": {
+    "version": "v0.1-TAO",
+    "created": "2026-06-21",
+    "source": "Q3 方案 §5 v1.2",
+    "total_rules": 35,
+    "by_role": { "commander": 16, "worker": 13, "root": 6 },
+    "schema": {
+      "id": "规则 ID（C-NN/W-NN/R-NN）",
+      "role": "commander|worker|root",
+      "rule": "规则一句话描述",
+      "source": "来源文档与条款",
+      "data_source": "从哪个工具/文件取数据",
+      "query_method": "具体到字段、索引、正则的查询方法",
+      "verdict_logic": "明确的 pass/fail 条件（不含主观措辞）",
+      "degradable": "true|false — 是否可在 Flash 不可用时降级为字符串匹配",
+      "added_in": "v1.0|v1.1|v1.2"
+    }
+  },
+  "rules": [
+    {"id": "C-01", "role": "commander", "rule": "收到任务后必须创建 plan（含 milestones 列表）", "source": "commander SKILL §1", "data_source": "TaskCreate 工具调用记录 或 plan 上行消息", "query_method": "检查 TaskList 返回的 tasks 数量 ≥2，或搜索消息中 sub_missions 数组", "verdict_logic": "tasks>=2 或 sub_missions.length>=1 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-02", "role": "commander", "rule": "每个 milestone 的 expect_outputs 必须非空", "source": "tree-state.js milestones", "data_source": "tree-state.json milestones 数组", "query_method": "leaf get 读取所有 milestone，检查 expect_outputs 字段", "verdict_logic": "所有 milestone.expect_outputs 非空字符串 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-03", "role": "commander", "rule": "每个 milestone 完成后必须调用 milestone set-result", "source": "tree-state.js milestones", "data_source": "tree-state.json milestones 数组", "query_method": "检查每个 milestone.status", "verdict_logic": "所有 milestone.status === done → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-04", "role": "commander", "rule": "self_audit 消息索引 < 第一个 send_message(子会话, 含 brief) 索引", "source": "方法论原则 6", "data_source": "源会话 list_messages", "query_method": "搜索 self_audit 或 自审 消息索引 → 搜索第一条含 brief: 的 send_message 调用索引 → 比较", "verdict_logic": "self_audit_idx < first_send_idx → pass", "degradable": false, "added_in": "v1.0"},
+    {"id": "C-05", "role": "commander", "rule": "发给子会话的首条 send_message 必须含 5 段 YAML（brief/dod/report/autonomy/self_audit）", "source": "方法论原则 5", "data_source": "对子会话的 list_messages(limit=1)", "query_method": "解析首条 user 消息，搜索 5 个顶层 YAML key", "verdict_logic": "5 个 key 全部存在且值非空 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-06", "role": "commander", "rule": "所有子节点 done 后方可声明自己的 done", "source": "tree-state.js E_CHILDREN_NOT_DONE", "data_source": "tree-state.js leaf set-status done 返回值", "query_method": "CLI 返回 ok 而非 E_CHILDREN_NOT_DONE", "verdict_logic": "返回 ok → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-07", "role": "commander", "rule": "done 消息必须附 self_audit 报告", "source": "方法论原则 6", "data_source": "源会话 list_messages 最后 10 条", "query_method": "正则匹配 /self[ _-]?audit|自审|自查报告/i + 检查匹配消息含 pass/fail 判定或逐条 gate 结论", "verdict_logic": "正则命中 且 含判定 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-08", "role": "commander", "rule": "self_audit 必须逐条回应 dod.quality_gates（按数组索引对齐，不要求 gate_id）", "source": "方法论原则 6（v1.2 修订）", "data_source": "done 消息 + root_dod", "query_method": "提取 self_audit 检查结论数组 + dod.quality_gates 数组 → 比对数组长度 + 逐索引检查 pass/fail 存在", "verdict_logic": "长度相等 且 每条有 verdict → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-09", "role": "commander", "rule": "声称的产出文件绝对路径必须真实存在", "source": "方法论原则 4", "data_source": "done 消息中的 deliverables 路径列表", "query_method": "Read(绝对路径) 逐一验证", "verdict_logic": "全部文件存在 → pass；ENOENT → fail；EACCES → warn", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-10", "role": "commander", "rule": "若 leaf add 的 role=commander，brief 必须含 max_commander_depth 字段且值 ≤2", "source": "方法论原则 13", "data_source": "对子 Commander 的 send_message 首条", "query_method": "解析 brief YAML 中 max_commander_depth 字段", "verdict_logic": "字段存在且 ≤2 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "C-11", "role": "commander", "rule": "Commander 严禁直接 Read/Write tree-state.json", "source": "方法论原则 8 + commander SKILL 铁律 1", "data_source": "源会话 Bash/Read/Write 调用历史", "query_method": "搜索包含 tree-state.json 的 Read/Write/Bash 调用", "verdict_logic": "无直接操作 → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "C-12", "role": "commander", "rule": "Commander 严禁混用双轨——判断用 Agent 工具，执行用 fork/create_session", "source": "方法论原则 2（v1.2 修订）", "data_source": "源会话 Agent 工具调用 + fork/create_session 记录", "query_method": "(a) Agent() 调用次数 > fork+create 次数 → 判定为判断轨过重；(b) fork/create_session 的 task 含 分析/审查/评估/审计/判断/规划 → 执行轨混入判断", "verdict_logic": "两种判定均为 fail → fail", "degradable": false, "added_in": "v1.1"},
+    {"id": "C-13", "role": "commander", "rule": "文档审计/验证场景必须 Fork ≥4 个独立审查子会话", "source": "方法论原则 6 + commander SKILL 铁律 5", "data_source": "tree-state.json leaves", "query_method": "筛选 role=worker 且 brief 含 review/审计/审查 的 leaf，统计数量", "verdict_logic": "worker 审查 leaf ≥4 → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "C-14", "role": "commander", "rule": "重要产出必须落盘到磁盘（.context/ 或指定路径）", "source": "方法论原则 10", "data_source": "done 消息 deliverables 列表", "query_method": "对每个 deliverable 调用 Read 验证文件存在 + 行数 ≥10", "verdict_logic": "全部存在且非空 → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "C-15", "role": "commander", "rule": "禁止用 fork_session 创建 role=worker 的 leaf", "source": "方法论原则 11", "data_source": "tree-state.json leaf 的 session 创建方式", "query_method": "get_session_info(session_id) 检查 source_session_id 字段", "verdict_logic": "create_session 创建（无 source_session_id）→ pass；fork 创建 → fail", "degradable": true, "added_in": "v1.1"},
+    {"id": "C-16", "role": "commander", "rule": "发给子会话的契约消息（含 brief 的 send_message）长度禁止 <100 字符", "source": "commander SKILL §11 禁止 #2（v1.2 新增）", "data_source": "Commander 的 send_message 调用记录", "query_method": "筛选目标为子会话的 send_message，检查 message 参数长度", "verdict_logic": "全部 ≥100 chars → pass", "degradable": true, "added_in": "v1.2"},
+
+    {"id": "W-01", "role": "worker", "rule": "首条自身 assistant 消息必须含 event: brief_echo YAML 块", "source": "worker SKILL 铁律 1", "data_source": "目标会话 list_messages(limit=50)，筛选 role=assistant", "query_method": "按 timestamp 升序取第一条自身消息，搜索 event: 后紧邻 brief_echo", "verdict_logic": "命中 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-02", "role": "worker", "rule": "brief_echo 必须包含 dod_essence 字段且非空且 ≥20 字符", "source": "worker SKILL 铁律 1", "data_source": "brief_echo YAML 块", "query_method": "解析 brief_echo，提取 dod_essence 字段，检查长度", "verdict_logic": "存在且 len≥20 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-03", "role": "worker", "rule": "milestones 必须按 M1,M2,M3... 顺序排列且全部 status=done", "source": "tree-state.js milestones", "data_source": "done 消息中的 milestones 数组", "query_method": "逐一检查 M1.status=done, M2.status=done...，无跳过", "verdict_logic": "全部 done 且 ID 连续 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-04", "role": "worker", "rule": "done 消息中的每个 milestone 必须含 note_path 且对应文件存在", "source": "方法论原则 10", "data_source": "done 消息 milestones 数组", "query_method": "提取 note_path → 拼接 workspace_root 绝对路径 → Read 验证", "verdict_logic": "全部文件存在 + 行数≥10 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-05", "role": "worker", "rule": "done 消息必须含 self_check 字段，值为数组且长度 ≥1", "source": "worker SKILL §done 格式", "data_source": "done 消息", "query_method": "解析 YAML，检查 self_check 是否为数组 + 长度 + 每项含 item/pass 字段", "verdict_logic": "数组长度≥1 且 每项含 item/pass → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-06", "role": "worker", "rule": "self_check 条目数必须等于 dod.quality_gates 条目数（按数组索引对齐）", "source": "worker SKILL §done 格式（v1.2 修订）", "data_source": "done 消息 self_check + dod.quality_gates", "query_method": "提取 self_check 数组长度 + quality_gates 数组长度 → 比对；逐索引检查 self_check[i].pass 存在", "verdict_logic": "长度相等 且 每索引有 pass 值 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-07", "role": "worker", "rule": "声称的产出文件绝对路径必须真实存在", "source": "方法论原则 4", "data_source": "同 C-09", "query_method": "同 C-09", "verdict_logic": "同 C-09", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-08", "role": "worker", "rule": "不得执行任何修改 tree-state 的 CLI 命令", "source": "worker SKILL 铁律 2", "data_source": "目标会话 Bash 调用历史", "query_method": "搜索是否含 tree-state.js 的写命令（leaf add/set-status, milestone add/set-result, event/drift/heartbeat/segment append, init, backup, restore）", "verdict_logic": "无写命令 → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-09", "role": "worker", "rule": "连续 ≥3 次同类工具调用失败（同一工具+同类错误）且未见 blocked 消息", "source": "worker SKILL 铁律 4（v1.1 降级）", "data_source": "目标会话工具调用历史", "query_method": "搜索连续的 error 返回，检查其后是否有 blocked YAML 消息", "verdict_logic": "无连续≥3次同类错误 或 有blocked → pass", "degradable": true, "added_in": "v1.0"},
+    {"id": "W-10", "role": "worker", "rule": "每个 milestone 完成后必须 Fork code-reviewer 做独立自审", "source": "worker SKILL 铁律 3（v1.2 修订）", "data_source": "目标会话 fork_session 调用 + milestone set-result 时间戳", "query_method": "检查每个 milestone 的 set-result 时间前后 120 秒窗口内是否有 fork_session 调用（±120s）", "verdict_logic": "每个 milestone 在时间窗口内对应 ≥1 次 fork → pass", "degradable": false, "added_in": "v1.0"},
+    {"id": "W-11", "role": "worker", "rule": "单条 assistant 消息长度禁止 >5K 字符", "source": "worker SKILL 铁律 5（v1.1 新增）", "data_source": "目标会话 list_messages", "query_method": "逐条检查 assistant 消息的 text 长度", "verdict_logic": "全部 ≤5000 chars → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "W-12", "role": "worker", "rule": "上行消息 type 必须是 done/blocked/plan/brief_echo 之一", "source": "worker SKILL 铁律 7（v1.1 新增）", "data_source": "目标会话的上行消息", "query_method": "解析每条上行消息的 event 字段", "verdict_logic": "全部 event ∈ {done,blocked,plan,brief_echo} → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "W-13", "role": "worker", "rule": "done 消息的 blocked_history 数组必须记录所有超过 brief 原定范围的产出说明", "source": "worker SKILL（v1.2 降级）", "data_source": "done 消息的 blocked_history 字段", "query_method": "检查 done 消息 YAML 中 blocked_history 是否为数组；若 deliverables 中任何文件路径不在 brief.in_scope 描述的关键词集中（精确字符串匹配），则要求 blocked_history 非空", "verdict_logic": "blocked_history 数组 ≥ out_of_scope 疑似命中数 → pass", "degradable": true, "added_in": "v1.0"},
+
+    {"id": "R-01", "role": "root", "rule": "必须是唯一的 root（parent=null 且 role=root）", "source": "方法论原则 1 + tree-state.js", "data_source": "tree-state.js validate", "query_method": "validate 已校验", "verdict_logic": "引用 validate 结果", "degradable": true, "added_in": "v1.0"},
+    {"id": "R-02", "role": "root", "rule": "第一个 leaf add 之前，必须存在 TaskCreate tasks≥2 或含 ≥2 子任务拆解的消息", "source": "方法论原则 2（v1.1 改写）", "data_source": "TaskList 或根会话消息", "query_method": "TaskList count≥2，或搜索消息中 my_mission/in_scope 结构", "verdict_logic": "tasks≥2 或 子任务≥2 → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "R-03", "role": "root", "rule": "存在整合 leaf（role:commander/worker, parent=root, brief 含 integrate/整合 关键词, done时间晚于其他 leaf）", "source": "方法论原则（v1.1 改写）", "data_source": "tree-state.json leaves", "query_method": "筛选整合 leaf，检查 done 时间 > 所有非整合 leaf 的 done 时间", "verdict_logic": "存在符合的整合 leaf → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "R-04", "role": "root", "rule": "所有 Worker leaf 的 milestone audit_pass 必须全部为 true", "source": "方法论原则 4（v1.1 改写）", "data_source": "tree-state.js leaf list-all", "query_method": "检查每个 role=worker 的 leaf 的 milestones[*].audit_pass", "verdict_logic": "全部 true → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "R-05", "role": "root", "rule": "整树必须走完三步质量门（实施→回归测试→审计）", "source": "方法论原则 3（v1.1 新增）", "data_source": "tree-state.json events + audit_log", "query_method": "检查是否存在：实施阶段 leaf done + 回归测试 leaf done + 审计 leaf done", "verdict_logic": "三个阶段都有对应 done leaf → pass", "degradable": true, "added_in": "v1.1"},
+    {"id": "R-06", "role": "root", "rule": "关键交付物必须经过独立验证（非产出 Agent 自身）", "source": "方法论原则 4（v1.1 新增）", "data_source": "tree-state.json leaves", "query_method": "检查交付物对应的验证 leaf 的 session_id ≠ 交付 leaf 的 session_id", "verdict_logic": "验证者≠产出者 → pass", "degradable": true, "added_in": "v1.1"}
+  ]
+}

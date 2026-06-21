@@ -1,0 +1,291 @@
+/* Proma Tree View Panel — v0.1 (补丁 L) */
+/* 树形任务面板样式 */
+
+.ptv-panel {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+  font-size: 12px;
+  background: var(--proma-bg, #ffffff);
+  color: var(--proma-fg, #1f2937);
+  border-bottom: 1px solid var(--proma-border, #e5e7eb);
+  max-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+  user-select: none;
+}
+.ptv-panel.ptv-collapsed { max-height: 32px; }
+.ptv-panel.ptv-collapsed .ptv-panel-body { display: none; }
+
+.ptv-panel.ptv-floating {
+  position: fixed;
+  top: 36px;
+  left: 4px;
+  width: 280px;
+  max-height: 50vh;
+  z-index: 9999;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* 头部 */
+.ptv-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--proma-header-bg, #f9fafb);
+  border-bottom: 1px solid var(--proma-border, #e5e7eb);
+  flex-shrink: 0;
+}
+.ptv-panel-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--proma-fg, #1f2937);
+}
+.ptv-panel-actions {
+  display: flex;
+  gap: 2px;
+}
+.ptv-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--proma-fg-muted, #6b7280);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+.ptv-btn:hover {
+  background: var(--proma-hover, #f3f4f6);
+  color: var(--proma-fg, #1f2937);
+}
+.ptv-btn-close { font-size: 14px; }
+
+/* 面板内容 */
+.ptv-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.ptv-panel-body::-webkit-scrollbar {
+  width: 6px;
+}
+.ptv-panel-body::-webkit-scrollbar-thumb {
+  background: var(--proma-scrollbar, #d1d5db);
+  border-radius: 3px;
+}
+
+.ptv-empty, .ptv-error {
+  padding: 12px 16px;
+  color: var(--proma-fg-muted, #6b7280);
+  font-style: italic;
+  text-align: center;
+}
+.ptv-error { color: #ef4444; }
+
+.ptv-workspace {
+  padding: 4px 10px;
+  font-size: 10px;
+  color: var(--proma-fg-muted, #9ca3af);
+  border-top: 1px solid var(--proma-border, #f3f4f6);
+  margin-top: 4px;
+}
+
+/* tree 容器 */
+.ptv-tree {
+  padding: 2px 0 6px;
+  border-bottom: 1px dashed var(--proma-border, #f3f4f6);
+}
+.ptv-tree:last-child { border-bottom: none; }
+
+.ptv-tree-header {
+  display: none;  /* 头部移到子元素中 */
+}
+
+.ptv-tree .ptv-tree-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--proma-tree-header-bg, #f3f4f6);
+  font-weight: 600;
+}
+.ptv-tree-id {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  color: var(--proma-tree-id, #111827);
+}
+.ptv-tree-count {
+  font-size: 10px;
+  background: var(--proma-badge-bg, #e5e7eb);
+  color: var(--proma-badge-fg, #4b5563);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: normal;
+}
+
+/* leaf 节点 */
+.ptv-leaf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+.ptv-leaf:hover {
+  background: var(--proma-hover, #f3f4f6);
+}
+.ptv-leaf-pending {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.ptv-role {
+  font-size: 12px;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.ptv-leaf-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ptv-leaf-title {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--proma-fg, #1f2937);
+}
+.ptv-leaf-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--proma-fg-muted, #6b7280);
+}
+
+.ptv-dot, .ptv-gate-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ptv-status {
+  font-size: 10px;
+}
+
+.ptv-milestone {
+  font-family: 'SF Mono', 'Consolas', monospace;
+  background: var(--proma-badge-bg, #f3f4f6);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.ptv-nudge {
+  color: #f59e0b;
+  font-weight: bold;
+}
+
+.ptv-context {
+  color: var(--proma-fg-muted, #9ca3af);
+}
+
+/* 子树 */
+.ptv-subtree {
+  position: relative;
+}
+.ptv-children {
+  position: relative;
+}
+.ptv-children::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--proma-tree-line, #e5e7eb);
+}
+.ptv-children.ptv-collapsed {
+  display: none;
+}
+
+/* 孤儿节点 */
+.ptv-orphans {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--proma-border, #f3f4f6);
+}
+.ptv-orphan-header {
+  padding: 2px 10px;
+  font-size: 10px;
+  color: var(--proma-fg-muted, #9ca3af);
+  font-style: italic;
+}
+
+.ptv-flat {
+  padding: 4px 0;
+}
+
+/* Toast */
+.ptv-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1f2937;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.ptv-toast.ptv-toast-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* === 暗色主题 === */
+.dark .ptv-panel,
+[class*="dark"] .ptv-panel {
+  --proma-bg: #1a1a1a;
+  --proma-fg: #e5e7eb;
+  --proma-fg-muted: #9ca3af;
+  --proma-border: #2d2d2d;
+  --proma-header-bg: #222;
+  --proma-hover: #262626;
+  --proma-scrollbar: #3a3a3a;
+  --proma-tree-header-bg: #222;
+  --proma-tree-id: #fbbf24;
+  --proma-badge-bg: #333;
+  --proma-badge-fg: #d1d5db;
+  --proma-tree-line: #333;
+}
+.dark .ptv-panel.ptv-floating,
+[class*="dark"] .ptv-panel.ptv-floating {
+  background: #1a1a1a;
+  border-color: #333;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+/* 主题: theme-proma-amber / theme-proma-mint 等特殊风格兼容 */
+[class*="theme-"] .ptv-panel {
+  background: var(--bg-color, #1a1a1a);
+  color: var(--text-color, #e5e7eb);
+}
