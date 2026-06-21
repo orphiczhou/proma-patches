@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-20 16:40 | 维护者: 周星星
+> 最后更新: 2026-06-21 09:18 | 维护者: 周星星
 
 ---
 
@@ -514,6 +514,27 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 5. **正式版升级后 renderer 版本漂移：** 补丁 D 解决，升级后需同步 renderer 文件。
 
 6. **MCP 创建的会话在 UI 中打开时 session 丢失/上下文回填（v0.11 发现，v0.12 修复）：** 跨渠道切换模型时，renderer 请求的 channelId 与 metadata 不一致，SDK 尝试 resume 但找不到旧 session。补丁 F 检测跨渠道差异后清除 `sdkSessionId`，走上下文回填路径避免硬撞 "Session 已失效"。
+
+7. **[1211] 模型不存在 — LAN 机器 DeepSeek/MiniMax 渠道 MCP 调用失败（2026-06-21 发现，待排查）：**
+
+  **现象：** LAN 机器 (192.168.3.25, Win10, Node v24) 上，通过 Proma HTTP API (`/send_message`) 调用 DeepSeek/MiniMax 渠道时，SDK 返回 `API Error: 400 [1211][模型不存在，请检查模型代码。]`。本地 (Win11, Node v22) 相同代码、相同渠道配置正常工作。只影响 standalone 渠道（provider=deepseek/anthrophic），proma-official 渠道和 zhipu-coding 不受影响。
+
+  **已排除的假设：**
+  - ❌ main.cjs / SDK 代码差异：MD5 完全一致 (`95534ee24e...`)，claude.exe MD5 也一致
+  - ❌ API key 无效或解密失败：`safeStorage.decryptString()` 解密成功，key 格式正确 (`sk-3d8e83056...`)
+  - ❌ baseUrl 配置错误：两边都是 `https://api.deepseek.com/anthropic`
+  - ❌ model_id 映射问题：直接传 `deepseek-v4-pro`，本地能通
+  - ❌ 网络/代理/DNS：无代理，直接 curl 从 LAN 调用 DeepSeek API（同 key/同 model/同 URL/同 headers）**返回正常**
+  - ❌ SDK headers（anthropic-beta/version/UA）：直接 curl 加全部 SDK headers 也能通
+  - ❌ SDK body 参数（thinking/tools/system）：直接 curl 加全部参数也能通
+  - ❌ 认证方式（x-api-key vs Bearer）：两种都能通
+
+  **唯一差异：**
+  - LAN Node v24.12.0 vs 本地 Node v22.13.1
+  - LAN Win10 vs 本地 Win11
+  - 但 claude.exe SDK 二进制是独立编译的，理论上不依赖系统 Node
+
+  **下一步：** 拿到 LAN 上 SDK 进程实际接收的环境变量（ANTHROPIC_BASE_URL、ANTHROPIC_API_KEY 等），与本地对比；或使用 MITM 代理抓取 SDK 发出的完整 HTTP 请求。
 
 ---
 
