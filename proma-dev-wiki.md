@@ -74,6 +74,14 @@
 | patch-M+ v0.4.3 | 2026-06-22 | 第二层 tab 按最近活动时间倒排 (IPC 加 latest_activity_ts=max(last_heartbeat, leaves[].last_event_ts, created_at, mtime)) + 🌳 按钮 onClick dump React props 调试入口定位 |
 | patch-M+ v0.4.4 | 2026-06-23 | 修入口定位: 基于 dump 真实数据用 3 重保险拿 slug (aria-controls UUID + React props.group.workspace.slug + textContent 反查), 加 workspaceIdToSlug 缓存 |
 
+### v0.4.4 验证结果 (2026-06-23)
+
+| 验证点 | 结果 | 根因 |
+|---|---|---|
+| 两层 tab 联动 | ✅ 通过 | - |
+| 入口定位 (从某项目 🌳 进激活该 workspace) | ❌ 10 次只 1 次生效 | injectEntryButton 注入时 fiber 可能没准备好 (DOM 刚渲染), slug=null → MutationObserver 重试时已注入直接 return, slug 永不更新. 修复方向: onClick 时重新调 getWorkspaceSlugFromProjectGroup (点击时 fiber 一定准备好了) |
+| 第二层按最近活动时间倒排 | ❌ 排错 | latest_activity_ts 用 max(leaves.last_event_ts, last_heartbeat, created_at, mtime), 但 **mtime 是文件系统时间**, watcher 跑过会更新文件让 mtime 变很新, 把不活跃 tree 顶上来. 修复方向: 去掉 mtime, 只用业务时间字段 (last_event_ts / last_heartbeat / created_at) |
+
 ### 关键文件
 
 | 文件 | 作用 |
