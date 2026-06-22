@@ -685,8 +685,9 @@
   let observer = null;
 
   // 从项目行 (.group/project) 提取 workspace_slug
-  // 优先用 React fiber props (准), 拿不到就用 textContent 反查 workspaceNameToSlug
+  // 3 重保险: aria-controls UUID → React fiber props.group.workspace.slug → textContent 反查
   let workspaceNameToSlug = {};  // name → slug 缓存 (init 时从 Proma API 拉一次)
+  let workspaceIdToSlug = {};    // id → slug 缓存 (UUID → slug 反查)
 
   async function refreshWorkspaceMap() {
     try {
@@ -695,8 +696,10 @@
       const workspaces = await ea.listAgentWorkspaces();
       if (!Array.isArray(workspaces)) return;
       workspaceNameToSlug = {};
+      workspaceIdToSlug = {};
       for (const ws of workspaces) {
         if (ws && ws.name && ws.slug) workspaceNameToSlug[ws.name] = ws.slug;
+        if (ws && ws.id && ws.slug) workspaceIdToSlug[ws.id] = ws.slug;
       }
     } catch (_) {}
   }
@@ -705,7 +708,18 @@
     try {
       const projectBtn = group.querySelector('button[class*="agent-project-item"]');
       if (!projectBtn) return null;
-      // 方法 1: React fiber props
+
+      // 方法 0 (最稳): aria-controls 含 workspace UUID, 反查 workspaceIdToSlug
+      try {
+        const ariaControls = projectBtn.getAttribute('aria-controls') || '';
+        const uuidMatch = ariaControls.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+        if (uuidMatch) {
+          const wsId = uuidMatch[1];
+          if (workspaceIdToSlug[wsId]) return workspaceIdToSlug[wsId];
+        }
+      } catch (_) {}
+
+      // 方法 1: React fiber props (关键字段: props.group.workspace.slug, props.currentWorkspaceId)
       const fiberKey = Object.keys(projectBtn).find(k =>
         k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
       );
@@ -715,29 +729,27 @@
         while (fiber && depth < 25) {
           const props = fiber.memoizedProps;
           if (props && typeof props === 'object') {
+            // 关键: props.group.workspace.slug (Proma 实际用的字段名)
+            if (props.group && props.group.workspace) {
+              const w = props.group.workspace;
+              if (typeof w.slug === 'string') return w.slug;
+              if (typeof w.id === 'string' && workspaceIdToSlug[w.id]) return workspaceIdToSlug[w.id];
+            }
+            // props.currentWorkspaceId 反查
+            if (typeof props.currentWorkspaceId === 'string' && workspaceIdToSlug[props.currentWorkspaceId]) {
+              return workspaceIdToSlug[props.currentWorkspaceId];
+            }
+            // 通用字段名 (兼容其他可能)
             if (typeof props.workspaceSlug === 'string') return props.workspaceSlug;
             if (props.workspace && typeof props.workspace.slug === 'string') return props.workspace.slug;
             if (props.project && typeof props.project.slug === 'string') return props.project.slug;
-            if (typeof props.slug === 'string' && props.slug.length > 3 && props.slug !== projectBtn.textContent.trim()) return props.slug;
-            for (const k of Object.keys(props)) {
-              const v = props[k];
-              if (v && typeof v === 'object' && !Array.isArray(v)) {
-                if (typeof v.slug === 'string' && (
-                  k.toLowerCase().includes('workspace') ||
-                  k.toLowerCase().includes('project') ||
-                  k.toLowerCase().includes('item')
-                )) {
-                  return v.slug;
-                }
-                if (typeof v.workspaceSlug === 'string') return v.workspaceSlug;
-              }
-            }
           }
           fiber = fiber.return;
           depth++;
         }
       }
-      // 方法 2: textContent 反查 workspaceNameToSlug (init 时缓存的 name → slug 映射)
+
+      // 方法 2: textContent 反查 workspaceNameToSlug
       const text = (projectBtn.textContent || '').trim();
       if (text && workspaceNameToSlug[text]) return workspaceNameToSlug[text];
     } catch (_) {}
