@@ -73,6 +73,7 @@
 | patch-M+ v0.4.2 | 2026-06-22 | 修第一层只显示 1 个 workspace 的 bug: discoverAllWorkspacesWithTrees 不再强制要求 trees 目录存在, 5 个 workspace 都返回 |
 | patch-M+ v0.4.3 | 2026-06-22 | 第二层 tab 按最近活动时间倒排 (IPC 加 latest_activity_ts=max(last_heartbeat, leaves[].last_event_ts, created_at, mtime)) + 🌳 按钮 onClick dump React props 调试入口定位 |
 | patch-M+ v0.4.4 | 2026-06-23 | 修入口定位: 基于 dump 真实数据用 3 重保险拿 slug (aria-controls UUID + React props.group.workspace.slug + textContent 反查), 加 workspaceIdToSlug 缓存 |
+| patch-M+ v0.4.5-a | 2026-06-23 | 修入口定位 race condition: `makeEntryBtn.onClick` 不再用闭包 slug (注入时 React fiber 可能未就绪 → slug=null), 改为每次点击时从 DOM 重新调 `getWorkspaceSlugFromProjectGroup`, 闭包值只作兜底 |
 
 ### v0.4.4 验证结果 (2026-06-23)
 
