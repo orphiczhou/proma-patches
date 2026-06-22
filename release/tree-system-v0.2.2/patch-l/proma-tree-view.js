@@ -422,19 +422,20 @@
   function renderTreeTabs() {
     treeTabsEl.innerHTML = '';
 
-    // 第一层: workspace 选择（如果有多个 workspace 才显示）
-    if (state.workspaces.length > 1) {
+    // 第一层: workspace 选择 (总是显示, 即使只有 1 个, 让用户看到完整 workspace 列表)
+    if (state.workspaces.length > 0) {
       const wsRow = h('div', { className: 'ptv-ws-tabs' });
       for (const ws of state.workspaces) {
         const isSelected = ws.workspace_slug === state.activeWorkspaceSlug;
+        const isEmpty = !ws.tree_count || ws.tree_count === 0;
         const wsTab = h('div', {
-          className: 'ptv-ws-tab' + (isSelected ? ' ptv-ws-tab-active' : '') + (ws.is_current ? ' ptv-ws-tab-current' : ''),
-          title: ws.workspace_slug + (ws.is_current ? ' (当前)' : '') + ' — ' + ws.tree_count + ' tree(s)',
+          className: 'ptv-ws-tab' + (isSelected ? ' ptv-ws-tab-active' : '') + (ws.is_current ? ' ptv-ws-tab-current' : '') + (isEmpty ? ' ptv-ws-tab-empty' : ''),
+          title: (ws.workspace_name || ws.workspace_slug) + (ws.is_current ? ' (当前)' : '') + ' — ' + ws.tree_count + ' tree(s)',
           onClick: () => selectWorkspace(ws.workspace_slug)
         });
-        // workspace 名简化（去掉 uuid 后缀）
-        const shortName = ws.workspace_slug.replace(/-[a-f0-9]{8}-[a-f0-9]{4}.*/i, '');
-        wsTab.appendChild(h('span', { className: 'ptv-ws-tab-name' }, shortName));
+        // 优先用 workspace_name, 没有就退化 slug 简化
+        const displayName = ws.workspace_name || ws.workspace_slug.replace(/-[a-f0-9]{8}-[a-f0-9]{4}.*/i, '');
+        wsTab.appendChild(h('span', { className: 'ptv-ws-tab-name' }, displayName));
         wsTab.appendChild(h('span', { className: 'ptv-ws-tab-count' }, ws.tree_count));
         if (ws.is_current) wsTab.appendChild(h('span', { className: 'ptv-ws-tab-mark', title: '当前 workspace' }, '★'));
         wsRow.appendChild(wsTab);

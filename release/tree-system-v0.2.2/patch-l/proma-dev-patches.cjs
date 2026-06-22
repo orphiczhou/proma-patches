@@ -1231,14 +1231,25 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
       const workspaces = [];
       const allTrees = [];
       const currentSlug = requestedSlug || findCurrentWorkspaceSlug();
+      // 从 Proma API 拿 slug → name 映射 (UI 第一层 tab 显示 name 而非 slug)
+      const slugToName = {};
+      try {
+        const a = api();
+        const allWs = a.listAgentWorkspaces();
+        if (Array.isArray(allWs)) {
+          for (const w of allWs) {
+            if (w && w.slug && w.name) slugToName[w.slug] = w.name;
+          }
+        }
+      } catch (_) {}
       for (const ws of allWorkspaces) {
-        // 不指定 slug 时, 包含所有; 指定时只匹配的
+        // 不指定 slug 时, 包含所有 workspace (即使没 tree 的也返回, 让 UI 显示完整列表)
+        // 指定时只匹配的
         if (requestedSlug && ws.workspace_slug !== requestedSlug) continue;
         const trees = readTreesFromDir(ws.trees_dir, ws.workspace_slug);
-        // 没指定 slug 时, 只包含有 tree 的 workspace
-        if (!requestedSlug && trees.length === 0) continue;
         workspaces.push({
           workspace_slug: ws.workspace_slug,
+          workspace_name: slugToName[ws.workspace_slug] || ws.workspace_slug,
           workspace_root: ws.workspace_root,
           trees_dir: ws.trees_dir,
           kind: ws.kind,
@@ -1246,8 +1257,7 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
           is_current: ws.workspace_slug === currentSlug,
           tree_count: trees.length,
           active_tree_count: trees.filter(t => t.has_active_leaf).length
-        });
-        for (const t of trees) allTrees.push(t);
+        });        for (const t of trees) allTrees.push(t);
       }
 
       // 排序: 当前 workspace 在前, 然后按 tree 数量降序

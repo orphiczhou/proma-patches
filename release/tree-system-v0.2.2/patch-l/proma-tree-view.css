@@ -230,6 +230,7 @@
   border-radius: 3px;
 }
 .ptv-ws-tab-mark { color: #22c55e; font-size: 11px; }
+.ptv-ws-tab-empty { opacity: 0.55; }
 .dark .ptv-ws-tab,
 [class*="dark"] .ptv-ws-tab { background: #262626; color: #9ca3af; }
 .dark .ptv-ws-tab-active,
