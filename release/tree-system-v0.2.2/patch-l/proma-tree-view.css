@@ -275,6 +275,13 @@
   border-left: 3px solid #22c55e;
   padding-left: 7px;
 }
+.ptv-tree-tab:not(.ptv-tree-tab-live):not(.ptv-tree-tab-active) {
+  /* 不活跃 tree 标灰 (用户期望活跃排顶+不活跃标灰) */
+  opacity: 0.5;
+}
+.ptv-tree-tab:not(.ptv-tree-tab-live):not(.ptv-tree-tab-active):hover {
+  opacity: 0.85;
+}
 .ptv-tree-tab-id {
   font-family: 'SF Mono', 'Consolas', monospace;
   font-weight: 600;

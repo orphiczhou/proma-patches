@@ -68,6 +68,7 @@
 | patch-M+ v0.2.1 | 2026-06-22 | 修复数据混杂 — 按 workspace 分组返回（IPC 用 discoverAllWorkspacesWithTrees） |
 | patch-M+ v0.3 | 2026-06-22 | 入口按钮精准注入（每个 .group/project 项目行 absolute 定位 right:60px）+ DOM dump 工具（proma:dom-dump IPC，preload 白名单） |
 | patch-M+ v0.3.1 | 2026-06-22 | IPC 加 instance filter（ISOLATED → ~/.proma-dev，否则 ~/.proma）避免跨实例显示 + 清理临时 debug labels |
+| patch-M+ v0.4 | 2026-06-22 | 入口按钮记忆 workspace_slug（React fiber + textContent 反查兜底）→ 点击从哪个项目进就激活哪个 workspace + 活跃 tree 排顶 + 不活跃 tree 标灰 |
 
 ### 关键文件
 

@@ -78,6 +78,7 @@
   const state = {
     floatingVisible: false,
     activeWorkspaceSlug: null,   // 选中的 workspace
+    pendingWorkspaceSlug: null,  // 用户从特定项目入口进时暂存, fetchData 后激活
     activeTreeId: null,
     workspaces: [],              // [{workspace_slug, is_current, tree_count, ...}]
     trees: [],                   // 所有 tree (每个带 workspace_slug)
@@ -186,10 +187,12 @@
     setupSplitter(splitter);
   }
 
-  function showOverlay() {
+  function showOverlay(workspaceSlug) {
     if (!overlayEl) buildOverlay();
     overlayEl.classList.add('ptv-overlay-show');
     state.floatingVisible = true;
+    // 优先使用传入的 workspace_slug (用户从某个项目入口进)
+    if (workspaceSlug) state.pendingWorkspaceSlug = workspaceSlug;
     fetchData();
     fetchWatcherStatus();
     startPolling();
@@ -297,16 +300,25 @@
       if (result && result.ok) {
         state.workspaces = result.workspaces || [];
         state.trees = result.trees || [];
-        // 默认选中"当前 workspace"（is_current=true）或第一个
-        if (!state.activeWorkspaceSlug || !state.workspaces.find(w => w.workspace_slug === state.activeWorkspaceSlug)) {
+        // 决定 activeWorkspaceSlug: 优先 pendingWorkspaceSlug (用户从特定项目入口进), 否则用 is_current, 否则第一个
+        const pendingSlug = state.pendingWorkspaceSlug;
+        if (pendingSlug && state.workspaces.find(w => w.workspace_slug === pendingSlug)) {
+          state.activeWorkspaceSlug = pendingSlug;
+          state.pendingWorkspaceSlug = null;
+        } else if (!state.activeWorkspaceSlug || !state.workspaces.find(w => w.workspace_slug === state.activeWorkspaceSlug)) {
           const currentWs = state.workspaces.find(w => w.is_current);
           state.activeWorkspaceSlug = currentWs ? currentWs.workspace_slug : (state.workspaces[0] && state.workspaces[0].workspace_slug);
         }
-        // 当前 workspace 下的 tree
-        const wsTrees = state.trees.filter(t => t.workspace_slug === state.activeWorkspaceSlug);
+        // 当前 workspace 下的 tree (按活跃度 + mtime 排序: 活跃 tree 排顶, 不活跃但 mtime 新的次之)
+        const wsTrees = state.trees
+          .filter(t => t.workspace_slug === state.activeWorkspaceSlug)
+          .sort((a, b) => {
+            if (a.has_active_leaf !== b.has_active_leaf) return a.has_active_leaf ? -1 : 1;
+            return (b.mtime_ms || 0) - (a.mtime_ms || 0);
+          });
         if (!state.activeTreeId || !wsTrees.find(t => t.tree_id === state.activeTreeId)) {
-          const activeTree = wsTrees.find(t => t.has_active_leaf);
-          state.activeTreeId = activeTree ? activeTree.tree_id : (wsTrees[0] && wsTrees[0].tree_id);
+          // 默认激活第一个 (排序后最活跃的最新 tree)
+          state.activeTreeId = wsTrees[0] && wsTrees[0].tree_id;
         }
         render();
       } else {
@@ -674,15 +686,78 @@
 
   let observer = null;
 
-  function makeEntryBtn() {
+  // 从项目行 (.group/project) 提取 workspace_slug
+  // 优先用 React fiber props (准), 拿不到就用 textContent 反查 workspaceNameToSlug
+  let workspaceNameToSlug = {};  // name → slug 缓存 (init 时从 Proma API 拉一次)
+
+  async function refreshWorkspaceMap() {
+    try {
+      const ea = window.electronAPI;
+      if (!ea || !ea.listAgentWorkspaces) return;
+      const workspaces = await ea.listAgentWorkspaces();
+      if (!Array.isArray(workspaces)) return;
+      workspaceNameToSlug = {};
+      for (const ws of workspaces) {
+        if (ws && ws.name && ws.slug) workspaceNameToSlug[ws.name] = ws.slug;
+      }
+    } catch (_) {}
+  }
+
+  function getWorkspaceSlugFromProjectGroup(group) {
+    try {
+      const projectBtn = group.querySelector('button[class*="agent-project-item"]');
+      if (!projectBtn) return null;
+      // 方法 1: React fiber props
+      const fiberKey = Object.keys(projectBtn).find(k =>
+        k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
+      );
+      if (fiberKey) {
+        let fiber = projectBtn[fiberKey];
+        let depth = 0;
+        while (fiber && depth < 25) {
+          const props = fiber.memoizedProps;
+          if (props && typeof props === 'object') {
+            if (typeof props.workspaceSlug === 'string') return props.workspaceSlug;
+            if (props.workspace && typeof props.workspace.slug === 'string') return props.workspace.slug;
+            if (props.project && typeof props.project.slug === 'string') return props.project.slug;
+            if (typeof props.slug === 'string' && props.slug.length > 3 && props.slug !== projectBtn.textContent.trim()) return props.slug;
+            for (const k of Object.keys(props)) {
+              const v = props[k];
+              if (v && typeof v === 'object' && !Array.isArray(v)) {
+                if (typeof v.slug === 'string' && (
+                  k.toLowerCase().includes('workspace') ||
+                  k.toLowerCase().includes('project') ||
+                  k.toLowerCase().includes('item')
+                )) {
+                  return v.slug;
+                }
+                if (typeof v.workspaceSlug === 'string') return v.workspaceSlug;
+              }
+            }
+          }
+          fiber = fiber.return;
+          depth++;
+        }
+      }
+      // 方法 2: textContent 反查 workspaceNameToSlug (init 时缓存的 name → slug 映射)
+      const text = (projectBtn.textContent || '').trim();
+      if (text && workspaceNameToSlug[text]) return workspaceNameToSlug[text];
+    } catch (_) {}
+    return null;
+  }
+
+  function makeEntryBtn(workspaceSlug) {
     return h('button', {
       className: 'ptv-entry-btn ptv-entry-btn-project',
-      title: '打开任务树面板 (Ctrl+Shift+T)',
+      title: '打开任务树面板 (Ctrl+Shift+T)' + (workspaceSlug ? ' — ' + workspaceSlug : ''),
       onClick: (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (state.floatingVisible) hideOverlay();
-        else showOverlay();
+        if (state.floatingVisible) {
+          hideOverlay();
+        } else {
+          showOverlay(workspaceSlug);  // 传 workspace_slug 进去, 浮窗默认激活它
+        }
       },
       onMouseDown: (e) => {
         // 保险: 优先于 click 触发, 避免被父级 React 事件系统吞掉
@@ -709,7 +784,9 @@
           injectedAny = true;
           return;  // 已注入
         }
-        const btn = makeEntryBtn();
+        // 提取该项目行的 workspace_slug (从 React fiber props)
+        const workspaceSlug = getWorkspaceSlugFromProjectGroup(group);
+        const btn = makeEntryBtn(workspaceSlug);
         try {
           group.appendChild(btn);
           entryBtnsByProject.set(key, btn);
@@ -926,6 +1003,10 @@
 
   function init() {
     setupKeyboard();
+    // 缓存 workspace name → slug 映射 (供 getWorkspaceSlugFromProjectGroup 反查兜底)
+    refreshWorkspaceMap();
+    // 每 30s 刷一次 (workspace 列表可能变化)
+    setInterval(refreshWorkspaceMap, 30000);
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => startObserver());
     } else {
