@@ -2021,7 +2021,7 @@ try {
       return false;
     },
     on: (channel, listener) => {
-      if (channel === 'proma:navigate-to-session') {
+      if (channel === 'proma:navigate-to-session' || channel === 'proma:navigate-failed') {
         const wrapped = (_event, ...args) => listener(...args);
         import_electron.ipcRenderer.on(channel, wrapped);
         return () => import_electron.ipcRenderer.removeListener(channel, wrapped);

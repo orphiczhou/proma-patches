@@ -1,52 +1,25 @@
-/* Proma Tree View Panel — v0.1 (补丁 L)
- * 独立 vanilla JS 文件，渲染树形任务面板到侧边栏
- * 数据来源: ipcRenderer.invoke('proma:get-tree-states')
- * 点击节点: ipcRenderer.send('proma:navigate-to-session', sessionId)
+/* Proma Tree View — v0.2 Overlay Edition (补丁 M+)
+ * 从侧边栏小面板重写为可调节浮窗
+ *
+ * 入口: 工作区 tab 栏右侧注入的 🌳 按钮 (MutationObserver)
+ * 浮窗: position fixed, 可拖动边缘调整大小, 位置/大小记忆 localStorage
+ * 内部布局: 顶部 tree tabs + watcher 控件 → 左侧横向缩进树 + 右侧详情面板
+ * 点击节点: 触发 tray:open-agent-session 真正切换会话
  */
 (function () {
   'use strict';
 
-  // 等待 ipcRenderer 通过 preload 暴露（如果没暴露则降级为复制 session_id）
+  // ============ 工具函数 ============
+
   function getIpc() {
     try {
       if (typeof window !== 'undefined' && window.promaTreeIpc) return window.promaTreeIpc;
-      // 优先用 preload 暴露的 electronAPI
       if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.proma) {
         return window.electronAPI.proma;
       }
     } catch (_) {}
     return null;
   }
-
-  const POLL_INTERVAL_MS = 3000;
-  const STATUS_COLOR = {
-    active: '#3b82f6',
-    pending_brief: '#a855f7',
-    done: '#22c55e',
-    pruned: '#ef4444',
-    archived: '#6b7280',
-    segment_pending: '#f59e0b'
-  };
-  const STATUS_LABEL = {
-    active: '进行中',
-    pending_brief: '待brief',
-    done: '完成',
-    pruned: '已剪枝',
-    archived: '已归档',
-    segment_pending: '竹节交接'
-  };
-  const ROLE_ICON = {
-    root: '📁',
-    commander: '🔀',
-    worker: '🍃'
-  };
-  const GATE_COLOR = {
-    pass: '#22c55e',
-    required: '#f59e0b',
-    fail: '#ef4444',
-    skip: '#9ca3af',
-    null: '#9ca3af'
-  };
 
   function h(tag, attrs, children) {
     const el = document.createElement(tag);
@@ -55,6 +28,7 @@
         if (k === 'className') el.className = attrs[k];
         else if (k === 'textContent') el.textContent = attrs[k];
         else if (k === 'title') el.title = attrs[k];
+        else if (k === 'style' && typeof attrs[k] === 'string') el.setAttribute('style', attrs[k]);
         else if (k.startsWith('on') && typeof attrs[k] === 'function') {
           el.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
         } else if (attrs[k] !== undefined && attrs[k] !== null) {
@@ -85,359 +59,257 @@
     return Math.floor(sec / 86400) + 'd 前';
   }
 
-  function buildLeafNode(leaf, treeId, expanded) {
-    const statusColor = STATUS_COLOR[leaf.status] || '#9ca3af';
-    const gateColor = GATE_COLOR[leaf.audit_gate ? leaf.audit_gate.verdict : null];
-    const leafNode = h('div', { className: 'ptv-leaf' + (leaf.status === 'pending_brief' ? ' ptv-leaf-pending' : '') });
+  const STATUS_COLOR = {
+    active: '#3b82f6', pending_brief: '#a855f7', done: '#22c55e',
+    pruned: '#ef4444', archived: '#6b7280', segment_pending: '#f59e0b'
+  };
+  const STATUS_LABEL = {
+    active: '进行中', pending_brief: '待brief', done: '完成',
+    pruned: '已剪枝', archived: '已归档', segment_pending: '竹节交接'
+  };
+  const ROLE_ICON = { root: '📁', commander: '🔀', worker: '🍃' };
+  const GATE_COLOR = {
+    pass: '#22c55e', required: '#f59e0b', fail: '#ef4444',
+    skip: '#9ca3af', null: '#9ca3af'
+  };
 
-    // 缩进图标 + 状态圆点
-    leafNode.appendChild(h('span', { className: 'ptv-role', title: 'role: ' + leaf.role }, ROLE_ICON[leaf.role] || '?'));
+  // ============ 浮窗状态 ============
 
-    // 标签内容
-    const main = h('div', { className: 'ptv-leaf-main' });
-    const title = h('div', { className: 'ptv-leaf-title', title: 'session: ' + leaf.session_id }, leaf.leaf_id);
-    main.appendChild(title);
+  const state = {
+    floatingVisible: false,
+    activeTreeId: null,
+    trees: [],
+    selectedLeafId: null,
+    watcherEnabled: null,
+    watcherWatchers: [],
+    pollTimer: null,
+    watcherPollTimer: null,
+    // 浮窗位置/大小（记忆 localStorage）
+    overlayRect: loadOverlayRect()
+  };
 
-    // 元信息行
-    const meta = h('div', { className: 'ptv-leaf-meta' });
-    meta.appendChild(h('span', { className: 'ptv-dot', title: 'status: ' + leaf.status, style: 'background:' + statusColor }));
-    meta.appendChild(h('span', { className: 'ptv-status' }, STATUS_LABEL[leaf.status] || leaf.status));
-
-    // audit_gate 状态点（worker/commander 有）
-    if (leaf.audit_gate && leaf.audit_gate.verdict) {
-      meta.appendChild(h('span', { className: 'ptv-gate-dot', title: 'audit_gate: ' + leaf.audit_gate.verdict, style: 'background:' + gateColor }));
-    }
-    if (leaf.role === 'worker' && leaf.milestones && leaf.milestones.length > 0) {
-      const done = leaf.milestones.filter(m => m.status === 'done').length;
-      meta.appendChild(h('span', { className: 'ptv-milestone' }, done + '/' + leaf.milestones.length));
-    }
-    if (leaf.nudge_count > 0) {
-      // 补丁 M: nudge 标记可点击展开违规列表
-      const nudgeBtn = h('span', {
-        className: 'ptv-nudge',
-        title: '点击查看 ' + leaf.nudge_count + ' 条 watcher 违规记录',
-        onClick: (ev) => {
-          ev.stopPropagation();
-          showViolations(leaf, treeId);
-        }
-      }, '⚠' + leaf.nudge_count);
-      meta.appendChild(nudgeBtn);
-    }
-    if (leaf.context_usage_pct > 0) {
-      meta.appendChild(h('span', { className: 'ptv-context', title: '上下文使用率' }, leaf.context_usage_pct + '%'));
-    }
-    main.appendChild(meta);
-
-    leafNode.appendChild(main);
-
-    // 点击行为
-    leafNode.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      handleLeafClick(leaf, treeId);
-    });
-    return leafNode;
+  function loadOverlayRect() {
+    try {
+      const raw = localStorage.getItem('proma-tree-overlay-rect');
+      if (raw) {
+        const r = JSON.parse(raw);
+        if (r && typeof r.w === 'number' && typeof r.h === 'number') return r;
+      }
+    } catch (_) {}
+    // 默认: 居中 70% 宽, 80% 高
+    return {
+      x: Math.round(window.innerWidth * 0.15),
+      y: Math.round(window.innerHeight * 0.10),
+      w: Math.round(window.innerWidth * 0.70),
+      h: Math.round(window.innerHeight * 0.80)
+    };
   }
 
-  function handleLeafClick(leaf, treeId) {
-    const ipc = getIpc();
-    if (ipc && ipc.send) {
-      // 通过 IPC 发送导航事件
-      ipc.send('proma:navigate-to-session', leaf.session_id);
-    } else {
-      // 降级: 复制到剪贴板
-      try {
-        navigator.clipboard.writeText(leaf.session_id);
-        showToast('已复制 session_id: ' + leaf.session_id.slice(0, 8) + '...');
-      } catch (_) {
-        showToast('session: ' + leaf.session_id);
-      }
-    }
+  function saveOverlayRect(rect) {
+    try { localStorage.setItem('proma-tree-overlay-rect', JSON.stringify(rect)); } catch (_) {}
   }
 
-  function showToast(msg) {
-    const toast = h('div', { className: 'ptv-toast' }, msg);
-    document.body.appendChild(toast);
-    setTimeout(() => toast.classList.add('ptv-toast-show'), 10);
-    setTimeout(() => {
-      toast.classList.remove('ptv-toast-show');
-      setTimeout(() => toast.remove(), 300);
-    }, 2000);
-  }
+  // ============ 浮窗 DOM 构建 ============
 
-  function renderTree(tree, state) {
-    const container = h('div', { className: 'ptv-tree' });
+  let overlayEl = null;
+  let bodyEl = null;
+  let treeTabsEl = null;
+  let treeCanvasEl = null;
+  let detailEl = null;
+  let statusEl = null;
 
-    // tree 头部
-    const header = h('div', { className: 'ptv-tree-header' });
-    const titleArea = h('div', { className: 'ptv-tree-title' });
-    titleArea.appendChild(h('span', { className: 'ptv-tree-id' }, tree.tree_id));
-    const leafCount = Object.keys(tree.leaves || {}).length;
-    titleArea.appendChild(h('span', { className: 'ptv-tree-count' }, leafCount + ' leaves'));
-    header.appendChild(titleArea);
+  function buildOverlay() {
+    overlayEl = h('div', { className: 'ptv-overlay', id: 'proma-tree-overlay' });
+    overlayEl.style.left = state.overlayRect.x + 'px';
+    overlayEl.style.top = state.overlayRect.y + 'px';
+    overlayEl.style.width = state.overlayRect.w + 'px';
+    overlayEl.style.height = state.overlayRect.h + 'px';
 
-    if (tree.error) {
-      container.appendChild(header);
-      container.appendChild(h('div', { className: 'ptv-error' }, '解析失败: ' + tree.error));
-      return container;
-    }
+    // 顶部 header
+    const header = h('div', { className: 'ptv-overlay-header' });
+    header.appendChild(h('span', { className: 'ptv-overlay-title' }, '🌳 任务树'));
 
-    // 构建 children map 并找 root
-    const leaves = tree.leaves || {};
-    const childrenMap = {};
-    let rootLeaf = null;
-    for (const [lid, leaf] of Object.entries(leaves)) {
-      if (leaf.parent === null || leaf.parent === undefined) {
-        rootLeaf = leaf;
-      } else {
-        if (!childrenMap[leaf.parent]) childrenMap[leaf.parent] = [];
-        childrenMap[leaf.parent].push(leaf);
-      }
-    }
-
-    // 递归渲染
-    function renderRecursive(leaf, depth) {
-      const subtree = h('div', { className: 'ptv-subtree', style: 'margin-left:' + (depth * 14) + 'px' });
-      subtree.appendChild(buildLeafNode(leaf, tree.tree_id, state.expanded[leaf.leaf_id]));
-      const kids = childrenMap[leaf.leaf_id] || [];
-      if (kids.length > 0) {
-        const kidsWrap = h('div', { className: 'ptv-children' + (state.expanded[leaf.leaf_id] === false ? ' ptv-collapsed' : '') });
-        // 排序：commander 在前，worker 在后；同类按 leaf_id
-        kids.sort((a, b) => {
-          if (a.role !== b.role) {
-            const order = { commander: 0, worker: 1, root: 2 };
-            return (order[a.role] || 9) - (order[b.role] || 9);
-          }
-          return a.leaf_id.localeCompare(b.leaf_id);
-        });
-        for (const k of kids) {
-          kidsWrap.appendChild(renderRecursive(k, depth + 1));
-        }
-        subtree.appendChild(kidsWrap);
-      }
-      return subtree;
-    }
-
-    if (rootLeaf) {
-      container.appendChild(renderRecursive(rootLeaf, 0));
-      // 处理孤儿子节点（parent 不在树中的）
-      const orphans = Object.values(leaves).filter(l => l !== rootLeaf && !leaves[l.parent]);
-      if (orphans.length > 0) {
-        const orphanWrap = h('div', { className: 'ptv-orphans' });
-        orphanWrap.appendChild(h('div', { className: 'ptv-orphan-header' }, '孤儿子节点 (' + orphans.length + ')'));
-        for (const o of orphans) orphanWrap.appendChild(renderRecursive(o, 1));
-        container.appendChild(orphanWrap);
-      }
-    } else {
-      // 没有根 leaf，平铺所有 leaves
-      const flat = h('div', { className: 'ptv-flat' });
-      for (const leaf of Object.values(leaves)) {
-        flat.appendChild(buildLeafNode(leaf, tree.tree_id, state.expanded[leaf.leaf_id]));
-      }
-      container.appendChild(flat);
-    }
-
-    container.appendChild(header);  // 头部放最前
-    container.insertBefore(header, container.firstChild);
-    return container;
-  }
-
-  // 主面板
-  function createPanel() {
-    const panel = h('div', { className: 'ptv-panel', id: 'proma-tree-panel' });
-    const header = h('div', { className: 'ptv-panel-header' });
-    header.appendChild(h('span', { className: 'ptv-panel-title' }, '🌳 任务树'));
-    const actions = h('div', { className: 'ptv-panel-actions' });
-
-    // Watcher 控件 (补丁 M)
+    // Watcher 控件区
+    const watcherArea = h('div', { className: 'ptv-overlay-watcher' });
     const watcherBtn = h('button', {
       className: 'ptv-btn ptv-watcher-btn',
       title: 'TAO Watcher 开关',
       onClick: () => toggleWatcher()
     }, '👁…');
-    const watcherRunBtn = h('button', {
+    const runBtn = h('button', {
       className: 'ptv-btn',
       title: '立即跑一次 Watcher 检查',
       onClick: () => runWatcherNow()
     }, '⚡');
-    actions.appendChild(watcherBtn);
-    actions.appendChild(watcherRunBtn);
+    watcherArea.appendChild(watcherBtn);
+    watcherArea.appendChild(runBtn);
+    header.appendChild(watcherArea);
 
-    const refreshBtn = h('button', { className: 'ptv-btn', title: '刷新', onClick: () => fetchData() }, '↻');
-    const collapseBtn = h('button', { className: 'ptv-btn', title: '折叠/展开全部', onClick: () => toggleAll() }, '⇕');
-    const closeBtn = h('button', { className: 'ptv-btn ptv-btn-close', title: '折叠面板', onClick: () => panel.classList.toggle('ptv-collapsed') }, '–');
-    actions.appendChild(refreshBtn);
-    actions.appendChild(collapseBtn);
-    actions.appendChild(closeBtn);
-    header.appendChild(actions);
-    panel.appendChild(header);
+    // 关闭按钮
+    const closeBtn = h('button', {
+      className: 'ptv-btn ptv-overlay-close',
+      title: '关闭浮窗 (ESC)',
+      onClick: () => hideOverlay()
+    }, '×');
+    header.appendChild(closeBtn);
+    overlayEl.appendChild(header);
 
-    const body = h('div', { className: 'ptv-panel-body' }, '加载中...');
-    panel.appendChild(body);
+    // tree tabs 栏（在 header 下面）
+    treeTabsEl = h('div', { className: 'ptv-tree-tabs' });
+    overlayEl.appendChild(treeTabsEl);
 
-    return { panel, body };
+    // body（左树 + 右详情）
+    bodyEl = h('div', { className: 'ptv-overlay-body' });
+    treeCanvasEl = h('div', { className: 'ptv-tree-canvas' });
+    const splitter = h('div', { className: 'ptv-splitter' });
+    detailEl = h('div', { className: 'ptv-detail-panel' });
+    bodyEl.appendChild(treeCanvasEl);
+    bodyEl.appendChild(splitter);
+    bodyEl.appendChild(detailEl);
+    overlayEl.appendChild(bodyEl);
+
+    // 底部状态条
+    statusEl = h('div', { className: 'ptv-overlay-status' }, '就绪');
+    overlayEl.appendChild(statusEl);
+
+    // 拖动调整大小（右下角）
+    const resizeHandle = h('div', { className: 'ptv-resize-handle' });
+    overlayEl.appendChild(resizeHandle);
+    setupResize(resizeHandle);
+    setupDrag(header);
+
+    document.body.appendChild(overlayEl);
+
+    // Splitter 拖动（左右分栏）
+    setupSplitter(splitter);
   }
 
-  // 全局状态
-  const state = {
-    expanded: {},           // leaf_id → bool (false=collapsed)
-    lastTrees: [],
-    workspaceRoot: null,
-    pollTimer: null,
-    watcherEnabled: null,   // null=未加载, true/false=开关状态
-    watcherWatchers: []     // [{ workspace_id, last_run_at, last_run_status, ... }]
-  };
-
-  function toggleAll() {
-    const anyExpanded = Object.values(state.expanded).some(v => v !== false);
-    for (const lid of Object.keys(state.expanded)) state.expanded[lid] = anyExpanded ? false : true;
-    render();
+  function showOverlay() {
+    if (!overlayEl) buildOverlay();
+    overlayEl.classList.add('ptv-overlay-show');
+    state.floatingVisible = true;
+    fetchData();
+    fetchWatcherStatus();
+    startPolling();
   }
 
-  function render() {
-    const body = document.querySelector('.ptv-panel-body');
-    if (!body) return;
-    body.innerHTML = '';
+  function hideOverlay() {
+    if (overlayEl) overlayEl.classList.remove('ptv-overlay-show');
+    state.floatingVisible = false;
+    stopPolling();
+  }
 
-    if (!state.lastTrees || state.lastTrees.length === 0) {
-      body.appendChild(h('div', { className: 'ptv-empty' }, '暂无活跃任务树'));
-      return;
-    }
+  // ============ 拖动 ============
 
-    // 排序：最近更新的在前
-    const sorted = state.lastTrees.slice().sort((a, b) => {
-      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return tb - ta;
+  function setupDrag(handleEl) {
+    let dragging = false;
+    let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    handleEl.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;  // 不拖按钮
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = state.overlayRect.x;
+      startTop = state.overlayRect.y;
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
     });
-
-    for (const tree of sorted) {
-      // 初始化 expanded 状态（首次见到时默认展开）
-      for (const lid of Object.keys(tree.leaves || {})) {
-        if (!(lid in state.expanded)) state.expanded[lid] = true;
-      }
-      body.appendChild(renderTree(tree, state));
-    }
-
-    if (state.workspaceRoot) {
-      body.appendChild(h('div', { className: 'ptv-workspace', title: state.workspaceRoot }, '📂 ' + state.workspaceRoot.replace(/\\/g, '/').split('/').slice(-3).join('/')));
-    }
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      state.overlayRect.x = Math.max(0, Math.min(window.innerWidth - 100, startLeft + dx));
+      state.overlayRect.y = Math.max(0, Math.min(window.innerHeight - 50, startTop + dy));
+      overlayEl.style.left = state.overlayRect.x + 'px';
+      overlayEl.style.top = state.overlayRect.y + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (dragging) { dragging = false; document.body.style.userSelect = ''; saveOverlayRect(state.overlayRect); }
+    });
   }
+
+  function setupResize(handleEl) {
+    let resizing = false;
+    let startX = 0, startY = 0, startW = 0, startH = 0;
+    handleEl.addEventListener('mousedown', (e) => {
+      resizing = true;
+      startX = e.clientX; startY = e.clientY;
+      startW = state.overlayRect.w;
+      startH = state.overlayRect.h;
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!resizing) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      state.overlayRect.w = Math.max(400, Math.min(window.innerWidth - state.overlayRect.x - 10, startW + dx));
+      state.overlayRect.h = Math.max(300, Math.min(window.innerHeight - state.overlayRect.y - 10, startH + dy));
+      overlayEl.style.width = state.overlayRect.w + 'px';
+      overlayEl.style.height = state.overlayRect.h + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (resizing) { resizing = false; document.body.style.userSelect = ''; saveOverlayRect(state.overlayRect); }
+    });
+  }
+
+  function setupSplitter(splitterEl) {
+    let splitting = false;
+    let startX = 0;
+    let startTreeW = 0;
+    splitterEl.addEventListener('mousedown', (e) => {
+      splitting = true;
+      startX = e.clientX;
+      startTreeW = treeCanvasEl.offsetWidth;
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!splitting) return;
+      const dx = e.clientX - startX;
+      const newTreeW = Math.max(200, Math.min(bodyEl.offsetWidth - 200, startTreeW + dx));
+      treeCanvasEl.style.flex = '0 0 ' + newTreeW + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (splitting) {
+        splitting = false;
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      }
+    });
+  }
+
+  // ============ 数据获取 ============
 
   async function fetchData() {
     const ipc = getIpc();
     if (!ipc || !ipc.invoke) {
-      const body = document.querySelector('.ptv-panel-body');
-      if (body) body.innerHTML = '';
-      if (body) body.appendChild(h('div', { className: 'ptv-error' }, 'ipcRenderer 不可用（请检查 preload 是否暴露 proma API）'));
+      if (treeCanvasEl) treeCanvasEl.innerHTML = '';
+      if (treeCanvasEl) treeCanvasEl.appendChild(h('div', { className: 'ptv-empty' }, 'IPC 不可用（请检查 preload）'));
       return;
     }
     try {
       const result = await ipc.invoke('proma:get-tree-states', {});
       if (result && result.ok) {
-        state.lastTrees = result.trees || [];
-        state.workspaceRoot = result.workspace_root;
-      } else {
-        state.lastTrees = [];
-      }
-      render();
-    } catch (e) {
-      const body = document.querySelector('.ptv-panel-body');
-      if (body) {
-        body.innerHTML = '';
-        body.appendChild(h('div', { className: 'ptv-error' }, '获取失败: ' + (e && e.message)));
-      }
-    }
-  }
-
-  function startPolling() {
-    if (state.pollTimer) clearInterval(state.pollTimer);
-    state.pollTimer = setInterval(fetchData, POLL_INTERVAL_MS);
-  }
-
-  function stopPolling() {
-    if (state.pollTimer) {
-      clearInterval(state.pollTimer);
-      state.pollTimer = null;
-    }
-  }
-
-  // 注入到侧边栏顶部
-  function mount() {
-    if (document.getElementById('proma-tree-panel')) return; // 已挂载
-    const { panel } = createPanel();
-    // 尝试挂载到侧边栏顶部（Proma 的侧边栏是 React 渲染，我们找一些候选锚点）
-    const candidates = [
-      '.sidebar',
-      '[class*="sidebar"]',
-      'aside',
-      '.left-panel',
-      '.chat-sidebar'
-    ];
-    let mounted = false;
-    for (const sel of candidates) {
-      const host = document.querySelector(sel);
-      if (host) {
-        host.insertBefore(panel, host.firstChild);
-        mounted = true;
-        break;
-      }
-    }
-    if (!mounted) {
-      // fallback: 挂到 body 最前面，浮动定位
-      if (!document.body) {
-        // DOM 还未完全加载，等待下一次 mount 重试
-        return;
-      }
-      panel.classList.add('ptv-floating');
-      document.body.insertBefore(panel, document.body.firstChild);
-    }
-    fetchData();
-    startPolling();
-    fetchWatcherStatus();  // 补丁 M: 加载 watcher 状态
-  }
-
-  // 监听导航事件（虽然我们不直接控制 React，但可触发 UI 提示）
-  function setupNavigationListener() {
-    const ipc = getIpc();
-    if (!ipc || !ipc.on) return;
-    try {
-      ipc.on('proma:navigate-to-session', (_event, arg) => {
-        if (arg && arg.sessionId) {
-          showToast('切换到会话: ' + arg.sessionId.slice(0, 8) + '... (React 端未集成则需手动切换)');
+        state.trees = result.trees || [];
+        // 选择默认 tree: 上次选中的 / 第一个
+        if (!state.activeTreeId || !state.trees.find(t => t.tree_id === state.activeTreeId)) {
+          // 优先活跃 tree（有任意 active leaf）
+          const activeTree = state.trees.find(t => Object.values(t.leaves || {}).some(l =>
+            ['active', 'pending_brief', 'segment_pending'].includes(l.status)
+          ));
+          state.activeTreeId = activeTree ? activeTree.tree_id : (state.trees[0] && state.trees[0].tree_id);
         }
-      });
-    } catch (_) {}
-  }
-
-  // 启动
-  function init() {
-    setupNavigationListener();
-    // 等侧边栏 DOM 加载好（React 异步渲染）
-    let attempts = 0;
-    const tryMount = () => {
-      attempts++;
-      mount();
-      if (attempts < 20 && !document.querySelector('.sidebar, [class*="sidebar"], aside')) {
-        setTimeout(tryMount, 500);
+        render();
+      } else {
+        state.trees = [];
+        render();
       }
-    };
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', tryMount);
-    } else {
-      tryMount();
+    } catch (e) {
+      if (statusEl) statusEl.textContent = '获取失败: ' + (e && e.message);
     }
-    // 监听 URL/hash 变化重新挂载（SPA 路由切换）
-    window.addEventListener('hashchange', () => setTimeout(mount, 300));
   }
-
-  // 兼容 preload 的 ipcRenderer.on 签名差异
-  function shimIpcOn(name, cb) {
-    // 占位，实际由 preload 决定
-  }
-
-  // ============================================================
-  // 补丁 M: Watcher 控制 + 违规展示
-  // ============================================================
 
   async function fetchWatcherStatus() {
     const ipc = getIpc();
@@ -452,8 +324,42 @@
     } catch (_) {}
   }
 
+  async function toggleWatcher() {
+    const ipc = getIpc();
+    if (!ipc || !ipc.invoke) { showToast('IPC 不可用'); return; }
+    const target = !state.watcherEnabled;
+    try {
+      const result = await ipc.invoke('proma:watcher-toggle', { enabled: target });
+      if (result && result.ok) {
+        state.watcherEnabled = !!result.enabled;
+        updateWatcherBtn();
+        showToast('Watcher: ' + (state.watcherEnabled ? 'ON' : 'OFF'));
+        if (state.watcherEnabled) setTimeout(() => runWatcherNow(), 500);
+      }
+    } catch (e) { showToast('切换失败: ' + (e && e.message)); }
+  }
+
+  async function runWatcherNow() {
+    const ipc = getIpc();
+    if (!ipc || !ipc.invoke) return;
+    showToast('Watcher 跑一轮...');
+    if (statusEl) statusEl.textContent = 'Watcher 检查中...';
+    try {
+      const result = await ipc.invoke('proma:watcher-run-now', {});
+      if (result && result.ok) {
+        const count = (result.runs || []).length;
+        const errs = (result.runs || []).filter(r => !r.ok).length;
+        showToast('完成: ' + count + ' ws, ' + errs + ' 错误');
+        if (statusEl) statusEl.textContent = 'Watcher 完成 (' + count + ' ws)';
+        setTimeout(() => fetchData(), 500);
+      }
+    } catch (e) {
+      showToast('Watcher 失败: ' + (e && e.message));
+    }
+  }
+
   function updateWatcherBtn() {
-    const btn = document.querySelector('.ptv-watcher-btn');
+    const btn = overlayEl && overlayEl.querySelector('.ptv-watcher-btn');
     if (!btn) return;
     if (state.watcherEnabled === null) {
       btn.textContent = '👁…';
@@ -467,65 +373,202 @@
     }
   }
 
-  async function toggleWatcher() {
-    const ipc = getIpc();
-    if (!ipc || !ipc.invoke) {
-      showToast('IPC 不可用，无法切换 Watcher');
+  function startPolling() {
+    stopPolling();
+    state.pollTimer = setInterval(fetchData, 3000);
+  }
+  function stopPolling() {
+    if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+  }
+
+  // ============ 渲染 ============
+
+  function render() {
+    if (!treeTabsEl || !treeCanvasEl) return;
+    renderTreeTabs();
+    renderTree();
+    renderDetail();
+  }
+
+  function renderTreeTabs() {
+    treeTabsEl.innerHTML = '';
+    if (state.trees.length === 0) {
+      treeTabsEl.appendChild(h('div', { className: 'ptv-empty' }, '暂无 tree'));
       return;
     }
-    const target = !state.watcherEnabled;
-    try {
-      const result = await ipc.invoke('proma:watcher-toggle', { enabled: target });
-      if (result && result.ok) {
-        state.watcherEnabled = !!result.enabled;
-        updateWatcherBtn();
-        showToast('Watcher: ' + (state.watcherEnabled ? 'ON' : 'OFF'));
-        if (state.watcherEnabled) {
-          setTimeout(() => runWatcherNow(), 500);  // 启用时立即跑一次
+    for (const tree of state.trees) {
+      const isActive = Object.values(tree.leaves || {}).some(l =>
+        ['active', 'pending_brief', 'segment_pending'].includes(l.status)
+      );
+      const isSelected = tree.tree_id === state.activeTreeId;
+      const tab = h('div', {
+        className: 'ptv-tree-tab' + (isSelected ? ' ptv-tree-tab-active' : '') + (isActive ? ' ptv-tree-tab-live' : ''),
+        title: tree.tree_id + (isActive ? ' (活跃)' : ' (空闲)'),
+        onClick: () => { state.activeTreeId = tree.tree_id; state.selectedLeafId = null; render(); }
+      });
+      tab.appendChild(h('span', { className: 'ptv-tree-tab-id' }, tree.tree_id));
+      const leafCount = Object.keys(tree.leaves || {}).length;
+      const nudgeCount = Object.values(tree.leaves || {}).reduce((sum, l) => sum + (l.nudge_count || 0), 0);
+      tab.appendChild(h('span', { className: 'ptv-tree-tab-count' }, leafCount + ' leaves' + (nudgeCount ? ' ⚠' + nudgeCount : '')));
+      treeTabsEl.appendChild(tab);
+    }
+  }
+
+  function renderTree() {
+    treeCanvasEl.innerHTML = '';
+    const tree = state.trees.find(t => t.tree_id === state.activeTreeId);
+    if (!tree) {
+      treeCanvasEl.appendChild(h('div', { className: 'ptv-empty' }, '选择上面的 tab 查看树'));
+      return;
+    }
+    if (tree.error) {
+      treeCanvasEl.appendChild(h('div', { className: 'ptv-error' }, '解析失败: ' + tree.error));
+      return;
+    }
+
+    // 构建 children map
+    const leaves = tree.leaves || {};
+    const childrenMap = {};
+    let rootLeaf = null;
+    for (const [lid, leaf] of Object.entries(leaves)) {
+      if (leaf.parent === null || leaf.parent === undefined) rootLeaf = leaf;
+      else {
+        if (!childrenMap[leaf.parent]) childrenMap[leaf.parent] = [];
+        childrenMap[leaf.parent].push(leaf);
+      }
+    }
+
+    function renderLeaf(leaf, depth) {
+      const node = h('div', {
+        className: 'ptv-leaf-row' + (leaf.leaf_id === state.selectedLeafId ? ' ptv-leaf-selected' : '') + (leaf.status === 'pending_brief' ? ' ptv-leaf-pending' : ''),
+        style: 'margin-left:' + (depth * 18) + 'px',
+        title: 'session: ' + leaf.session_id,
+        onClick: () => { state.selectedLeafId = leaf.leaf_id; render(); handleLeafClick(leaf); }
+      });
+      // 角色 icon
+      node.appendChild(h('span', { className: 'ptv-role' }, ROLE_ICON[leaf.role] || '?'));
+      // 状态圆点
+      const statusColor = STATUS_COLOR[leaf.status] || '#9ca3af';
+      node.appendChild(h('span', { className: 'ptv-dot', style: 'background:' + statusColor }));
+      // leaf_id
+      node.appendChild(h('span', { className: 'ptv-leaf-id' }, leaf.leaf_id));
+      // 元数据 chips
+      const meta = h('span', { className: 'ptv-leaf-chips' });
+      meta.appendChild(h('span', { className: 'ptv-chip ptv-status-chip', style: 'color:' + statusColor }, STATUS_LABEL[leaf.status] || leaf.status));
+      if (leaf.audit_gate && leaf.audit_gate.verdict) {
+        const gc = GATE_COLOR[leaf.audit_gate.verdict];
+        meta.appendChild(h('span', { className: 'ptv-chip', style: 'color:' + gc, title: 'audit_gate: ' + leaf.audit_gate.verdict }, leaf.audit_gate.verdict));
+      }
+      if (leaf.role === 'worker' && leaf.milestones && leaf.milestones.length > 0) {
+        const done = leaf.milestones.filter(m => m.status === 'done').length;
+        meta.appendChild(h('span', { className: 'ptv-chip' }, done + '/' + leaf.milestones.length));
+      }
+      if (leaf.nudge_count > 0) {
+        meta.appendChild(h('span', { className: 'ptv-chip ptv-nudge-chip', title: '点击查看违规' }, '⚠' + leaf.nudge_count));
+      }
+      if (leaf.context_usage_pct > 0) {
+        meta.appendChild(h('span', { className: 'ptv-chip' }, leaf.context_usage_pct + '%'));
+      }
+      node.appendChild(meta);
+      return node;
+    }
+
+    function renderRecursive(leaf, depth) {
+      const wrapper = h('div');
+      wrapper.appendChild(renderLeaf(leaf, depth));
+      const kids = childrenMap[leaf.leaf_id] || [];
+      kids.sort((a, b) => {
+        if (a.role !== b.role) {
+          const order = { commander: 0, worker: 1, root: 2 };
+          return (order[a.role] || 9) - (order[b.role] || 9);
         }
-      } else {
-        showToast('切换失败');
+        return a.leaf_id.localeCompare(b.leaf_id);
+      });
+      for (const k of kids) wrapper.appendChild(renderRecursive(k, depth + 1));
+      return wrapper;
+    }
+
+    if (rootLeaf) {
+      treeCanvasEl.appendChild(renderRecursive(rootLeaf, 0));
+    } else {
+      // 无根, 平铺
+      for (const leaf of Object.values(leaves)) {
+        treeCanvasEl.appendChild(renderLeaf(leaf, 0));
       }
-    } catch (e) {
-      showToast('切换失败: ' + (e && e.message));
     }
   }
 
-  async function runWatcherNow() {
-    const ipc = getIpc();
-    if (!ipc || !ipc.invoke) {
-      showToast('IPC 不可用');
+  function renderDetail() {
+    if (!detailEl) return;
+    detailEl.innerHTML = '';
+    if (!state.selectedLeafId) {
+      detailEl.appendChild(h('div', { className: 'ptv-empty' }, '点击左侧节点查看详情'));
       return;
     }
-    showToast('Watcher 跑一轮...');
-    try {
-      const result = await ipc.invoke('proma:watcher-run-now', {});
-      if (result && result.ok) {
-        const count = (result.runs || []).length;
-        const errs = (result.runs || []).filter(r => !r.ok).length;
-        showToast('Watcher 完成: ' + count + ' workspace, ' + errs + ' 错误');
-        // 立即刷新数据展示违规
-        setTimeout(() => fetchData(), 500);
-      }
-    } catch (e) {
-      showToast('Watcher 失败: ' + (e && e.message));
+    const tree = state.trees.find(t => t.tree_id === state.activeTreeId);
+    if (!tree) return;
+    const leaf = (tree.leaves || {})[state.selectedLeafId];
+    if (!leaf) {
+      detailEl.appendChild(h('div', { className: 'ptv-empty' }, '节点不存在'));
+      return;
     }
-  }
 
-  function showViolations(leaf, treeId) {
-    // 弹出违规详情浮窗
-    const existing = document.getElementById('ptv-violations-popup');
-    if (existing) existing.remove();
+    // 节点标题
+    detailEl.appendChild(h('div', { className: 'ptv-detail-header' }, [
+      h('span', { className: 'ptv-role' }, ROLE_ICON[leaf.role] || '?'),
+      h('span', { className: 'ptv-detail-title' }, leaf.leaf_id)
+    ]));
 
-    const popup = h('div', { className: 'ptv-violations-popup', id: 'ptv-violations-popup' });
-    popup.appendChild(h('div', { className: 'ptv-popup-title' }, '⚠ ' + leaf.leaf_id + ' 违规记录 (' + leaf.nudge_count + ')'));
+    // 元数据
+    const metaTable = h('div', { className: 'ptv-detail-meta' });
+    function metaRow(label, value, color) {
+      const row = h('div', { className: 'ptv-meta-row' });
+      row.appendChild(h('span', { className: 'ptv-meta-label' }, label));
+      const valEl = h('span', { className: 'ptv-meta-value' }, String(value));
+      if (color) valEl.style.color = color;
+      row.appendChild(valEl);
+      return row;
+    }
+    const sc = STATUS_COLOR[leaf.status] || '#9ca3af';
+    metaTable.appendChild(metaRow('status', STATUS_LABEL[leaf.status] || leaf.status, sc));
+    metaTable.appendChild(metaRow('role', leaf.role));
+    metaTable.appendChild(metaRow('session_id', leaf.session_id.slice(0, 8) + '...'));
+    metaTable.appendChild(metaRow('parent', leaf.parent || '(root)'));
+    metaTable.appendChild(metaRow('model', leaf.model || '?'));
+    metaTable.appendChild(metaRow('last_event', formatRelative(leaf.last_event_ts)));
+    metaTable.appendChild(metaRow('context', (leaf.context_usage_pct || 0) + '%'));
+    if (leaf.audit_gate) {
+      const gc = GATE_COLOR[leaf.audit_gate.verdict];
+      metaTable.appendChild(metaRow('audit_gate', leaf.audit_gate.verdict, gc));
+    }
+    metaTable.appendChild(metaRow('nudge_count', leaf.nudge_count || 0, (leaf.nudge_count || 0) > 0 ? '#f59e0b' : null));
+    metaTable.appendChild(metaRow('audit_log', (leaf.audit_log_count || 0) + ' 条'));
+    detailEl.appendChild(metaTable);
 
-    const log = leaf.nudge_log || [];
-    if (log.length === 0) {
-      popup.appendChild(h('div', { className: 'ptv-empty' }, '(无详细记录)'));
-    } else {
-      // 按时间倒序
-      const sorted = log.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+    // 操作按钮
+    const actions = h('div', { className: 'ptv-detail-actions' });
+    actions.appendChild(h('button', {
+      className: 'ptv-btn ptv-action-btn',
+      title: '切换到此 Agent 会话',
+      onClick: () => handleLeafClick(leaf, true)
+    }, '→ 切换会话'));
+    actions.appendChild(h('button', {
+      className: 'ptv-btn ptv-action-btn',
+      title: '复制 session_id 到剪贴板',
+      onClick: () => {
+        try {
+          navigator.clipboard.writeText(leaf.session_id);
+          showToast('已复制: ' + leaf.session_id.slice(0, 8) + '...');
+        } catch (_) { showToast(leaf.session_id); }
+      }
+    }, '复制 ID'));
+    detailEl.appendChild(actions);
+
+    // 违规列表（nudge_log）
+    if (leaf.nudge_log && leaf.nudge_log.length > 0) {
+      detailEl.appendChild(h('div', { className: 'ptv-detail-section-title' }, '⚠ 违规记录 (' + leaf.nudge_log.length + ')'));
+      const logWrap = h('div', { className: 'ptv-violation-list' });
+      const sorted = leaf.nudge_log.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
       for (const v of sorted) {
         const entry = h('div', { className: 'ptv-violation-entry ptv-severity-' + v.severity });
         entry.appendChild(h('div', { className: 'ptv-violation-header' }, [
@@ -534,34 +577,182 @@
           h('span', { className: 'ptv-violation-ts' }, formatRelative(v.ts))
         ]));
         entry.appendChild(h('div', { className: 'ptv-violation-evidence' }, v.evidence || '(无证据)'));
-        if (v.suggest) {
-          entry.appendChild(h('div', { className: 'ptv-violation-suggest' }, '→ ' + v.suggest));
-        }
-        if (v.send_message === false) {
-          entry.appendChild(h('div', { className: 'ptv-violation-note' }, '(已超 nudge 上限, 仅记录)'));
-        }
-        popup.appendChild(entry);
+        if (v.suggest) entry.appendChild(h('div', { className: 'ptv-violation-suggest' }, '→ ' + v.suggest));
+        if (v.send_message === false) entry.appendChild(h('div', { className: 'ptv-violation-note' }, '(已达 nudge 上限, 仅记录)'));
+        logWrap.appendChild(entry);
       }
+      detailEl.appendChild(logWrap);
+    } else {
+      detailEl.appendChild(h('div', { className: 'ptv-detail-section-title' }, '✓ 无违规记录'));
     }
-
-    const closeBtn = h('button', { className: 'ptv-btn ptv-popup-close', onClick: () => popup.remove() }, '×');
-    popup.appendChild(closeBtn);
-    document.body.appendChild(popup);
-    // 点击外部关闭
-    setTimeout(() => {
-      const handler = (ev) => {
-        if (!popup.contains(ev.target)) {
-          popup.remove();
-          document.removeEventListener('click', handler);
-        }
-      };
-      document.addEventListener('click', handler);
-    }, 100);
   }
 
-  // 暴露给外部调试
-  window.__promaTreeView = { mount, fetchData, render, state, startPolling, stopPolling,
-                             toggleWatcher, runWatcherNow, fetchWatcherStatus };
+  // ============ 点击节点行为 ============
+
+  function handleLeafClick(leaf, force) {
+    const ipc = getIpc();
+    if (!ipc || !ipc.send) {
+      // fallback: 复制 session_id
+      try {
+        navigator.clipboard.writeText(leaf.session_id);
+        showToast('已复制: ' + leaf.session_id.slice(0, 8) + '...');
+      } catch (_) {}
+      return;
+    }
+    // 调 tray:open-agent-session（IPC handler 会转发）
+    try {
+      ipc.send('proma:navigate-to-session', leaf.session_id);
+      if (force) showToast('切换到 ' + leaf.leaf_id);
+    } catch (e) {
+      showToast('切换失败: ' + (e && e.message));
+    }
+  }
+
+  // ============ Toast ============
+
+  function showToast(msg) {
+    const toast = h('div', { className: 'ptv-toast' }, msg);
+    document.body.appendChild(toast);
+    setTimeout(() => toast.classList.add('ptv-toast-show'), 10);
+    setTimeout(() => {
+      toast.classList.remove('ptv-toast-show');
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+
+  // ============ 入口按钮注入（MutationObserver）============
+
+  let entryBtn = null;
+  let observer = null;
+
+  function injectEntryButton() {
+    if (entryBtn && document.body.contains(entryBtn)) return;  // 已注入
+
+    // 候选 selector（Proma UI 可能变化, 提供多个）
+    // 找包含 "+" 按钮的容器, 或工作区 tab 栏
+    const candidates = [
+      // 优先: 找创建会话按钮附近的容器（"+"按钮的父节点）
+      { selector: '[class*="workspace"][class*="header"]', insert: 'append' },
+      { selector: '[class*="WorkspaceHeader"]', insert: 'append' },
+      // 备选: 找有 "+" 文字或 Plus icon 的按钮, 注入到它父节点
+      { selector: 'button[class*="new"], button[class*="create"], button[class*="add"]', insert: 'after-parent' },
+      // 兜底: 顶部任何 header
+      { selector: 'header', insert: 'append' }
+    ];
+
+    let host = null;
+    let insertMode = 'append';
+    for (const c of candidates) {
+      const el = document.querySelector(c.selector);
+      if (el) { host = el; insertMode = c.insert; break; }
+    }
+    if (!host) return false;
+
+    // 创建按钮
+    if (!entryBtn) {
+      entryBtn = h('button', {
+        className: 'ptv-entry-btn',
+        title: '打开任务树面板',
+        onClick: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (state.floatingVisible) hideOverlay();
+          else showOverlay();
+        }
+      }, '🌳');
+    }
+
+    try {
+      if (insertMode === 'append') {
+        host.appendChild(entryBtn);
+      } else if (insertMode === 'after-parent' && host.parentNode) {
+        host.parentNode.insertBefore(entryBtn, host.nextSibling);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function startObserver() {
+    if (observer) return;
+    observer = new MutationObserver(() => {
+      if (!entryBtn || !document.body.contains(entryBtn)) {
+        if (!injectEntryButton()) {
+          // 注入失败, 检查 fallback 按钮是否存在
+          ensureFallbackButton();
+        } else if (fallbackBtn && fallbackBtn.parentNode) {
+          // 注入成功, 移除 fallback
+          fallbackBtn.remove();
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    // 初次尝试
+    let attempts = 0;
+    const initialTry = () => {
+      attempts++;
+      if (injectEntryButton()) return;
+      if (attempts < 30) { setTimeout(initialTry, 500); return; }
+      // 30 次尝试都失败, 启用 fallback 浮动按钮
+      ensureFallbackButton();
+    };
+    initialTry();
+  }
+
+  // ============ Fallback: 固定浮动按钮（注入失败时）============
+
+  let fallbackBtn = null;
+
+  function ensureFallbackButton() {
+    if (fallbackBtn && document.body.contains(fallbackBtn)) return;
+    fallbackBtn = h('button', {
+      className: 'ptv-entry-fallback',
+      title: '打开任务树面板 (Ctrl+Shift+T)',
+      onClick: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.floatingVisible) hideOverlay();
+        else showOverlay();
+      }
+    }, '🌳');
+    document.body.appendChild(fallbackBtn);
+  }
+
+  // ============ 键盘快捷键 ============
+
+  function setupKeyboard() {
+    document.addEventListener('keydown', (e) => {
+      // ESC 关闭浮窗
+      if (e.key === 'Escape' && state.floatingVisible) {
+        hideOverlay();
+      }
+      // Ctrl+Shift+T 切换浮窗
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'T' || e.key === 't')) {
+        e.preventDefault();
+        if (state.floatingVisible) hideOverlay();
+        else showOverlay();
+      }
+    });
+  }
+
+  // ============ 启动 ============
+
+  function init() {
+    setupKeyboard();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => startObserver());
+    } else {
+      startObserver();
+    }
+  }
+
+  // 暴露调试接口
+  window.__promaTreeView = {
+    showOverlay, hideOverlay, fetchData, render,
+    state, toggleWatcher, runWatcherNow, fetchWatcherStatus,
+    injectEntryButton
+  };
 
   init();
 })();

@@ -1209,14 +1209,27 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
     }
   });
 
-  // proma:navigate-to-session — 通过全局事件通知 renderer 切换会话
-  // 不直接调用 main.cjs 内部 navigate 函数（minified 难定位），
-  // 而是通过 BrowserWindow.webContents.send 广播事件，由 renderer 自行处理
+  // proma:navigate-to-session — 通过 Proma 内置 tray:open-agent-session IPC 切换会话
+  // 补丁 M+ v0.2: 不再用 proma:navigate-to-session 广播（renderer 没监听）
+  // 改为复用 Proma 内置的 tray:open-agent-session 事件链
+  // renderer 已监听这个事件并自动 setActiveTabId + updateSettings
   ipcMain.on("proma:navigate-to-session", (event, sessionId) => {
     try {
       const bw = electron.BrowserWindow && electron.BrowserWindow.fromWebContents(event.sender);
       if (bw) {
-        bw.webContents.send("proma:navigate-to-session", { sessionId });
+        // 验证 session 存在（避免切换到不存在的 session）
+        try {
+          const a = api();
+          const meta = a.getAgentSessionMeta(sessionId);
+          if (!meta) {
+            log("[Patch L] navigate-to-session: session " + sessionId + " not found (可能是 Chat 会话或测试数据)");
+            bw.webContents.send("proma:navigate-failed", { sessionId, reason: "not-found" });
+            return;
+          }
+        } catch (_) {}
+        // 真正切换: 复用 Proma 的 tray:open-agent-session 事件
+        bw.webContents.send("tray:open-agent-session", { sessionId });
+        log("[Patch L] navigate-to-session: " + sessionId);
       }
     } catch (e) {
       log("[Patch L] navigate-to-session error: " + (e && e.message));
