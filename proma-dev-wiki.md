@@ -74,6 +74,7 @@
 | patch-M+ v0.4.3 | 2026-06-22 | 第二层 tab 按最近活动时间倒排 (IPC 加 latest_activity_ts=max(last_heartbeat, leaves[].last_event_ts, created_at, mtime)) + 🌳 按钮 onClick dump React props 调试入口定位 |
 | patch-M+ v0.4.4 | 2026-06-23 | 修入口定位: 基于 dump 真实数据用 3 重保险拿 slug (aria-controls UUID + React props.group.workspace.slug + textContent 反查), 加 workspaceIdToSlug 缓存 |
 | patch-M+ v0.4.5-a | 2026-06-23 | 修入口定位 race condition: `makeEntryBtn.onClick` 不再用闭包 slug (注入时 React fiber 可能未就绪 → slug=null), 改为每次点击时从 DOM 重新调 `getWorkspaceSlugFromProjectGroup`, 闭包值只作兜底 |
+| patch-M+ v0.4.5-b | 2026-06-23 | 修排序 mtime 干扰: `readTreesFromDir` 算 `latest_activity_ts` 去掉 mtimeMs 参与 (mtime 是文件系统时间, watcher 跑过会让不活跃 tree 顶上来), 只在业务字段 (last_heartbeat / created_at / leaves[].last_event_ts) 全空时退化用 mtime |
 
 ### v0.4.4 验证结果 (2026-06-23)
 
@@ -82,6 +83,13 @@
 | 两层 tab 联动 | ✅ 通过 | - |
 | 入口定位 (从某项目 🌳 进激活该 workspace) | ❌ 10 次只 1 次生效 | injectEntryButton 注入时 fiber 可能没准备好 (DOM 刚渲染), slug=null → MutationObserver 重试时已注入直接 return, slug 永不更新. 修复方向: onClick 时重新调 getWorkspaceSlugFromProjectGroup (点击时 fiber 一定准备好了) |
 | 第二层按最近活动时间倒排 | ❌ 排错 | latest_activity_ts 用 max(leaves.last_event_ts, last_heartbeat, created_at, mtime), 但 **mtime 是文件系统时间**, watcher 跑过会更新文件让 mtime 变很新, 把不活跃 tree 顶上来. 修复方向: 去掉 mtime, 只用业务时间字段 (last_event_ts / last_heartbeat / created_at) |
+
+### v0.4.5 修复 (2026-06-23, 待验证)
+
+| 修复点 | 修法 | 文件 |
+|---|---|---|
+| 入口定位 race condition (问题 A) | `makeEntryBtn.onClick` 不用闭包 slug, 每次从 DOM 重新调 `getWorkspaceSlugFromProjectGroup`, 闭包值只作兜底 | proma-tree-view.js |
+| 排序 mtime 干扰 (问题 B) | `readTreesFromDir` 的 `latest_activity_ts` 不再以 mtimeMs 作初值, 只在业务字段全空时退化用 mtime | proma-dev-patches.cjs |
 
 ### 关键文件
 
