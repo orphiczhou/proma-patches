@@ -56,6 +56,36 @@
 | v0.10.1 | 2026-06-16 | 10 工具体系 + 完整验证 |
 | v0.11 | 2026-06-17 | remote-session 11 工具 (提案阶段2) + 实例命名体系 |
 
+## 树形 UI 浮窗补丁（patch-L/M/M+）
+
+> 独立补丁系列，叠加在插件系统补丁之上。源码发布在 `release/tree-system-v0.2.2/patch-l/`，5 个文件直接 cp 到 `D:/Proma-dev/resources/app/dist/`。
+
+| 版本 | 日期 | 改动 |
+|---|---|---|
+| patch-L v0.1 | 2026-06-21 | 树形 UI 面板首版（IPC + 浮窗 + fallback 按钮） |
+| patch-M v0.1 | 2026-06-22 | TAO Watcher 脚本主导重写（5min interval + nudge + audit-gate） |
+| patch-M+ v0.2 | 2026-06-22 | 树面板重写为可调节浮窗 + 真正切换会话（tray:open-agent-session IPC） |
+| patch-M+ v0.2.1 | 2026-06-22 | 修复数据混杂 — 按 workspace 分组返回（IPC 用 discoverAllWorkspacesWithTrees） |
+| patch-M+ v0.3 | 2026-06-22 | 入口按钮精准注入（每个 .group/project 项目行 absolute 定位 right:60px）+ DOM dump 工具（proma:dom-dump IPC，preload 白名单） |
+| patch-M+ v0.3.1 | 2026-06-22 | IPC 加 instance filter（ISOLATED → ~/.proma-dev，否则 ~/.proma）避免跨实例显示 + 清理临时 debug labels |
+
+### 关键文件
+
+| 文件 | 作用 |
+|---|---|
+| `proma-dev-patches.cjs` | 主入口；注册 IPC、TAO Watcher、workspace 发现 |
+| `preload.cjs` | renderer 桥接；promaTreeIpc.invoke 白名单（必须同步加 channel） |
+| `renderer/assets/proma-tree-view.js` | 浮窗 UI + 入口按钮注入（MutationObserver 持续 inject） |
+| `renderer/assets/proma-tree-view.css` | 浮窗样式 |
+| `renderer/index.html` | 注入 link/script 引用 |
+
+### 已知约束
+
+- **不修改 main.cjs**（AGPL 合规，所有逻辑写进 patches.cjs）
+- **零外部依赖**（patches.cjs 只用 Node.js 内置 + electron）
+- **preload.cjs 白名单制**：新增 IPC channel 必须同步加白名单，否则 renderer invoke 被 reject
+- **preload.cjs 已经被 Proma 商业版 require**，修改会立即生效（不需要重启 main 进程之外的步骤）
+
 ## 测试记录
 
 ### 2026-06-17 remote-session Release 验收 — ❌ 不通过

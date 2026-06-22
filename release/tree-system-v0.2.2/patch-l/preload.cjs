@@ -2003,7 +2003,7 @@ try {
   const promaBridge = {
     invoke: (channel, ...args) => {
       // 补丁 L (UI 面板)
-      if (channel === 'proma:get-tree-states' || channel === 'proma:tree-view-ready') {
+      if (channel === 'proma:get-tree-states' || channel === 'proma:tree-view-ready' || channel === 'proma:dom-dump') {
         return import_electron.ipcRenderer.invoke(channel, ...args);
       }
       // 补丁 M (Watcher 控制)

@@ -668,69 +668,204 @@
 
   // ============ 入口按钮注入（MutationObserver）============
 
-  let entryBtn = null;
+  // 每个项目行注入一个按钮 + 保留 fallback 单按钮 (向后兼容)
+  const entryBtnsByProject = new Map();  // projectKey -> {btn, group}
+  let entryBtn = null;  // 兼容旧引用 (用作"是否已注入"标志)
+
   let observer = null;
 
-  function injectEntryButton() {
-    if (entryBtn && document.body.contains(entryBtn)) return;  // 已注入
-
-    // 候选 selector（Proma UI 可能变化, 提供多个）
-    // 找包含 "+" 按钮的容器, 或工作区 tab 栏
-    const candidates = [
-      // 优先: 找创建会话按钮附近的容器（"+"按钮的父节点）
-      { selector: '[class*="workspace"][class*="header"]', insert: 'append' },
-      { selector: '[class*="WorkspaceHeader"]', insert: 'append' },
-      // 备选: 找有 "+" 文字或 Plus icon 的按钮, 注入到它父节点
-      { selector: 'button[class*="new"], button[class*="create"], button[class*="add"]', insert: 'after-parent' },
-      // 兜底: 顶部任何 header
-      { selector: 'header', insert: 'append' }
-    ];
-
-    let host = null;
-    let insertMode = 'append';
-    for (const c of candidates) {
-      const el = document.querySelector(c.selector);
-      if (el) { host = el; insertMode = c.insert; break; }
-    }
-    if (!host) return false;
-
-    // 创建按钮
-    if (!entryBtn) {
-      entryBtn = h('button', {
-        className: 'ptv-entry-btn',
-        title: '打开任务树面板',
-        onClick: (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (state.floatingVisible) hideOverlay();
-          else showOverlay();
-        }
-      }, '🌳');
-    }
-
-    try {
-      if (insertMode === 'append') {
-        host.appendChild(entryBtn);
-      } else if (insertMode === 'after-parent' && host.parentNode) {
-        host.parentNode.insertBefore(entryBtn, host.nextSibling);
+  function makeEntryBtn() {
+    return h('button', {
+      className: 'ptv-entry-btn ptv-entry-btn-project',
+      title: '打开任务树面板 (Ctrl+Shift+T)',
+      onClick: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.floatingVisible) hideOverlay();
+        else showOverlay();
+      },
+      onMouseDown: (e) => {
+        // 保险: 优先于 click 触发, 避免被父级 React 事件系统吞掉
+        e.preventDefault();
+        e.stopPropagation();
       }
-      return true;
-    } catch (_) {
-      return false;
-    }
+    }, '🌳');
   }
 
+  function injectEntryButton() {
+    // 主路径: 每个 .group/project 项目行注入一个按钮
+    let injectedAny = false;
+    try {
+      const groups = document.querySelectorAll('.group\\/project');
+      groups.forEach((group, idx) => {
+        // 给每个项目行打一个稳定 key (用 data 属性记忆)
+        let key = group.dataset.promaBtnKey;
+        if (!key) {
+          key = 'proj-' + idx + '-' + Math.random().toString(36).slice(2, 8);
+          group.dataset.promaBtnKey = key;
+        }
+        const existing = entryBtnsByProject.get(key);
+        if (existing && group.contains(existing)) {
+          injectedAny = true;
+          return;  // 已注入
+        }
+        const btn = makeEntryBtn();
+        try {
+          group.appendChild(btn);
+          entryBtnsByProject.set(key, btn);
+          injectedAny = true;
+        } catch (_) {}
+      });
+    } catch (_) {}
+
+    // 兜底: 没找到任何项目行, 注入一个全局按钮 (老逻辑, 用 .tabbar-bg 或 sidebar)
+    if (!injectedAny && (!entryBtn || !document.body.contains(entryBtn))) {
+      const candidates = [
+        { selector: '.tabbar-bg', insert: 'append' },
+        { selector: '[class*="tabbar"]', insert: 'append' },
+        { selector: '.crt-sidebar', insert: 'append' },
+        { selector: 'header', insert: 'append' }
+      ];
+      let host = null;
+      for (const c of candidates) {
+        try {
+          const el = document.querySelector(c.selector);
+          if (el) { host = el; break; }
+        } catch (_) {}
+      }
+      if (host) {
+        if (!entryBtn) {
+          entryBtn = h('button', {
+            className: 'ptv-entry-btn',
+            title: '打开任务树面板 (Ctrl+Shift+T)',
+            onClick: (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (state.floatingVisible) hideOverlay();
+              else showOverlay();
+            },
+            onMouseDown: (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }, '🌳');
+        }
+        try { host.appendChild(entryBtn); injectedAny = true; } catch (_) {}
+      }
+    }
+    return injectedAny;
+  }
+
+  // ============ DOM 探测：把工作区顶部栏的 DOM 结构 dump 到文件 ============
+
+  function dumpDOMForDebug() {
+    try {
+      // 扫描候选容器, 把 outerHTML 通过 IPC 发回主进程
+      const candidates = [
+        '.automation-entry', '.titlebar-no-drag', '.titlebar-drag-region',
+        '.tabbar-bg', '[class*="tabbar"]',
+        '.crt-sidebar', '[class*="sidebar"]',
+        '.agent-project-item-current', '[class*="agent-project"]', '[class*="project-item"]',
+        '.workspace-badge', '.workspace-switcher', '[class*="workspace"]',
+        '.session-item', '[class*="session"]',
+        'header', 'nav'
+      ];
+      const dumps = {};
+      for (const sel of candidates) {
+        try {
+          const el = document.querySelector(sel);
+          if (el) {
+            dumps[sel] = {
+              found: true,
+              outerHTML: el.outerHTML.slice(0, 3000),
+              parent_class: el.parentElement ? el.parentElement.className.slice(0, 200) : null,
+              child_count: el.children.length
+            };
+          } else {
+            dumps[sel] = { found: false };
+          }
+        } catch (e) {
+          dumps[sel] = { found: false, error: String(e && e.message) };
+        }
+      }
+      // 收集 body 内所有 class 名 (去重)
+      try {
+        const allClasses = new Set();
+        document.querySelectorAll('[class]').forEach(el => {
+          const cls = el.className;
+          if (typeof cls === 'string') {
+            cls.split(/\s+/).forEach(c => { if (c && c.length > 1) allClasses.add(c); });
+          }
+        });
+        dumps['__all_classes__'] = Array.from(allClasses).sort().slice(0, 400);
+      } catch (_) {}
+      // 文本搜索: 找含项目/工作区关键词的元素
+      try {
+        const keywords = ['默认工作区域', '结构化实现方案', '工作区', '项目'];
+        const matches = [];
+        document.querySelectorAll('button, div, span, a, li, p').forEach(el => {
+          const ownText = Array.from(el.childNodes)
+            .filter(n => n.nodeType === 3)
+            .map(n => n.textContent.trim())
+            .join('');
+          const fullText = (el.textContent || '').trim();
+          if (!ownText && !fullText) return;
+          for (const kw of keywords) {
+            // 优先记录"自己直接包含"的元素 (ownText 含 kw)
+            // 否则记录 fullText 含 kw 但子元素文本总量明显更少的 (说明它是接近叶子的容器)
+            const isDirect = ownText.includes(kw);
+            const isContainer = fullText.includes(kw) && fullText.length < 60;
+            if (isDirect || isContainer) {
+              const cls = (typeof el.className === 'string') ? el.className : '';
+              matches.push({
+                tag: el.tagName,
+                keyword: kw,
+                direct: isDirect,
+                text: (isDirect ? ownText : fullText).slice(0, 80),
+                class: cls.slice(0, 250),
+                parent_class: el.parentElement ? (typeof el.parentElement.className === 'string' ? el.parentElement.className : '').slice(0, 150) : '',
+                outerHTML: el.outerHTML.slice(0, 600)
+              });
+              break;
+            }
+          }
+        });
+        dumps['__text_search__'] = matches.slice(0, 30);
+      } catch (_) {}
+      // 算 window 名, 让 dump 文件按 window 区分
+      let windowName = 'main';
+      try {
+        const ws = new URLSearchParams(location.search).get('window');
+        if (ws) windowName = ws;
+      } catch (_) {}
+      const ipc = getIpc();
+      if (ipc && ipc.invoke) {
+        ipc.invoke('proma:dom-dump', { dumps, url: location.href, windowName, ts: Date.now() }).catch(()=>{});
+      }
+    } catch (_) {}
+  }
+
+  let domDumped = false;
   function startObserver() {
     if (observer) return;
     observer = new MutationObserver(() => {
-      if (!entryBtn || !document.body.contains(entryBtn)) {
+      // 多按钮模式: 每次都尝试注入 (新项目动态出现时也覆盖). injectEntryButton 内部幂等
+      const hasProjectBtns = entryBtnsByProject.size > 0;
+      const hasGlobalBtn = entryBtn && document.body.contains(entryBtn);
+      if (!hasProjectBtns && !hasGlobalBtn) {
         if (!injectEntryButton()) {
-          // 注入失败, 检查 fallback 按钮是否存在
           ensureFallbackButton();
         } else if (fallbackBtn && fallbackBtn.parentNode) {
-          // 注入成功, 移除 fallback
           fallbackBtn.remove();
         }
+      } else {
+        // 已注入过, 但仍尝试覆盖新出现的项目行
+        injectEntryButton();
+      }
+      // DOM 探测: 注入成功后 3 秒做一次 dump
+      if (!domDumped && (hasProjectBtns || hasGlobalBtn)) {
+        domDumped = true;
+        setTimeout(dumpDOMForDebug, 3000);
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
@@ -738,10 +873,15 @@
     let attempts = 0;
     const initialTry = () => {
       attempts++;
-      if (injectEntryButton()) return;
+      if (injectEntryButton()) {
+        setTimeout(dumpDOMForDebug, 3000);
+        domDumped = true;
+        return;
+      }
       if (attempts < 30) { setTimeout(initialTry, 500); return; }
-      // 30 次尝试都失败, 启用 fallback 浮动按钮
+      // 30 次尝试都失败, 启用 fallback 浮动按钮 + 也 dump 一次
       ensureFallbackButton();
+      if (!domDumped) { dumpDOMForDebug(); domDumped = true; }
     };
     initialTry();
   }

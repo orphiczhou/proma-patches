@@ -30,6 +30,31 @@
   color: #d1d5db;
 }
 
+/* 项目行内的入口按钮 (注入到 .group/project 容器里, absolute 定位) */
+.ptv-entry-btn-project {
+  position: absolute;
+  right: 60px;  /* 避开项目自带 right-5 (20px) 和 right-0 (0px) 操作按钮 */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  margin-left: 0;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  font-size: 14px;
+  border-radius: 5px;
+}
+/* 悬停项目行时显示入口按钮 (跟 Proma 自带操作按钮一致行为) */
+.group\/project:hover .ptv-entry-btn-project,
+.group\/project:focus-within .ptv-entry-btn-project {
+  opacity: 1;
+}
+.dark .ptv-entry-btn-project,
+[class*="dark"] .ptv-entry-btn-project {
+  color: #d1d5db;
+}
+
 /* Fallback: 固定浮动按钮（注入失败时显示在右上角） */
 .ptv-entry-fallback {
   position: fixed;

@@ -1092,14 +1092,16 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
   }
   const ipcMain = electron.ipcMain;
 
-  // workspace 发现 — 跟 WatcherManager 保持一致, 扫描所有实例的所有 workspace
+  // workspace 发现 — 跟 WatcherManager 保持一致, 只扫当前实例对应目录
+  // ISOLATED 实例 (dev) → ~/.proma-dev/agent-workspaces/
+  // 非 ISOLATED 实例 (release/release-fresh) → ~/.proma/agent-workspaces/
   function discoverAllWorkspacesWithTrees() {
     const os = require("os");
     const home = os.homedir();
-    const bases = [
-      path.join(home, ".proma-dev", "agent-workspaces"),
-      path.join(home, ".proma", "agent-workspaces")
-    ];
+    const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
+    const bases = isIsolated
+      ? [path.join(home, ".proma-dev", "agent-workspaces")]
+      : [path.join(home, ".proma", "agent-workspaces")];
     const found = [];
     for (const base of bases) {
       if (!fs.existsSync(base)) continue;
@@ -1125,7 +1127,7 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
             workspace_root: wsRoot,
             trees_dir: tc.dir,
             kind: tc.kind,
-            is_isolated: path.basename(base) === ".proma-dev"
+            is_isolated: isIsolated
           });
           break;
         }
@@ -1314,6 +1316,84 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
     return { ok: true, ts: Date.now() };
   });
 
+  // proma:dom-dump — 调试用, 把 renderer DOM 结构写到文件
+  // 用于诊断入口按钮注入位置. 文件名按 window 区分, 避免子窗口覆盖主窗口
+  ipcMain.handle("proma:dom-dump", async (_event, arg) => {
+    try {
+      const os = require("os");
+      const windowName = (arg && arg.windowName) || "main";
+      const safeName = String(windowName).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+      const dumpPath = path.join(
+        os.homedir(),
+        ".proma", "agent-workspaces", "proma", "workspace-files",
+        "tao-engine", "dom-dump-" + safeName + ".txt"
+      );
+      fs.mkdirSync(path.dirname(dumpPath), { recursive: true });
+      const lines = [];
+      lines.push("=== Proma DOM Dump (window=" + windowName + ") ===");
+      lines.push("Time: " + new Date().toISOString());
+      lines.push("URL: " + (arg && arg.url));
+      lines.push("");
+      const dumps = (arg && arg.dumps) || {};
+      for (const [sel, info] of Object.entries(dumps)) {
+        // __all_classes__ 是特殊字段: class 名数组
+        if (sel === "__all_classes__") {
+          lines.push("--- ALL CLASS NAMES in body (deduped) ---");
+          if (Array.isArray(info)) {
+            lines.push("  total: " + info.length);
+            lines.push("  classes:");
+            info.forEach(c => lines.push("    ." + c));
+          }
+          lines.push("");
+          continue;
+        }
+        // __debug_labels__ 是特殊字段: 屏幕上红色数字标签对应的 DOM 信息
+        if (sel === "__debug_labels__") {
+          lines.push("--- DEBUG LABELS (red numbers on screen) ---");
+          if (Array.isArray(info)) {
+            info.forEach(item => {
+              lines.push("  #" + item.n + " [" + item.where + "] <" + item.tag + ">");
+              lines.push("    class: " + item.class);
+              if (item.text) lines.push("    text: " + item.text);
+              if (item.parent_class) lines.push("    parent_class: " + item.parent_class);
+              if (item.rect) lines.push("    rect: x=" + item.rect.x + " y=" + item.rect.y + " w=" + item.rect.w + " h=" + item.rect.h);
+            });
+          }
+          lines.push("");
+          continue;
+        }
+        // __text_search__ 是特殊字段: 含特定关键词的元素
+        if (sel === "__text_search__") {
+          lines.push("--- TEXT SEARCH matches ---");
+          if (Array.isArray(info)) {
+            info.forEach((item, idx) => {
+              lines.push("  [" + idx + "] <" + item.tag + "> keyword='" + item.keyword + "'");
+              lines.push("    text: " + item.text);
+              lines.push("    class: " + item.class);
+              if (item.parent_class) lines.push("    parent_class: " + item.parent_class);
+            });
+          }
+          lines.push("");
+          continue;
+        }
+        lines.push("--- selector: " + sel + " ---");
+        if (!info.found) {
+          lines.push("  (not found)" + (info.error ? " error: " + info.error : ""));
+        } else {
+          lines.push("  parent_class: " + info.parent_class);
+          lines.push("  child_count: " + info.child_count);
+          lines.push("  outerHTML (first 3000 chars):");
+          lines.push(info.outerHTML);
+        }
+        lines.push("");
+      }
+      fs.writeFileSync(dumpPath, lines.join("\n"));
+      return { ok: true, path: dumpPath };
+    } catch (e) {
+      return { ok: false, error: String(e && e.message) };
+    }
+  });
+
   log("[Patch L] Tree panel IPC registered: proma:get-tree-states / proma:navigate-to-session / proma:tree-view-ready");
 })();
 
@@ -1369,17 +1449,18 @@ function saveTaoConfig(cfg) {
 }
 
 // ============================================================
-// Workspace 发现: 扫描 ~/.proma-dev/agent-workspaces/* + ~/.proma/agent-workspaces/*
-// 每个 workspace 有独立 .context/trees/ 目录, 每个对应一个 Watcher 实例
+// Workspace 发现: 只扫当前实例对应目录 (避免跨实例显示)
+// ISOLATED 实例 (dev) → ~/.proma-dev/agent-workspaces/*
+// 非 ISOLATED 实例 (release/release-fresh) → ~/.proma/agent-workspaces/*
 // ============================================================
 
 function discoverWorkspaces() {
   const os = require("os");
   const home = os.homedir();
-  const candidates = [
-    path.join(home, ".proma-dev", "agent-workspaces"),
-    path.join(home, ".proma", "agent-workspaces")
-  ];
+  const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
+  const candidates = isIsolated
+    ? [path.join(home, ".proma-dev", "agent-workspaces")]
+    : [path.join(home, ".proma", "agent-workspaces")];
   const found = [];
   for (const base of candidates) {
     if (!fs.existsSync(base)) continue;
@@ -1409,7 +1490,7 @@ function discoverWorkspaces() {
           workspace_id: name,
           workspace_root: path.dirname(path.dirname(treesDir)),  // 去掉 .context/trees
           trees_dir: treesDir,
-          is_isolated: path.basename(base) === ".proma-dev"
+          is_isolated: isIsolated
         });
         break;
       }
