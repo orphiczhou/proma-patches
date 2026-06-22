@@ -1095,6 +1095,7 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
   // workspace 发现 — 跟 WatcherManager 保持一致, 只扫当前实例对应目录
   // ISOLATED 实例 (dev) → ~/.proma-dev/agent-workspaces/
   // 非 ISOLATED 实例 (release/release-fresh) → ~/.proma/agent-workspaces/
+  // 重要: 即使 workspace 没有 trees 目录也要返回 (UI 显示完整 workspace 列表)
   function discoverAllWorkspacesWithTrees() {
     const os = require("os");
     const home = os.homedir();
@@ -1116,21 +1117,25 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
           { dir: path.join(wsRoot, ".context", "trees"), kind: "direct" },
           { dir: path.join(wsRoot, "workspace-files", ".context", "trees"), kind: "workspace-files" }
         ];
+        let matched = null;
         for (const tc of treesCandidates) {
           try {
             if (!fs.existsSync(tc.dir)) continue;
             const ts = fs.statSync(tc.dir);
             if (!ts.isDirectory()) continue;
+            matched = tc;
+            break;
           } catch (_) { continue; }
-          found.push({
-            workspace_slug: name,
-            workspace_root: wsRoot,
-            trees_dir: tc.dir,
-            kind: tc.kind,
-            is_isolated: isIsolated
-          });
-          break;
         }
+        // 不管 trees 目录存不存在都 push (UI 需要显示完整 workspace 列表)
+        // trees_dir 为 null 时, readTreesFromDir 会返回空数组 (readTreesFromDir 内部有 fs.existsSync 检查)
+        found.push({
+          workspace_slug: name,
+          workspace_root: wsRoot,
+          trees_dir: matched ? matched.dir : null,
+          kind: matched ? matched.kind : "workspace-files",
+          is_isolated: isIsolated
+        });
       }
     }
     return found;
