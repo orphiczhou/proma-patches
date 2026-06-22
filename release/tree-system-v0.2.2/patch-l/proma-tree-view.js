@@ -77,8 +77,10 @@
 
   const state = {
     floatingVisible: false,
+    activeWorkspaceSlug: null,   // 选中的 workspace
     activeTreeId: null,
-    trees: [],
+    workspaces: [],              // [{workspace_slug, is_current, tree_count, ...}]
+    trees: [],                   // 所有 tree (每个带 workspace_slug)
     selectedLeafId: null,
     watcherEnabled: null,
     watcherWatchers: [],
@@ -290,25 +292,40 @@
       return;
     }
     try {
+      // 拉所有 workspace 的 tree（按 workspace 分组）
       const result = await ipc.invoke('proma:get-tree-states', {});
       if (result && result.ok) {
+        state.workspaces = result.workspaces || [];
         state.trees = result.trees || [];
-        // 选择默认 tree: 上次选中的 / 第一个
-        if (!state.activeTreeId || !state.trees.find(t => t.tree_id === state.activeTreeId)) {
-          // 优先活跃 tree（有任意 active leaf）
-          const activeTree = state.trees.find(t => Object.values(t.leaves || {}).some(l =>
-            ['active', 'pending_brief', 'segment_pending'].includes(l.status)
-          ));
-          state.activeTreeId = activeTree ? activeTree.tree_id : (state.trees[0] && state.trees[0].tree_id);
+        // 默认选中"当前 workspace"（is_current=true）或第一个
+        if (!state.activeWorkspaceSlug || !state.workspaces.find(w => w.workspace_slug === state.activeWorkspaceSlug)) {
+          const currentWs = state.workspaces.find(w => w.is_current);
+          state.activeWorkspaceSlug = currentWs ? currentWs.workspace_slug : (state.workspaces[0] && state.workspaces[0].workspace_slug);
+        }
+        // 当前 workspace 下的 tree
+        const wsTrees = state.trees.filter(t => t.workspace_slug === state.activeWorkspaceSlug);
+        if (!state.activeTreeId || !wsTrees.find(t => t.tree_id === state.activeTreeId)) {
+          const activeTree = wsTrees.find(t => t.has_active_leaf);
+          state.activeTreeId = activeTree ? activeTree.tree_id : (wsTrees[0] && wsTrees[0].tree_id);
         }
         render();
       } else {
+        state.workspaces = [];
         state.trees = [];
         render();
       }
     } catch (e) {
       if (statusEl) statusEl.textContent = '获取失败: ' + (e && e.message);
     }
+  }
+
+  // 切换 workspace 时重置选中 tree
+  function selectWorkspace(slug) {
+    if (state.activeWorkspaceSlug === slug) return;
+    state.activeWorkspaceSlug = slug;
+    state.activeTreeId = null;
+    state.selectedLeafId = null;
+    render();
   }
 
   async function fetchWatcherStatus() {
@@ -392,33 +409,62 @@
 
   function renderTreeTabs() {
     treeTabsEl.innerHTML = '';
-    if (state.trees.length === 0) {
-      treeTabsEl.appendChild(h('div', { className: 'ptv-empty' }, '暂无 tree'));
-      return;
+
+    // 第一层: workspace 选择（如果有多个 workspace 才显示）
+    if (state.workspaces.length > 1) {
+      const wsRow = h('div', { className: 'ptv-ws-tabs' });
+      for (const ws of state.workspaces) {
+        const isSelected = ws.workspace_slug === state.activeWorkspaceSlug;
+        const wsTab = h('div', {
+          className: 'ptv-ws-tab' + (isSelected ? ' ptv-ws-tab-active' : '') + (ws.is_current ? ' ptv-ws-tab-current' : ''),
+          title: ws.workspace_slug + (ws.is_current ? ' (当前)' : '') + ' — ' + ws.tree_count + ' tree(s)',
+          onClick: () => selectWorkspace(ws.workspace_slug)
+        });
+        // workspace 名简化（去掉 uuid 后缀）
+        const shortName = ws.workspace_slug.replace(/-[a-f0-9]{8}-[a-f0-9]{4}.*/i, '');
+        wsTab.appendChild(h('span', { className: 'ptv-ws-tab-name' }, shortName));
+        wsTab.appendChild(h('span', { className: 'ptv-ws-tab-count' }, ws.tree_count));
+        if (ws.is_current) wsTab.appendChild(h('span', { className: 'ptv-ws-tab-mark', title: '当前 workspace' }, '★'));
+        wsRow.appendChild(wsTab);
+      }
+      treeTabsEl.appendChild(wsRow);
     }
-    for (const tree of state.trees) {
-      const isActive = Object.values(tree.leaves || {}).some(l =>
-        ['active', 'pending_brief', 'segment_pending'].includes(l.status)
-      );
-      const isSelected = tree.tree_id === state.activeTreeId;
-      const tab = h('div', {
-        className: 'ptv-tree-tab' + (isSelected ? ' ptv-tree-tab-active' : '') + (isActive ? ' ptv-tree-tab-live' : ''),
-        title: tree.tree_id + (isActive ? ' (活跃)' : ' (空闲)'),
-        onClick: () => { state.activeTreeId = tree.tree_id; state.selectedLeafId = null; render(); }
-      });
-      tab.appendChild(h('span', { className: 'ptv-tree-tab-id' }, tree.tree_id));
-      const leafCount = Object.keys(tree.leaves || {}).length;
-      const nudgeCount = Object.values(tree.leaves || {}).reduce((sum, l) => sum + (l.nudge_count || 0), 0);
-      tab.appendChild(h('span', { className: 'ptv-tree-tab-count' }, leafCount + ' leaves' + (nudgeCount ? ' ⚠' + nudgeCount : '')));
-      treeTabsEl.appendChild(tab);
+
+    // 第二层: 当前 workspace 下的 tree 选择
+    const wsTrees = state.trees.filter(t => t.workspace_slug === state.activeWorkspaceSlug);
+    const treeRow = h('div', { className: 'ptv-tree-tabs-row' });
+    if (wsTrees.length === 0) {
+      treeRow.appendChild(h('div', { className: 'ptv-empty' }, '此 workspace 暂无 tree'));
+    } else {
+      for (const tree of wsTrees) {
+        const isSelected = tree.tree_id === state.activeTreeId;
+        const tab = h('div', {
+          className: 'ptv-tree-tab' + (isSelected ? ' ptv-tree-tab-active' : '') + (tree.has_active_leaf ? ' ptv-tree-tab-live' : ''),
+          title: tree.tree_id + (tree.has_active_leaf ? ' (活跃)' : ' (空闲)'),
+          onClick: () => { state.activeTreeId = tree.tree_id; state.selectedLeafId = null; render(); }
+        });
+        tab.appendChild(h('span', { className: 'ptv-tree-tab-id' }, tree.tree_id));
+        const leafCount = Object.keys(tree.leaves || {}).length;
+        const nudgeCount = Object.values(tree.leaves || {}).reduce((sum, l) => sum + (l.nudge_count || 0), 0);
+        tab.appendChild(h('span', { className: 'ptv-tree-tab-count' }, leafCount + ' leaves' + (nudgeCount ? ' ⚠' + nudgeCount : '')));
+        treeRow.appendChild(tab);
+      }
     }
+    treeTabsEl.appendChild(treeRow);
   }
 
   function renderTree() {
     treeCanvasEl.innerHTML = '';
-    const tree = state.trees.find(t => t.tree_id === state.activeTreeId);
+    // 按当前 workspace 过滤
+    const tree = state.trees.find(t => t.tree_id === state.activeTreeId && t.workspace_slug === state.activeWorkspaceSlug);
     if (!tree) {
-      treeCanvasEl.appendChild(h('div', { className: 'ptv-empty' }, '选择上面的 tab 查看树'));
+      const wsTrees = state.trees.filter(t => t.workspace_slug === state.activeWorkspaceSlug);
+      if (wsTrees.length === 0) {
+        treeCanvasEl.appendChild(h('div', { className: 'ptv-empty' },
+          '当前 workspace 无 tree。通过 `node tree-state.js init <tree_id> ...` 创建第一个 tree。'));
+      } else {
+        treeCanvasEl.appendChild(h('div', { className: 'ptv-empty' }, '选择上面的 tab 查看树'));
+      }
       return;
     }
     if (tree.error) {
@@ -505,7 +551,7 @@
       detailEl.appendChild(h('div', { className: 'ptv-empty' }, '点击左侧节点查看详情'));
       return;
     }
-    const tree = state.trees.find(t => t.tree_id === state.activeTreeId);
+    const tree = state.trees.find(t => t.tree_id === state.activeTreeId && t.workspace_slug === state.activeWorkspaceSlug);
     if (!tree) return;
     const leaf = (tree.leaves || {})[state.selectedLeafId];
     if (!leaf) {

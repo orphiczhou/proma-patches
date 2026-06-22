@@ -150,16 +150,78 @@
 
 .ptv-tree-tabs {
   display: flex;
-  gap: 2px;
-  padding: 6px 8px;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
   background: var(--proma-bg, #fff);
   border-bottom: 1px solid var(--proma-border, #e5e7eb);
-  overflow-x: auto;
   flex-shrink: 0;
-  min-height: 36px;
-  align-items: center;
 }
 .dark .ptv-tree-tabs { border-bottom-color: #333; }
+
+/* 第一层: workspace tabs */
+.ptv-ws-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 4px;
+  overflow-x: auto;
+  border-bottom: 1px dashed var(--proma-border, #e5e7eb);
+  align-items: center;
+}
+.dark .ptv-ws-tabs { border-bottom-color: #333; }
+
+.ptv-ws-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--proma-hover, #f3f4f6);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--proma-fg-muted, #6b7280);
+  flex-shrink: 0;
+}
+.ptv-ws-tab:hover { background: var(--proma-hover, #e5e7eb); }
+.ptv-ws-tab-active {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  border-color: rgba(168, 85, 247, 0.4);
+  font-weight: 600;
+}
+.ptv-ws-tab-current {
+  /* 当前 workspace 强调 */
+  border-left: 3px solid #22c55e;
+  padding-left: 7px;
+}
+.ptv-ws-tab-name {
+  font-weight: inherit;
+}
+.ptv-ws-tab-count {
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.ptv-ws-tab-mark { color: #22c55e; font-size: 11px; }
+.dark .ptv-ws-tab,
+[class*="dark"] .ptv-ws-tab { background: #262626; color: #9ca3af; }
+.dark .ptv-ws-tab-active,
+[class*="dark"] .ptv-ws-tab-active {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+/* 第二层: tree tabs */
+.ptv-tree-tabs-row {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  overflow-x: auto;
+  align-items: center;
+  min-height: 32px;
+}
 
 .ptv-tree-tab {
   display: flex;

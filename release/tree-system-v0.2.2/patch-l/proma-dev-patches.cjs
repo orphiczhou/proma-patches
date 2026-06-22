@@ -1092,121 +1092,194 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
   }
   const ipcMain = electron.ipcMain;
 
-  // workspace_root 候选列表（按优先级）
-  // 1. PROMA_WORKSPACE_ROOT 环境变量
-  // 2. ~/.proma/agent-workspaces/proma/workspace-files
-  // 3. ~/AppData/Roaming/electron-dev/.context/trees 之类（兼容老路径）
-  function getCandidateWorkspaceRoots() {
+  // workspace 发现 — 跟 WatcherManager 保持一致, 扫描所有实例的所有 workspace
+  function discoverAllWorkspacesWithTrees() {
     const os = require("os");
-    const path = require("path");
     const home = os.homedir();
-    const candidates = [];
-    if (process.env.PROMA_WORKSPACE_ROOT) candidates.push(process.env.PROMA_WORKSPACE_ROOT);
-    candidates.push(path.join(home, ".proma", "agent-workspaces", "proma", "workspace-files"));
-    candidates.push(path.join(home, ".proma", "agent-workspaces", "proma"));
-    return candidates;
-  }
-
-  function findTreesRoot() {
-    for (const root of getCandidateWorkspaceRoots()) {
-      const treesDir = path.join(root, ".context", "trees");
-      try {
-        if (fs.existsSync(treesDir) && fs.statSync(treesDir).isDirectory()) {
-          return { workspace_root: root, trees_dir: treesDir };
+    const bases = [
+      path.join(home, ".proma-dev", "agent-workspaces"),
+      path.join(home, ".proma", "agent-workspaces")
+    ];
+    const found = [];
+    for (const base of bases) {
+      if (!fs.existsSync(base)) continue;
+      let entries = [];
+      try { entries = fs.readdirSync(base); } catch (_) {}
+      for (const name of entries) {
+        const wsRoot = path.join(base, name);
+        let st;
+        try { st = fs.statSync(wsRoot); } catch (_) { continue; }
+        if (!st.isDirectory()) continue;
+        const treesCandidates = [
+          { dir: path.join(wsRoot, ".context", "trees"), kind: "direct" },
+          { dir: path.join(wsRoot, "workspace-files", ".context", "trees"), kind: "workspace-files" }
+        ];
+        for (const tc of treesCandidates) {
+          try {
+            if (!fs.existsSync(tc.dir)) continue;
+            const ts = fs.statSync(tc.dir);
+            if (!ts.isDirectory()) continue;
+          } catch (_) { continue; }
+          found.push({
+            workspace_slug: name,
+            workspace_root: wsRoot,
+            trees_dir: tc.dir,
+            kind: tc.kind,
+            is_isolated: path.basename(base) === ".proma-dev"
+          });
+          break;
         }
-      } catch (_) {}
+      }
     }
-    return null;
+    return found;
   }
 
-  // proma:get-tree-states — 扫描 trees 目录返回所有 tree 数据
-  // 入参: { workspace_root?: string }  可选自定义 workspace
+  // 通过 Proma API 找当前激活 workspace slug
+  // 启发式: listAgentSessions 中 updatedAt 最新的 session 的 workspaceId → getAgentWorkspace(slug)
+  function findCurrentWorkspaceSlug() {
+    try {
+      const a = api();
+      const sessions = a.listAgentSessions();
+      if (!Array.isArray(sessions) || sessions.length === 0) return null;
+      // 找最近活跃 session
+      const sorted = sessions
+        .filter(s => s.workspaceId)
+        .sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0));
+      if (sorted.length === 0) return null;
+      const ws = a.getAgentWorkspace(sorted[0].workspaceId);
+      return ws && ws.slug ? ws.slug : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // proma:get-tree-states — 按 workspace 分组返回 tree
+  // 入参: { workspace_slug?: string, include_empty?: bool }
+  //   workspace_slug 指定 → 只返回该 workspace 的 tree
+  //   不指定 → 返回所有 workspace 的 tree, 按 workspace 分组
   ipcMain.handle("proma:get-tree-states", async (_event, arg) => {
     try {
-      const requestedRoot = arg && arg.workspace_root;
-      let loc;
-      if (requestedRoot) {
-        const treesDir = path.join(requestedRoot, ".context", "trees");
-        if (fs.existsSync(treesDir)) {
-          loc = { workspace_root: requestedRoot, trees_dir: treesDir };
-        }
-      }
-      if (!loc) loc = findTreesRoot();
-      if (!loc) {
-        return { ok: false, error: "trees directory not found in any candidate workspace root", trees: [] };
+      const requestedSlug = arg && arg.workspace_slug;
+      const allWorkspaces = discoverAllWorkspacesWithTrees();
+      if (allWorkspaces.length === 0) {
+        return { ok: false, error: "no workspace with .context/trees/ found", workspaces: [], trees: [] };
       }
 
-      const trees = [];
-      let entries = [];
-      try { entries = fs.readdirSync(loc.trees_dir); } catch (_) {}
-      for (const name of entries) {
-        if (name.endsWith(".js") || name.endsWith(".json") || name.endsWith(".md")) continue;
-        const statePath = path.join(loc.trees_dir, name, "tree-state.json");
-        if (!fs.existsSync(statePath)) continue;
-        try {
-          const raw = fs.readFileSync(statePath, "utf8");
-          const state = JSON.parse(raw);
-          // 提取 UI 所需字段（避免传整个 state）
-          const leaves = {};
-          for (const [lid, leaf] of Object.entries(state.leaves || {})) {
-            leaves[lid] = {
-              leaf_id: leaf.leaf_id,
-              session_id: leaf.session_id,
-              parent: leaf.parent,
-              path: leaf.path,
-              role: leaf.role,
-              model: leaf.model,
-              channel: leaf.channel,
-              status: leaf.status,
-              created_at: leaf.created_at,
-              added_by: leaf.added_by,
-              last_event_ts: leaf.last_event_ts,
-              last_event_type: leaf.last_event_type,
-              context_usage_pct: leaf.context_usage_pct,
-              milestones: Array.isArray(leaf.milestones) ? leaf.milestones.map(m => ({
-                id: m.id, status: m.status, audit_pass: m.audit_pass
-              })) : [],
-              events_count: Array.isArray(leaf.events) ? leaf.events.length : 0,
-              audit_gate: leaf.audit_gate || null,
-              nudge_count: leaf.nudge_count || 0,
-              audit_log_count: Array.isArray(leaf.audit_log) ? leaf.audit_log.length : 0,
-              // 补丁 M: nudge_log 详细字段 (供 UI 展开违规列表)
-              nudge_log: Array.isArray(leaf.nudge_log) ? leaf.nudge_log.slice(-10).map(e => ({
-                ts: e.ts,
-                rule_id: e.rule_id,
-                severity: e.severity,
-                evidence: e.evidence,
-                suggest: e.suggest,
-                nudge_count: e.nudge_count,
-                send_message: e.send_message
-              })) : [],
-              audit_log: Array.isArray(leaf.audit_log) ? leaf.audit_log.slice(-10).map(e => ({
-                ts: e.ts,
-                auditor: e.auditor,
-                rule_id: e.rule_id,
-                pass: e.pass,
-                evidence: e.evidence,
-                degraded: e.degraded
-              })) : []
-            };
+      function readTreesFromDir(treesDir, workspaceSlug) {
+        const trees = [];
+        let entries = [];
+        try { entries = fs.readdirSync(treesDir); } catch (_) {}
+        for (const name of entries) {
+          if (name.endsWith(".js") || name.endsWith(".json") || name.endsWith(".md")) continue;
+          const statePath = path.join(treesDir, name, "tree-state.json");
+          if (!fs.existsSync(statePath)) continue;
+          try {
+            const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+            const leaves = {};
+            let hasActiveLeaf = false;
+            for (const [lid, leaf] of Object.entries(state.leaves || {})) {
+              if (["active", "pending_brief", "segment_pending"].includes(leaf.status)) hasActiveLeaf = true;
+              leaves[lid] = {
+                leaf_id: leaf.leaf_id, session_id: leaf.session_id,
+                parent: leaf.parent, path: leaf.path, role: leaf.role,
+                model: leaf.model, channel: leaf.channel, status: leaf.status,
+                created_at: leaf.created_at, added_by: leaf.added_by,
+                last_event_ts: leaf.last_event_ts, last_event_type: leaf.last_event_type,
+                context_usage_pct: leaf.context_usage_pct,
+                milestones: Array.isArray(leaf.milestones) ? leaf.milestones.map(m => ({
+                  id: m.id, status: m.status, audit_pass: m.audit_pass
+                })) : [],
+                events_count: Array.isArray(leaf.events) ? leaf.events.length : 0,
+                audit_gate: leaf.audit_gate || null,
+                nudge_count: leaf.nudge_count || 0,
+                audit_log_count: Array.isArray(leaf.audit_log) ? leaf.audit_log.length : 0,
+                nudge_log: Array.isArray(leaf.nudge_log) ? leaf.nudge_log.slice(-10).map(e => ({
+                  ts: e.ts, rule_id: e.rule_id, severity: e.severity,
+                  evidence: e.evidence, suggest: e.suggest,
+                  nudge_count: e.nudge_count, send_message: e.send_message
+                })) : [],
+                audit_log: Array.isArray(leaf.audit_log) ? leaf.audit_log.slice(-10).map(e => ({
+                  ts: e.ts, auditor: e.auditor, rule_id: e.rule_id,
+                  pass: e.pass, evidence: e.evidence, degraded: e.degraded
+                })) : []
+              };
+            }
+            // 文件 stat 取 mtime
+            let mtimeMs = 0;
+            try { mtimeMs = fs.statSync(statePath).mtimeMs; } catch (_) {}
+            trees.push({
+              tree_id: state.tree_id || name,
+              workspace_slug: workspaceSlug,
+              created_at: state.created_at,
+              last_heartbeat: state.last_heartbeat,
+              mtime_ms: mtimeMs,
+              has_active_leaf: hasActiveLeaf,
+              root_brief: state.root_brief,
+              root_dod: state.root_dod,
+              leaves,
+              _meta: state._meta || {}
+            });
+          } catch (e) {
+            trees.push({ tree_id: name, workspace_slug, error: "parse failed: " + e.message });
           }
-          trees.push({
-            tree_id: state.tree_id || name,
-            created_at: state.created_at,
-            last_heartbeat: state.last_heartbeat,
-            root_brief: state.root_brief,
-            root_dod: state.root_dod,
-            leaves,
-            _meta: state._meta || {}
-          });
-        } catch (e) {
-          trees.push({ tree_id: name, error: "failed to parse: " + e.message });
         }
+        return trees;
       }
-      return { ok: true, workspace_root: loc.workspace_root, trees };
+
+      const workspaces = [];
+      const allTrees = [];
+      const currentSlug = requestedSlug || findCurrentWorkspaceSlug();
+      for (const ws of allWorkspaces) {
+        // 不指定 slug 时, 包含所有; 指定时只匹配的
+        if (requestedSlug && ws.workspace_slug !== requestedSlug) continue;
+        const trees = readTreesFromDir(ws.trees_dir, ws.workspace_slug);
+        // 没指定 slug 时, 只包含有 tree 的 workspace
+        if (!requestedSlug && trees.length === 0) continue;
+        workspaces.push({
+          workspace_slug: ws.workspace_slug,
+          workspace_root: ws.workspace_root,
+          trees_dir: ws.trees_dir,
+          kind: ws.kind,
+          is_isolated: ws.is_isolated,
+          is_current: ws.workspace_slug === currentSlug,
+          tree_count: trees.length,
+          active_tree_count: trees.filter(t => t.has_active_leaf).length
+        });
+        for (const t of trees) allTrees.push(t);
+      }
+
+      // 排序: 当前 workspace 在前, 然后按 tree 数量降序
+      workspaces.sort((a, b) => {
+        if (a.is_current !== b.is_current) return a.is_current ? -1 : 1;
+        return b.tree_count - a.tree_count;
+      });
+
+      return {
+        ok: true,
+        current_workspace_slug: currentSlug,
+        workspaces,
+        trees: allTrees
+      };
     } catch (e) {
-      return { ok: false, error: String(e && e.message || e), trees: [] };
+      return { ok: false, error: String(e && e.message || e), workspaces: [], trees: [] };
     }
+  });
+
+  // proma:list-workspaces — 列出所有有 tree 的 workspace (轻量, 不读 tree-state)
+  ipcMain.handle("proma:list-workspaces", async () => {
+    const all = discoverAllWorkspacesWithTrees();
+    const currentSlug = findCurrentWorkspaceSlug();
+    return {
+      ok: true,
+      current_workspace_slug: currentSlug,
+      workspaces: all.map(ws => ({
+        workspace_slug: ws.workspace_slug,
+        workspace_root: ws.workspace_root,
+        is_isolated: ws.is_isolated,
+        kind: ws.kind,
+        is_current: ws.workspace_slug === currentSlug
+      }))
+    };
   });
 
   // proma:navigate-to-session — 通过 Proma 内置 tray:open-agent-session IPC 切换会话
