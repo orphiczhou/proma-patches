@@ -1214,11 +1214,31 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
             // 文件 stat 取 mtime
             let mtimeMs = 0;
             try { mtimeMs = fs.statSync(statePath).mtimeMs; } catch (_) {}
+            // 计算 latest_activity_ts: max(last_heartbeat, leaves[].last_event_ts, created_at, mtime)
+            // 用于 UI 第二层 tab 按最近活动时间倒排
+            let latestTs = mtimeMs;
+            try {
+              if (state.last_heartbeat) {
+                const t = new Date(state.last_heartbeat).getTime();
+                if (!isNaN(t) && t > latestTs) latestTs = t;
+              }
+              if (state.created_at) {
+                const t = new Date(state.created_at).getTime();
+                if (!isNaN(t) && t > latestTs) latestTs = t;
+              }
+              for (const leaf of Object.values(state.leaves || {})) {
+                if (leaf && leaf.last_event_ts) {
+                  const t = new Date(leaf.last_event_ts).getTime();
+                  if (!isNaN(t) && t > latestTs) latestTs = t;
+                }
+              }
+            } catch (_) {}
             trees.push({
               tree_id: state.tree_id || name,
               workspace_slug: workspaceSlug,
               created_at: state.created_at,
               last_heartbeat: state.last_heartbeat,
+              latest_activity_ts: latestTs,
               mtime_ms: mtimeMs,
               has_active_leaf: hasActiveLeaf,
               root_brief: state.root_brief,
@@ -1387,6 +1407,31 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
               lines.push("    class: " + item.class);
               if (item.parent_class) lines.push("    parent_class: " + item.parent_class);
             });
+          }
+          lines.push("");
+          continue;
+        }
+        // __project_info__ 是特殊字段: 单个项目按钮的 React fiber 信息 (调试入口定位用)
+        if (sel === "__project_info__") {
+          lines.push("--- PROJECT INFO (debug entry location) ---");
+          lines.push("source: " + info.source);
+          lines.push("textContent: " + info.textContent);
+          lines.push("className: " + info.className);
+          if (info.ariaLabel) lines.push("ariaLabel: " + info.ariaLabel);
+          if (info.dataset) lines.push("dataset: " + JSON.stringify(info.dataset));
+          lines.push("");
+          lines.push("React prop keys (depth.field (type) = preview):");
+          if (Array.isArray(info.reactPropKeys)) {
+            info.reactPropKeys.forEach(p => lines.push("  " + p));
+          }
+          lines.push("");
+          lines.push("workspaceNameToSlug cache (init from listAgentWorkspaces):");
+          if (info.workspaceNameToSlug_cache && typeof info.workspaceNameToSlug_cache === 'object') {
+            for (const [name, slug] of Object.entries(info.workspaceNameToSlug_cache)) {
+              lines.push("  '" + name + "' → " + slug);
+            }
+          } else {
+            lines.push("  (empty)");
           }
           lines.push("");
           continue;

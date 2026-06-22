@@ -309,13 +309,10 @@
           const currentWs = state.workspaces.find(w => w.is_current);
           state.activeWorkspaceSlug = currentWs ? currentWs.workspace_slug : (state.workspaces[0] && state.workspaces[0].workspace_slug);
         }
-        // 当前 workspace 下的 tree (按活跃度 + mtime 排序: 活跃 tree 排顶, 不活跃但 mtime 新的次之)
+        // 当前 workspace 下的 tree (按最近活动时间倒排: 最新活动在前)
         const wsTrees = state.trees
           .filter(t => t.workspace_slug === state.activeWorkspaceSlug)
-          .sort((a, b) => {
-            if (a.has_active_leaf !== b.has_active_leaf) return a.has_active_leaf ? -1 : 1;
-            return (b.mtime_ms || 0) - (a.mtime_ms || 0);
-          });
+          .sort((a, b) => (b.latest_activity_ts || 0) - (a.latest_activity_ts || 0));
         if (!state.activeTreeId || !wsTrees.find(t => t.tree_id === state.activeTreeId)) {
           // 默认激活第一个 (排序后最活跃的最新 tree)
           state.activeTreeId = wsTrees[0] && wsTrees[0].tree_id;
@@ -747,6 +744,62 @@
     return null;
   }
 
+  // dump 单个项目按钮的 React fiber 信息 (调试用, 定位 workspace_slug 字段名)
+  function dumpProjectInfo(projectBtn, source) {
+    try {
+      const info = {
+        source: source || 'unknown',
+        textContent: (projectBtn.textContent || '').trim().slice(0, 100),
+        className: (typeof projectBtn.className === 'string' ? projectBtn.className : '').slice(0, 250),
+        ariaLabel: projectBtn.getAttribute ? projectBtn.getAttribute('aria-label') : null,
+        dataset: { ...(projectBtn.dataset || {}) },
+        reactPropKeys: [],
+        workspaceNameToSlug_cache: workspaceNameToSlug
+      };
+      const fiberKey = Object.keys(projectBtn).find(k =>
+        k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$')
+      );
+      if (fiberKey) {
+        let fiber = projectBtn[fiberKey];
+        let depth = 0;
+        while (fiber && depth < 25) {
+          const props = fiber.memoizedProps;
+          if (props && typeof props === 'object') {
+            for (const k of Object.keys(props)) {
+              if (k === 'children' || k.length > 30) continue;  // 跳过 children (太长)
+              const v = props[k];
+              const t = Array.isArray(v) ? 'array' : (v === null ? 'null' : typeof v);
+              let preview = '';
+              if (t === 'object') {
+                try { preview = 'keys: ' + Object.keys(v).slice(0, 15).join(','); } catch(_) { preview = '?'; }
+              } else if (t === 'string') {
+                preview = '"' + v.slice(0, 60) + '"';
+              } else if (t === 'number' || t === 'boolean') {
+                preview = String(v);
+              } else if (t === 'array') {
+                preview = '[' + v.length + ']';
+              }
+              info.reactPropKeys.push('d' + depth + '.' + k + ' (' + t + ') = ' + preview);
+            }
+          }
+          fiber = fiber.return;
+          depth++;
+        }
+      } else {
+        info.reactPropKeys.push('(no React fiber key found)');
+      }
+      const ipc = getIpc();
+      if (ipc && ipc.invoke) {
+        ipc.invoke('proma:dom-dump', {
+          dumps: { __project_info__: info },
+          url: location.href,
+          windowName: 'project-info',
+          ts: Date.now()
+        }).catch(()=>{});
+      }
+    } catch (_) {}
+  }
+
   function makeEntryBtn(workspaceSlug) {
     return h('button', {
       className: 'ptv-entry-btn ptv-entry-btn-project',
@@ -754,6 +807,14 @@
       onClick: (e) => {
         e.preventDefault();
         e.stopPropagation();
+        // 调试: dump 该项目按钮的 React 信息 (定位 workspace_slug 字段名)
+        try {
+          const group = e.currentTarget.closest ? e.currentTarget.closest('.group\\/project') : null;
+          if (group) {
+            const pBtn = group.querySelector('button[class*="agent-project-item"]');
+            if (pBtn) dumpProjectInfo(pBtn, 'entry-btn-click');
+          }
+        } catch (_) {}
         if (state.floatingVisible) {
           hideOverlay();
         } else {

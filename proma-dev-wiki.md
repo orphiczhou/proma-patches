@@ -71,6 +71,7 @@
 | patch-M+ v0.4 | 2026-06-22 | 入口按钮记忆 workspace_slug（React fiber + textContent 反查兜底）→ 点击从哪个项目进就激活哪个 workspace + 活跃 tree 排顶 + 不活跃 tree 标灰 |
 | patch-M+ v0.4.1 | 2026-06-22 | 修两层 tab 完整显示: IPC 返回所有 workspace(含 name 不再过滤空) + UI 总是显示第一层 workspace tab + 空 workspace 标灰 |
 | patch-M+ v0.4.2 | 2026-06-22 | 修第一层只显示 1 个 workspace 的 bug: discoverAllWorkspacesWithTrees 不再强制要求 trees 目录存在, 5 个 workspace 都返回 |
+| patch-M+ v0.4.3 | 2026-06-22 | 第二层 tab 按最近活动时间倒排 (IPC 加 latest_activity_ts=max(last_heartbeat, leaves[].last_event_ts, created_at, mtime)) + 🌳 按钮 onClick dump React props 调试入口定位 |
 
 ### 关键文件
 
