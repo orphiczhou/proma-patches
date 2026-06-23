@@ -25,8 +25,9 @@
 - **remote-session Release 验收**：⚠️ 有条件通过（39/40，1 个 fork new_title Bug，不阻断上线）
 - **session-management Skill v1.3.0** + **GitHub 仓库** `orphiczhou/proma-patches` + `apply-patches.sh` v0.16.5
 
-### Layer 2 — 树形会话执行体系 ✅ v0.2.1 + v0.7 Phase A（Layer 1 Hard Gate 已落地）
+### Layer 2 — 树形会话执行体系 ✅ v0.2.1 + v0.7 Phase A + v0.7+ 引擎内联（工作区零源码）
 
+- **[2026-06-23] v0.7+ 引擎内联 MCP**: tree-state.js(2428行)→`tree-engine.cjs` 内联进 patches.cjs 的 mcp__tree__*(27工具)，消除 spawn 包装，**工作区零源码泄漏**（agent 看不到改不到引擎代码）。`run(cmd,args,treesRoot?)`与CLI stdout等价；TREES_ROOT可注入；per-call treesRoot并发安全；findEngine自适应定位engine。验证: smoke+dbc-spec 21/0+audit-attacks 18/CRITICAL=0+A1独立审计子会话。部署 dist/(patches+engine)+激活SKILL+清理3处遗留。详见 [note.md](./note.md)。**下一步**: 重启验证/V4-V8/Phase D/Layer4
 - **[2026-06-23] v0.7 Phase A 完成** (commit `1757b5e`)：tree-state.js **+12 DbC 校验点**（A1-A7 + HARDEN2/HARDEN6 + V1/V2/V3 审计加固），把 SKILL.md 的"应当"升级为代码"必须"，对应 CP1-CP6 + SP1 + 节点预算 + 加固#2/#6。**实施**: 4 批次真实子会话(自举) + commander 独立验收(dbc-spec 21/0) + 独立对抗审计发现 BLOCKER 已修 V1(restore旁路)/V2(auditor白名单)/V3(expect_outputs非空)。重构提取 collectValidateIssues + resolveAuditorIndep。详见 [note.md](./note.md)。**下一步**: 部署+T1-T4回归 / Phase D / V4-V8深度加固 / Phase B-G / Layer 4 subagent_trace_id
 - **核心交付**：tree-state.js v0.2.2 + Phase A（ROLE_ENUM + E_DEPTH_EXCEEDED + 12 DbC + collectValidateIssues + resolveAuditorIndep 白名单 + migrate + 深度限制 + Worker禁子节点 + 根唯一性）、tree-commander SKILL v2.2、tree-worker SKILL v2.2、commander-methodology v1.2（13原则）
 - **Q1 v2 验证**（2026-06-21）：全深度 3 层测试 + 3 轮独立 Agent Team 审计，发现 8 项问题（2 阻断/3 严重/2 中等/1 低），核心引擎功能正确但方法论合规性存在结构性缺陷

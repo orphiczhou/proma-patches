@@ -1057,14 +1057,15 @@ function createExternalHttpBridge() {
 }
 
 // ============================================================
-// 补丁 v0.7+: Tree 体系 MCP Server（把 tree-state.js CLI 包装成 mcp__tree__* 工具）
-// tree-state.js 零改动（保持 CLI + TREES_ROOT=__dirname）；本层 spawn 包装。
-// 选 spawn 而非 require：require 会把 tree-state.js 的 __dirname 变成 dist/，破坏其 TREES_ROOT 定位。
+// 补丁 v0.7+: Tree 体系 MCP Server（mcp__tree__* — 27 工具直接调内联引擎）
+// 引擎 tree-engine.cjs（同目录，从 tree-state.js 改造）导出 run(cmd,args)→{ok,error?,...result}。
+// TREES_ROOT 由 callTreeState 按 workspace 注入（treeEngine.setTreesRoot），不再依赖 __dirname。
+// 工作区无需 tree-state.js 源码 —— 引擎代码内联在 dist/，agent 看不到。
 // ============================================================
 (function registerTreeMcpServer() {
-  const { execFile } = require("child_process");
-  const { promisify } = require("util");
-  const execFileAsync = promisify(execFile);
+  // v0.7+: 引擎内联 —— 直接 require tree-engine.cjs（同目录），调 engine.run。
+  // 不再 spawn node tree-state.js：工作区无需 tree-state.js 源码，agent 看不到引擎代码。
+  const treeEngine = require("./tree-engine.cjs");
 
   // workspace → trees_dir 定位（复制 registerTreePanelIpc 内 discoverAllWorkspacesWithTrees 的核心；
   // 后者是 IIFE 局部函数，本模块级 createTreeMcpServer 无法访问，故独立实现一份）
@@ -1092,22 +1093,16 @@ function createExternalHttpBridge() {
     return null;
   }
 
-  // spawn node tree-state.js <args>，解析 stdout JSON（tree-state.js 总输出 {ok,error?,...result}）
+  // 调内联引擎 engine.run(cmd, args)。返回 {ok,error?,...result}，与原 CLI stdout 一致。
+  // 每次 call 前按 workspace 重设 TREES_ROOT（engine 模块级可变状态；Electron 主进程 JS 单线程，
+  // MCP 调用串行，无竞态；dbc-spec 等独立进程各设各的）。
   async function callTreeState(workspaceSlug, args) {
     const ws = findTreesDirForWorkspace(workspaceSlug);
     if (!ws) return { ok: false, error: { code: "E_NO_TREES_DIR", msg: `workspace "${workspaceSlug}" has no .context/trees/. Looked under ~/.proma[-dev]/agent-workspaces/${workspaceSlug}/{,workspace-files/}.context/trees/. Deploy tree-system to this workspace first.` } };
-    const script = path.join(ws.trees_dir, "tree-state.js");
-    if (!fs.existsSync(script)) return { ok: false, error: { code: "E_NO_TREE_STATE_JS", msg: `tree-state.js not found at ${script}` } };
-    try {
-      const { stdout } = await execFileAsync("node", [script, ...args], { cwd: ws.workspace_root, timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
-      return JSON.parse(stdout.trim());
-    } catch (e) {
-      // tree-state.js 失败时 exit 1/3，但 stdout 仍是 {ok:false,error:{code,msg}}
-      const out = e && e.stdout ? e.stdout.toString().trim() : "";
-      try { return JSON.parse(out); } catch (_) {
-        return { ok: false, error: { code: "E_EXEC", msg: String((e && e.message) || "exec failed").slice(0, 300), stderr: String((e && e.stderr) || "").slice(0, 300) } };
-      }
-    }
+    const [cmd, ...rest] = Array.isArray(args) ? args : [];
+    if (!cmd) return { ok: false, error: { code: "E_SCHEMA_INVALID", msg: "no tree command given" } };
+    // per-call treesRoot: 显式安全，不依赖模块级共享 TREES_ROOT（多 workspace 并发场景防覆盖）
+    return await treeEngine.run(cmd, rest, ws.trees_dir);
   }
 
   global.__proma_createTreeMcpServer__ = function (sdk, z, workspaceSlug) {
@@ -2256,19 +2251,20 @@ function ruleW01(leaf, tree) {
     suggest: "首条回复必须含 'event: brief_echo' YAML 块" }];
 }
 
-// W-08: Worker 没跑 tree-state.js 写命令 (v0.1 检查 user 消息中的 bash 命令调用)
+// W-08: Worker 没直接调 tree 写工具 (v0.7+: 引擎内联 MCP, 查 mcp__tree__* 写工具调用, 非 tree-state.js CLI)
 function ruleW08(leaf, tree) {
   if (leaf.role !== "worker") return [];
   const msgs = readLeafMessages(leaf.session_id, 50);
   if (msgs.length === 0) return [];
-  // 找 user 角色的 tool_use 调用, 检查是否含 tree-state.js 写命令
-  const writeCmds = /tree-state\.js\s+(leaf\s+add|leaf\s+set-status|milestone\s+add|milestone\s+set-result|event\s+append|drift\s+append|heartbeat\s+append|segment\s+append|init|backup|restore)/i;
+  // v0.7+: worker 调任何 mcp__tree__* 写工具都违反 leaf purity（worker 只该 send_message 上报）。
+  // 工具全名 mcp__tree__tree_<cmd>（MCP server name="tree", tool name="tree_init" 等）。
+  const writeTools = /mcp__tree__tree_(init|backup|restore|migrate|leaf_add|leaf_set_status|leaf_set_context|leaf_set_last_event|leaf_set_session|leaf_autonomy_override|milestone_add|milestone_set_result|event_append|drift_append|heartbeat_append|segment_append|nudge_append|audit_gate|audit_append)\b/i;
   for (const m of msgs) {
     const text = msgText(m);
-    if (writeCmds.test(text)) {
+    if (writeTools.test(text)) {
       return [{ rule_id: "W-08", leaf_id: leaf.leaf_id, severity: "high",
-        evidence: "worker 会话含 tree-state.js 写命令调用 (违反 leaf purity)",
-        suggest: "Worker 不应直接修改 tree-state, 通过 send_message 上报让 Commander 操作" }];
+        evidence: "worker 会话含 mcp__tree__* 写工具调用 (违反 leaf purity)",
+        suggest: "Worker 不应直接操作 tree 状态, 通过 send_message 上报让 Commander 操作" }];
     }
   }
   return [];
@@ -2314,22 +2310,21 @@ function ruleW12(leaf, tree) {
   return violations;
 }
 
-// C-11: Commander 没直接 Read/Write tree-state.json (检查 tool_use)
+// C-11: Commander 没直接 Read/Write tree-state.json 数据文件 (v0.7+: 合法途径是 mcp__tree__* 工具)
 function ruleC11(leaf, tree) {
   if (leaf.role !== "commander" && leaf.role !== "root") return [];
   const msgs = readLeafMessages(leaf.session_id, 80);
   if (msgs.length === 0) return [];
-  // S5 修复: 精确匹配 .json (非 .js) + 排除 CLI 调用
-  // 违规模式: Read/Write/Edit 直接操作 tree-state.json (注意 .json 必须紧跟, 不能是 .js)
-  // CLI 合法: node tree-state.js xxx 或 tree-state.js <子命令>
+  // v0.7+: 引擎已内联 MCP, 合法的状态变更途径是 mcp__tree__* 工具调用。
+  // tree-state.json 是数据文件, 任何直接 Read/Write/Edit 都违规
+  // （mcp__tree__* 工具调用不会在消息文本里产生 "Read tree-state.json" 字样，故无需再排除 CLI 模式）。
   const directAccessPattern = /\b(?:Read|Write|Edit)\b[^\n]{0,200}\btree-state\.json\b(?!s\b)/i;
-  const cliCallPattern = /\b(?:node\s+)?tree-state\.js\s+(?:leaf|milestone|event|drift|heartbeat|segment|init|backup|restore|validate|migrate|audit|nudge)\b/i;
   for (const m of msgs) {
     const text = msgText(m);
-    if (directAccessPattern.test(text) && !cliCallPattern.test(text)) {
+    if (directAccessPattern.test(text)) {
       return [{ rule_id: "C-11", leaf_id: leaf.leaf_id, severity: "mid",
         evidence: "commander/root 直接 Read/Write tree-state.json (违反 Leaf Purity)",
-        suggest: "状态变更必须走 tree-state.js CLI 子命令, 不直接读写文件" }];
+        suggest: "状态变更必须走 mcp__tree__* 工具, 不直接读写数据文件" }];
     }
   }
   return [];

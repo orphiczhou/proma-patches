@@ -4,6 +4,58 @@
 
 新条目追加在顶部。
 
+## 2026-06-23 v0.7+ 引擎内联 MCP（消除工作区源码暴露）
+
+**起因**: 独立审计发现 commit ba2c030 的"MCP 化"是半成品——`createTreeMcpServer` 只用 spawn 包装 `node tree-state.js`，90KB 引擎源码仍躺在每个工作区 `.context/trees/`，agent 可 Read/Edit/cat 直接绕过 MCP。用户要求真正内联（对照 session-management：逻辑全在 patches.cjs，工作区零源码）。方案文件 `.context/plan/tree-engine-inline-mcp.md`。
+
+**交付**: 6 任务（M1-M4 + MED M1 + A1）+ P4 部署，用 Tree 思想推进（SDK Agent 并行实现 + collaboration 真实子会话独立审计）。
+
+### 改造核心（M1）
+`tree-state.js`(2428行) → `patch-l/tree-engine.cjs`：
+- `TREES_ROOT`: `const __dirname` → `let` + `setTreesRoot()` 可注入（require 不再依赖 __dirname）
+- 删 `main()`/process 副作用；加 `run(cmd,args,treesRoot?)` 返回 `{ok,error?,...result}`（永不 throw，与原 CLI stdout 字节级等价）+ `if(require.main===module)` CLI shim（向后兼容）
+- `module.exports = {dispatch, run, setTreesRoot, getTreesRoot, parseArgs, ERRORS}`
+- **cmd 函数体 + Phase A 12 DbC + 文件锁 + 原子写全部零改动**（A1 用 diff 实证 1-2395 行一字未改）
+
+### MCP 接入（M2）
+`patches.cjs registerTreeMcpServer`：`callTreeState` 从 spawn execFile → `treeEngine.run(cmd, rest, ws.trees_dir)`（per-call treesRoot）。27 工具 schema 不变。W-08 审计规则改查 `mcp__tree__tree_*` 写工具；C-11 简化为查直接 Read/Write tree-state.json 数据文件。
+
+### 验收工具（M3）+ SKILL（M4）
+- dbc-spec/audit-attacks: `execFileSync` → `require engine.run`（async 化）+ `_findEngine()` 自适应查找（test-sandbox/assets/dist/ 都能定位）
+- tree-commander SKILL.md: 20+ 处 CLI → mcp__tree__*（26/27 工具；set-session 原文就没有，非遗漏）+ assets/ 自包含
+
+### MED M1 加固（per-call treesRoot）
+`run()` 加可选 treesRoot 参数 + try/finally 恢复。MCP 多 workspace 并发场景显式传 per-call，消除跨请求覆盖风险（当前已安全——临界区纯同步；per-call 是显式防御，未来临界区 async 化时仍需彻底参数化）。
+
+### 验证（四重）
+- smoke 12/0（M1）+ 11/0（MED M1 per-call 隔离 + finally 恢复）
+- dbc-spec **21/0**（改前改后一致）+ audit-attacks **18 攻击/CRITICAL=0**（3 BYPASS + 2 GAP 全是 V4-V8 既有待做项，非本次引入）
+- A1 独立审计子会话（collaboration）：结论"代码可部署"，diff 实证 cmd 零改动，发现 B1(部署未完成→已修) + tree-2 遗留(已清理)
+
+### P4 部署 + 清理
+- dist/: patches.cjs(新版) + tree-engine.cjs(新增) → `D:/Proma-dev/resources/app/dist/`（备份 .bak-20260623-pre-inline）
+- 激活 skill: SKILL.md 514行CLI版 → 744行MCP版（备份 .bak）
+- assets 同步 workspace-files + 激活路径两处，findEngine 自适应
+- **清理工作区遗留 tree-state.js ×3**（proma/tree-1/tree-2）→ 全局扫描 .context/trees/ **零 .js 源码** ✓
+
+### 关键技术决策
+1. **spawn→require**: spawn 保留 tree-state.js 文件暴露；require 内联消除。`__dirname` 障碍用 setTreesRoot 注入解决。
+2. **run() 等价 CLI stdout**: MCP/dbc-spec 调用方零改动（只看 {ok,error?}）。
+3. **per-call treesRoot**: MCP 路径显式安全（不依赖模块级共享 TREES_ROOT）。
+4. **findEngine 自适应**: 验收工具在 test-sandbox/assets/激活 assets/dist/ 任意位置都能定位 engine。
+5. **CLI shim 保留**: 向后兼容（`node tree-engine.cjs <cmd>`），过渡期可用。
+
+### 待办
+- 🔴 **重启 D:\Proma-dev 验证**: 确认 27 个 mcp__tree__* 注册 + tree_validate 返回 {ok}（需用户操作）
+- V4-V8 深度加固（A3 alignment 必填 / A5 验 pass 值 / CP2 直接改文件 / A4 budget0 / MS audit_pass 鉴权）—— 对应 audit-attacks 的 3 BYPASS + 2 GAP
+- Phase D（D1/D2/D3 用户层 bug）+ Phase B-G
+- Layer 4 subagent_trace_id（真·独立审计，CLI 层极限是白名单）
+- assets 的 dbc-spec 跑时会在 assets/core 建临时数据，commander 用后应清理（罕用场景）
+
+**自举验证延续**: 本次用 SDK Agent（M3/M4 并行）+ collaboration 真实子会话（A1 独立审计），延续 Phase A 的"实现/测试/审计分离"模式，再次验证有效。
+
+---
+
 ## 2026-06-23 v0.7 Phase A 实施 — Layer 1 Hard Gate（代码硬约束落地）
 
 **commit**: `1757b5e` `feat(tree-state): v0.7 Phase A — Layer 1 Hard Gate (12 DbC + validate重构)`

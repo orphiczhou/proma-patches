@@ -11,7 +11,7 @@ skill_name: tree-commander
 version: 2.2
 target: 根会话（指挥官）
 requires:
-  - tree-state.js                                          # 同目录 .context/trees/tree-state.js
+  - tree-state.js (v0.7+ 已内联进 mcp__tree__* MCP，工作区不再有源码)
   - commander-methodology.md v1.2                          # 指挥官方法论
   - tree-commander-design.md v1.1                          # 体系设计文档
   - tree-audit-methodology.md v1.0                         # 树形审计方法论（审计任务强制执行）
@@ -21,6 +21,8 @@ mcp_dependencies:
 task_tools: TaskCreate / TaskUpdate / Agent
 ```
 
+> **v0.7+：本 skill 通过 `mcp__tree__*` MCP 工具操作 tree 状态（替代旧的 `node tree-state.js` CLI）。所有工具返回 `{ok, error?, ...result}`，失败时查 `error.code`。引擎代码已内联进 MCP，工作区不再有 tree-state.js 源码。**
+
 ---
 
 ## §1 铁律（5 条）
@@ -29,7 +31,7 @@ task_tools: TaskCreate / TaskUpdate / Agent
 
 | # | 措辞 | 依据 |
 |---|------|------|
-| 1 | **严禁直接读写 tree-state.json** — 所有状态变更必须走 `tree-state.js` 子命令 | 补丁 4（§A.1）；方法论原则 8 |
+| 1 | **严禁直接读写 tree-state.json** — 所有状态变更必须走 `mcp__tree__*` MCP 工具 | 补丁 4（§A.1）；方法论原则 8 |
 | 2 | **必须下发 5 件套契约** — brief / dod / report / autonomy / self_audit 缺一不可 | 设计文档 §3；§3 契约纪律 |
 | 3 | **必须走三步质量门** — 实施 → 回归测试 → 审计，缺任一步不算完成 | 方法论原则 3 |
 | 4 | **必须三档递进纠偏** — 同一偏差最多 2 次纠正机会，第 3 次必剪枝 | 设计文档 §5.3；方法论原则 9 |
@@ -44,24 +46,20 @@ task_tools: TaskCreate / TaskUpdate / Agent
 指挥官 Skill 加载时，必须执行以下检查：
 
 ```text
-1. 检查 tree-state.js 存在:
-   ls .context/trees/tree-state.js
-   → 不存在则报错，不能继续
+1. 检查 mcp__tree__* 工具可用:
+   任调一个 mcp__tree__* 工具（如 tree_tree_dump）确认返回 {ok:true,...}
+   → 返回 {ok:false, error} 则报错，不能继续
 
-2. 检查 Node.js 可用:
-   node --version
-   → 不可用则报错，不能继续
-
-3. 列出已存在的 tree:
-   ls .context/trees/*/
+2. 列出已存在的 tree:
+   ls .context/trees/*/    （仍可用文件系统定位 <tree_id>）
    识别子目录名作为 <tree_id> 列表
    对每个 <tree_id> 运行:
-     node .context/trees/tree-state.js leaf list-active <tree_id>
-     输出活跃叶子清单
+     mcp__tree__tree_leaf_list_active(tree_id=<tree_id>)
+     输出活跃叶子清单（返回 {ok, leaves:[...]}）
 
-4. 对每个 tree 运行一致性校验:
-   node .context/trees/tree-state.js validate <tree_id>
-   → issues 非空则打印告警后继续（不阻断）
+3. 对每个 tree 运行一致性校验:
+   mcp__tree__tree_validate(tree_id=<tree_id>)
+   → 返回的 issues 非空则打印告警后继续（不阻断）
 ```
 
 ---
@@ -173,9 +171,10 @@ self_audit:
   1. fork_session(from=<parent_session>, new_channel_id=..., new_model_id=...)
      或 create_session(channel_id=..., model_id=..., title=<命名规范的标题>)
   2. 首条消息 = §3 的 5 件套完整 YAML（直接复制粘贴模板）
-  3. 调 tree-state.js leaf add <tree_id> --json '<leaf 初始数据>'
+  3. 调 mcp__tree__tree_leaf_add(tree_id=<tree_id>, leaf=<leaf 初始数据对象>)
+     （命名强制校验在工具内置，失败返回 error.code 如 E_NAME_INVALID）
   4. 对 self_audit 的每个 milestone 调:
-     tree-state.js milestone add <tree_id> <leaf_id> --json '{...}'
+     mcp__tree__tree_milestone_add(tree_id=<tree_id>, leaf_id=<leaf_id>, milestone=<milestone 对象>)
 ```
 
 ### Step 3：事件路由
@@ -183,7 +182,7 @@ self_audit:
 ```text
 子会话通过 send_message(notify) 上行事件。
 根会话收到后按 §6 事件路由表派发处理。
-所有事件先登记: tree-state.js event append <tree_id> <leaf_id> --type <type> --json '<meta>'
+所有事件先登记: mcp__tree__tree_event_append(tree_id=<tree_id>, leaf_id=<leaf_id>, type=<type>, meta=<meta 对象>)
 ```
 
 ### Step 4：质量门
@@ -192,7 +191,7 @@ self_audit:
 子会话 done 上报后:
   1. 检查 self_check 是否全部 pass（缺任一项 → 直接退回，不进入验收）
   2. 派验收 Agent（见 §9 模板）→ 拿到 verdict
-  3. verdict.pass → tree-state.js leaf set-status <tree_id> <leaf_id> done
+  3. verdict.pass → mcp__tree__tree_leaf_set_status(tree_id=<tree_id>, leaf_id=<leaf_id>, status=done)
      verdict 不通过 → 按 §7 三档纠偏决策树执行
 ```
 
@@ -207,56 +206,65 @@ self_audit:
 
 ---
 
-## §5 tree-state.js 子命令速查
+## §5 mcp__tree__* 工具速查
 
-> 依据：设计文档附录 A（A.3-A.7）。所有子命令均存在于 tree-state.js 实现中。
+> v0.7+ 起 tree-state.js 已内联进 MCP，通过 `mcp__tree__*` 工具调用。依据：设计文档附录 A（A.3-A.7）。所有工具返回 `{ok, error?, ...result}`，失败看 `error.code`（如 `E_NAME_INVALID`、`E_DELIVERABLE_MISSING`、`E_SCHEMA_INVALID`）。
 
 ### Query（只读）
 
-| 命令 | 说明 |
+| 工具 | 说明 |
 |------|------|
-| `leaf get <tree_id> <leaf_id>` | 查询单个 leaf 完整信息 |
-| `leaf list-active <tree_id>` | 列出所有 status=active 的叶子（心跳用） |
-| `leaf list-all <tree_id>` | 列出所有叶子（含 done/pruned/archived） |
-| `tree dump <tree_id>` | 全树 JSON dump（调试/恢复用） |
-| `drift list <tree_id> [--leaf <id>] [--since <iso>]` | 查询 drift 历史，可按 leaf / 时间过滤 |
-| `heartbeat tail <tree_id> [--leaf <id>] [-n 20]` | 查询最近 N 条心跳记录 |
-| `event list <tree_id> [--leaf <id>] [--type done\|blocked\|plan\|brief_echo\|heartbeat_reply\|nudge\|limit\|status_check]` | 查询事件历史（共 8 种类型） |
+| `mcp__tree__tree_leaf_get(tree_id, leaf_id)` | 查询单个 leaf 完整信息 |
+| `mcp__tree__tree_leaf_list_active(tree_id)` | 列出所有 status=active 的叶子（心跳用） |
+| `mcp__tree__tree_leaf_list_all(tree_id)` | 列出所有叶子（含 done/pruned/archived） |
+| `mcp__tree__tree_tree_dump(tree_id)` | 全树 JSON dump（调试/恢复用） |
+| `mcp__tree__tree_drift_list(tree_id, leaf_id?, since?)` | 查询 drift 历史，可按 leaf / 时间过滤 |
+| `mcp__tree__tree_heartbeat_tail(tree_id, leaf_id?, n?)` | 查询最近 N 条心跳记录 |
+| `mcp__tree__tree_event_list(tree_id, leaf_id?, type?)` | 查询事件历史（共 8 种类型：done/blocked/plan/brief_echo/heartbeat_reply/nudge/limit/status_check） |
 
 ### Add（新增）
 
-| 命令 | 说明 |
+| 工具 | 说明 |
 |------|------|
-| `leaf add <tree_id> --json '<json>'` | Fork 新会话时调用，含命名强制校验 |
-| `milestone add <tree_id> <leaf_id> --json '<json>'` | 添加里程碑（id/desc/expect_outputs） |
+| `mcp__tree__tree_leaf_add(tree_id, leaf=<obj>)` | Fork 新会话时调用，含命名强制校验（失败返回 `E_NAME_INVALID`） |
+| `mcp__tree__tree_milestone_add(tree_id, leaf_id, milestone=<obj>)` | 添加里程碑（milestone 对象含 id/desc/expect_outputs） |
 
 ### Update（字段更新）
 
-| 命令 | 说明 |
+| 工具 | 说明 |
 |------|------|
-| `leaf set-status <tree_id> <leaf_id> <active\|done\|pruned\|archived\|segment_pending>` | 设置叶子状态。切 done 时校验 milestones 非空且全部 audit_pass=true |
-| `leaf set-context <tree_id> <leaf_id> <0-100>` | 心跳后更新上下文使用率 |
-| `leaf set-last-event <tree_id> <leaf_id> <event_type> [--ts <iso>]` | 更新最后事件类型和时间 |
-| `leaf autonomy-override <tree_id> <leaf_id> --json '<json>'` | 中档纠偏时限权（added_must_ask / removed_can_decide） |
-| `milestone set-result <tree_id> <leaf_id> <mid> --audit-pass <true\|false> [--note-path <path>]` | 记录里程碑审计结果 |
+| `mcp__tree__tree_leaf_set_status(tree_id, leaf_id, status)` | status ∈ `active\|done\|pruned\|archived\|segment_pending`。切 done 时校验 milestones 非空且全部 audit_pass=true（失败返回 `E_MILESTONE_INCOMPLETE`） |
+| `mcp__tree__tree_leaf_set_context(tree_id, leaf_id, context_pct)` | context_pct 0-100，心跳后更新上下文使用率 |
+| `mcp__tree__tree_leaf_set_last_event(tree_id, leaf_id, event_type, ts?)` | 更新最后事件类型和时间 |
+| `mcp__tree__tree_leaf_autonomy_override(tree_id, leaf_id, overrides=<obj>)` | 中档纠偏时限权（overrides 对象含 added_must_ask / removed_can_decide / reason） |
+| `mcp__tree__tree_milestone_set_result(tree_id, leaf_id, milestone_id, audit_pass, note_path?)` | 记录里程碑审计结果（audit_pass 布尔） |
 
 ### Append（数组追加）
 
-| 命令 | 说明 |
+| 工具 | 说明 |
 |------|------|
-| `event append <tree_id> <leaf_id> --type <type> --json '<meta>'` | 登记上行事件元数据，同时更新 last_event_* |
-| `drift append <tree_id> <leaf_id> --kind <production\|direction\|rhythm> --severity <low\|mid\|high> --action <nudge\|limit\|prune\|self_correct\|declare\|handoff> [--fork-to <id>] [--reason <text>]` | 双写 drift_history + drift_log |
-| `heartbeat append <tree_id> --json '{"verdicts":[...], "ts":"...", "next_heartbeat":"..."}'` | 追加心跳记录，更新 last_heartbeat |
-| `segment append <tree_id> <leaf_id> <new_session_id>` | 竹节交接：追加 segment_chain + 改状态 segment_pending |
+| `mcp__tree__tree_event_append(tree_id, leaf_id, type, meta=<obj>)` | 登记上行事件元数据，同时更新 last_event_* |
+| `mcp__tree__tree_drift_append(tree_id, leaf_id, kind, severity, action, fork_to?, reason?)` | kind ∈ `production\|direction\|rhythm`，severity ∈ `low\|mid\|high`，action ∈ `nudge\|limit\|prune\|self_correct\|declare\|handoff`。双写 drift_history + drift_log |
+| `mcp__tree__tree_heartbeat_append(tree_id, heartbeat=<obj>)` | heartbeat 对象含 `{verdicts:[...], ts, next_heartbeat}`，追加并更新 last_heartbeat |
+| `mcp__tree__tree_segment_append(tree_id, leaf_id, new_session_id)` | 竹节交接：追加 segment_chain + 改状态 segment_pending |
+
+### Audit（v2.1 审计专用）
+
+| 工具 | 说明 |
+|------|------|
+| `mcp__tree__tree_audit_gate(tree_id, leaf_id, verdict, audit_session_id?, reason?)` | 审计门禁裁决 |
+| `mcp__tree__tree_audit_append(tree_id, leaf_id, report=<obj>)` | 追加审计报告 |
+| `mcp__tree__tree_nudge_append(tree_id, leaf_id, nudge=<obj>)` | 追加 nudge 记录 |
 
 ### Maintain（维护）
 
-| 命令 | 说明 |
+| 工具 | 说明 |
 |------|------|
-| `init <tree_id> --root-brief '<json>' --root-dod '<json>' [--audit-meta '<json>']` | 首次创建 tree（根会话激活时调一次） |
-| `backup <tree_id> [--label <text>]` | 手动备份（保留最近 10 份） |
-| `restore <tree_id> <backup_file>` | 从备份恢复（恢复前自动安全备份） |
-| `validate <tree_id>` | 一致性校验：parent 引用 / fork_to / session_id 唯一 / path 一致 / milestone.id 唯一 |
+| `mcp__tree__tree_init(tree_id, root_brief=<obj>, root_dod=<obj>, session_id?, model?, channel?, audit_meta?)` | 首次创建 tree（根会话激活时调一次） |
+| `mcp__tree__tree_backup(tree_id, label?)` | 手动备份（保留最近 10 份） |
+| `mcp__tree__tree_restore(tree_id, backup_file)` | 从备份恢复（恢复前自动安全备份） |
+| `mcp__tree__tree_validate(tree_id)` | 一致性校验：parent 引用 / fork_to / session_id 唯一 / path 一致 / milestone.id 唯一 |
+| `mcp__tree__tree_migrate(tree_id)` | 数据迁移 |
 
 ---
 
@@ -264,13 +272,13 @@ self_audit:
 
 > 依据：设计文档 §4.2 事件通道 + §4.3 心跳通道 + §6.1 brief_echo。
 
-| 事件 | 触发 | 指挥官动作 | tree-state.js 子命令 |
-|------|------|-----------|---------------------|
-| **done** | 子会话完成上报 | ① 登记事件 ② 派验收 Agent（§9）③ 按 verdict 执行：pass → set-status done；不通过 → 走 §7 纠偏 | `event append --type done` → `leaf set-status done` 或 `drift append` |
-| **blocked** | 子会话卡点上报 | ① 登记事件 ② 审查选项 A/B ③ send_message 给决策 ④ 超 10 分钟无响应 → archive + 重 Fork | `event append --type blocked` → 超时后 `leaf set-status archived` + `leaf add` 新叶 |
-| **plan** | 子会话拆解计划上报 | ① 登记事件 + 登记 plan_id + ts ② 派路线图 Agent（researcher）评估 ③ 5 分钟内收到 verdict → 按 verdict 行事 ④ 5 分钟未收到 → **默认放行**（plan_ack_seconds 到期）⑤ 若 verdict=nack 在放行后才到 → 走中档纠偏 | `event append --type plan` → nack 时 `drift append --action limit` |
-| **brief_echo** | 子会话首条上行（复述理解） | ① 登记事件 ② 派路线图 Agent 比对对齐度 ③ ≥85% → 放行 ④ <85% → 直接发回简报，重新 brief_echo（最便宜纠偏） | `event append --type brief_echo` → <85% 时 `drift append --severity low --action nudge` |
-| **heartbeat_reply** | 子会话回应 status_check | ① 登记事件 ② 解析回应内容 ③ 正常 → 仅记录 ④ 异常 → 喂给 §7 纠偏 | `event append --type heartbeat_reply` → `leaf set-context` |
+| 事件 | 触发 | 指挥官动作 | mcp__tree__* 工具 |
+|------|------|-----------|------------------|
+| **done** | 子会话完成上报 | ① 登记事件 ② 派验收 Agent（§9）③ 按 verdict 执行：pass → set-status done；不通过 → 走 §7 纠偏 | `tree_event_append(type=done)` → `tree_leaf_set_status(status=done)` 或 `tree_drift_append` |
+| **blocked** | 子会话卡点上报 | ① 登记事件 ② 审查选项 A/B ③ send_message 给决策 ④ 超 10 分钟无响应 → archive + 重 Fork | `tree_event_append(type=blocked)` → 超时后 `tree_leaf_set_status(status=archived)` + `tree_leaf_add` 新叶 |
+| **plan** | 子会话拆解计划上报 | ① 登记事件 + 登记 plan_id + ts ② 派路线图 Agent（researcher）评估 ③ 5 分钟内收到 verdict → 按 verdict 行事 ④ 5 分钟未收到 → **默认放行**（plan_ack_seconds 到期）⑤ 若 verdict=nack 在放行后才到 → 走中档纠偏 | `tree_event_append(type=plan)` → nack 时 `tree_drift_append(action=limit)` |
+| **brief_echo** | 子会话首条上行（复述理解） | ① 登记事件 ② 派路线图 Agent 比对对齐度 ③ ≥85% → 放行 ④ <85% → 直接发回简报，重新 brief_echo（最便宜纠偏） | `tree_event_append(type=brief_echo)` → <85% 时 `tree_drift_append(severity=low, action=nudge)` |
+| **heartbeat_reply** | 子会话回应 status_check | ① 登记事件 ② 解析回应内容 ③ 正常 → 仅记录 ④ 异常 → 喂给 §7 纠偏 | `tree_event_append(type=heartbeat_reply)` → `tree_leaf_set_context` |
 
 ### plan 默认放行机制（详细）
 
@@ -300,10 +308,10 @@ self_audit:
   if severity == low OR action == status_check:
     ┌─ 轻档 nudge ─────────────────────────────────────────┐
     │ send_message(leaf.session_id, "nudge: " + suggestion) │
-    │ tree-state.js leaf set-last-event <tree_id> <leaf_id> nudge    │
-    │ tree-state.js drift append <tree_id> <leaf_id>                │
-    │   --kind <kind> --severity low --action nudge                 │
-    │   --reason "<suggestion 摘要>"                                 │
+    │ mcp__tree__tree_leaf_set_last_event(tree_id, leaf_id, "nudge")     │
+    │ mcp__tree__tree_drift_append(tree_id, leaf_id,                       │
+    │   kind=<kind>, severity="low", action="nudge",                       │
+    │   reason="<suggestion 摘要>")                                        │
     └────────────────────────────────────────────────────────┘
 
   elif severity == mid:
@@ -311,12 +319,13 @@ self_audit:
       ┌─ 中档限权 ──────────────────────────────────────────────┐
       │ send_message(leaf.session_id, "limit: 权限已限制 — "    │
       │   + verdict.gaps 摘要)                                   │
-      │ tree-state.js leaf autonomy-override <tree_id> <leaf_id> │
-      │   --json '{"added_must_ask":[...], "removed_can_decide": │
-      │   [...], "reason":"中档纠偏：方向偏差 mid 严重度"}'     │
-      │ tree-state.js leaf set-last-event <tree_id> <leaf_id> limit      │
-      │ tree-state.js drift append <tree_id> <leaf_id>                  │
-      │   --kind <kind> --severity mid --action limit                   │
+      │ mcp__tree__tree_leaf_autonomy_override(tree_id, leaf_id, │
+      │   overrides={                                            │
+      │     added_must_ask:[...], removed_can_decide:[...],      │
+      │     reason:"中档纠偏：方向偏差 mid 严重度"})             │
+      │ mcp__tree__tree_leaf_set_last_event(tree_id, leaf_id, "limit")     │
+      │ mcp__tree__tree_drift_append(tree_id, leaf_id,                       │
+      │   kind=<kind>, severity="mid", action="limit")                       │
       └──────────────────────────────────────────────────────────┘
     else:
       → 先走轻档 nudge（给一次自纠机会）
@@ -324,17 +333,17 @@ self_audit:
   elif severity == high OR (mid + leaf 已有 limit 记录):
     ┌─ 重档剪枝 ─────────────────────────────────────────┐
     │ archive_session(leaf.session_id)                    │
-    │ tree-state.js leaf set-status <tree_id> <leaf_id> pruned     │
+    │ mcp__tree__tree_leaf_set_status(tree_id, leaf_id, "pruned")         │
     │ fork_session(from=<leaf_id>,                        │
     │   up_to_message_uuid=<verdict.suggested_fork_from_uuid>)     │
     │ 新 leaf: role 加 i2/i3 后缀                         │
-    │ tree-state.js leaf add <tree_id> --json '<新 leaf JSON>'     │
-    │ tree-state.js drift append <tree_id> <原 leaf_id>           │
-    │   --kind <kind> --severity high --action prune              │
-    │   --fork-to <新 leaf_id> --reason "<偏差原因摘要>"          │
+    │ mcp__tree__tree_leaf_add(tree_id, leaf=<新 leaf 对象>)             │
+    │ mcp__tree__tree_drift_append(tree_id, <原 leaf_id>,                 │
+    │   kind=<kind>, severity="high", action="prune",                     │
+    │   fork_to=<新 leaf_id>, reason="<偏差原因摘要>")                    │
     └──────────────────────────────────────────────────────┘
 
-全部动作调 drift append 记录。
+全部动作调 tree_drift_append 记录。
 ```
 
 ### 三档递进原则
@@ -363,14 +372,14 @@ prompt: |
   执行树 <tree_id> 心跳巡检。工作区: C:\Users\sir_c\.proma\agent-workspaces\proma\workspace-files
 
   步骤:
-  1. 运行: node .context/trees/tree-state.js leaf list-active <tree_id>
-     输出: {"ok":true,"leaves":[{leaf_id, session_id, last_event_ts, context_usage_pct},...]}
+  1. 调用 mcp__tree__tree_leaf_list_active(tree_id=<tree_id>)
+     返回: {ok:true, leaves:[{leaf_id, session_id, last_event_ts, context_usage_pct},...]}
   2. 对每个 active 叶子调用 mcp__session__list_messages(session_id, limit=3) 获取最近活动
   3. 组装数据后，调用哨兵 Agent（subagent_type=explorer），prompt 见下方判定矩阵
   4. 对哨兵判定为 stale/silent 的叶子:
      mcp__session__send_message(session_id, "status_check: 请报告当前步骤、已产出文件、预计完成时间、是否有阻塞")
-     调 tree-state.js leaf set-last-event <tree_id> <leaf_id> status_check
-  5. 调 tree-state.js heartbeat append <tree_id> --json '<判定结果 JSON>'
+     调 mcp__tree__tree_leaf_set_last_event(tree_id=<tree_id>, leaf_id=<leaf_id>, event_type="status_check")
+  5. 调 mcp__tree__tree_heartbeat_append(tree_id=<tree_id>, heartbeat=<判定结果对象>)
   6. 返回巡检摘要（< 200 字）：活跃数/停滞数/静默数/已发 status_check 数
 ```
 
@@ -411,7 +420,7 @@ prompt: |
 收到哨兵 Agent 返回的 verdicts 数组:
 
   for each verdict in verdicts:
-    调 tree-state.js leaf set-context <tree_id> <leaf_id> <pct>
+    调 mcp__tree__tree_leaf_set_context(tree_id=<tree_id>, leaf_id=<leaf_id>, context_pct=<pct>)
     
     if verdict.verdict == "active":
       → 仅记录，不动作
@@ -422,16 +431,16 @@ prompt: |
     
     elif verdict.verdict == "stale":
       → 已发 status_check（步骤 4 完成）
-      → 调 tree-state.js leaf set-last-event <tree_id> <leaf_id> status_check
+      → 调 mcp__tree__tree_leaf_set_last_event(tree_id=<tree_id>, leaf_id=<leaf_id>, event_type="status_check")
     
     elif verdict.verdict == "silent":
       → 已发 status_check
-      → 调 tree-state.js leaf set-last-event <tree_id> <leaf_id> status_check
-      → 调 tree-state.js drift append <tree_id> <leaf_id>
-          --kind rhythm --severity mid --action nudge
-          --reason "静默 > 30 分钟，下次心跳若仍 silent 升级到重档剪枝"
+      → 调 mcp__tree__tree_leaf_set_last_event(tree_id=<tree_id>, leaf_id=<leaf_id>, event_type="status_check")
+      → 调 mcp__tree__tree_drift_append(tree_id=<tree_id>, leaf_id=<leaf_id>,
+          kind="rhythm", severity="mid", action="nudge",
+          reason="静默 > 30 分钟，下次心跳若仍 silent 升级到重档剪枝")
   
-  最后调 tree-state.js heartbeat append <tree_id> --json '<完整 verdicts JSON>'
+  最后调 mcp__tree__tree_heartbeat_append(tree_id=<tree_id>, heartbeat=<完整 verdicts 对象>)
 ```
 
 ---
@@ -481,17 +490,17 @@ prompt: |
 
 > 依据：设计文档 §8.3 灾难恢复（4 类故障 F1-F4）。
 
-| 故障 | 现象 | 恢复动作 | tree-state.js 子命令 |
-|------|------|---------|---------------------|
-| **F1. 子会话崩溃** | send_message 无响应，心跳发现 🔴 | ① 从该 leaf 最后通过的 milestone uuid 重 Fork ② archive 旧会话 ③ 新 leaf 加 i2 后缀 | `leaf set-status <tree_id> <leaf_id> pruned` → `leaf add` 新叶 → `drift append --action prune --fork-to <新 leaf_id>` |
-| **F2. 根会话崩溃** | 调度停滞 | ① tree-state.json 完整 → 重启根会话 ② 调 `leaf list-active` 恢复所有活跃叶子索引 ③ 调 `validate` 校验一致性 ④ 恢复心跳 automation（如存在） | `leaf list-active` → `validate` → `event list` 重建最近事件时间线 |
-| **F3. tree-state 损坏** | JSON 解析失败（E_SCHEMA_INVALID） | ① 从 `.tmp` 或最近 backup 恢复 ② 无备份则从 drift_log/heartbeat_log 重建叶子列表 ③ 重建后调 `validate` | `restore <tree_id> <backup_file>` 或 `tree dump` 确认恢复结果 |
-| **F4. SDK 配额耗尽** | Fork/send_message 失败 | ① 根会话"待机"：每 5 分钟 ping 1 次 ② 恢复后重试失败的 Fork ③ 不写 tree-state，等恢复后统一更新 | 无需特殊子命令，恢复后 `leaf list-active` 确认状态一致 |
+| 故障 | 现象 | 恢复动作 | mcp__tree__* 工具 |
+|------|------|---------|------------------|
+| **F1. 子会话崩溃** | send_message 无响应，心跳发现 🔴 | ① 从该 leaf 最后通过的 milestone uuid 重 Fork ② archive 旧会话 ③ 新 leaf 加 i2 后缀 | `tree_leaf_set_status(status=pruned)` → `tree_leaf_add` 新叶 → `tree_drift_append(action=prune, fork_to=<新 leaf_id>)` |
+| **F2. 根会话崩溃** | 调度停滞 | ① tree-state.json 完整 → 重启根会话 ② 调 `tree_leaf_list_active` 恢复所有活跃叶子索引 ③ 调 `tree_validate` 校验一致性 ④ 恢复心跳 automation（如存在） | `tree_leaf_list_active` → `tree_validate` → `tree_event_list` 重建最近事件时间线 |
+| **F3. tree-state 损坏** | JSON 解析失败（E_SCHEMA_INVALID） | ① 从 `.tmp` 或最近 backup 恢复 ② 无备份则从 drift_log/heartbeat_log 重建叶子列表 ③ 重建后调 `tree_validate` | `tree_restore(tree_id, backup_file)` 或 `tree_tree_dump` 确认恢复结果 |
+| **F4. SDK 配额耗尽** | Fork/send_message 失败 | ① 根会话"待机"：每 5 分钟 ping 1 次 ② 恢复后重试失败的 Fork ③ 不写 tree-state，等恢复后统一更新 | 无需特殊工具，恢复后 `tree_leaf_list_active` 确认状态一致 |
 
 **关键设计**：
 - leaves 条目永不删除，只改 status（保留可追溯）
 - drift_log 永不截断
-- 每写 10 次自动备份一次（tree-state.js 内置）
+- 每写 10 次自动备份一次（mcp__tree__* 引擎内置）
 
 ---
 
@@ -503,7 +512,7 @@ prompt: |
 |---|---------|------|---------|
 | 1 | 指挥官亲自写代码 / 亲自做判断 | 上下文爆炸，甜点危机 | 派子 Agent 判断 / 派子会话执行 |
 | 2 | 给子会话一句话任务 | 必然跑偏 | 7 段式 prompt：背景 + 必读 + 任务 + 约束 + 流程 + 禁止 + 格式 |
-| 3 | 直接读/写 tree-state.json | 字段写错 / 格式错误 / 覆盖丢失 | 走 tree-state.js 子命令 |
+| 3 | 直接读/写 tree-state.json | 字段写错 / 格式错误 / 覆盖丢失 | 走 mcp__tree__* 工具 |
 | 4 | 下发缺失 DoD 的任务 | 子会话不知道什么叫完成 | 5 件套缺一不可 |
 | 5 | 下发缺失 milestones 的任务 | 无法内部自审 | self_audit.milestones 必填 |
 | 6 | 跳过 brief_echo 直接开始干活 | 理解偏差在全程传播 | 首条上行必须是 brief_echo |
