@@ -154,6 +154,41 @@
 
 3 份子 Agent 报告 (工程/方法论/综合对比) 结论**惊人一致**, 互补可信, 无矛盾. 详见完整报告.
 
+## 专家组审议包 (2026-06-23)
+
+> 完整目录: `.context/expert-review-2026-06-23/`
+> 用途: 用户召开专家组审议 v0.6 修订计划, 自包含讨论包
+
+| 文件 | 内容 |
+|---|---|
+| `00-handoff.md` | 交接文件 (项目背景 + 现状 + 7 个决议题) |
+| `01-test-summary.md` | 测试报告核心结论 (CP1-CP6) |
+| `02-current-v0.5-plan.md` | 现有 v0.5 计划 (已批准的 4 个 bug 修复) |
+| `02b-current-v0.5-architecture-fixes.md` | v0.5 调研过程 |
+| `03-v0.6-revised-plan-draft.md` | **v0.6 修订计划草稿 (核心讨论稿)** |
+| `04-source-tao-audit.md` | 原始 TAO 审计报告 (35 条规则覆盖矩阵) |
+| `05-source-meta-audit.md` | 元审计 Agent 综合报告 |
+| `README.md` | 专家组导读 |
+
+### v0.6 修订核心 (待专家组审议)
+
+1. **新建 Phase 6 (审计机制硬约束), P0 最高优先级** — 8 个子步骤对应 CP1-CP6 + SP1 + SP4
+2. **Phase 1 (剪枝语义) 降 P1**, 与 Phase 6 并行
+3. **Phase 3 (watcher) 大幅简化** — 去掉 setTimeout 重构, 只加 silence_minutes 字段
+4. **migrate-existing-workspaces 改不覆盖策略**
+
+### 7 个待决议题
+
+1. Phase 6 是否应该作为 P0?
+2. Phase 6 是 8 步一次性做, 还是只做 P0 两步先看效果?
+3. migrate 策略: 强制 vs 只对新 tree 生效?
+4. commander 行为问题: 硬校验让 commander 卡死时是否回退?
+5. Proma 平台层 Agent 凭证缺失: 先推平台改造还是先工具层 hack?
+6. Phase 3 是否完全不动 watcher 代码?
+7. Phase 6 完成后怎么验证?
+
+详见 `expert-review-2026-06-23/00-handoff.md` §6.
+
 - `created_at` 是 tree 创建时间而非最后活动时间, 不该参与"最近活动"判断
 - 浮窗 UI 排序逻辑可能根本没用 `latest_activity_ts`, 而是 fallback 到别的字段 (如 `created_at`)
 - tree-state.json 里 `leaves[].last_event_ts` 字段缺失或格式不一致
