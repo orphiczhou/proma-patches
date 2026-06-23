@@ -97,6 +97,63 @@
 
 可能的新根因方向 (待用户复测后再诊断, **本次未改代码**):
 - 业务时间字段本身不准: `last_heartbeat` 可能被 watcher 周期性刷新, 反而比真实 `last_event_ts` 更新
+
+## Tree 体系阶段测试报告 (2026-06-23)
+
+> 完整报告: `.context/audit/2026-06-23-test-summary.md`
+> 来源: 用户在"tree 测试 1/2"workspace 实测 commander/worker 体系跑 mdref/pytut 两棵树, 派审计 Agent 出 2 份文档:
+> - `.context/audit/2026-06-23-mdref-pytut-tao-audit.md` (启动会话视角, 35 条规则覆盖矩阵)
+> - `.context/note.md` 顶部 (元审计 Agent 综合归纳)
+> 分析方法: 3 个子 Agent 从工程/方法论/综合对比三个角度独立归纳
+
+### 整体结论
+
+**Tree 体系处于"形式闭环、实质不闭环"的 v0.1 阶段, 不能上生产.**
+
+- ✅ 流程能跑通: 契约下发、event 路由、drift 记录、文件产出
+- ❌ **审计链路是伪链路**: commander 自审自过、声称产出但文件未落盘也 pass、零独立审查 leaf
+- ❌ 软约束没硬护栏: skill 文档里的"应当"在 tree-state.js 层未升级为"必须"
+
+### 共性确认问题 (两份文档独立得出, P0/P1)
+
+| ID | 问题 | 严重度 | 修复方向 |
+|---|---|---|---|
+| CP1 | 声称产出文件未落盘但 audit pass (A1/B1) | 🔴 critical | `leaf set-status done` 加 fs.existsSync 校验 expect_outputs |
+| CP2 | 零独立审查 leaf (auditor_session_id 全 null 或等于 commander) | 🔴 critical | `audit-gate` 加独立性校验 `auditor_session_id !== added_by && !== root_session_id` |
+| CP3 | commander 自做根因诊断 + 自填对齐度 (违反铁律 1) | 🟡 high | alignment 字段从 Agent 输出注入, 禁止 commander 自填 |
+| CP4 | 节点数失控 (14 > 10 上限) | 🟡 high | `leaf add` 加 --max-leaves (默认 10) |
+| CP5 | self_check 字段格式不合规 (W-05/W-06 全员 fail) | 🟡 mid | done 上行 schema 校验 |
+| CP6 | validate 失败仍续跑 + 收尾 | 🟡 high | `tree set-status archived` 强制 validate ok |
+
+### 单文档独有但可信 (中置信度)
+
+- SP1: audit 时序倒填 (A1 audit 比 plan 早 0.3 秒)
+- SP2: chapter-02 correction_round=1 是假的 (磁盘只第一版)
+- SP3: root session_id 全程 PENDING_ROOT 未修
+- SP4: commander idx 369 error_during_execution, context 671% 无预警
+- SP5: C-12 双轨违背 (drift_log 明文 "switching to Agent-based execution")
+- SP6: 三档纠偏跳级, 未 drift append 即动作
+- SP7: W-10/W-13 全员 fail
+
+### 待核实 (低置信度)
+
+- UC1: commander 消息流"无可识别 Agent 调用痕迹" (list_messages 不暴露 tool_use 块)
+- UC2: "switching to Agent-based execution" 具体语义 (绕过 worker vs 仅换 fork)
+- UC3: tao-watcher 是否真未启动 (字段为 null vs 实际未跑)
+
+### v0.5 计划诊断
+
+**v0.5 完全没碰到审计核心**, 建议:
+
+1. 新建 **Phase 6 (审计机制硬约束, P0 最高优先级)**, 8 个子步骤对应 CP1-CP6 + SP1 + SP4
+2. Phase 1 (剪枝语义) 降为 P1, 与 Phase 6 并行
+3. **Phase 3 简化**: 不改 setTimeout (审计没提 interval 问题), 只加 silence_minutes + status IPC
+4. **migrate-existing-workspaces 改不覆盖策略** (避免覆盖用户手改)
+
+### 子 Agent 分析依据
+
+3 份子 Agent 报告 (工程/方法论/综合对比) 结论**惊人一致**, 互补可信, 无矛盾. 详见完整报告.
+
 - `created_at` 是 tree 创建时间而非最后活动时间, 不该参与"最近活动"判断
 - 浮窗 UI 排序逻辑可能根本没用 `latest_activity_ts`, 而是 fallback 到别的字段 (如 `created_at`)
 - tree-state.json 里 `leaves[].last_event_ts` 字段缺失或格式不一致
