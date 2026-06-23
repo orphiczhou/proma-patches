@@ -87,6 +87,16 @@ const E_BACKUP_CORRUPT = 'E_BACKUP_CORRUPT';
 const E_IO = 'E_IO';
 const E_UNKNOWN = 'E_UNKNOWN';
 const E_GATEKEEPER_REQUIRED = 'E_GATEKEEPER_REQUIRED';
+// v0.7 Phase A: DbC 硬约束（Layer 1 Hard Gate）
+const E_DELIVERABLE_MISSING = 'E_DELIVERABLE_MISSING';
+const E_AUDITOR_NOT_INDEPENDENT = 'E_AUDITOR_NOT_INDEPENDENT';
+const E_AUDIT_PREMATURE = 'E_AUDIT_PREMATURE';
+// v0.7 Phase A 批次2: DbC 硬约束（cmdEventAppend）
+const E_ALIGNMENT_NOT_VERIFIED = 'E_ALIGNMENT_NOT_VERIFIED';
+const E_SELFCHECK_INVALID = 'E_SELFCHECK_INVALID';
+// v0.7 Phase A 批次3: DbC 硬约束（节点预算 + 归档前置校验）
+const E_TREE_NODE_BUDGET_EXCEEDED = 'E_TREE_NODE_BUDGET_EXCEEDED';
+const E_TREE_NOT_VALIDATED = 'E_TREE_NOT_VALIDATED';
 
 // v0.2.2: 真实 MCP session_id 格式校验（UUID v1-v5 不区分版本）
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -458,6 +468,8 @@ async function cmdInit(args) {
     heartbeat_log: [],
     drift_log: [],
     audit_meta,
+    // v0.7 Phase A: deliverables 根目录，A1 文件存在性校验的相对路径基准
+    _deliverables_root: path.join(dir, 'deliverables'),
     _meta: {
       workspace_root,
       tao_version: null,
@@ -619,6 +631,15 @@ async function cmdLeafAdd(args) {
           `cannot add leaf under parent "${parent}": parent is a worker (atomic leaf). Only commanders can have children.`
         );
       }
+    }
+
+    // v0.7 Phase A 批次3 (A4): 节点预算硬约束 — active leaf 数不得超过 root_dod.node_budget
+    // root leaf 算 active；待创建的新 leaf 未计入。超出时拒绝，逼操作者先归档或调高预算。
+    const maxLeaves = (state.root_dod && state.root_dod.node_budget) || 10;
+    const activeCount = Object.values(state.leaves).filter(l => l.status !== 'archived').length;
+    if (activeCount >= maxLeaves) {
+      throw new TreeStateError(E_TREE_NODE_BUDGET_EXCEEDED,
+        `cannot add leaf: active_count ${activeCount} >= budget ${maxLeaves}. archive leaves first or increase root_dod.node_budget`);
     }
 
     const now = nowIso();
@@ -851,6 +872,39 @@ async function cmdLeafSetStatus(args) {
         }
       }
 
+      // v0.7 批次4 (V3): 每个 milestone 的 expect_outputs 必须非空且全为非空字符串（堵零交付物）
+      // A1 仅校验"已声明的字符串相对路径"是否落盘，空数组/缺省会被跳过，done 可零交付物达成；先于此拦截。
+      for (const m of ms) {
+        const outs = Array.isArray(m.expect_outputs) ? m.expect_outputs : [];
+        if (outs.length === 0) {
+          throw new TreeStateError(E_DELIVERABLE_MISSING,
+            `cannot set status=done: milestone "${m.id}" has empty expect_outputs (must declare at least one deliverable)`);
+        }
+        for (const outPath of outs) {
+          if (typeof outPath !== 'string' || outPath.length === 0) {
+            throw new TreeStateError(E_DELIVERABLE_MISSING,
+              `cannot set status=done: milestone "${m.id}" expect_outputs contains non-string/empty entry`);
+          }
+        }
+      }
+
+      // v0.7 Phase A (A1): done 前置 deliverables 文件存在性硬约束
+      // 每个 milestone 的 expect_outputs 必须真实落盘，把"宣告完成"钉死在可验收的物理产物上
+      const droot = state._deliverables_root || path.join(treeDir(tree_id), 'deliverables');
+      for (const m of ms) {
+        const outs = Array.isArray(m.expect_outputs) ? m.expect_outputs : [];
+        for (const outPath of outs) {
+          if (typeof outPath !== 'string' || outPath.length === 0) continue;
+          const resolved = path.isAbsolute(outPath) ? outPath : path.join(droot, outPath);
+          if (!fs.existsSync(resolved)) {
+            throw new TreeStateError(
+              E_DELIVERABLE_MISSING,
+              `cannot set status=done: deliverable "${outPath}" not found. milestone: ${m.id}, leaf: ${leaf_id}, resolved: ${resolved}`
+            );
+          }
+        }
+      }
+
       // v0.2.2-修复#5: Worker done 前置 events 检查
       // 必须含 ≥2 events 且包含 brief_echo + done（堵住 Events 空洞）
       if (leaf.role === 'worker') {
@@ -895,6 +949,17 @@ async function cmdLeafSetStatus(args) {
             `cannot set commander status=done: ${notDone.length} child leaf(s) not done: ${notDone.join(', ')}`
           );
         }
+      }
+    }
+
+    // v0.7 Phase A 批次3 (A6): archived 前整树必须通过 validate
+    // 归档是"封存历史"，封存一棵带病（validate 有 issue）的树会污染后续追溯。
+    // collectValidateIssues 只读 state，withLock 内安全调用。
+    if (new_status === 'archived') {
+      const validateIssues = collectValidateIssues(state);
+      if (validateIssues.length > 0) {
+        throw new TreeStateError(E_TREE_NOT_VALIDATED,
+          `cannot archive leaf "${leaf_id}": validate() found ${validateIssues.length} issue(s) in tree. run 'validate ${tree_id}'. First: ${validateIssues[0].type} on ${validateIssues[0].leaf_id || 'tree'}`);
       }
     }
 
@@ -1204,6 +1269,73 @@ async function cmdEventAppend(args) {
     }
     const leaf = state.leaves[leaf_id];
     if (!Array.isArray(leaf.events)) leaf.events = [];
+
+    // v0.7 Phase A 批次2 (A3) + 批次4 (V2): brief_echo 带 alignment 字段时，必须附带独立 auditor_session_id。
+    // v0.7 批次4 升级为白名单：auditor 必须是树中真实存在的、独立的 leaf session（堵伪造 UUID）。
+    // Commander 不可自评 alignment，必须委托独立 Agent 并回填其 session_id。
+    if (opts.type === 'brief_echo') {
+      const alignment = meta.alignment;
+      if (alignment !== undefined && alignment !== null) {
+        const auditor = meta.auditor_session_id;
+        const indepProblem = resolveAuditorIndep(state, leaf, auditor);
+        if (indepProblem) {
+          throw new TreeStateError(
+            E_ALIGNMENT_NOT_VERIFIED,
+            `brief_echo rejected: alignment=${JSON.stringify(alignment)} present but auditor_session_id is missing or not independent. ` +
+              `Commander cannot self-assess alignment. ` +
+              `auditor must be a real, independent leaf session in the tree (problem: ${indepProblem}; auditor="${auditor || 'null'}").`
+          );
+        }
+      }
+    }
+
+    // v0.7 Phase A 批次2 (A5): done event 的 self_check schema 硬约束（strict: 必须存在且合法）。
+    // 每个 done event 必须附带结构化 self_check（非空 [{item,pass,evidence}] 数组），
+    // 拒绝字符串（"all_pass"）、空数组、缺字段或类型错误，杜绝 worker 走捷径伪造 done。CP5 硬修复。
+    if (opts.type === 'done') {
+      const sc = meta.self_check;
+      if (sc === undefined || sc === null) {
+        throw new TreeStateError(
+          E_SELFCHECK_INVALID,
+          `done event rejected: self_check is missing (must be a non-empty array of {item,pass,evidence}).`
+        );
+      }
+      if (!Array.isArray(sc)) {
+        throw new TreeStateError(
+          E_SELFCHECK_INVALID,
+          `done event rejected: self_check must be an array, got ${typeof sc}. ` +
+            `string values like "all_pass" are not accepted.`
+        );
+      }
+      if (sc.length === 0) {
+        throw new TreeStateError(
+          E_SELFCHECK_INVALID,
+          `done event rejected: self_check array is empty (must have at least one item).`
+        );
+      }
+      for (let i = 0; i < sc.length; i++) {
+        const it = sc[i];
+        if (!it.item || typeof it.item !== 'string') {
+          throw new TreeStateError(
+            E_SELFCHECK_INVALID,
+            `done event rejected: self_check[${i}].item is missing or not a string.`
+          );
+        }
+        if (typeof it.pass !== 'boolean') {
+          throw new TreeStateError(
+            E_SELFCHECK_INVALID,
+            `done event rejected: self_check[${i}].pass must be boolean, got ${typeof it.pass}.`
+          );
+        }
+        if (!it.evidence || typeof it.evidence !== 'string') {
+          throw new TreeStateError(
+            E_SELFCHECK_INVALID,
+            `done event rejected: self_check[${i}].evidence is missing or not a string.`
+          );
+        }
+      }
+    }
+
     const ev = { type: opts.type, ts, meta };
     leaf.events.push(ev);
     leaf.last_event_type = opts.type;
@@ -1411,6 +1543,13 @@ async function cmdRestore(args) {
     }
     // 恢复视为新基线：清零计数，下次写从 1 起
     state._meta.write_count = 0;
+    // v0.7 批次4 (V1): restore 前置 validate，杜绝 backup→改→restore 伪造 done worker/auditor。
+    // state 即 parsed；collectValidateIssues 只读 state.leaves 等，安全。
+    const restoreIssues = collectValidateIssues(state);
+    if (restoreIssues.length > 0) {
+      throw new TreeStateError(E_TREE_NOT_VALIDATED,
+        `cannot restore: backup contains ${restoreIssues.length} issue(s). First: ${restoreIssues[0].type} on ${restoreIssues[0].leaf_id || 'tree'}. Refusing to restore non-compliant state.`);
+    }
     writeState(tree_id, state);
     result = { restored_from: path.basename(full), tree_id };
   });
@@ -1426,7 +1565,29 @@ async function cmdValidate(args) {
   const [tree_id] = positional;
   assertTreeExists(tree_id);
   const state = readState(tree_id);
+  const issues = collectValidateIssues(state);
+  return { ok: issues.length === 0, issues, summary: issues.length + ' issue(s)' };
+}
 
+// v0.7 批次4 (V2): auditor 独立性白名单校验。
+// 返回 problem 字符串(null=通过)。auditor 必须是树中真实存在的、独立的 leaf session。
+// 黑名单时代仅排除 null/added_by/root，任意伪造 UUID 即可放行；白名单要求 auditor 真实存在于树。
+function resolveAuditorIndep(state, leaf, auditorSessionId) {
+  if (!auditorSessionId) return 'auditor_session_id is null';
+  if (leaf.added_by && auditorSessionId === leaf.added_by) return 'auditor=added_by (self-audit forbidden)';
+  const auditorLeaf = Object.values(state.leaves).find(l => l.session_id === auditorSessionId);
+  if (!auditorLeaf) return `auditor "${auditorSessionId}" not found as any leaf session in tree (forged UUID)`;
+  if (auditorLeaf.leaf_id === leaf.leaf_id) return 'auditor is the leaf itself';
+  return null;
+}
+
+/**
+ * 收集 tree 的所有校验问题（只读 state，不修改）。
+ * cmdValidate 与归档前置（A6）复用同一份检查逻辑，避免两处漂移。
+ * 包含原有检查 1-8 + HARDEN2(done worker 独立 audit_gate) + HARDEN6(context 溢出)。
+ * issues 项格式: { type, leaf_id?, detail }
+ */
+function collectValidateIssues(state) {
   const issues = [];
   const leaves = state.leaves || {};
   const leafIds = Object.keys(leaves);
@@ -1603,11 +1764,30 @@ async function cmdValidate(args) {
     }
   }
 
-  // 输出: ok=true 即使有 issues 也算 ok（设计 §A.7 输出 ok:false 是 schema 故障级）
-  // 重读附录 A.7 输出格式：
-  //   {"ok":true,"issues":[]}  或  {"ok":false,"issues":[...]}
-  // → issues 非空时 ok=false
-  return { ok: issues.length === 0, issues };
+  // HARDEN2 (加固点#2) + 批次4 (V2): done worker 必须有独立 audit_gate
+  // v0.7 批次4 升级为白名单：auditor 必须是树中真实存在的、独立的 leaf session（堵伪造 UUID）。
+  // 模拟"绕过 audit-gate 命令直接篡改文件"的场景：done worker 的 audit_gate 若不独立，validate 必须报出。
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    if (leaf.role === 'worker' && leaf.status === 'done') {
+      const gate = leaf.audit_gate || {};
+      const auditor = gate.auditor_session_id;
+      let problem = null;
+      if (gate.verdict !== 'pass') problem = `verdict="${gate.verdict}" (must be pass)`;
+      else problem = resolveAuditorIndep(state, leaf, auditor);
+      if (problem) issues.push({ type: 'audit_gate_not_independent', leaf_id: id, detail: `done worker audit_gate not independent: ${problem}` });
+    }
+  }
+
+  // HARDEN6 (加固点#6 预留): commander/root context_usage_pct>100 视为卡死/塌缩
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    if ((leaf.role === 'commander' || leaf.role === 'root') && typeof leaf.context_usage_pct === 'number' && leaf.context_usage_pct > 100) {
+      issues.push({ type: 'context_overflow', leaf_id: id, detail: `context_usage_pct=${leaf.context_usage_pct} > 100 (presumed stuck/collapsed)` });
+    }
+  }
+
+  return issues;
 }
 
 // ============================================================
@@ -1711,6 +1891,33 @@ async function cmdAuditGate(args) {
     }
     const leaf = state.leaves[leaf_id];
     const from = leaf.audit_gate || { verdict: null, auditor_session_id: null, ts: null };
+
+    // v0.7 Phase A (A2) + 批次4 (V2): auditor 独立性硬约束 — pass/required 时审计者必须独立于被审计者
+    // v0.7 批次4 升级为白名单：auditor 必须是树中真实存在的、独立的 leaf session。
+    // 旧黑名单(null/added_by/root)可被任意伪造 UUID 绕过；现要求 auditor 真实存在于树。
+    if (verdict === 'pass' || verdict === 'required') {
+      const indepProblem = resolveAuditorIndep(state, leaf, audit_session_id);
+      if (indepProblem) {
+        throw new TreeStateError(
+          E_AUDITOR_NOT_INDEPENDENT,
+          `audit-gate rejected: auditor "${audit_session_id}" not independent for leaf "${leaf_id}" (verdict=${verdict}): ${indepProblem}. Audit must be performed by an independent session that exists in the tree.`
+        );
+      }
+    }
+
+    // v0.7 Phase A (A7): audit 时序硬约束 — pass 时被审计 leaf 必须已有更早的 done 事件
+    // 审计发生在工作完成之后，杜绝"未完工即审计通过"
+    if (verdict === 'pass') {
+      const evs = Array.isArray(leaf.events) ? leaf.events : [];
+      const hasDone = evs.some((e) => e && e.type === 'done');
+      if (!hasDone) {
+        throw new TreeStateError(
+          E_AUDIT_PREMATURE,
+          `audit-gate rejected: no done event found for leaf "${leaf_id}". Audit must occur after work is completed.`
+        );
+      }
+    }
+
     leaf.audit_gate = {
       verdict,
       auditor_session_id: audit_session_id,

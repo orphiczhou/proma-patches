@@ -1,0 +1,3 @@
+# test-sandbox: 仅入库 dbc-spec.cjs 验收工具
+# core/ 是 tree-state.js 运行副本 + tdb* 测试 tree 数据（每次运行重新生成，不入库）
+core/
