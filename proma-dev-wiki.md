@@ -84,12 +84,25 @@
 | 入口定位 (从某项目 🌳 进激活该 workspace) | ❌ 10 次只 1 次生效 | injectEntryButton 注入时 fiber 可能没准备好 (DOM 刚渲染), slug=null → MutationObserver 重试时已注入直接 return, slug 永不更新. 修复方向: onClick 时重新调 getWorkspaceSlugFromProjectGroup (点击时 fiber 一定准备好了) |
 | 第二层按最近活动时间倒排 | ❌ 排错 | latest_activity_ts 用 max(leaves.last_event_ts, last_heartbeat, created_at, mtime), 但 **mtime 是文件系统时间**, watcher 跑过会更新文件让 mtime 变很新, 把不活跃 tree 顶上来. 修复方向: 去掉 mtime, 只用业务时间字段 (last_event_ts / last_heartbeat / created_at) |
 
-### v0.4.5 修复 (2026-06-23, 待验证)
+### v0.4.5 修复 (2026-06-23, 已验证)
 
-| 修复点 | 修法 | 文件 |
-|---|---|---|
-| 入口定位 race condition (问题 A) | `makeEntryBtn.onClick` 不用闭包 slug, 每次从 DOM 重新调 `getWorkspaceSlugFromProjectGroup`, 闭包值只作兜底 | proma-tree-view.js |
-| 排序 mtime 干扰 (问题 B) | `readTreesFromDir` 的 `latest_activity_ts` 不再以 mtimeMs 作初值, 只在业务字段全空时退化用 mtime | proma-dev-patches.cjs |
+| 修复点 | 修法 | 文件 | 验证结果 |
+|---|---|---|---|
+| 入口定位 race condition (问题 A) | `makeEntryBtn.onClick` 不用闭包 slug, 每次从 DOM 重新调 `getWorkspaceSlugFromProjectGroup`, 闭包值只作兜底 | proma-tree-view.js | ✅ 通过 (不同 workspace 的 🌳 进去都能正确激活) |
+| 排序 mtime 干扰 (问题 B) | `readTreesFromDir` 的 `latest_activity_ts` 不再以 mtimeMs 作初值, 只在业务字段全空时退化用 mtime | proma-dev-patches.cjs | ❌ 仍未解决 — 业务时间倒排仍然不对, 用户反馈第二层 tab 顺序不符合"活跃 tree 排前" |
+
+### 问题 B 未解决 - 待重新诊断 (2026-06-23, 暂不改)
+
+用户反馈问题 B 的修复无效, 第二层 tab 排序仍然不对 (活跃 tree 没排到前面).
+
+可能的新根因方向 (待用户复测后再诊断, **本次未改代码**):
+- 业务时间字段本身不准: `last_heartbeat` 可能被 watcher 周期性刷新, 反而比真实 `last_event_ts` 更新
+- `created_at` 是 tree 创建时间而非最后活动时间, 不该参与"最近活动"判断
+- 浮窗 UI 排序逻辑可能根本没用 `latest_activity_ts`, 而是 fallback 到别的字段 (如 `created_at`)
+- tree-state.json 里 `leaves[].last_event_ts` 字段缺失或格式不一致
+- 排序比较方向反了 ( ascending ↔ descending )
+
+下一步: 需要用户复测时 dump 几个 tree 的真实数据, 看 `last_heartbeat` / `created_at` / `leaves[].last_event_ts` 的实际值, 才能确定是 IPC 计算错还是 UI 排序错.
 
 ### 关键文件
 
