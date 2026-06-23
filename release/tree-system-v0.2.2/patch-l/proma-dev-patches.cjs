@@ -1056,6 +1056,113 @@ function createExternalHttpBridge() {
   })();
 }
 
+// ============================================================
+// 补丁 v0.7+: Tree 体系 MCP Server（把 tree-state.js CLI 包装成 mcp__tree__* 工具）
+// tree-state.js 零改动（保持 CLI + TREES_ROOT=__dirname）；本层 spawn 包装。
+// 选 spawn 而非 require：require 会把 tree-state.js 的 __dirname 变成 dist/，破坏其 TREES_ROOT 定位。
+// ============================================================
+(function registerTreeMcpServer() {
+  const { execFile } = require("child_process");
+  const { promisify } = require("util");
+  const execFileAsync = promisify(execFile);
+
+  // workspace → trees_dir 定位（复制 registerTreePanelIpc 内 discoverAllWorkspacesWithTrees 的核心；
+  // 后者是 IIFE 局部函数，本模块级 createTreeMcpServer 无法访问，故独立实现一份）
+  function findTreesDirForWorkspace(workspaceSlug) {
+    if (!workspaceSlug) return null;
+    const os = require("os");
+    const home = os.homedir();
+    const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
+    const base = isIsolated
+      ? path.join(home, ".proma-dev", "agent-workspaces")
+      : path.join(home, ".proma", "agent-workspaces");
+    const wsRoot = path.join(base, workspaceSlug);
+    try { if (!fs.existsSync(wsRoot) || !fs.statSync(wsRoot).isDirectory()) return null; } catch (_) { return null; }
+    const candidates = [
+      path.join(wsRoot, "workspace-files", ".context", "trees"),
+      path.join(wsRoot, ".context", "trees"),
+    ];
+    for (const dir of candidates) {
+      try {
+        if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+          return { trees_dir: dir, workspace_root: wsRoot };
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  // spawn node tree-state.js <args>，解析 stdout JSON（tree-state.js 总输出 {ok,error?,...result}）
+  async function callTreeState(workspaceSlug, args) {
+    const ws = findTreesDirForWorkspace(workspaceSlug);
+    if (!ws) return { ok: false, error: { code: "E_NO_TREES_DIR", msg: `workspace "${workspaceSlug}" has no .context/trees/. Looked under ~/.proma[-dev]/agent-workspaces/${workspaceSlug}/{,workspace-files/}.context/trees/. Deploy tree-system to this workspace first.` } };
+    const script = path.join(ws.trees_dir, "tree-state.js");
+    if (!fs.existsSync(script)) return { ok: false, error: { code: "E_NO_TREE_STATE_JS", msg: `tree-state.js not found at ${script}` } };
+    try {
+      const { stdout } = await execFileAsync("node", [script, ...args], { cwd: ws.workspace_root, timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
+      return JSON.parse(stdout.trim());
+    } catch (e) {
+      // tree-state.js 失败时 exit 1/3，但 stdout 仍是 {ok:false,error:{code,msg}}
+      const out = e && e.stdout ? e.stdout.toString().trim() : "";
+      try { return JSON.parse(out); } catch (_) {
+        return { ok: false, error: { code: "E_EXEC", msg: String((e && e.message) || "exec failed").slice(0, 300), stderr: String((e && e.stderr) || "").slice(0, 300) } };
+      }
+    }
+  }
+
+  global.__proma_createTreeMcpServer__ = function (sdk, z, workspaceSlug) {
+    const RO = { annotations: { readOnlyHint: true } };
+    const tt = (name, desc, schema, argBuilder, readOnly) => sdk.tool(
+      name, desc, schema,
+      async (args) => jsonResult(await callTreeState(workspaceSlug, argBuilder(args))),
+      readOnly ? RO : undefined
+    );
+    const J = JSON.stringify;
+    return sdk.createSdkMcpServer({
+      name: "tree",
+      version: "0.7.0",
+      tools: [
+        // ---- Maintain ----
+        tt("tree_init", "Initialize a new tree (creates tree dir + root leaf).", { tree_id: z.string(), root_brief: z.record(z.any()), root_dod: z.record(z.any()), session_id: z.string().optional(), model: z.string().optional(), channel: z.string().optional(), audit_meta: z.record(z.any()).optional() }, (a) => ["init", a.tree_id, "--root-brief", J(a.root_brief), "--root-dod", J(a.root_dod), ...(a.session_id ? ["--session-id", a.session_id] : []), ...(a.model ? ["--model", a.model] : []), ...(a.channel ? ["--channel", a.channel] : []), ...(a.audit_meta ? ["--audit-meta", J(a.audit_meta)] : [])]),
+        tt("tree_validate", "Run all tree invariants (parent links, session_id uniqueness, path, done-worker independent audit_gate, context overflow). Returns {ok, issues}.", { tree_id: z.string() }, (a) => ["validate", a.tree_id], true),
+        tt("tree_backup", "Create a timestamped backup of tree-state.json.", { tree_id: z.string(), label: z.string().optional() }, (a) => ["backup", a.tree_id, ...(a.label ? ["--label", a.label] : [])]),
+        tt("tree_restore", "Restore tree-state.json from a backup file (basename in tree dir, or absolute path). Refuses non-compliant backups (v0.7 V1).", { tree_id: z.string(), backup_file: z.string() }, (a) => ["restore", a.tree_id, a.backup_file]),
+        tt("tree_migrate", "Run schema migration for a tree.", { tree_id: z.string() }, (a) => ["migrate", a.tree_id]),
+        // ---- Add ----
+        tt("tree_leaf_add", "Add a leaf node. worker leaves can't have children; commander nesting depth <=3 enforced.", { tree_id: z.string(), leaf: z.record(z.any()).describe('Full leaf json: {leaf_id,session_id,parent,path,role,model,channel,added_by}') }, (a) => ["leaf", "add", a.tree_id, "--json", J(a.leaf)]),
+        tt("tree_milestone_add", "Add a milestone to a leaf (expect_outputs must be non-empty per v0.7 V3).", { tree_id: z.string(), leaf_id: z.string(), milestone: z.record(z.any()) }, (a) => ["milestone", "add", a.tree_id, a.leaf_id, "--json", J(a.milestone)]),
+        // ---- Update ----
+        tt("tree_leaf_set_status", "Set leaf status (active|done|pruned|archived|segment_pending|pending_brief). done/archived trigger DbC hard gates (v0.7 Phase A).", { tree_id: z.string(), leaf_id: z.string(), status: z.string() }, (a) => ["leaf", "set-status", a.tree_id, a.leaf_id, a.status]),
+        tt("tree_leaf_set_context", "Update leaf context_usage_pct (0-100+).", { tree_id: z.string(), leaf_id: z.string(), context_pct: z.number() }, (a) => ["leaf", "set-context", a.tree_id, a.leaf_id, String(a.context_pct)]),
+        tt("tree_leaf_set_last_event", "Update leaf last_event_type/ts.", { tree_id: z.string(), leaf_id: z.string(), event_type: z.string(), ts: z.string().optional() }, (a) => ["leaf", "set-last-event", a.tree_id, a.leaf_id, a.event_type, ...(a.ts ? ["--ts", a.ts] : [])]),
+        tt("tree_leaf_set_session", "Update leaf session_id (e.g. fix PENDING_ROOT root).", { tree_id: z.string(), leaf_id: z.string(), session_id: z.string() }, (a) => ["leaf", "set-session", a.tree_id, a.leaf_id, a.session_id]),
+        tt("tree_leaf_autonomy_override", "Override leaf autonomy (added_must_ask / etc).", { tree_id: z.string(), leaf_id: z.string(), overrides: z.record(z.any()) }, (a) => ["leaf", "autonomy-override", a.tree_id, a.leaf_id, "--json", J(a.overrides)]),
+        tt("tree_milestone_set_result", "Set milestone audit result.", { tree_id: z.string(), leaf_id: z.string(), milestone_id: z.string(), audit_pass: z.boolean(), note_path: z.string().optional() }, (a) => ["milestone", "set-result", a.tree_id, a.leaf_id, a.milestone_id, "--audit-pass", String(a.audit_pass), ...(a.note_path ? ["--note-path", a.note_path] : [])]),
+        // ---- Append ----
+        tt("tree_event_append", "Append an event (done/blocked/plan/brief_echo/heartbeat_reply/nudge/limit/status_check). done requires self_check schema; brief_echo+alignment requires independent auditor (v0.7).", { tree_id: z.string(), leaf_id: z.string(), type: z.string(), meta: z.record(z.any()) }, (a) => ["event", "append", a.tree_id, a.leaf_id, "--type", a.type, "--json", J(a.meta)]),
+        tt("tree_drift_append", "Append a drift (3-tier correction).", { tree_id: z.string(), leaf_id: z.string(), kind: z.string(), severity: z.string(), action: z.string(), fork_to: z.string().optional(), reason: z.string().optional() }, (a) => ["drift", "append", a.tree_id, a.leaf_id, "--kind", a.kind, "--severity", a.severity, "--action", a.action, ...(a.fork_to ? ["--fork-to", a.fork_to] : []), ...(a.reason ? ["--reason", a.reason] : [])]),
+        tt("tree_heartbeat_append", "Append a heartbeat (sentinel agent patrol).", { tree_id: z.string(), heartbeat: z.record(z.any()) }, (a) => ["heartbeat", "append", a.tree_id, "--json", J(a.heartbeat)]),
+        tt("tree_segment_append", "Append a segment (bamboo-joint handoff).", { tree_id: z.string(), leaf_id: z.string(), new_session_id: z.string() }, (a) => ["segment", "append", a.tree_id, a.leaf_id, a.new_session_id]),
+        tt("tree_nudge_append", "Append a nudge (TAO Watcher).", { tree_id: z.string(), leaf_id: z.string(), nudge: z.record(z.any()) }, (a) => ["nudge", "append", a.tree_id, a.leaf_id, "--json", J(a.nudge)]),
+        // ---- TAO ----
+        tt("tree_audit_gate", "Set audit_gate verdict. pass/required requires independent auditor session (whitelist, v0.7 V2); pass requires a prior done event (v0.7 A7).", { tree_id: z.string(), leaf_id: z.string(), verdict: z.string(), audit_session_id: z.string().optional(), reason: z.string().optional() }, (a) => ["audit", "gate", a.tree_id, a.leaf_id, "--verdict", a.verdict, ...(a.audit_session_id ? ["--audit-session-id", a.audit_session_id] : []), ...(a.reason ? ["--reason", a.reason] : [])]),
+        tt("tree_audit_append", "Append an audit report entry.", { tree_id: z.string(), leaf_id: z.string(), report: z.record(z.any()) }, (a) => ["audit", "append", a.tree_id, a.leaf_id, "--json", J(a.report)]),
+        // ---- Query ----
+        tt("tree_leaf_get", "Get a leaf by id.", { tree_id: z.string(), leaf_id: z.string() }, (a) => ["leaf", "get", a.tree_id, a.leaf_id], true),
+        tt("tree_leaf_list_active", "List active (non-archived) leaves.", { tree_id: z.string() }, (a) => ["leaf", "list-active", a.tree_id], true),
+        tt("tree_leaf_list_all", "List all leaves (including archived).", { tree_id: z.string() }, (a) => ["leaf", "list-all", a.tree_id], true),
+        tt("tree_tree_dump", "Dump full tree state as JSON.", { tree_id: z.string() }, (a) => ["tree", "dump", a.tree_id], true),
+        tt("tree_drift_list", "List drift entries.", { tree_id: z.string(), leaf_id: z.string().optional(), since: z.string().optional() }, (a) => ["drift", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.since ? ["--since", a.since] : [])], true),
+        tt("tree_heartbeat_tail", "Tail heartbeat log.", { tree_id: z.string(), leaf_id: z.string().optional(), n: z.number().optional() }, (a) => ["heartbeat", "tail", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.n ? ["-n", String(a.n)] : [])], true),
+        tt("tree_event_list", "List events.", { tree_id: z.string(), leaf_id: z.string().optional(), type: z.string().optional() }, (a) => ["event", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.type ? ["--type", a.type] : [])], true),
+      ],
+    });
+  };
+
+  log("[Patch v0.7+] Tree MCP server factory registered (mcp__tree__* — 27 tools wrapping tree-state.js)");
+})();
+
+
 // ---- 注册全局钩子（内部 Agent MCP server）----
 global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
   try {
@@ -1064,7 +1171,10 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
     if (!z) return undefined;
     const server = createSessionMcpServer(sdk, z, sessionId);
     const remoteServer = createRemoteSessionMcpServer(sdk, z);
-    return { session: server, "remote-session": remoteServer };
+    let treeServer;
+    try { treeServer = global.__proma_createTreeMcpServer__(sdk, z, workspaceSlug); }
+    catch (e) { log("ERROR creating tree MCP server: " + (e && e.message ? e.message : String(e))); treeServer = undefined; }
+    return Object.assign({ session: server, "remote-session": remoteServer }, treeServer ? { tree: treeServer } : {});
   } catch (err) {
     log(`ERROR creating MCP server: ${err instanceof Error ? err.message : String(err)}`);
     console.error(err);
@@ -1214,9 +1324,11 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
             // 文件 stat 取 mtime
             let mtimeMs = 0;
             try { mtimeMs = fs.statSync(statePath).mtimeMs; } catch (_) {}
-            // 计算 latest_activity_ts: max(last_heartbeat, leaves[].last_event_ts, created_at, mtime)
+            // 计算 latest_activity_ts: 优先业务时间字段 max(last_heartbeat, leaves[].last_event_ts, created_at)
+            // 修 race condition: mtime 是文件系统时间, watcher 跑过更新 tree-state.json 会让 mtime 变很新,
+            // 把不活跃 tree 顶上来. 只在业务字段全空时退化用 mtime.
             // 用于 UI 第二层 tab 按最近活动时间倒排
-            let latestTs = mtimeMs;
+            let latestTs = 0;
             try {
               if (state.last_heartbeat) {
                 const t = new Date(state.last_heartbeat).getTime();
@@ -1233,6 +1345,8 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
                 }
               }
             } catch (_) {}
+            // 业务时间字段全空时退化用 mtime (新建 tree 还没产生业务事件)
+            if (latestTs === 0) latestTs = mtimeMs;
             trees.push({
               tree_id: state.tree_id || name,
               workspace_slug: workspaceSlug,
