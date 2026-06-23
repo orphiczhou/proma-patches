@@ -25,14 +25,14 @@
 - **remote-session Release 验收**：⚠️ 有条件通过（39/40，1 个 fork new_title Bug，不阻断上线）
 - **session-management Skill v1.3.0** + **GitHub 仓库** `orphiczhou/proma-patches` + `apply-patches.sh` v0.16.5
 
-### Layer 2 — 树形会话执行体系 ✅ v0.2.1（Q1 v1.1 闭环，Q2 待实施，Q3 进行中）
+### Layer 2 — 树形会话执行体系 ✅ v0.2.1 + v0.7 Phase A（Layer 1 Hard Gate 已落地）
 
-- **核心交付**：tree-state.js v0.2.1（~1680行，ROLE_ENUM + E_DEPTH_EXCEEDED + E_CHILDREN_NOT_DONE + migrate + 深度限制 + Worker禁子节点 + 根唯一性）、tree-commander SKILL v2.2、tree-worker SKILL v2.2、commander-methodology v1.2（13原则）
-- **架构升级（Q1 v1.1）**：role 正式化为 root/commander/worker 三层、Commander 最大深度 2（子+孙）、Worker=create_session 干净上下文、Commander=fork_session 继承战略上下文、分布式写入原则
-- **6 次验证**：B任务(4子会话) → S1重测(25命令) → L2验证(3子会话) → Q1 e2e(7 leaf, q1e2e) → Q1 S1回归+migrate → **Q1 全深度3层(10 leaf, q1full, 38/38)**
-- **发布包**：`release/tree-system-v0.2.0/`（17 文件）+ Q1 v1.1 修订
-- **Q2 方案**：侧边栏树形可视化面板（`plan/q2-tree-ui-panel.md`），需新补丁 L，**未实施**
-- **Q3 当前方向**：硬约束体系执行（进度控制）
+- **[2026-06-23] v0.7 Phase A 完成** (commit `1757b5e`)：tree-state.js **+12 DbC 校验点**（A1-A7 + HARDEN2/HARDEN6 + V1/V2/V3 审计加固），把 SKILL.md 的"应当"升级为代码"必须"，对应 CP1-CP6 + SP1 + 节点预算 + 加固#2/#6。**实施**: 4 批次真实子会话(自举) + commander 独立验收(dbc-spec 21/0) + 独立对抗审计发现 BLOCKER 已修 V1(restore旁路)/V2(auditor白名单)/V3(expect_outputs非空)。重构提取 collectValidateIssues + resolveAuditorIndep。详见 [note.md](./note.md)。**下一步**: 部署+T1-T4回归 / Phase D / V4-V8深度加固 / Phase B-G / Layer 4 subagent_trace_id
+- **核心交付**：tree-state.js v0.2.2 + Phase A（ROLE_ENUM + E_DEPTH_EXCEEDED + 12 DbC + collectValidateIssues + resolveAuditorIndep 白名单 + migrate + 深度限制 + Worker禁子节点 + 根唯一性）、tree-commander SKILL v2.2、tree-worker SKILL v2.2、commander-methodology v1.2（13原则）
+- **Q1 v2 验证**（2026-06-21）：全深度 3 层测试 + 3 轮独立 Agent Team 审计，发现 8 项问题（2 阻断/3 严重/2 中等/1 低），核心引擎功能正确但方法论合规性存在结构性缺陷
+- **Q2 方案**（v1.1 更新）：(a) **tree-state.js v0.2.2 硬化**（修复 ROOT_PLACEHOLDER、CLI 手动注入、Events 空洞——~90行代码）；(b) 侧边栏树形可视化面板（需新补丁 L）
+- **Q3 方案**（v1.2）：天道运行官硬约束流程执行体系（35条规则，audit-gate + Pulse + Auditor + 自检，不新增补丁）
+- **技术报告**：[`.context/technical-report-tree-system-issues.md`](technical-report-tree-system-issues.md) — Q1 v2 8 项问题详细分析与解决方案
 - **已知限制**：notify未验证、心跳/内审仅方案、竹节交接未实现、I3并发竞态、Commander prune级联未定义
 
 ---

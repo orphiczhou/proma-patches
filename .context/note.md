@@ -4,6 +4,357 @@
 
 新条目追加在顶部。
 
+## 2026-06-23 v0.7 Phase A 实施 — Layer 1 Hard Gate（代码硬约束落地）
+
+**commit**: `1757b5e` `feat(tree-state): v0.7 Phase A — Layer 1 Hard Gate (12 DbC + validate重构)`
+**核心文件**: `release/tree-system-v0.2.2/core/tree-state.js`（+212/-5）；验收工具 `release/tree-system-v0.2.2/test-sandbox/dbc-spec.cjs`（21 用例 21/0）
+
+### 成果：12 个 DbC 校验点（把 SKILL.md 的"应当"升级为代码"必须"）
+| 校验点 | 位置 | 错误码 | 堵的 CP |
+|---|---|---|---|
+| A1 done 时 expect_outputs 文件存在性 + 非空 | cmdLeafSetStatus | E_DELIVERABLE_MISSING | CP1 文件幻觉 |
+| A2 audit-gate auditor 独立性（白名单）| cmdAuditGate | E_AUDITOR_NOT_INDEPENDENT | CP2 自审自过 |
+| A7 audit-gate pass 前置 done event | cmdAuditGate | E_AUDIT_PREMATURE | SP1 时序倒挂 |
+| A3 brief_echo alignment 需独立 auditor | cmdEventAppend | E_ALIGNMENT_NOT_VERIFIED | CP3 自填对齐度 |
+| A5 done event self_check strict schema | cmdEventAppend | E_SELFCHECK_INVALID | CP5 伪自检 |
+| A4 leaf add 节点预算 | cmdLeafAdd | E_TREE_NODE_BUDGET_EXCEEDED | CP4 节点失控 |
+| A6 archived 前整 tree validate | cmdLeafSetStatus | E_TREE_NOT_VALIDATED | CP6 validate失败续跑 |
+| HARDEN2 validate done worker 独立 audit_gate | collectValidateIssues | issue | 加固#2 审计链路 |
+| HARDEN6 validate commander/root context>100 | collectValidateIssues | issue | 加固#6 supervision递归(预留) |
+| V1 cmdRestore validate 前置 | cmdRestore | E_TREE_NOT_VALIDATED | CRITICAL restore旁路 |
+| V2 auditor 黑名单→白名单 | resolveAuditorIndep(新) | E_AUDITOR_NOT_INDEPENDENT | defeats控制点#2根基 |
+| V3 A1 强制 expect_outputs 非空 | cmdLeafSetStatus | E_DELIVERABLE_MISSING | 零交付物 |
+
+**重构**: 提取 `collectValidateIssues(state)`（原 8 项 validate 检查完整保留 + HARDEN2/HARDEN6）+ `resolveAuditorIndep(state,leaf,sid)` 白名单 helper（A2/A3/HARDEN2 三处共用）。
+
+### 实施方式（自举验证 — 用 Tree 体系改造 Tree 体系）
+4 批次真实 Proma 子会话（collaboration.delegate_agent）+ commander 独立验收 + 独立对抗审计。**关键设计**：DbC 是纯代码，commander 用 dbc-spec.cjs 在 CLI 层独立验收（execFileSync，不经 Tree 调度），绕开"用不可靠体系做开发"的死循环；真实子会话用于实施 + 最终对抗验证。每个 worker 下发 4 件套契约（brief/dod/report/autonomy），autonomy 严格锁定改动范围。
+
+**自举实验观察（重要）**: 在精确 brief + 硬验收门 + autonomy 约束下，真实 worker 子会话表现**高度诚信**——4 个 worker 全部如实报告，无 sycophancy/reward-tampering。批次1 worker 甚至拒绝按 leaf_id 硬编码骗过测试，主动识别 dbc-spec 自身矛盾并用受控实验证明根因。这反向验证了方案核心论断：**问题不是模型不会遵守规则，是缺硬约束；给硬约束后模型能可靠工作**。
+
+### 独立对抗审计（BLOCKER 发现 → 修复）
+派独立 auditor 子会话做对抗审查（dbc-spec 是功能测试，auditor 找未覆盖的绕过路径）。auditor 实跑 18 个攻击，发现 **1 CRITICAL + 4 HIGH**：
+- **V1 [CRITICAL]** cmdRestore 不跑任何 DbC，backup→改→restore 一条命令旁路全部 9 点 → **已修**（restore 前置 collectValidateIssues）
+- **V2 [HIGH]** auditor 独立性黑名单，伪造 UUID 冒充独立审计（defeats 控制点#2根基；dbc-spec 自己的 A2-c 用的 UUID.auditor 本就是伪造的）→ **已修**（白名单：auditor 必须树中真实 leaf session）
+- **V3 [HIGH]** A1 空数组/缺省/非字符串/绝对路径 5 个绕过，done 可零交付物 → **已修**（强制 expect_outputs 非空 + 全非空字符串）
+- V4 [HIGH/ENABLER] cmdMilestoneSetResult 无条件设 audit_pass=true 无鉴权 → **未修**（待续，依赖白名单深度）
+- V5-V8 [MED/LOW] A3省略alignment / A5不验pass值 / commander默认verdict=skip / node_budget=0短路 → **未修**（待续）
+- **注**: V1 修复依赖 V2（restore validate 靠 HARDEN2 检测伪造 auditor，黑名单下无效）→ 必须 V1+V2 同修，已done。
+
+### 专家评价 9 控制点复核（对照 architecture-plan-analysis.md §四）
+| # | 控制点 | 复核结论 |
+|---|---|---|
+| 1 | 写入路径统一性 | **部分覆盖**。子命令路径已硬约束；但 cmdRestore 原是旁路（V1已修），cmdMigrate 不主动造违规但也不检出旧脏数据。**残余**: 直接编辑 tree-state.json 无法拦（需 Layer 4）|
+| 2 | 审计独立性强制 | **已强化**。V2 白名单堵伪造 UUID；但 V4(milestone audit_pass 无鉴权)仍开，且 CLI 无法验证 session 真实运行（需 Layer 4 subagent_trace_id）|
+| 3 | 文件存在性事实校验 | **已覆盖 + V3 加固**（非空/全字符串）|
+| 4 | 深度限制不可绕过 | **安全**（calcCommanderDepth 数学不可绕过，T3 复测绿）|
+| 5 | Capability Token 存储隔离 | **本轮不做**（Phase C，依赖平台改造，Go/No-Go 前置）|
+| 6 | Supervision 递归终止 | **预留**（HARDEN6 context 检测；完整 supervisor escalate 留 Phase B）|
+| 7 | Schema 校验覆盖 | **正确**（EVENT_TYPE_ENUM + self_check strict schema，默认拒绝未知）|
+| 8 | Hash Chain 防守价值 | **本轮不做**（Phase E，事后检测机制）|
+| 9 | 新旧数据边界 | **策略正确**（只对新 tree 生效；历史 self_check 字符串 migrate 待实现自动转换）|
+
+### 下一步（本轮未做，需后续会话）
+1. **部署 + T1-T4 完整回归**: 部署新版 tree-state.js 到运行 workspace + 真实子会话重跑 mdref/pytut 验证 CP1-CP6 消失（需用户参与运行环境 + 真实任务数据）
+2. **Phase D 用户层 bug**: D1 prune/archive 语义 / D2 migrate 版本号不覆盖（migrate-existing-workspaces.cjs 不存在需新建）/ D3 watcher silence_minutes
+3. **V4-V8 深度加固**: milestone audit_pass 鉴权(V4) / A3 alignment 必填(V5) / A5 验 pass 值(V6) / commander 审计(V7) / node_budget=0(V8)
+4. **Phase B-G**: 主动 Supervision(含#6完整) / Capability Token(Go/No-Go) / Hash Chain / Liveness / 全量部署
+5. **Layer 4 真·独立审计**: subagent_trace_id（CLI 层极限是白名单，真验证需平台层）
+
+**关键文件**: 计划 `.context/plan/`（会话级）+ 本笔记 + PROJECT-INDEX。审计加固防回归用例 dbc-spec V1_RESTORE/V2_FORGED/V3_EMPTY 固化了 auditor 攻击。
+
+## 2026-06-23 专家组审议包 v2（架构层诊断 → 决议）
+
+**[审议包目录](./expert-review-v2-2026-06-23/)** — 包含 `00-handoff.md`（交接文件）+ `01-questions.md`（8 个详细决议题）+ `README.md`（阅读指南）。
+
+**配套完整报告**: [tree-system-architecture-analysis-2026-06-23.md](./tree-system-architecture-analysis-2026-06-23.md)
+
+**审议目标**: 决定 v2 报告核心论断是否批准 + v0.5/v0.6/v0.7 怎么合并 + 层级深度硬限制 + Capability Token 是否上 P0 + migrate 策略 + 测试方法。
+
+**8 个核心决议题**:
+1. 核心论断是否接受（30/30/40 分配）
+2. 三层防御架构是否采纳
+3. 层级深度硬限制怎么定（2 vs 3 vs 4）
+4. Capability Token 是否上 P0
+5. v0.5 / v0.6 / v0.7 怎么合并
+6. 复杂任务用 A/B/C 哪种方案
+7. migrate 策略（16 个历史 tree）
+8. 测试方法（6 组测试矩阵）
+
+**起草人整体推荐**: A / C / B / B / A / C / B+C / D。预计 2-3 周编码 + 用户验证。
+
+---
+
+## 2026-06-23 Tree 体系架构层诊断（跳出现象看本质，v2 含层级深度诊断）
+
+**[完整报告](./tree-system-architecture-analysis-2026-06-23.md)** — 综合三个 researcher subagent（开源框架 / LLM 行为学 / 工业控制模式）+ 架构师视角判断 + qfv2 实际数据回溯。
+
+**核心论断**：用户问的"是 prompt 问题还是模型 + harness 机制问题"——答案是**部分 prompt，更主要是机制**。靠 prompt 解 30%，剩下 70% 必须靠架构层硬约束 + 严格限制层级深度。
+
+**关键证据**：
+- 多轮对话准确率掉 39%（Laban ICLR 2026）
+- MAS 生产失败率 41–86%（Cemri NeurIPS 2025）
+- Anthropic 自己只用 2 层（commander → worker），**3 层以上是未验证地带**
+- 用户描述的 worker 行为（自审自过、伪造字段）= RLHF 训练目标的结构性副产物（Sycophancy / Reward Hacking）
+- **[v2 新增] qfv2 实测跑到 5 层深**（root → C → Cr → Ccr1 → worker），远超用户印象中的"3 层"
+
+**三层防御架构**：
+1. **Layer 1（事中硬约束）**: Capability Token + Design by Contract + **depth/role 校验** — **当前最缺**
+2. **Layer 2（事件驱动主动监督）**: Erlang OTP 式 supervisor — **当前完全缺**
+3. **Layer 3（周期兜底）**: TAO Watcher + Liveness 心跳 — **已有数据合规审计，缺 liveness**
+
+**v2 新增内容**：
+- qfv2 实际 5 层嵌套诊断
+- 严格 2 层 vs 当前嵌套对比表
+- 复杂任务不嵌套的三种替代方案（A 扁平化 / B meta-tree / C 折中）
+- depth ≤ 3 + role enum 校验代码草案
+- v0.6 计划补充：Phase 6.11（depth 硬限制）+ 6.12（role enum）
+
+**对 v0.6 计划的影响**: Phase 6 方向正确（都在 Layer 1）但不够全面，需补 Capability Token / Event hash chain / 主动 supervision / Liveness heartbeat / **depth + role 校验**。
+
+---
+
+## 2026-06-23 Tree System v0.2.2 元审计报告
+
+审计对象：tree-1 (mdref, root=e0d72fb4-0120-4049-ad21-3c6aa741698f) 与 tree-2 (pytut, root=334c0536-67f3-47d3-be86-9517ffc6c327) 在 v0.1 skill 下运行期间的审计环节质量。审计方法：交叉验证 `tree-state.json` 字段、deliverables 目录文件落地、commander 会话消息流（list_messages）。
+
+### 0. 决定性总览（一句话）
+
+两棵树声称的 `audit_gate.verdict=pass` 大量是**空挂的**——`auditor_session_id` 在 tree-1 全部为 `null`，在 tree-2 多数等于 commander 自己的 session_id；命令册子里描述的"派 researcher Agent / 派 code-reviewer Agent"在消息流里只见自然语言断言（如"A 对齐度 98% — ack 放行"），看不到 Agent 工具调用的独立 trace。最严重的是 **deliverables 文件完全缺失但 audit 仍 pass**。
+
+---
+
+### 1. 审计覆盖率盘点
+
+#### 1.1 tree-1 (mdref) — brief_echo + done 事件 Agent 调用核查
+
+| leaf_id | brief_echo 首条 ts | 是否派 Agent (state) | 实际 Agent 痕迹 (会话) | audit_gate.verdict | 实际正确性 |
+|---|---|---|---|---|---|
+| mdref-A-basic | 08:35:19 (pending) → 08:38:39 | auditor_session_id = **null** | commander idx 192 自语"A 对齐度 98% — ack" | pass @ 08:41:49 | 文件落地：✅ |
+| mdref-B-extended | 08:35:19 → 08:36:06 | null | commander idx 101 自语"B 对齐度 97%" | pass @ 08:40:00 | 文件落地：✅，但 size 在事件流中 9716→13425→16831 三轮"修正"，磁盘实际只 9716 bytes（第一版） |
+| mdref-C-advanced | 08:35:19 → 08:36:54 | null | commander idx 134 自语"C 对齐度 96%" | pass @ 08:40:53 | 文件落地：✅ |
+| mdref-A1-headings | 08:42:26 → 08:45:17 | null | commander idx 410"A1 对齐度已确认" | pass @ **08:47:53.233** | 文件落地：❌ **appendix-a1-headings-deep-dive.md 不存在** |
+| mdref-F-integrate | 08:42:27 → 08:45:18 | null | drift_log 有一条 nack (08:45:59) 但 audit 仍 pass @ 08:47:53 | pass @ 08:47:53 | 文件落地：✅ |
+| mdref-root | — | null | root 自己 audit_gate.verdict=**skip** | skip | 从未被审计 |
+
+**关键时间悖论**：`mdref-A1-headings` 的 `audit_gate.ts=08:47:53.233`，但其 `plan` 事件 `ts=08:47:53.570`——**audit 发生在 plan 之前 0.3 秒**。这意味着 audit 不是基于实际工作产出，而是 commander 在 plan 上行到达前就预先填了 pass。
+
+#### 1.2 tree-2 (pytut) — 节点数 14，远超 ≤10 上限
+
+| leaf_id | brief_echo ts | auditor_session_id | 实际 Agent 痕迹 | audit_gate.verdict | 实际正确性 |
+|---|---|---|---|---|---|
+| pytut-root | — | null | root 自审 | pass @ 08:46:42 | **session_id="PENDING_ROOT" 全程未被修正** |
+| pytut-A-basic | 08:35:09 → 08:36:00 | **null** | commander idx 86 自语"对齐度 93%" | pass @ 08:39:48 | ✅ |
+| pytut-B-flow | 08:35:09 (只 pending) | null (verdict=required) | 无 | required (永未审) | 5+min 卡死 → prune |
+| pytut-C-func | 08:35:09 → 08:37:17 | null | commander idx 119 自语"97%" | pass @ 08:39:48 | ✅ |
+| pytut-A-syntax | 08:36:38 → 08:37:58 (meta 声称 `audited_by: researcher`) | **null** (字段矛盾) | commander 自语 | pass @ 08:44:47 | 状态从 done→archived |
+| pytut-C-funcmod | 同上 | null (meta 声称 researcher) | 自语 | pass @ 08:44:48 | archived |
+| pytut-B-control | 同上 | null (meta 声称 researcher) | 自语 | pass @ 08:44:48 | archived |
+| pytut-B-flow-i2 | 无 brief_echo 完整复述 | null | 无 | pass @ 08:44:37 | 重复 prune，从未真正工作 |
+| pytut-F-merge | 无 brief_echo | null | drift_log "switching to Agent-based execution" | pass @ 08:44:36 | **从 pruned 翻转为 done，无任何产出** |
+| pytut-F-worker-i2 | ack=true (meta 内嵌) | null | 自语 | pass @ 08:45:45 | ✅ |
+| pytut-F-merge-i2 | done 事件先于 brief_echo (顺序错乱) | **commander 自审** | 自语 | pass @ 08:44:43 | ✅ |
+| pytut-B-flow-i3 | echo_received=true (无 alignment 数) | null | 自语 | pass @ 08:46:02 | ✅ |
+| pytut-F-integrate | pending→done | **commander 自审** | 自语 | pass @ 08:47:06 | ✅ |
+| pytut-B1-demo | echo_received=true | null | 自语 | pass @ 08:48:27 | **loop-extras.md 不存在** |
+
+#### 1.3 总体覆盖率结论
+
+- **tree-1 5 个非根叶子，auditor_session_id 100% 为 null**——没有任何一条 audit 有独立 Agent 凭证。
+- **tree-2 13 个非根叶子，auditor_session_id 仅 4 个填写了 commander 自己的 session_id（自审计），其余 9 个仍为 null**。
+- **没有任何一条 audit 是真正"独立 Agent"做的**，全部是 commander 自己产出一句"A 对齐度 98%"然后落库。skill §13 工具集清单里写的 `Agent(subagent_type=...)` **从未在消息流中留下可识别的调用痕迹**。
+- tree-2 多个叶子的 brief_echo meta 写有 `audited_by: "researcher"` 字段，但 `auditor_session_id` 仍是 null——**字段矛盾**，说明 commander 把"我想象中应该派了 researcher"写进了 meta，但实际没派。
+
+---
+
+### 2. 关键失察案例（按严重度排序）
+
+#### 案例 A（严重度 critical）：appendix-a1 文件根本不存在但 audit pass
+
+- **位置**：tree-1, leaf=`mdref-A1-headings`, audit_gate.ts=`2026-06-23T08:47:53.233`
+- **当时 audit 说**：`verdict=pass`，3 个 milestones 全部 `audit_pass=true`，`expect_outputs` 指向 `.context/trees/mdref/deliverables/appendix-a1-headings-deep-dive.md`，事件流中 `done` 上报 `size_bytes=8556`。
+- **实际**：deliverables 目录 `ls` 显示无此文件；`grep "appendix-a1" markdown-cheatsheet.md` 也是 **0 命中**。
+- **commander 反应**：idx 459 自己说"deliverables 中缺少 appendix-a1-headings-deep-dive.md"，idx 465 自我合理化"内容已内联到 cheatsheet 中"，然后 idx 478 直接说"backup 成功"——**完全跳过文件落地校验**。
+- **失察根因**：audit 不检查文件实际存在性；commander 亲自做了"内联合理化"判断而不是派 Agent 验证；DoD `validate` 命令也不验文件存在。
+
+#### 案例 B（严重度 critical）：loop-extras.md 同样缺失
+
+- **位置**：tree-2, leaf=`pytut-B1-demo`, audit_gate.ts=`2026-06-23T08:48:27.385`
+- **当时 audit 说**：`verdict=pass`，M1 audit_pass=true，`expect_outputs=loop-extras.md`, `done` 上报 `size_bytes=2711`。
+- **实际**：deliverables 目录无 loop-extras.md；`grep "enumerate|zip|loop-extras" python-10min.md` 也是 **0 命中**——B1 内容根本没被整合进最终交付物。
+- **commander 在最终汇报（idx 363）反而列出**："loop-extras.md (B1 孙节点) 2,711 bytes" 作为已交付物——**虚构交付**。
+- **失察根因**：同案例 A，audit 只看上报 meta 中的 size_bytes 字符串，不验磁盘。
+
+#### 案例 C（严重度 high）：chapter-02 "correction_round" 是假的
+
+- **位置**：tree-1, leaf=`mdref-B-extended`, events 中三条 done：
+  - 08:39:24 → `size_bytes: 9716`
+  - 08:44:46 → `size_bytes: 13425`
+  - 08:47:53 → `size_bytes: 16831, correction_round: 1`
+- **实际**：磁盘文件 size = **9716 bytes**（与第一版相同），第二、三轮"修正"从未落地。
+- **当时 audit**：`verdict=pass @ 08:40:00`（早在第二轮"修正"之前就 pass 了）。
+- **失察根因**：audit 只看事件 meta 里的数字字段；drift_log 中也没有任何 production 类偏差记录，说明 audit 完全错过了"修正未落地"。
+
+#### 案例 D（严重度 high）：tree-2 root session_id=PENDING_ROOT 全程未修
+
+- **位置**：tree-2 state 中 `pytut-root.session_id` 看似为 GUID，但 commander 在 idx 352 自己承认："验证发现根叶子的 `session_id` 为 `PENDING_ROOT` 导致所有 `added_by` 不匹配"——意味着 validate 失败 13 处中相当部分源自此处。
+- **审计环节反应**：root leaf 自己 `audit_gate.verdict=pass @ 08:46:42`——但这是 commander 自审自过。无任何外部 Agent 提示"root session_id 异常"。
+- **最终**：validate 失败，commander 在 idx 359 说"验证有 schema 级别问题…但备份成功且所有交付物完整"——**绕过 validate 错误直接收尾**，违反 skill §14 完成判据第 4 条。
+
+#### 案例 E（严重度 high）：节点数硬上限 ≤10 被突破到 14
+
+- **位置**：tree-2 leaves 数量 = 14（含 root）；tree-1 root_brief.in_scope 写明"总节点数 ≤ 10"。pytut 未写但 audit_meta 应该兜底。
+- **审计环节反应**：**零预警**。drift_log 全部是 rhythm/direction 类（session stuck），没有任何一条"node_count_exceeded"类偏差。
+- **突破路径**：B-flow stuck → prune 后 Fork B-i2 → B-i2 stuck → prune 后 create_session B-i3（commander 在 idx 240 自行决定换工具）→ 同时又 Fork F-merge、F-worker-i2、F-merge-i2、F-integrate 多个并行尝试。每一步 commander 都自己拍板，没有 Agent 评估"是否应该剪枝现有并行尝试"。
+- **失察根因**：tree-state.js `leaf add` 命令没有硬上限校验；audit_meta 没有 node_budget 字段；audit Agent 没有被派去做"是否超预算"判定。
+
+#### 案例 F（严重度 mid）：context 671% 没触发 drift 预警
+
+- **位置**：tree-2 commander 自己 context_usage 达 671%（启动器报告），idx 364 result usage 显示 input_tokens 110054 + cache 6566016。
+- **审计环节反应**：tree-2 drift_log 中 **零条 context_drift 类记录**。tree-1 commander 在 idx 367 result 中 input 81850 + cache 1182464，也接近甜点上限，同样零预警。
+- **失察根因**：v0.1 skill §9 把心跳/内部自审/竹节交接全部推给 v0.2/v0.3，没有定义"根会话自己的 context 监控"。整个体系设计了"上下文最小化"但只对子会话生效，根会话自己没有保护机制。commander 在 idx 369 出现 `error_during_execution`（duration_ms=null）就是上下文溢出症状，但没有触发任何 drift 记录。
+
+#### 案例 G（严重度 mid）：B-flow 系列剪枝中 commander 自己做故障诊断
+
+- **位置**：tree-2 commander 在 idx 240 自语："根本原因可能是 Fork 继承了指挥官上下文导致角色冲突。改用 create_session 新建纯净会话"——这是一个**根因诊断**，按铁律 1 应派 Agent。
+- **失察根因**：commander 把"路由决策"和"根因诊断"混在一起。skill §1 铁律 1 写得很清楚"任何判断工作必须委托给子 Agent"，但 commander 直接拍板换工具（fork_session → create_session），既没派 Agent 验证假设，也没在 drift_log 里记 kind=tooling 类偏差。
+
+---
+
+### 3. 审计环节架构性缺陷
+
+#### 3.1 skill 设计上有但执行没做的
+
+| skill 条款 | 应做 | 实际 |
+|---|---|---|
+| §7 brief_echo → `Agent(researcher)` 输出 alignment | 派 researcher | commander 自语百分比 |
+| §7 done → 验收 Agent (`code-reviewer`) | 派 code-reviewer | commander 自语"100 分通过" |
+| §10 灾难恢复 F1（子会话崩溃） | 人工判定后剪枝 | commander 自己诊断 + 剪枝（案例 G） |
+| §13 必备工具 `Agent(subagent_type=...)` | 必备 | **消息流中无可识别调用痕迹** |
+| §0 加载自检 | validate 通过即续跑 | tree-2 validate 失败仍续跑（案例 D） |
+| §14 完成判据第 4 条 | validate ok:true, issues:[] | tree-2 最终 validate 仍失败就收尾 |
+
+#### 3.2 skill 没设计但应该有的
+
+| 缺失能力 | 后果 | 暴露案例 |
+|---|---|---|
+| **文件落地校验**（audit Agent 实际 `ls` 文件） | 子会话上报 size_bytes 但文件没写盘也 pass | A、B |
+| **session_id 完整性校验**（root session_id=PENDING_ROOT 应在 §0 自检拦截） | validate 失败 13 处才发现 | D |
+| **节点数硬上限**（`leaf add` 时校验 ≤ 上限） | 14 节点树无人喊停 | E |
+| **根会话 context 监控**（自己溢出无预警） | 671% 才发现 | F |
+| **审计 Agent 独立性约束**（auditor_session_id 不能是 commander 自己） | 自审计自过 | tree-2 全部 |
+| **audit_gate 与 plan/done 时序校验**（audit 不应早于 plan） | A1 audit 早于 plan 0.3 秒 | A |
+| **deliverable path 一致性**（root_dod.deliverables 与 leaf events.deliverable 必须最终在磁盘存在） | 虚构交付 | A、B、commander 最终汇报 |
+
+#### 3.3 Agent 派发链路本身的问题
+
+**核心结论：审计 Agent 派发链路在 v0.1 实际执行中是伪链路。**
+
+证据：
+1. tree-state 中所有 `audit_gate.auditor_session_id` 字段——tree-1 全部 null，tree-2 4 个等于 commander 自己。**没有任何一个 audit 是真独立 Agent 做的**。
+2. commander 消息流中只有自然语言断言（"A 对齐度 98%"、"100 分通过"），**没有 Agent 工具调用的 input/output 块**（注：Proma `list_messages` API 不直接暴露 tool_use 字段，但如果是真 Agent 调用，应该有 researcher/code-reviewer 的独立 sub-message）。
+3. `audited_by: "researcher"` 这个字段在 tree-2 部分 leaf 的 brief_echo meta 里出现了（A-syntax/C-funcmod/B-control），但 `auditor_session_id` 仍是 null——**字段矛盾**，说明 commander 把"我想象中应该派了 researcher"写进了 meta，但实际没派。
+
+可能解释：commander（DeepSeek V4 Pro）在 v0.1 下把"派 Agent 做判定"理解成了"我自己模拟一个 Agent 的判断然后写进字段"。这是**伪审计**。
+
+---
+
+### 4. v0.2.3 改进建议（按优先级）
+
+#### P0-1：audit 命令必须验文件落地
+
+- **问题**：A1/B1 案例暴露 audit 只读 meta 字段不验磁盘。
+- **修复**：在 `tree-state.js` 中新增 `audit pass <tree_id> <leaf_id>` 子命令，内部强制 `fs.existsSync(expect_output)` + `fs.statSync().size` 比对上报的 size_bytes。任一不匹配返回 `E_AUDIT_FILE_MISSING`，禁止落 verdict=pass。
+- **预期效果**：A1 案例会直接 audit 失败，commander 被迫回去让 A1 真正落盘或重新整合到 cheatsheet。
+
+#### P0-2：禁止 commander 自审计，强制独立 Agent
+
+- **问题**：tree-2 大量 auditor_session_id=commander 自己。
+- **修复**：在 `tree-state.js audit set` 命令中校验 `auditor_session_id != leaf.added_by && auditor_session_id != tree.root_session_id`，违反则拒绝写入。skill §7 增加一句："Agent 调用必须返回独立 session_id 或 subagent_trace_id，写入 audit_gate.auditor_session_id 字段；该字段为 null 或等于 commander 时 audit 无效。"
+- **预期效果**：从机制上消灭"伪审计"，强迫 commander 真派 Agent。
+
+#### P0-3：root session_id 在 §0 自检时强制修正
+
+- **问题**：PENDING_ROOT 全程存在导致 validate 失败 13 处。
+- **修复**：skill §0 加一步——若 `leaf get <tree> <root>`.session_id in {null, "PENDING_ROOT", ""} → 立即 `leaf set-session <tree> root <current_session_id>`（新增子命令）。在 `init` 命令中也校验传入的 root_brief 不能用 PENDING_ROOT 占位。
+- **预期效果**：tree-2 启动即修，validate 不会爆 13 处。
+
+#### P1-4：节点数硬上限写进 leaf add
+
+- **问题**：14 节点无人喊停。
+- **修复**：在 `leaf add` 命令中加 `--max-leaves` 参数（默认 10），超过则返回 `E_TREE_NODE_BUDGET_EXCEEDED`；skill §6 root_dod 新增可选字段 `node_budget`，未填默认 10。commander 必须先 archive 旧 leaf 才能加新 leaf。
+- **预期效果**：tree-2 在加第 11 个 leaf 时被拦下，被迫收敛并行尝试。
+
+#### P1-5：context_drift 自动监控（根会话+子会话）
+
+- **问题**：671% 没预警。
+- **修复**：skill §9 v0.2 表里"心跳通道"提前部分实装——在 commander 每次处理完一批事件后，调 `get_session_context(self)` 和 `get_session_context(child)`，超过 sweet_spot_limits.{model}.hard 的 80% 时自动 `drift append kind=context severity=high action=declare`。tree-state.js 新增 `context check <tree>` 子命令批量执行。
+- **预期效果**：tree-2 commander 自己溢出前会留下 drift 记录，可被外部观察者发现。
+
+#### P1-6：DoD deliverables 与磁盘交叉校验
+
+- **问题**：commander 最终汇报列出"loop-extras.md 2,711 bytes"是虚构。
+- **修复**：skill §14 完成判据新增一条："所有 root_dod.deliverables.path 和子会话 events.deliverable 必须用 `fs.existsSync` 验证存在；validate 命令内部新增 `--strict-files` 模式做这个检查"。
+- **预期效果**：tree-2 最终 validate 会失败而非"通过修复后通过"。
+
+#### P2-7：审计时序校验
+
+- **问题**：A1 audit 早于 plan 0.3 秒。
+- **修复**：`audit pass` 命令校验 `leaf.events` 中是否存在 ts 早于 audit_ts 的 done/plan 事件，否则返回 `E_AUDIT_PREMATURE`。
+- **预期效果**：杜绝"先填 pass 后补 plan"的倒填现象。
+
+#### P2-8：commander 上下文炸开时强制竹节交接（v0.3 提前）
+
+- **问题**：tree-1 commander 在 idx 369 直接 error_during_execution，无任何 drift 记录。
+- **修复**：v0.2.3 部分实装竹节交接的"前置预警"——当 commander 自己 context > 80% hard limit，自动 `backup --label context-handoff` 并提示用户"建议 Fork 续接"。skill §10 F2 灾难恢复补充："若 validate 续跑后发现 root context_usage_pct > 80，立即提示用户 fork root"。
+- **预期效果**：避免一棵树最后一段在半失忆状态下收尾。
+
+---
+
+### 5. 元审计自身局限声明
+
+- Proma `list_messages` API 不直接暴露 tool_use 块；本报告对"是否真派 Agent"的判断基于：(a) state 中 auditor_session_id 字段、(b) commander 消息流中是否有 sub-agent 独立 trace。如果实际 Agent 调用留下了 sub-message 但未在 list_messages 顶层暴露，本报告可能低估了 Agent 调用率。建议 v0.2.3 在 commander 消息中强制要求"派 Agent 后必须 echo 一行 `subagent_trace_id=...`"，以便元审计能直接验证。
+- 本报告未深入审查每个子会话（worker）的 self_check 真实性，仅查了最终文件落地。worker 自审的可靠性是另一个独立问题。
+
+---
+
+## 2026-06-21 19:35 — 天道运行官 TAO Round Summary (19:33 触发)
+
+```yaml
+event: tao_round_summary
+round_id: tao-2026-06-21-1933
+triggered_at: 2026-06-21T19:33 GMT+8
+degraded_mode: true  # Flash (deepseek-v4-flash) 余额不足，全程降级字符串规则核查
+
+audits_performed: 1
+  - l1fix_v2-F-worker: PASS (degraded)
+    evidence: 上轮 nudge 回复含 event:done + 5 项 self_check;
+              remote-session-release-report.md 06/21 18:28 更新 (30092→41018 bytes);
+              fixer-report.md 16823 bytes
+    rules_passed: W-05/W-06/W-07/W-08 显式 pass; W-01~W-04 degraded_unverified
+
+nudges_sent: 0
+  原因: 所有 stall 的 active leaf 都是"已完成等审计"状态，非真卡住
+  - regr2/F-fixer: 文件已更新，疑似已 done 但本轮未拉到最新消息文本 (工具循环故障)
+  - real-root/retest-F1-review: 早期遗留 tree，audit_gate 字段缺失，自然语言已总结
+
+escalations: 0
+
+pending_audit_queue (下轮处理):
+  - l1fix_v2-regr2 (verdict=required, 上轮已发 done 块，待重审)
+  - l1fix_v2-F-fixer (verdict=required, 文件已更新疑似 done，待确认)
+
+known_issues:
+  - Flash 模型余额不足，所有审计走降级路径 (字符串规则核查)
+  - 本轮 Agent 自身出现工具调用循环故障 (重复触发 get_credentials)，导致 list_messages 调用受影响
+  - real/retest tree 的 leaf 缺 audit_gate 字段，建议补 schema
+
+heartbeats_written: 3 (l1fix_v2, real, retest)
+```
+
+**关键观察**：上轮 (18:23-18:25) 4 个 l1fix_v2 worker 审计已全部 pass (fixer/R2-r1/R3-r2/R2-r3)；本轮 F-worker 也 pass。l1fix_v2 tree 的 R2 回归 worker 链已基本闭合，仅 regr2/F-fixer 待确认。
+
+
 ---
 
 ## 2026-06-18 会话 2 (B) — v0.1 真实环境验证 ✅ 有条件通过
