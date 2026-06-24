@@ -253,7 +253,7 @@ self_audit:
 | 工具 | 说明 |
 |------|------|
 | `mcp__tree__tree_audit_gate(tree_id, leaf_id, verdict, audit_session_id?, reason?)` | 审计门禁裁决 |
-| `mcp__tree__tree_audit_append(tree_id, leaf_id, report=<obj>)` | 追加审计报告 |
+| `mcp__tree__tree_audit_append(tree_id, leaf_id, report=<obj>)` | 追加审计报告。report 必填字段：`auditor_session_id`(UUID)、`total`(int)、`passed`(int)、`failed`(int)、`results[]`(每项含 `{item, pass, evidence}`)。缺字段抛 `E_SCHEMA_INVALID` |
 | `mcp__tree__tree_nudge_append(tree_id, leaf_id, nudge=<obj>)` | 追加 nudge 记录 |
 
 ### Maintain（维护）
@@ -563,13 +563,13 @@ prompt: |
 |----|------|------|
 | `prefix` | 项目代号 | `[a-z][a-z0-9_]{3,7}`（小写字母开头，4-8 字符，**不含连字符**） |
 | `path` | 树定位：根为空，子=A/B/C，孙=A1/A2，曾孙=A1a | `[A-Z]\d*(?:[a-z]\d*)*` |
-| `role` | 角色短名（可含连字符） | `\w+` |
+| `role` | 角色枚举（引擎硬约束，越界抛 `E_SCHEMA_INVALID`） | `root\|commander\|worker` |
 | `suffix` | 可选。竹节=sNN / 尝试=iNN | `s\d+\|i\d+` |
 
 ### 完整正则
 
 ```
-^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\d*(?:[a-z]\d*)*)?-)?(\w+)(?:-(s\d+|i\d+))?$
+^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\d*(?:[a-z]\d*)*)?-)?(root|commander|worker)(?:-(s\d+|i\d+))?$
 ```
 
 ### 正例
@@ -577,13 +577,13 @@ prompt: |
 | 命名 | 解读 |
 |------|------|
 | `nanju-root` | nanju 项目根会话 |
-| `nanju-A-eval` | 第 1 子 A = 实验评测模块 |
-| `nanju-A-eval-s2` | A 的竹节第 2 节 |
-| `nanju-A1-engine` | A 的第 1 孙 = 评测引擎 |
-| `sweng-B-pedagogy` | sweng 项目 B = 教学法模块 |
-| `webv3-C-api` | webv3 项目 C = API 设计 |
+| `nanju-A-commander` | 第 1 子 A = 子指挥官 |
+| `nanju-A-commander-s2` | A 的竹节第 2 节 |
+| `nanju-A1-worker` | A 的第 1 孙 = 原子工人 |
+| `sweng-B-worker` | sweng 项目 B = 原子工人 |
+| `webv3-C-commander` | webv3 项目 C = 子指挥官 |
 | `pguide-root` | pguide 项目根会话 |
-| `nanju-A1b-engine` | A1 的第 2 次尝试（i2=i, path 中 b 表示第 2 个曾孙） |
+| `nanju-A1b-worker` | A1 的第 2 次尝试（i2=i, path 中 b 表示第 2 个曾孙） |
 
 ### 负例
 
@@ -600,7 +600,7 @@ prompt: |
 
 1. `prefix` 由根会话首次 `init` 时生成，**永不变更**
 2. Fork 时强制继承 prefix（leaf add 校验）
-3. `role` 必填
+3. `role` 必须在 `[root, commander, worker]` 枚举内，越界抛 `E_SCHEMA_INVALID`（引擎 `cmdLeafAdd` → `assertEnum` 硬约束，Q1 v1.1 起生效）
 4. 重档剪枝时旧会话 archive 不删，新会话加 `i2/i3` 后缀
 
 ---

@@ -512,6 +512,30 @@ CASES.V5BT = async () => {
     E.ALIGNMENT_NOT_VERIFIED);
 };
 
+// ---------- 批次5 (C4): milestone add 空 expect_outputs → validate 软警告 ----------
+CASES.C4 = async () => {
+  console.log('\n[C4] milestone add 空 expect_outputs → add ok, validate 报 milestone_empty_outputs issue');
+  const { tid } = await setupTree();
+  const leafId = await addWorker(tid, 'C4');
+  // milestone add 空 expect_outputs → add 成功（保"先建后填"灵活）
+  await expectOk('C4 milestone add 空 expect_outputs 不拦',
+    ['milestone', 'add', tid, leafId, '--json', JSON.stringify({ id: 'M1', desc: 'empty', expect_outputs: [] })]);
+  // validate → 报 milestone_empty_outputs issue
+  const r = await run(['validate', tid]);
+  const issues = (r.result && r.result.issues) || [];
+  const hit = issues.find((i) => i.type === 'milestone_empty_outputs');
+  if (hit) pass('C4 validate 报 milestone_empty_outputs issue', `${hit.type} on ${hit.leaf_id}`);
+  else fail('C4 validate 报 milestone_empty_outputs issue', `未找到 issue. ok=${r.result && r.result.ok}, issues=${JSON.stringify(issues).slice(0, 200)}`);
+  // 对照: 非空 expect_outputs 不报
+  const leafId2 = await addWorker(tid, 'C4b');
+  await run(['milestone', 'add', tid, leafId2, '--json', JSON.stringify({ id: 'M1', desc: 'full', expect_outputs: ['x.md'] })]);
+  const r2 = await run(['validate', tid]);
+  const issues2 = (r2.result && r2.result.issues) || [];
+  const hit2 = issues2.find((i) => i.type === 'milestone_empty_outputs' && i.leaf_id === leafId2);
+  if (!hit2) pass('C4 非空 expect_outputs 不误报', 'ok');
+  else fail('C4 非空 expect_outputs 不误报', `误报: ${JSON.stringify(hit2).slice(0, 100)}`);
+};
+
 // ============================================================
 // 主入口
 // ============================================================
@@ -521,7 +545,7 @@ async function main() {
   console.log('被测引擎: patch-l/tree-engine.cjs (require, 不再 spawn tree-state.js)');
   console.log('============================================================');
   const filter = process.argv.slice(2);
-  const order = ['A1', 'A2', 'A7', 'A3', 'A5', 'A4', 'A6', 'HARDEN2', 'HARDEN6', 'V2_FORGED', 'V1_RESTORE', 'V3_EMPTY', 'T3', 'V8', 'V6', 'V5B', 'V4', 'CP2', 'V9', 'V5BT'];
+  const order = ['A1', 'A2', 'A7', 'A3', 'A5', 'A4', 'A6', 'HARDEN2', 'HARDEN6', 'V2_FORGED', 'V1_RESTORE', 'V3_EMPTY', 'T3', 'V8', 'V6', 'V5B', 'V4', 'CP2', 'V9', 'V5BT', 'C4'];
   for (const key of order) {
     if (filter.length > 0 && !filter.includes(key)) continue;
     if (typeof CASES[key] === 'function') await CASES[key]();

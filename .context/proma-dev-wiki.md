@@ -1031,6 +1031,37 @@ sed -i 's/"iconTemplate.png"/"proma-coral.png"/g' main.cjs
 | migrate 子命令 | 旧 role 映射 + worker→commander 提升 | — |
 | added_by 追踪 | leaf add 记录创建会话 | — |
 
+#### audit_append report 结构（v0.2.2）
+
+`cmdAuditAppend`（tree-state.js ~L2047）要求 report 对象包含以下**必填字段**，缺任一字段抛 `E_SCHEMA_INVALID`：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `auditor_session_id` | UUID string | 审计者会话 ID（必须是树中独立 leaf 的 session_id） |
+| `total` | int | 检查项总数 |
+| `passed` | int | 通过数 |
+| `failed` | int | 失败数 |
+| `results` | array | 每项 `{item: string, pass: bool, evidence: string}` |
+
+**模板**：
+```json
+{
+  "auditor_session_id": "<审计者 session UUID>",
+  "total": 5,
+  "passed": 4,
+  "failed": 1,
+  "results": [
+    {"item": "deliverables 完整性", "pass": true, "evidence": "3/3 文件产出"},
+    {"item": "self_check 全部 pass", "pass": true, "evidence": "5/5 ✅"},
+    {"item": "Drift 清零", "pass": false, "evidence": "1 条未解决 drift"},
+    {"item": "DoD 逐项满足", "pass": true, "evidence": "quality_gates 全部通过"},
+    {"item": "决策笔记齐全", "pass": true, "evidence": ".note.md 含 2 个关键决策"}
+  ]
+}
+```
+
+**MCP 调用**：`mcp__tree__tree_audit_append(tree_id, leaf_id, report=<上述对象>)`
+
 ### 18.4 已验证场景
 
 | 验证任务 | 时间 | 频道 | 子会话数 | 结果 |

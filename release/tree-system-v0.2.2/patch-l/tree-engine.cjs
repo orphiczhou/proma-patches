@@ -1869,6 +1869,19 @@ function collectValidateIssues(state) {
     }
   }
 
+  // v0.7 批次5+ (C4 软警告): milestone.expect_outputs 为空 → validate 报 issue（不拦 add，保"先建后填"灵活；done 时 V3 已拦）
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    if (Array.isArray(leaf.milestones)) {
+      for (const m of leaf.milestones) {
+        const outs = Array.isArray(m.expect_outputs) ? m.expect_outputs : [];
+        if (outs.length === 0) {
+          issues.push({ type: 'milestone_empty_outputs', leaf_id: id, detail: `milestone "${m.id}" has empty expect_outputs (declare deliverables before done; V3 will block done otherwise)` });
+        }
+      }
+    }
+  }
+
   return issues;
 }
 
