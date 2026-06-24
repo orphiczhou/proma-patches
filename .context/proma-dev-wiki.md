@@ -1,6 +1,6 @@
 # Proma 开发版 Wiki
 
-> 最后更新: 2026-06-21 09:18 | 维护者: 周星星
+> 最后更新: 2026-06-24 16:10 | 维护者: 周星星
 
 ---
 
@@ -1062,3 +1062,132 @@ Layer 2: 树形会话执行体系 (v0.2.1)
 - 并发竞态：send_message fire-and-forget 存在消息丢失风险（L1 I3）
 - Commander prune/archive 时子树的级联行为未定义（M5）
 - v0.3 目标：心跳实现 + 内审实现 + notify 验证 + 竹节交接 + 自动化 smoke test + 级联剪枝
+
+---
+
+## 十九、2026-06-24 多实例 bridge 端口遮蔽修复 + Dev 运行时 DbC 验证
+
+### 19.1 问题：Dev/Pro 启动后 HTTP bridge 对 remote-session 不可见
+
+**现象**：双击 `start-dev.bat` 启动 dev 实例后：
+- `discover_instances` 只返回 release，看不到 dev
+- `mcp__remote-session__remote_*(instance="dev")` 报 "No instance named 'dev' found"
+- 但 dev agent 能正常调 `mcp__session__list_channels`，证明 patches.cjs 已加载
+
+**根因**：`start-dev.bat` 设了 `PROMA_BRIDGE_HOST=0.0.0.0`，dev bridge 监听 `0.0.0.0:19876`。release bridge 监听 `127.0.0.1:19876`。Windows 上 `0.0.0.0:port` 和 `127.0.0.1:port` 可以共存（不同 socket），但所有 client 访问 `127.0.0.1:19876` 都被路由到 release，dev 完全收不到。
+
+```text
+netstat | grep 19876
+  0.0.0.0:19876   →  Proma-white.exe (dev)   ← 被遮蔽
+  127.0.0.1:19876 →  Proma-black.exe (release)
+```
+
+**关键诊断**：`curl http://<机器IP>:19876/get_instance_info` 才能打到 dev（绑定 0.0.0.0 的 socket 通过非环回网卡可达）。但 `discoverInstances` 只扫 `127.0.0.1`，永远漏掉 dev。
+
+### 19.2 修复：删除所有 start-*.bat 的 PROMA_BRIDGE_HOST
+
+**改动**（4 个 bat 全改）：
+- `D:\Proma-dev\start-dev.bat` — 删 `set PROMA_BRIDGE_HOST=0.0.0.0`
+- `D:\Proma-dev\start-pro.bat` — 同上
+- `D:\Proma-dev\start-release.bat` — 同上
+- `D:\Proma-dev\start-release-fresh.bat` — 同上
+
+**效果**：dev/pro/release 启动后自动 fallback 端口：
+
+| Instance | 端口 | EXE | 数据目录 |
+|---|---|---|---|
+| release | `127.0.0.1:19876` | Proma-black.exe | `~/.proma/` (共享正式版, ISOLATED=0) |
+| **dev** | `127.0.0.1:19877` | Proma-white.exe | `~/.proma-dev/` (ISOLATED=1) |
+| **pro** | `127.0.0.1:19878` | Proma-green.exe | `~/.proma-pro/` (ISOLATED=1) |
+| release-fresh | `127.0.0.1:19879` | Proma-coral.exe | `~/.proma-release-fresh/` (ISOLATED=1) |
+
+启动顺序决定端口：先启动的占 19876，后启动的自动 +1。**Patches.cjs 端口 fallback 链设计是正确的**，是 `PROMA_BRIDGE_HOST=0.0.0.0` 让 dev 抢占了 19876 阻止了 fallback。
+
+### 19.3 踩坑：bat 文件必须 ASCII only
+
+**问题**：第一次改 `start-dev.bat` 时用了中文 REM 注释（UTF-8 编码），结果双击后黑色 cmd 窗口一闪关闭，Proma-white.exe 完全没启动。
+
+**根因**：Windows cmd.exe 默认按系统 ANSI 编码（GBK on 中文 Windows）解析 .bat 文件。UTF-8 多字节字符会让 cmd.exe 解析失败，整个脚本静默 abort。
+
+**验证**：`file xxx.bat` 必须返回 "ASCII text"。返回 "Unicode text, UTF-8 text" 则有毒。
+
+**铁律**：所有 `D:\Proma-dev\*.bat` **必须 ASCII only**，包括 REM 注释也不能含中文/UTF-8。
+
+### 19.4 Dev engine 运行时 DbC 对抗验证
+
+直接 `require("D:/Proma-dev/resources/app/dist/tree-engine.cjs")`，注入临时 treesRoot，跑完整生命周期 + 对抗测试：
+
+| # | 测试 | 期望 | 实际 |
+|---|------|------|------|
+| 1 | init tree | PASS | ✅ |
+| 2 | validate clean tree | PASS, 0 issues | ✅ |
+| 3 | leaf add (valid UUID + parent=vrfy-root + path=A 大写 + added_by UUID) | PASS | ✅ |
+| 4 | leaf set-status done WITHOUT milestones | BLOCKED | ✅ `E_SCHEMA_INVALID: milestones must be non-empty` |
+| 5 | leaf set-status done, milestone exists but audit_pass=false | BLOCKED | ✅ `E_SCHEMA_INVALID: milestone "m1" is not audit_pass=true` |
+| 6 | event-append done with deliverable + valid self_check (array) | PASS | ✅ |
+| 7 | audit-gate self-audit (auditor = added_by) | BLOCKED | ✅ `E_AUDITOR_NOT_INDEPENDENT` (V2 白名单工作) |
+| 8 | audit-gate independent auditor (树中独立 leaf) | PASS | ✅ |
+
+**生效的 DbC 硬约束**：
+- A5 done event self_check strict schema（必须 `[{item,pass,evidence}]` 数组）
+- A2 audit-gate auditor 独立性白名单（V2 修复，堵伪造 UUID）
+- SP1 audit-gate pass 前置 done event（E_AUDIT_PREMATURE）
+- A1 leaf-set-status done 前置 milestones 非空 + audit_pass=true
+
+**待加固（V4-V8，下次会话）**：
+- V4 milestone set-result 无条件设 audit_pass=true 无鉴权
+- V5 brief_echo 省略 alignment 字段绕过独立审计
+- V6 self_check 全 pass=false 通过 schema
+- V7 commander 默认 verdict=skip 直接 done
+- V8 node_budget=0 被当默认值 10
+
+### 19.5 关键命令签名备忘（避免下次踩坑）
+
+`engine.run(cmd, args, treesRoot)` — cmd 是顶层，args 是剩余参数：
+
+```text
+init <tree_id> <root_session_uuid> --root-brief '<json>' --root-dod '<json>' --audit-meta '<json>'
+
+leaf add <tree_id> --json '<leaf_json>'
+  leaf_json 字段: leaf_id, session_id, parent, path, role, model, channel, added_by
+  - session_id/added_by 必须是 UUID
+  - parent 是 "{tree_id}-root" 不是 "root"
+  - leaf_id 命名: <prefix>-<PATH_UPPERCASE>-<role>[-<suffix>]
+  - prefix 长度 4-8 字符 ([a-z][a-z0-9_]{3,7})
+
+event append <tree_id> <leaf_id> --type <done|brief_echo|...> --json '<meta_json>'
+  meta_json 字段: note/deliverable/size_bytes/**self_check** 等
+  - self_check 必须放在 meta 里，不是 --self-check 选项
+  - self_check 必须是 [{item, pass, evidence}] 非空数组
+
+milestone add <tree_id> <leaf_id> --json '<milestone_json>'
+  milestone_json 字段是 **id**（不是 milestone_id！）, description, expect_outputs
+
+audit gate <tree_id> <leaf_id> --verdict <required|pass|fail|skip> [--audit-session-id <uuid>]
+  - 参数名是 --audit-session-id（不是 --auditor-session-id）
+  - audit-session-id 必须是树中真实独立 leaf 的 session_id（V2 白名单）
+```
+
+### 19.6 D:\Proma-dev\ 多实例 launcher 心智模型（修正 §二）
+
+`D:\Proma-dev\` 是**多实例 launcher 目录**，4 个主题 exe 对应 4 个 instance：
+
+| EXE | instance | 默认 BAT | userData |
+|---|---|---|---|
+| `Proma-white.exe` | dev | `start-dev.bat` | `~/.proma-dev/` |
+| `Proma-green.exe` | pro | `start-pro.bat` | `~/.proma-pro/` |
+| `Proma-coral.exe` | release | `start-release.bat` | `~/.proma/` (ISOLATED=0 共享正式版) |
+| `Proma-coral.exe` | release-fresh | `start-release-fresh.bat` | `~/.proma-release-fresh/` |
+
+4 个 .exe 是同一份 Proma Electron 二进制（仅图标主题不同），用 `PROMA_INSTANCE_NAME` 区分身份。旧的独立 `D:\Proma-release\` 目录已被这套 launcher 替代。
+
+### 19.7 诊断技巧速查
+
+| 现象 | 第一反应检查 |
+|---|---|
+| `discover_instances` 漏实例 | `netstat -ano \| grep "0.0.0.0:19876"`，看是否有 dev 绑 0.0.0.0 |
+| bat 双击一闪关闭 | `file xxx.bat`，必须 ASCII text（不能 UTF-8） |
+| patches.cjs 加载失败但无错误 | 让该实例 agent 调 `mcp__session__list_channels`，比扫端口更可靠 |
+| leaf add 报 path 不匹配 | leaf_id 命名 `<prefix>-<PATH_UPPER>-<role>`，path 字段大写 |
+| done event 拒收 self_check missing | self_check 放 `--json` 的 meta 里，不是独立选项 |
+| audit-gate 拒收 auditor | `--audit-session-id`（不是 --auditor-session-id），必须是树中独立 leaf UUID |

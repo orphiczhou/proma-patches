@@ -4,6 +4,82 @@
 
 新条目追加在顶部。
 
+## 2026-06-24 Dev bridge 0.0.0.0:19876 端口遮蔽 bug（根因+修复）
+
+**现象**: dev 实例的 patches.cjs 完整加载（27 个 mcp__tree__* 工具 + 11+11 个 mcp__session__/remote-session__ 工具全部注册，dev agent 调用 `mcp__session__list_channels` 成功返回 4 个频道），但 `netstat | grep 19877` 不见监听，`mcp__remote-session__remote_*(instance="dev")` 报 "No instance named 'dev' found (scanned 19876-19895)"。
+
+**根因**: `D:/Proma-dev/start-dev.bat` 设了 `PROMA_BRIDGE_HOST=0.0.0.0`，导致 dev 的 HTTP bridge 监听 `0.0.0.0:19876`（所有接口）。Windows 上 `0.0.0.0:19876` 和 release 的 `127.0.0.1:19876` **可以共存**（不同的 socket），但所有 client 访问 `127.0.0.1:19876` 都被路由到 release，dev 完全收不到。
+
+- 验证: `curl http://192.168.3.141:19876/get_instance_info` 返回 `{"instance":"dev","proma_dev":true,"port":19876}` — 通过机器 IP 才能打到 dev
+- `netstat -ano | grep ":19876"` 显示两条 LISTENING：`0.0.0.0:19876` (dev, PID 23396) + `127.0.0.1:19876` (release, PID 17624)
+
+**Why**: patches.cjs `createExternalHttpBridge` 设计是 dev/release 都监听 127.0.0.1，dev 试 19876 失败（被 release 占用，EADDRINUSE）→ 自动 fallback 19877。但 PROMA_BRIDGE_HOST=0.0.0.0 让 dev 绑定 0.0.0.0 而非 127.0.0.1，Windows 不认为 0.0.0.0:19876 和 127.0.0.1:19876 冲突，dev "成功"绑定 19876 → return，不试 19877 → dev 对 127.0.0.1 client 不可见。
+
+**修复**: 删除 start-dev.bat 的 `set PROMA_BRIDGE_HOST=0.0.0.0` 一行（保留注释记录历史）。代价：局域网内其他机器不能通过机器 IP 访问 dev bridge。但 dev 本来就是隔离开发实例，不需要 LAN 可见。
+
+**踩坑**: 修复时第一版用了中文 REM 注释（UTF-8），导致 cmd.exe 解析失败、黑窗一闪关闭、Proma-white.exe 没启动。`file` 命令显示 "Unicode text, UTF-8 text" — Windows bat 必须 ASCII only，否则 cmd.exe 处理多字节字符出错。第二版改纯英文 REM 注释后正常。同时把 start-pro.bat / start-release-fresh.bat / start-release.bat 中的 0.0.0.0 也都删了（这些都是 D:\Proma-dev\ 下的 launcher，4 个 exe 对应 4 个 instance）。
+
+**D:\Proma-dev\ 是多实例 launcher 目录**（关键心智模型）：
+- `start-dev.bat` → `Proma-white.exe` → instance="dev"，数据 `~/.proma-dev/`
+- `start-pro.bat` → `Proma-green.exe` → instance="pro"，数据 `~/.proma-pro/`
+- `start-release.bat` → `Proma-coral.exe` → instance="release"，ISOLATED=0 共享 `~/.proma/`
+- `start-release-fresh.bat` → `Proma-coral.exe` → instance="release-fresh"，ISOLATED=1 数据 `~/.proma-release-fresh/`
+- 4 个 .exe 是同一份 Proma Electron 二进制（不同图标主题），用 PROMA_INSTANCE_NAME 区分身份
+
+**How to apply**: 任何 Proma 实例的 `PROMA_BRIDGE_HOST` 都应该保持默认（127.0.0.1），让 patches.cjs 的端口 fallback 逻辑正常工作。如果需要 LAN 可见，应该在 patches.cjs 里改成"试 19877 成功后再 alias 0.0.0.0"或类似策略，而不是粗暴覆盖 bindHost。Windows .bat 文件**必须 ASCII only**，REM 注释也不能含中文/UTF-8。
+
+**关键诊断技巧**:
+1. patches.cjs 1181 行 `createExternalHttpBridge()` 是同步调用但内部是 async IIFE，**IIFE 内部错误不冒泡**，加载失败也不影响 main.cjs 570900 行的 try/catch 后续逻辑
+2. patches.cjs 1162 行的 `global.__proma_getMcpServers__` 在 createExternalHttpBridge **之前**注册，所以 patches.cjs 加载顺序里：MCP 工具注册先成功 → 然后 bridge 启动失败也会被吞，不影响 agent 调用 mcp__session__* 工具
+3. **判定 bridge 是否启动**用 `netstat -ano | grep "0.0.0.0:19876"` 看 dev 是否绑了 0.0.0.0；不只是看 127.0.0.1
+4. **判定 patches.cjs 是否加载**最有效的方法是让 dev agent 列工具+调 mcp__session__list_channels，远胜于扫端口
+5. **bat 文件编码**用 `file xxx.bat` 检查，必须是 "ASCII text"。UTF-8 会让 cmd.exe 一闪关闭且无错误提示
+
+---
+
+## 2026-06-24 Dev 实例运行时验证（重启 + 清理 + engine DbC 对抗）
+
+**前提**: 修复 start-dev.bat / start-pro.bat 的 0.0.0.0 问题 + UTF-8 编码 bug 后，重启 dev/pro/release 三个实例。`discover_instances(refresh=true)` 同时返回 3 个实例：release@19876 / dev@19877 / pro@19878（端口 fallback 链完美）。
+
+**27 工具注册验证**（通过 dev agent 列工具+调 list_channels）:
+- ✅ 11 个 mcp__session__* 全部注册（agent 调 list_channels 成功返回 4 个频道）
+- ✅ 11 个 mcp__remote-session__* 全部注册
+- ✅ 26+ 个 mcp__tree__* 全部注册
+
+**清理动作**:
+- 归档 3 个 tree MCP 联调测试会话：ae3f183e / 849ff044 / 35020007（通过 mcp__remote-session__remote_archive_session）
+- mcpvfy tree（root_brief="验证 MCP 内联引擎"）备份到 `_archive/mcpvfy-20260624/` 后删除，dev tree 数据干净
+
+**engine DbC 运行时对抗验证**（直接 require `D:/Proma-dev/resources/app/dist/tree-engine.cjs`，注入临时 treesRoot）:
+
+| # | 测试 | 期望 | 实际 |
+|---|------|------|------|
+| 1 | init tree | PASS | ✅ |
+| 2 | validate clean | PASS, 0 issues | ✅ |
+| 3 | leaf add (path 大写 A, parent=vrfy-root, added_by=valid UUID) | PASS | ✅ |
+| 4 | leaf set-status done WITHOUT milestones | BLOCKED | ✅ `E_SCHEMA_INVALID: milestones must be non-empty` |
+| 5 | leaf set-status done, milestone exists, deliverable file MISSING | BLOCKED | ✅ `E_SCHEMA_INVALID: milestone "m1" is not audit_pass=true` |
+| 6 | event-append done with deliverable + valid self_check | PASS | ✅ |
+| 7 | audit-gate self-audit (auditor=added_by) | BLOCKED | ✅ `E_AUDITOR_NOT_INDEPENDENT` (V2 白名单工作) |
+| 8 | audit-gate independent auditor (auditor 是树中独立 leaf) | PASS | ✅ |
+
+**关键命令签名备忘**（下次写测试脚本别再踩坑）:
+- `engine.run(cmd, args, treesRoot)` — cmd 是顶层（init/validate/leaf/event/audit/milestone/...），args 是剩余参数
+- `init <tree_id> <root_session_uuid> --root-brief '<json>' --root-dod '<json>' --audit-meta '<json>'`
+- `leaf add <tree_id> --json '<leaf_json>'`（不是位置参数！json 字段：leaf_id/session_id/parent/path/role/model/channel/added_by，session_id/added_by 必须是 UUID，parent="tid-root" 不是 "root"）
+- `event append <tree_id> <leaf_id> --type <done|brief_echo|...> --json '<meta_json>'`（self_check 放进 meta 里，不是 --self-check！）
+- `milestone add <tree_id> <leaf_id> --json '<milestone_json>'`（json 字段是 `id` 不是 `milestone_id`！）
+- `audit gate <tree_id> <leaf_id> --verdict <required|pass|fail|skip> [--audit-session-id <uuid>]`（参数名是 `--audit-session-id` 不是 `--auditor-session-id`）
+- leaf_id 命名：`<prefix>-<PATH_UPPERCASE>-<role>[-<suffix>]`，prefix 4-8 字符（`[a-z][a-z0-9_]{3,7}`），path 字母大写
+
+**结论**: v0.7+ 引擎内联 MCP 改造在 dev/pro/release 三实例全部运行正常。27 工具注册 + DbC 4 个关键控制点（milestones 非空 / milestone audit_pass / V2 auditor 独立性白名单 / A5 self_check strict schema）全部生效。剩余待加固项 V4-V8 不影响当前正确性，可推后。
+
+---
+
+## 2026-06-24 Dev bridge 0.0.0.0:19876 端口遮蔽 bug（根因+修复）
+
+---
+
 ## 2026-06-23 v0.7+ 引擎内联 MCP（消除工作区源码暴露）
 
 **起因**: 独立审计发现 commit ba2c030 的"MCP 化"是半成品——`createTreeMcpServer` 只用 spawn 包装 `node tree-state.js`，90KB 引擎源码仍躺在每个工作区 `.context/trees/`，agent 可 Read/Edit/cat 直接绕过 MCP。用户要求真正内联（对照 session-management：逻辑全在 patches.cjs，工作区零源码）。方案文件 `.context/plan/tree-engine-inline-mcp.md`。
