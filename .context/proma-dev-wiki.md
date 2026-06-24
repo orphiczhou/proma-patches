@@ -542,6 +542,7 @@ sed -i 's/"version": "0.12.X"/"version": "0.12.23"/g' D:/Proma-dev/resources/app
 
 | 日期 | 版本 | 改动 |
 |---|---|---|
+| 2026-06-24 | **v0.7+ 引擎内联 MCP** | **消除工作区源码暴露**：tree-state.js(2428行)→`patch-l/tree-engine.cjs` 内联进 patches.cjs 的 mcp__tree__*(27工具)，不再 spawn CLI。**工作区零源码泄漏**（agent 看不到引擎代码，对照 session-management 范本）。① M1: TREES_ROOT 可注入(setTreesRoot) + run(cmd,args,treesRoot?) 与 CLI stdout 等价 + CLI shim，**cmd/12DbC/文件锁零改动**(git rename 83% 实证)；② M2: callTreeState spawn→engine.run(per-call treesRoot)，W-08 改查 mcp__tree__tree_* 写工具，C-11 简化查直接读写 tree-state.json；③ M3: dbc-spec/audit-attacks execFile→require engine.run(async化) + findEngine 自适应定位；④ M4: commander SKILL.md 20+处 CLI→mcp__tree__* + assets 自包含；⑤ MED M1: run() per-call treesRoot 并发加固。**验证**: smoke 12/0+11/0, dbc-spec 21/0, audit-attacks 18/CRITICAL=0, A1 独立审计子会话通过, **dev+release 双实例运行时验证**（27工具注册 + DbC 4/4 拦截 + l1fix validate 真实跑出 issues）。清理 proma/tree-1/tree-2 三处遗留 tree-state.js。详见 `.context/plan/tree-engine-inline-mcp.md` + `note.md` |
 | 2026-06-20 | **v0.16.7** | **LAN 局域网支持 + discover_instances**：① HTTP bridge 绑定地址改为 `PROMA_BRIDGE_HOST` 环境变量控制（默认 `127.0.0.1`，设 `0.0.0.0` 开放 LAN）；② `discoverRemoteInstance` 支持 `host:port` 直连格式（跳过端口扫描）；③ 新增 **`discover_instances`** MCP 工具（12 本地 + 12 远端）——扫描 localhost + 指定 LAN hosts，60s 缓存；④ `proma-mcp-server.cjs` 新增 `--host` 参数（跨机连接）；⑤ 所有 4 个 BAT 启动文件默认开启 `PROMA_BRIDGE_HOST=0.0.0.0` |
 | 2026-06-20 | **v0.16.6** | **单目录多实例 + Pro 实例**：① 架构简化——Release 实例改为从 `D:\Proma-dev\` 目录 + `start-release.bat` 启动（`Proma-coral.exe`），与 Dev 共享同一份代码；② 新增 **Pro 实例**（`start-pro.bat` / `Proma-green.exe` / 翡翠绿图标 / `~/.proma-pro/` 隔离 profile）；③ **补丁 3 升级为动态托盘图标**——按 `PROMA_INSTANCE_NAME` 自动选择（dev→white / release→coral / pro→emerald），不再写死；④ Release 的 `D:\Proma-release\` 目录保留不动（旧版 ASAR 打包，仍有其他用途） |
 | 2026-06-19 | **v0.2.0** | **Layer 2 树形会话执行体系初始版本**：完整发布包 `release/tree-system-v0.2.0/`（17 文件、7000+ 行）。tree-state.js v1.0（1551 行）、tree-commander SKILL v2.0、tree-worker SKILL v2.0、commander-methodology v1.0（14条铁律）、tree-audit-methodology v1.0（融合终局验证）。4 次验证：B 任务(4子会话)、S1 重测(25命令)、L2 验证(3子会话0偏差)、L1Fix(3worker 进行中)。已知限制：notify 未验证、心跳/内审仅方案 |
@@ -964,6 +965,10 @@ sed -i 's/"iconTemplate.png"/"proma-coral.png"/g' main.cjs
 ---
 
 ## 十八、Layer 2：树形会话执行体系 v0.2.1
+
+> **🔴 v0.7+ 更新（2026-06-24）**: 状态引擎已从 `tree-state.js` 改造为 `patch-l/tree-engine.cjs`，**内联进 proma-dev-patches.cjs 的 mcp__tree__* MCP**（27工具），不再 spawn CLI。**工作区零源码泄漏**（agent 看不到引擎代码，对照 session-management 范本）。
+> 核心：`run(cmd,args,treesRoot?)` 等价 CLI stdout（永不 throw）；TREES_ROOT 可注入；per-call treesRoot 并发安全；findEngine 自适应定位 engine。**Phase A 12 DbC + 文件锁零改动**。
+> 验证: smoke + dbc-spec 21/0 + audit-attacks 18/CRITICAL=0 + A1 独立审计 + dev/release 双实例运行时验证（27工具 + DbC 4/4 拦截）。详见 `.context/plan/tree-engine-inline-mcp.md` + `note.md` + handoff `session-2026-06-24-runtime-verified.md`
 
 > Q1 v1.1 架构落地 | 2026-06-19 | 审计驱动修订
 
