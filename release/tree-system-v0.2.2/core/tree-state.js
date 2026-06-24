@@ -437,6 +437,12 @@ async function cmdInit(args) {
 
   const root_brief = parseJsonArg(opts['root-brief'], 'root-brief');
   const root_dod = parseJsonArg(opts['root-dod'], 'root-dod');
+  // v0.7 批次5 (V8+): node_budget 必须是非负有限数（堵字符串/布尔/NaN/负数静默回退默认，审计[2]）
+  if (root_dod.node_budget !== undefined && root_dod.node_budget !== null) {
+    if (typeof root_dod.node_budget !== 'number' || !Number.isFinite(root_dod.node_budget) || root_dod.node_budget < 0) {
+      throw new TreeStateError(E_SCHEMA_INVALID, `root_dod.node_budget must be a non-negative finite number, got ${JSON.stringify(root_dod.node_budget)}`);
+    }
+  }
   const audit_meta_override = opts['audit-meta'] ? parseJsonArg(opts['audit-meta'], 'audit-meta') : null;
 
   const dir = treeDir(tree_id);
@@ -633,9 +639,11 @@ async function cmdLeafAdd(args) {
       }
     }
 
-    // v0.7 Phase A 批次3 (A4): 节点预算硬约束 — active leaf 数不得超过 root_dod.node_budget
+    // v0.7 Phase A 批次3 (A4) + 批次5 (V8): 节点预算硬约束 — active leaf 数不得超过 root_dod.node_budget
     // root leaf 算 active；待创建的新 leaf 未计入。超出时拒绝，逼操作者先归档或调高预算。
-    const maxLeaves = (state.root_dod && state.root_dod.node_budget) || 10;
+    // V8: budget=0 必须被尊重（原 `|| 10` 短路把 0 当 10）。typeof + isFinite 严格挡 null/undefined/字符串/NaN。
+    const _nodeBudget = state.root_dod && state.root_dod.node_budget;
+    const maxLeaves = (typeof _nodeBudget === 'number' && Number.isFinite(_nodeBudget)) ? _nodeBudget : 10;
     const activeCount = Object.values(state.leaves).filter(l => l.status !== 'archived').length;
     if (activeCount >= maxLeaves) {
       throw new TreeStateError(E_TREE_NODE_BUDGET_EXCEEDED,
@@ -888,18 +896,42 @@ async function cmdLeafSetStatus(args) {
         }
       }
 
-      // v0.7 Phase A (A1): done 前置 deliverables 文件存在性硬约束
-      // 每个 milestone 的 expect_outputs 必须真实落盘，把"宣告完成"钉死在可验收的物理产物上
+      // v0.7 Phase A (A1) + 批次5 (V9): done 前置 deliverables 文件存在性 + 路径安全硬约束
+      // 每个 milestone 的 expect_outputs 必须真实落盘，把"宣告完成"钉死在可验收的物理产物上。
+      // V9: expect_outputs 必须是 deliverables/ 下的相对路径，禁止绝对路径 + 路径遍历
+      //     （堵 A1-abspath：恶意 commander 用系统文件 win.ini/hosts 冒充交付物）。
       const droot = state._deliverables_root || path.join(treeDir(tree_id), 'deliverables');
       for (const m of ms) {
         const outs = Array.isArray(m.expect_outputs) ? m.expect_outputs : [];
         for (const outPath of outs) {
           if (typeof outPath !== 'string' || outPath.length === 0) continue;
-          const resolved = path.isAbsolute(outPath) ? outPath : path.join(droot, outPath);
+          if (path.isAbsolute(outPath)) {
+            throw new TreeStateError(
+              E_DELIVERABLE_MISSING,
+              `cannot set status=done: deliverable "${outPath}" must be a relative path under deliverables/ (absolute paths forbidden — system files cannot masquerade as work products). milestone: ${m.id}, leaf: ${leaf_id}`
+            );
+          }
+          const resolved = path.join(droot, outPath);
+          const rel = path.relative(droot, resolved);
+          if (rel.startsWith('..') || path.isAbsolute(rel)) {
+            throw new TreeStateError(
+              E_DELIVERABLE_MISSING,
+              `cannot set status=done: deliverable "${outPath}" escapes deliverables/ directory (path traversal forbidden). milestone: ${m.id}, leaf: ${leaf_id}`
+            );
+          }
           if (!fs.existsSync(resolved)) {
             throw new TreeStateError(
               E_DELIVERABLE_MISSING,
               `cannot set status=done: deliverable "${outPath}" not found. milestone: ${m.id}, leaf: ${leaf_id}, resolved: ${resolved}`
+            );
+          }
+          // v0.7 批次5 (V9+): 拒符号链接（堵 symlink 逃逸 deliverables/，审计[3]；path.relative 不解析 symlink）
+          let _lst;
+          try { _lst = fs.lstatSync(resolved); } catch (_) { _lst = null; }
+          if (_lst && _lst.isSymbolicLink()) {
+            throw new TreeStateError(
+              E_DELIVERABLE_MISSING,
+              `cannot set status=done: deliverable "${outPath}" is a symbolic link (forbidden — symlinks cannot escape deliverables/). milestone: ${m.id}, leaf: ${leaf_id}`
             );
           }
         }
@@ -1218,6 +1250,11 @@ async function cmdMilestoneSetResult(args) {
     throw new TreeStateError(E_SCHEMA_INVALID, `--audit-pass "${auditPassRaw}" must be true|false`);
   }
   const note_path = opts['note-path'] || null;
+  // v0.7 批次5 (V4): audit_pass=true 必须有独立 auditor 背书（堵 MS-free-auditpass 放大器）。
+  const audit_session_id = opts['audit-session-id'] || null;
+  if (audit_session_id && !UUID_RE.test(audit_session_id)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `--audit-session-id "${audit_session_id}" is not a valid UUID`);
+  }
 
   let result = null;
   await withLock(tree_id, () => {
@@ -1235,6 +1272,18 @@ async function cmdMilestoneSetResult(args) {
     }
     if (!target) {
       throw new TreeStateError(E_LEAF_NOT_FOUND, `milestone "${milestone_id}" not found in leaf "${leaf_id}"`);
+    }
+    // v0.7 批次5 (V4): audit_pass=true 必须由独立 auditor 背书（self-approving forbidden）。
+    //   audit_pass=false 免校验（失败声明无需独立背书，且 failed milestone 也无法满足 done 前置）。
+    if (audit_pass === true) {
+      const indepProblem = resolveAuditorIndep(state, leaf, audit_session_id);
+      if (indepProblem) {
+        throw new TreeStateError(
+          E_AUDITOR_NOT_INDEPENDENT,
+          `milestone set-result rejected: --audit-pass true requires independent --audit-session-id for leaf "${leaf_id}" milestone "${milestone_id}": ${indepProblem}. Self-approving a milestone audit is forbidden.`
+        );
+      }
+      target.auditor_session_id = audit_session_id;
     }
     target.audit_pass = audit_pass;
     target.status = audit_pass ? 'done' : 'failed';
@@ -1270,9 +1319,12 @@ async function cmdEventAppend(args) {
     const leaf = state.leaves[leaf_id];
     if (!Array.isArray(leaf.events)) leaf.events = [];
 
-    // v0.7 Phase A 批次2 (A3) + 批次4 (V2): brief_echo 带 alignment 字段时，必须附带独立 auditor_session_id。
-    // v0.7 批次4 升级为白名单：auditor 必须是树中真实存在的、独立的 leaf session（堵伪造 UUID）。
-    // Commander 不可自评 alignment，必须委托独立 Agent 并回填其 session_id。
+    // v0.7 Phase A 批次2 (A3) + 批次4 (V2) + 批次5 (V5b): brief_echo 的 alignment 对齐性校验。
+    //   alignment 是 commander 端对齐评估快照（非 worker 自产，见 tree-worker SKILL §3.4：brief_echo 必填
+    //   my_understanding/milestones_preview，无 alignment）。alignment 由独立 auditor 评估后回填。
+    //   - 带 alignment → 必须有独立 auditor（A3 原校验，堵自评），并清除 alignment_pending。
+    //   - 不带 alignment → 允许（worker 首条 echo 常无 alignment），但标记 alignment_pending=true；
+    //     真正闸门在 cmdAuditGate（worker pass 前必须 alignment_pending=false，堵 A3-omit-alignment 绕过）。
     if (opts.type === 'brief_echo') {
       const alignment = meta.alignment;
       if (alignment !== undefined && alignment !== null) {
@@ -1286,6 +1338,9 @@ async function cmdEventAppend(args) {
               `auditor must be a real, independent leaf session in the tree (problem: ${indepProblem}; auditor="${auditor || 'null'}").`
           );
         }
+        leaf.alignment_pending = false;
+      } else if (leaf.alignment_pending === undefined) {
+        leaf.alignment_pending = true;
       }
     }
 
@@ -1333,6 +1388,15 @@ async function cmdEventAppend(args) {
             `done event rejected: self_check[${i}].evidence is missing or not a string.`
           );
         }
+      }
+      // v0.7 批次5 (V6): done 声明"完成"，self_check 不允许全部 pass:false（与 done 语义矛盾）。
+      //   允许混合（诚实报部分失败），仅拦"全 false 却 done"——这种情况应改用 'blocked' 事件。
+      const anyPass = sc.some((it) => it.pass === true);
+      if (!anyPass) {
+        throw new TreeStateError(
+          E_SELFCHECK_INVALID,
+          `done event rejected: self_check has no item with pass=true (all ${sc.length} item(s) failed). done declares completion but self_check reports zero passing — contradiction. Fix the work or use event 'blocked' instead.`
+        );
       }
     }
 
@@ -1764,18 +1828,33 @@ function collectValidateIssues(state) {
     }
   }
 
-  // HARDEN2 (加固点#2) + 批次4 (V2): done worker 必须有独立 audit_gate
-  // v0.7 批次4 升级为白名单：auditor 必须是树中真实存在的、独立的 leaf session（堵伪造 UUID）。
-  // 模拟"绕过 audit-gate 命令直接篡改文件"的场景：done worker 的 audit_gate 若不独立，validate 必须报出。
+  // HARDEN2 (加固点#2) + 批次4 (V2) + 批次5 (CP2): 任何 verdict='pass' 的 audit_gate 都必须 auditor 独立。
+  // v0.7 批次4 白名单：auditor 必须是树中真实存在的、独立的 leaf session（堵伪造 UUID）。
+  // v0.7 批次5 (CP2) 扩展：原仅查 worker+done，攻击者可给 pending_brief/commander 伪造 pass 蒙混（CP2-direct-forge）。
+  //   现 verdict=pass 即查独立性（不限 role/status）。verdict=skip/required/fail 不查（零误伤：commander/root 默认 skip）。
   for (const id of leafIds) {
     const leaf = leaves[id];
-    if (leaf.role === 'worker' && leaf.status === 'done') {
-      const gate = leaf.audit_gate || {};
+    const gate = leaf.audit_gate || {};
+    if (gate.verdict === 'pass') {
       const auditor = gate.auditor_session_id;
-      let problem = null;
-      if (gate.verdict !== 'pass') problem = `verdict="${gate.verdict}" (must be pass)`;
-      else problem = resolveAuditorIndep(state, leaf, auditor);
-      if (problem) issues.push({ type: 'audit_gate_not_independent', leaf_id: id, detail: `done worker audit_gate not independent: ${problem}` });
+      const problem = resolveAuditorIndep(state, leaf, auditor);
+      if (problem) issues.push({ type: 'audit_gate_not_independent', leaf_id: id, detail: `audit_gate(verdict=pass) not independent: ${problem}` });
+    }
+  }
+
+  // v0.7 批次5 (V5b 兜底): worker done/pass 的 alignment 必须有事件留痕（防 alignment_pending 标志被篡改，审计[1]）
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    const gate = leaf.audit_gate || {};
+    if (leaf.role === 'worker' && (leaf.status === 'done' || gate.verdict === 'pass')) {
+      const evs = Array.isArray(leaf.events) ? leaf.events : [];
+      const alignmentEcho = evs.find((e) => e && e.type === 'brief_echo' && e.meta && e.meta.alignment !== undefined && e.meta.alignment !== null && e.meta.alignment !== '');
+      if (!alignmentEcho) {
+        issues.push({ type: 'alignment_not_recorded', leaf_id: id, detail: `worker ${leaf.status === 'done' ? 'done' : 'audit_gate=pass'} but no brief_echo event carries alignment (alignment_pending flag may be tampered)` });
+      } else {
+        const ap = resolveAuditorIndep(state, leaf, alignmentEcho.meta.auditor_session_id);
+        if (ap) issues.push({ type: 'alignment_not_recorded', leaf_id: id, detail: `alignment brief_echo auditor not independent: ${ap}` });
+      }
     }
   }
 
@@ -1915,6 +1994,28 @@ async function cmdAuditGate(args) {
           E_AUDIT_PREMATURE,
           `audit-gate rejected: no done event found for leaf "${leaf_id}". Audit must occur after work is completed.`
         );
+      }
+      // v0.7 批次5 (V5b): worker 的 audit pass 前必须有 alignment 事件留痕。
+      //   查 events（权威）而非 alignment_pending 布尔标志——后者可被 tamperLeaf 直接篡改绕过（审计[1]）。
+      //   非 worker（commander/root）不走此门。冒用树中真实独立 leaf session 是 Layer4 残留（同 CP2）。
+      if (leaf.role === 'worker') {
+        const alignmentEvs = Array.isArray(leaf.events)
+          ? leaf.events.filter((e) => e && e.type === 'brief_echo' && e.meta && e.meta.alignment !== undefined && e.meta.alignment !== null && e.meta.alignment !== '')
+          : [];
+        if (alignmentEvs.length === 0) {
+          throw new TreeStateError(
+            E_ALIGNMENT_NOT_VERIFIED,
+            `audit-gate rejected: worker "${leaf_id}" has no brief_echo event carrying alignment. Independent alignment assessment must be recorded (brief_echo with alignment + auditor_session_id) before audit pass.`
+          );
+        }
+        const lastAlign = alignmentEvs[alignmentEvs.length - 1];
+        const alignProblem = resolveAuditorIndep(state, leaf, lastAlign.meta.auditor_session_id);
+        if (alignProblem) {
+          throw new TreeStateError(
+            E_ALIGNMENT_NOT_VERIFIED,
+            `audit-gate rejected: alignment brief_echo auditor not independent for worker "${leaf_id}": ${alignProblem}.`
+          );
+        }
       }
     }
 

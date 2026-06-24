@@ -1191,3 +1191,55 @@ audit gate <tree_id> <leaf_id> --verdict <required|pass|fail|skip> [--audit-sess
 | leaf add 报 path 不匹配 | leaf_id 命名 `<prefix>-<PATH_UPPER>-<role>`，path 字段大写 |
 | done event 拒收 self_check missing | self_check 放 `--json` 的 meta 里，不是独立选项 |
 | audit-gate 拒收 auditor | `--audit-session-id`（不是 --auditor-session-id），必须是树中独立 leaf UUID |
+
+## 二十、2026-06-24 V4-V9 DbC 深度加固（9 个硬约束点 + 独立审计迭代）
+
+### 20.1 背景
+audit-attacks.cjs 实测 18 攻击 / 3 BYPASS + 2 GAP。用 Tree 方法论（实现/测试/审计分离 + 自举 + 迭代收敛）推进。Plan agent 独立验证推翻原 V5 设计，collaboration 审计子会话又发现 3 个实现者盲点。详见 `note.md` 顶部条目。
+
+### 20.2 9 个 DbC 硬约束点（core/tree-state.js → patch-l → dist 三处同步）
+
+| 点 | 位置 | 堵的攻击 |
+|---|---|---|
+| V8 | cmdLeafAdd | budget=0 短路当 10 |
+| V8+ | cmdInit | budget 字符串/负数静默回退 |
+| V6 | done event | self_check 全 pass:false |
+| V5b | cmdAuditGate(pass) | 无 alignment 绕对齐留痕（查 events 不查可篡改标志） |
+| V5b兜底 | validate | alignment_pending 标志篡改（审计[1]） |
+| V4 | milestone set-result | 无条件 audit_pass=true（ENABLER） |
+| CP2 | validate | HARDEN2 扩展为任何 verdict=pass |
+| V9 | done | expect_outputs 绝对路径/遍历（系统文件冒充） |
+| V9+ | done | symlink 逃逸 deliverables/（审计[3]） |
+
+### 20.3 关键教训
+- **安全检查不依赖可篡改布尔标志**：V5b 原查 alignment_pending 标志（可 tamperLeaf 篡改），改查 events 留痕（审计[1]）。
+- **独立审计真实有效**：collaboration 子会话发现主会话 3 个盲点（alignment 篡改 / budget 字符串 / symlink）。
+
+### 20.4 收敛结果
+audit-attacks 18 攻击 0 BYPASS / dbc-spec 36/0 / audit-extra（审计留 21 case）[1][2][3] 全堵。
+
+### 20.5 Layer4 残留（CLI 极限，非 bug）
+互审洗白（两 worker 互审）+ 冒用真实 session。需平台 subagent_trace_id 绑定。
+
+### 20.6 破坏性 + SKILL 配套
+- V4: `milestone set-result --audit-pass true` 必须补 `--audit-session-id`
+- V5b: worker done 前，commander/独立 auditor 须回填一条 `brief_echo(alignment + auditor_session_id)`
+- tree-worker §3.4 + tree-commander SKILL 需补"alignment 回填职责"，否则按现 SKILL 工作的合法 worker 被 V5b 卡死
+
+### 20.7 命令签名更新（V4-V9 后）
+- `milestone set-result <tid> <lid> <mid> --audit-pass true --audit-session-id <独立UUID>`
+- `event append <tid> <lid> --type brief_echo --json '{"alignment":"95%","auditor_session_id":"<独立UUID>"}'`（worker done 前必须有一条回填）
+- `init <tid> ... --root-dod '{"node_budget": <非负整数>}'`（字符串/负数被拒）
+- expect_outputs: deliverables/ 下相对路径，禁绝对路径/遍历/symlink
+
+### 20.8 第 3-4 轮迭代：MCP Schema Gap 修复 + release/dev 冗余验证（2026-06-24 19:20-20:33）
+
+**MCP Schema Gap（M8）**：第 2 轮独立测试子会话（DeepSeek V4 Pro，role=test）端到端 MCP 验证发现 `patches.cjs` 的 `tree_milestone_set_result` MCP 工具 schema **缺 `audit_session_id` 参数**——V4 在 MCP 接口层不可用（引擎层正确但生产 wrapper 断裂，测试会话被迫直改 tree-state.json 绕过 V4）。修复：schema 加 `audit_session_id: z.string().optional()` + handler 传 `--audit-session-id`（patch-l/proma-dev-patches.cjs:1135）。**教训**：引擎层 require 测试不够，必须端到端 MCP 验证——独立测试角色再次证明价值（实现者 + 第 1 轮审计都聚焦 tree-engine.cjs，漏 patches.cjs wrapper）。
+
+**冗余验证（M9-M10）**：release + dev 两实例并行派 DeepSeek V4 Pro 测试子会话，相同测试交叉对比：
+- V4 MCP gap 修复：两实例都 `ok=true` ✓✓（audit_session_id 合法路径可用）
+- V8/V6：两实例 ✓✓
+- 三集回归：两实例一致（dbc-spec 36/0 + audit-attacks 0 BYPASS + audit-extra 21）
+- 遗留（非 bug）：dev MCP workspace=null（子会话 slug "undefined"，mcp__tree__* 直调不可用，改 require 等价）；release V9 测试方法误差（event_append vs set-status，V9 校验在 set-status）
+
+**最终收敛**：9 DbC + MCP gap 修复，两实例冗余交叉确认。Tree 方法论多会话协作（实现/测试/审计分离 + 3 轮迭代 + 冗余验证）全程有效。

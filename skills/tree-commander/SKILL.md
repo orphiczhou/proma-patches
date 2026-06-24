@@ -294,6 +294,30 @@ self_audit:
   5. 若 verdict=nack 在默认放行后才到 → 走 §7 中档纠偏
 ```
 
+### brief_echo alignment 回填机制（v0.7 批次5 V5b 必须）
+
+```text
+子会话 worker 发出 brief_echo（首条，复述理解）后:
+  1. 根会话调 event append 登记（worker 的 brief_echo event，含 my_understanding/milestones_preview）
+  2. 根会话派路线图 Agent 评估对齐度（比对 brief/dod）
+     - 路线图 Agent 必须是独立 leaf（其 session_id 将作为 alignment auditor）
+  3. 评估完成 → 根会话【必须】回填一条 brief_echo event 到 worker leaf:
+     mcp__tree__tree_event_append(
+       tree_id, leaf_id=<worker>,
+       type='brief_echo',
+       json='{"alignment":"<评估结论或百分比>","auditor_session_id":"<路线图Agent的session_id>"}'
+     )
+     这条回填 event 是 worker 后续 audit_gate pass 的硬前置（V5b 查 events 留痕，不查可篡改标志）。
+  4. 对齐度 ≥85% → 放行 worker 继续干活
+     对齐度 <85% → tree_drift_append(severity=low, action=nudge) 发回重 brief_echo
+  5. ⚠️ 若跳过步骤 3（未回填 alignment event），worker 永远拿不到 audit pass:
+     - cmdAuditGate 拦 E_ALIGNMENT_NOT_VERIFIED（worker events 无 alignment 留痕）
+     - worker 卡死无法 done，会上行 blocked 抱怨"audit pass 被拦"
+     - 这是 V5b 的硬约束（堵 A3-omit-alignment 绕过），不是 bug
+```
+
+> **为什么 alignment 在回填 event 里，不在 worker 首条 brief_echo 里**：alignment 是 commander/路线图 Agent 的**对齐评估产物**（worker 自己无法自评对齐度）。worker 首条 brief_echo 只含 `my_understanding + milestones_preview`（见 tree-worker SKILL §3.4）。评估由独立 Agent 完成后，结果以第二条 brief_echo event 形式回填到 worker leaf——这同时满足 V5b 的"events 留痕"和 A3 的"独立 auditor 背书"。
+
 ---
 
 ## §7 三档纠偏决策树（v0.2 启用）

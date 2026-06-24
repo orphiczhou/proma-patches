@@ -105,7 +105,7 @@ async function setupTree(budget) {
   const tid = freshTreeId();
   await run(['init', tid,
     '--root-brief', JSON.stringify({ parent_intent: 'dbc unit test' }),
-    '--root-dod', JSON.stringify({ deliverables: [], node_budget: budget || 10, max_depth: 3 }),
+    '--root-dod', JSON.stringify({ deliverables: [], node_budget: (budget === undefined ? 10 : budget), max_depth: 3 }),
     '--session-id', UUID.root, '--model', 'claude-sonnet-4-6', '--channel', 'anthropic',
   ]);
   return { tid };
@@ -149,10 +149,11 @@ async function prepareWorkerForDone(tid, leafId, opts) {
   await run(['milestone', 'add', tid, leafId, '--json', JSON.stringify({
     id: 'M1', desc: 'test milestone', expect_outputs: outputs,
   })]);
-  await run(['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true']);
+  // v0.7 批次5 (V4): set-result 需独立 auditor 背书（调用方需 setupTreeWithAuditor 保证 auditor leaf 存在）
+  await run(['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', UUID.auditor]);
   // events: brief_echo + done
-  // done event 带合法 self_check（为 A5 做准备：A5 实现后 done 强制 self_check schema）
-  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok' })]);
+  // brief_echo 带 alignment + 独立 auditor（V5b: 清 alignment_pending，让后续 audit_gate pass 放行）
+  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok', alignment: '95%', auditor_session_id: UUID.auditor })]);
   if (opts.skipDoneEvent !== true) {
     const defaultDone = {
       deliverables: [],
@@ -175,7 +176,7 @@ const CASES = {};
 // ---------- A1: done 时校验 expect_outputs 文件存在 ----------
 CASES.A1 = async () => {
   console.log('\n[A1] done 时 milestone.expect_outputs 文件必须存在 (E_DELIVERABLE_MISSING)');
-  const { tid } = await setupTree();
+  const { tid } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'A1');
   await prepareWorkerForDone(tid, leafId, { expectOutputs: ['missing-deliverable.md'] });
   // 文件不存在 → set-status done 必须被拦
@@ -203,7 +204,7 @@ CASES.A2 = async () => {
   //     混淆 A2 独立性验证 —— A2-c 与 A7 的区别应仅在"auditor 是否独立", 而非"有无 done event"
   const { tid: tid2, auditorSession } = await setupTreeWithAuditor();
   const leafId2 = await addWorker(tid2, 'A2c');
-  await run(['event', 'append', tid2, leafId2, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok' })]);
+  await run(['event', 'append', tid2, leafId2, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok', alignment: '95%', auditor_session_id: auditorSession })]);
   await run(['event', 'append', tid2, leafId2, '--type', 'done', '--json', JSON.stringify({ deliverables: [], self_check: [{ item: 'a2c_setup', pass: true, evidence: 'setup default for strict A5' }] })]);
   await expectOk('A2-c 独立 auditor 放行',
     ['audit', 'gate', tid2, leafId2, '--verdict', 'pass', '--audit-session-id', auditorSession]);
@@ -353,8 +354,8 @@ CASES.V3_EMPTY = async () => {
   const { tid, auditorSession } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'V3');
   await run(['milestone', 'add', tid, leafId, '--json', JSON.stringify({ id: 'M1', desc: 'empty outputs', expect_outputs: [] })]);
-  await run(['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true']);
-  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok' })]);
+  await run(['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', auditorSession]);
+  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok', alignment: '95%', auditor_session_id: auditorSession })]);
   await run(['event', 'append', tid, leafId, '--type', 'done', '--json', JSON.stringify({ self_check: [{ item: 'v3', pass: true, evidence: 'setup' }] })]);
   await run(['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', auditorSession]);
   await expectFail('V3 空 expect_outputs 拦截', ['leaf', 'set-status', tid, leafId, 'done'], E.DELIVERABLE_MISSING);
@@ -384,6 +385,133 @@ CASES.T3 = async () => {
   })], E.DEPTH_EXCEEDED);
 };
 
+// ---------- 批次5 (V8): node_budget=0 被尊重 ----------
+CASES.V8 = async () => {
+  console.log('\n[V8] node_budget=0 必须禁止加任何非root leaf (E_TREE_NODE_BUDGET_EXCEEDED)');
+  const { tid } = await setupTree(0); // budget=0: root 已是 1 active >= 0
+  await expectFail('V8 budget=0 加 leaf 被拦',
+    ['leaf', 'add', tid, '--json', JSON.stringify({
+      leaf_id: `${tid}-V8-worker`, session_id: UUID.worker, parent: `${tid}-root`,
+      path: 'V8', role: 'worker', model: 'claude-sonnet-4-6', channel: 'anthropic', added_by: UUID.root,
+    })], E.TREE_NODE_BUDGET_EXCEEDED);
+};
+
+// ---------- 批次5 (V6): self_check 全 pass:false 被拦 ----------
+CASES.V6 = async () => {
+  console.log('\n[V6] done event self_check 全 pass:false 被拦 (E_SELFCHECK_INVALID)');
+  const { tid } = await setupTreeWithAuditor();
+  const leafId = await addWorker(tid, 'V6');
+  await expectFail('V6 全 pass:false 拦截',
+    ['event', 'append', tid, leafId, '--type', 'done', '--json',
+     JSON.stringify({ self_check: [{ item: 'failed', pass: false, evidence: '没做' }] })],
+    E.SELFCHECK_INVALID);
+  await expectOk('V6 混合 pass 放行（诚实报部分失败）',
+    ['event', 'append', tid, leafId, '--type', 'done', '--json',
+     JSON.stringify({ self_check: [
+       { item: 'done_part', pass: true, evidence: 'e1' },
+       { item: 'missed_part', pass: false, evidence: 'e2' },
+     ] })]);
+};
+
+// ---------- 批次5 (V5b): 无 alignment 留痕时 worker audit_gate pass 被拦 ----------
+CASES.V5B = async () => {
+  console.log('\n[V5b] brief_echo 无 alignment 时 worker audit_gate pass 被拦 (E_ALIGNMENT_NOT_VERIFIED)');
+  const { tid, auditorSession } = await setupTreeWithAuditor();
+  const leafId = await addWorker(tid, 'V5b');
+  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok' })]);
+  await run(['event', 'append', tid, leafId, '--type', 'done', '--json',
+    JSON.stringify({ self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
+  await expectFail('V5b 无 alignment → audit pass 被拦',
+    ['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', auditorSession],
+    E.ALIGNMENT_NOT_VERIFIED);
+  await expectOk('V5b 补 alignment+auditor 后 brief_echo 放行',
+    ['event', 'append', tid, leafId, '--type', 'brief_echo', '--json',
+     JSON.stringify({ alignment: '95%', auditor_session_id: auditorSession })]);
+  await expectOk('V5b 补 alignment 后 audit pass 放行',
+    ['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', auditorSession]);
+};
+
+// ---------- 批次5 (V4): milestone set-result audit_pass=true 需独立 auditor ----------
+CASES.V4 = async () => {
+  console.log('\n[V4] milestone set-result --audit-pass true 需独立 --audit-session-id (E_AUDITOR_NOT_INDEPENDENT)');
+  const { tid, auditorSession } = await setupTreeWithAuditor();
+  const leafId = await addWorker(tid, 'V4');
+  await run(['milestone', 'add', tid, leafId, '--json', JSON.stringify({ id: 'M1', desc: 'm', expect_outputs: ['x.md'] })]);
+  await expectFail('V4-a audit_pass=true 无 auditor 拦截',
+    ['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true'],
+    E.AUDITOR_NOT_INDEPENDENT);
+  await expectFail('V4-b auditor=self(根) 拦截',
+    ['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', UUID.root],
+    E.AUDITOR_NOT_INDEPENDENT);
+  await expectOk('V4-c 独立 auditor 放行',
+    ['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', auditorSession]);
+  await expectOk('V4-d audit_pass=false 免 auditor 放行',
+    ['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'false']);
+};
+
+// ---------- 批次5 (CP2): 任何 verdict=pass 的 audit_gate 都验独立性 ----------
+CASES.CP2 = async () => {
+  console.log('\n[CP2] 伪造 audit_gate.verdict=pass (任意 role/status) 被 validate 报出');
+  const FK = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+  const { tid } = await setupTree();
+  const leafId = await addWorker(tid, 'Cp2');
+  tamperLeaf(tid, leafId, (l) => {
+    l.audit_gate = { verdict: 'pass', auditor_session_id: FK, ts: '2026-06-23T00:00:00Z' };
+  });
+  let r = await run(['validate', tid]);
+  let issues = (r.result && r.result.issues) || [];
+  let hit = issues.find((i) => i.type === 'audit_gate_not_independent');
+  if (hit) pass('CP2 伪造 pass 被 validate 报出', `${hit.type} on ${hit.leaf_id}`);
+  else fail('CP2 伪造 pass 被 validate 报出', `未报出 (issues=${issues.length})`);
+  // 对照: 合法独立 auditor 的 pass 不误报
+  const { tid: tid2, auditorSession } = await setupTreeWithAuditor();
+  const leafId2 = await addWorker(tid2, 'Cq2');
+  tamperLeaf(tid2, leafId2, (l) => {
+    l.audit_gate = { verdict: 'pass', auditor_session_id: auditorSession, ts: '2026-06-23T00:00:00Z' };
+  });
+  r = await run(['validate', tid2]);
+  issues = (r.result && r.result.issues) || [];
+  hit = issues.find((i) => i.type === 'audit_gate_not_independent');
+  if (hit) fail('CP2 合法 auditor 不误报', `误报: ${hit.type} on ${hit.leaf_id}`);
+  else pass('CP2 合法 auditor 不误报', 'ok');
+};
+
+// ---------- 批次5 (V9): expect_outputs 禁止绝对路径/路径遍历 ----------
+CASES.V9 = async () => {
+  console.log('\n[V9] expect_outputs 绝对路径/路径遍历被拦 (E_DELIVERABLE_MISSING)');
+  const { tid, auditorSession } = await setupTreeWithAuditor();
+  const sysFile = process.platform === 'win32' ? 'C:/Windows/win.ini' : '/etc/hosts';
+  // (a) 绝对路径（系统文件冒充交付物）→ 拦
+  const leafId = await addWorker(tid, 'V9a');
+  await run(['milestone', 'add', tid, leafId, '--json', JSON.stringify({ id: 'M1', desc: 'abs', expect_outputs: [sysFile] })]);
+  await run(['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', auditorSession]);
+  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ alignment: '95%', auditor_session_id: auditorSession })]);
+  await run(['event', 'append', tid, leafId, '--type', 'done', '--json', JSON.stringify({ self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
+  await run(['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', auditorSession]);
+  await expectFail('V9-a 绝对路径拦截', ['leaf', 'set-status', tid, leafId, 'done'], E.DELIVERABLE_MISSING);
+  // (b) 路径遍历（../逃出 deliverables/）→ 拦
+  const leafId2 = await addWorker(tid, 'V9b');
+  await run(['milestone', 'add', tid, leafId2, '--json', JSON.stringify({ id: 'M1', desc: 'trav', expect_outputs: ['../../../etc/hosts'] })]);
+  await run(['milestone', 'set-result', tid, leafId2, 'M1', '--audit-pass', 'true', '--audit-session-id', auditorSession]);
+  await run(['event', 'append', tid, leafId2, '--type', 'brief_echo', '--json', JSON.stringify({ alignment: '95%', auditor_session_id: auditorSession })]);
+  await run(['event', 'append', tid, leafId2, '--type', 'done', '--json', JSON.stringify({ self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
+  await run(['audit', 'gate', tid, leafId2, '--verdict', 'pass', '--audit-session-id', auditorSession]);
+  await expectFail('V9-b 路径遍历拦截', ['leaf', 'set-status', tid, leafId2, 'done'], E.DELIVERABLE_MISSING);
+};
+
+// ---------- 批次5 (V5b-tamper): alignment_pending 标志篡改无效（审计[1] 回归）----------
+CASES.V5BT = async () => {
+  console.log('\n[V5b-tamper] 篡改 alignment_pending 标志无法绕过对齐门（cmdAuditGate 查 events 留痕）');
+  const { tid, auditorSession } = await setupTreeWithAuditor();
+  const leafId = await addWorker(tid, 'V5t');
+  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok' })]); // 无 alignment
+  await run(['event', 'append', tid, leafId, '--type', 'done', '--json', JSON.stringify({ self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
+  tamperLeaf(tid, leafId, (l) => { l.alignment_pending = false; }); // 篡改标志
+  await expectFail('V5b-tamper 篡改标志后 audit pass 仍被拦',
+    ['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', auditorSession],
+    E.ALIGNMENT_NOT_VERIFIED);
+};
+
 // ============================================================
 // 主入口
 // ============================================================
@@ -393,7 +521,7 @@ async function main() {
   console.log('被测引擎: patch-l/tree-engine.cjs (require, 不再 spawn tree-state.js)');
   console.log('============================================================');
   const filter = process.argv.slice(2);
-  const order = ['A1', 'A2', 'A7', 'A3', 'A5', 'A4', 'A6', 'HARDEN2', 'HARDEN6', 'V2_FORGED', 'V1_RESTORE', 'V3_EMPTY', 'T3'];
+  const order = ['A1', 'A2', 'A7', 'A3', 'A5', 'A4', 'A6', 'HARDEN2', 'HARDEN6', 'V2_FORGED', 'V1_RESTORE', 'V3_EMPTY', 'T3', 'V8', 'V6', 'V5B', 'V4', 'CP2', 'V9', 'V5BT'];
   for (const key of order) {
     if (filter.length > 0 && !filter.includes(key)) continue;
     if (typeof CASES[key] === 'function') await CASES[key]();

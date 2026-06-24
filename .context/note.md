@@ -4,6 +4,56 @@
 
 新条目追加在顶部。
 
+## 2026-06-24 V4-V9 DbC 深度加固（tree-engine.cjs 9 个硬约束点）
+
+**起因**: audit-attacks.cjs 对抗测试实测 18 攻击 / 3 BYPASS(A3-omit/A5-pass-false/CP2) + 2 GAP(A4-budget0/MS-free-auditpass)。用 Tree 方法论（实现/测试/审计分离 + 自举 + 迭代收敛）推进，collaboration 独立审计子会话又发现 3 个实现者漏掉的绕过，共交付 **9 个 DbC 硬约束点**。
+
+**交付清单**（core/tree-state.js → patch-l/tree-engine.cjs → D:/Proma-dev/dist 三处同步，diff 验证仅 wrapper 差异）:
+
+| 点 | 位置 | 堵的攻击 | 错误码 |
+|---|---|---|---|
+| V8 | cmdLeafAdd | node_budget=0 被 `\|\|10` 短路当 10 | E_TREE_NODE_BUDGET_EXCEEDED |
+| V8+ | cmdInit | node_budget 字符串/布尔/负数静默回退（审计[2]） | E_SCHEMA_INVALID |
+| V6 | cmdEventAppend(done) | self_check 全 pass:false 却 done | E_SELFCHECK_INVALID |
+| V5b | cmdAuditGate(pass) | brief_echo 无 alignment 绕过对齐留痕 | E_ALIGNMENT_NOT_VERIFIED |
+| V5b兜底 | collectValidateIssues | alignment_pending 标志被 tamperLeaf 篡改（审计[1]） | issue: alignment_not_recorded |
+| V4 | cmdMilestoneSetResult | milestone set-result 无条件 audit_pass=true（ENABLER） | E_AUDITOR_NOT_INDEPENDENT |
+| CP2 | collectValidateIssues | HARDEN2 只查 worker+done，pending/commander 伪造 pass 漏网 | issue: audit_gate_not_independent |
+| V9 | cmdLeafSetStatus(done) | expect_outputs 绝对路径/遍历（系统文件冒充交付物） | E_DELIVERABLE_MISSING |
+| V9+ | cmdLeafSetStatus(done) | symlink 逃逸 deliverables/（审计[3]） | E_DELIVERABLE_MISSING |
+
+**关键设计决策（推翻原 V5 方案）**: 原 V5 想强制 brief_echo alignment 必填。Plan agent 独立验证发现 alignment 是 commander 端"路线图 Agent"产物（tree-worker SKILL §3.4 brief_echo 必填 my_understanding/milestones_preview，**无 alignment**），强制会破坏铁律1 + 炸掉全部现有用例。改用 **V5b**：brief_echo 无 alignment 合法（标 alignment_pending），闸门移到 audit_gate（worker pass 前查 events 留痕）。
+
+**审计[1] 修复的关键教训**: 原本 V5b 的 cmdAuditGate 检查依赖 alignment_pending **布尔标志**（可被 tamperLeaf 直接篡改绕过）。独立审计子会话发现后，改为查 **events 留痕**（权威）+ validate 兜底。**安全检查不能依赖可篡改的布尔标志，必须验可验证的事件留痕**——这是本轮最重要的方法论收获。
+
+**实测收敛**:
+- audit-attacks: 18 攻击 / **0 BYPASS / 0 GAP / 0 ENABLER / 18 不可绕过**
+- dbc-spec: **36/0**（13 原用例 + V8/V6/V5b/V4/CP2/V9/V5b-tamper）
+- audit-extra（审计子会话留的 21 case 补充对抗集，留存 test-sandbox/）：审计[1][2][3] 真实绕过全堵
+
+**破坏性变更（V4 + V5b）+ 调用点同步**:
+- `milestone set-result --audit-pass true` 必须补 `--audit-session-id <独立leaf UUID>`（audit-pass false 免）
+- worker done 前，commander/独立 auditor 必须发一条带 `alignment + auditor_session_id` 的 brief_echo event 回填（清 alignment_pending）
+- 所有现有调用点（dbc-spec/audit-attacks 的 prep/prepareWorkerForDone/SKILL 示例）已同步补字段 + 迁 setupTreeWithAuditor
+
+**Layer4 残留（CLI 层极限，记录非 bug）**: ① 互审洗白（两独立 worker 互相当 auditor，形式独立 vs 实质独立）；② 冒用（篡改文件用树中真实独立 leaf 的 session_id 当 auditor）。需平台层 subagent_trace_id 绑定真实 session 才能堵，CLI 层 resolveAuditorIndep 白名单已是极限。
+
+**SKILL 影响（需配套文档）**: tree-worker SKILL §3.4 + tree-commander SKILL 需补"alignment 回填职责"——否则按现 SKILL（brief_echo 无 alignment）工作的合法 worker 会被 V5b 卡死（拿不到 audit pass）。母会话/独立 auditor 收到 worker 首条 brief_echo 评估对齐后，回填一条 brief_echo event（带 alignment + auditor_session_id）。
+
+**命令签名备忘（V4-V9 后更新）**:
+- `milestone set-result <tid> <lid> <mid> --audit-pass true --audit-session-id <独立UUID>`
+- `event append <tid> <lid> --type brief_echo --json '{"alignment":"95%","auditor_session_id":"<独立UUID>"}'`（worker done 前必须有一条回填）
+- `init <tid> ... --root-dod '{"node_budget": <非负整数>}'`（字符串/负数被拒）
+- expect_outputs 必须是 deliverables/ 下相对路径，禁绝对路径/遍历/symlink
+
+**自举验证延续**: 本轮用 SDK Agent（Plan agent 独立验证推翻原 V5 设计）+ collaboration 真实子会话（独立审计发现 [1][2][3]），再次验证"实现/测试/审计分离"模式有效。审计的对抗价值真实——发现实现者（主会话）3 个盲点。
+
+**第 3 轮迭代 — MCP Schema Gap 修复（M8, 2026-06-24 19:20）**: 第 2 轮独立测试子会话（DeepSeek V4 Pro，role=test）端到端 MCP 验证发现：`patches.cjs` 的 `tree_milestone_set_result` MCP 工具 schema **缺 `audit_session_id` 参数**，导致 V4 在 MCP 接口层不可用（agent 无法通过 MCP 传独立 auditor，引擎层正确但生产 wrapper 断裂，测试会话被迫直改 tree-state.json 绕过 V4 才能测 V9）。修复：schema 加 `audit_session_id: z.string().optional()` + handler 传 `--audit-session-id`（patch-l/proma-dev-patches.cjs:1135）。部署 dist + 备份 `.bak-20260624-pre-mcp-gap`。**需重启 dev 生效**（patches.cjs 启动时加载）。**教训**：引擎层 require 测试不够，必须端到端 MCP 验证——独立测试角色价值再次证明（实现者 + 第 1 轮审计都聚焦 tree-engine.cjs，漏了 patches.cjs wrapper）。M7 审计子会话同时签字"可部署"（[1][2][3] 修复正确，硬链接/TOCTOU/边界全验证，Layer4 残留确认非 bug）。
+
+**第 4 轮冗余验证（M9-M10, release+dev 并行, 2026-06-24 20:33）**: 两实例各派 DeepSeek V4 Pro 测试子会话跑相同测试交叉对比。V4 MCP gap 修复两实例都 ok=true ✓✓（audit_session_id 合法路径可用），V8/V6 两实例 ✓✓，三集回归一致（36/0 + 0 BYPASS + 21）。遗留（非 bug）：dev MCP workspace=null（子会话 slug "undefined"，mcp__tree__* 直调不可用，改 require 等价）+ release V9 测试方法误差（V9 校验在 set-status，非 event_append）。最终收敛：9 DbC + MCP gap 两实例冗余确认。Tree 方法论多会话协作全程有效。
+
+---
+
 ## 2026-06-24 Dev bridge 0.0.0.0:19876 端口遮蔽 bug（根因+修复）
 
 **现象**: dev 实例的 patches.cjs 完整加载（27 个 mcp__tree__* 工具 + 11+11 个 mcp__session__/remote-session__ 工具全部注册，dev agent 调用 `mcp__session__list_channels` 成功返回 4 个频道），但 `netstat | grep 19877` 不见监听，`mcp__remote-session__remote_*(instance="dev")` 报 "No instance named 'dev' found (scanned 19876-19895)"。

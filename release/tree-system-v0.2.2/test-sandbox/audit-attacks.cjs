@@ -48,7 +48,7 @@ function freshTreeId() { counter++; const tid = `atk${counter}`; const d = path.
 async function setupTree(budget) {
   const tid = freshTreeId();
   await run(['init', tid, '--root-brief', JSON.stringify({ parent_intent: 'audit' }),
-    '--root-dod', JSON.stringify({ deliverables: [], node_budget: budget || 10, max_depth: 3 }),
+    '--root-dod', JSON.stringify({ deliverables: [], node_budget: (budget === undefined ? 10 : budget), max_depth: 3 }),
     '--session-id', UUID.root, '--model', 'claude-sonnet-4-6', '--channel', 'anthropic']);
   return tid;
 }
@@ -56,6 +56,10 @@ async function addWorker(tid, p) {
   const id = `${tid}-${p}-worker`;
   await run(['leaf', 'add', tid, '--json', JSON.stringify({ leaf_id: id, session_id: UUID.worker, parent: `${tid}-root`, path: p, role: 'worker', model: 'claude-sonnet-4-6', channel: 'anthropic', added_by: UUID.root })]);
   return id;
+}
+// v0.7 批次5: 确保树中有独立 auditor leaf（V4 set-result / V5b alignment / audit_gate 都需 auditor 在树）
+async function ensureAuditorLeaf(tid) {
+  await run(['leaf', 'add', tid, '--json', JSON.stringify({ leaf_id: `${tid}-Aud-commander`, session_id: UUID.auditor, parent: `${tid}-root`, path: 'Aud', role: 'commander', model: 'claude-sonnet-4-6', channel: 'anthropic', added_by: UUID.root })]);
 }
 function tamper(tree_id, fn) {
   const sp = path.join(SANDBOX, tree_id, 'tree-state.json');
@@ -66,9 +70,10 @@ function tamperLeaf(tree_id, leaf_id, fn) { tamper(tree_id, (s) => { if (s.leave
 // 把 worker 配齐 done 前置（除被测项），但 expect_outputs 用攻击值
 async function prep(tid, leafId, opts) {
   opts = opts || {};
+  await ensureAuditorLeaf(tid);
   await run(['milestone', 'add', tid, leafId, '--json', JSON.stringify({ id: 'M1', desc: 'm', expect_outputs: opts.outputs === undefined ? ['real.md'] : opts.outputs })]);
-  await run(['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true']);
-  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok' })]);
+  await run(['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', UUID.auditor]);
+  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok', alignment: '95%', auditor_session_id: UUID.auditor })]);
   await run(['event', 'append', tid, leafId, '--type', 'done', '--json', JSON.stringify(opts.doneMeta || { deliverables: [], self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
   if (opts.auditGate !== false) await run(['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', opts.auditor || UUID.auditor]);
 }
@@ -99,9 +104,10 @@ function record(id, label, verdict, evidence) { results.push({ id, label, verdic
 // 攻击1b: expect_outputs 缺省（milestone 无该字段）→ done
 {
   const tid = await setupTree(); const lid = await addWorker(tid, 'A1miss');
+  await ensureAuditorLeaf(tid);
   await run(['milestone', 'add', tid, lid, '--json', JSON.stringify({ id: 'M1', desc: 'm' })]); // 无 expect_outputs
-  await run(['milestone', 'set-result', tid, lid, 'M1', '--audit-pass', 'true']);
-  await run(['event', 'append', tid, lid, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok' })]);
+  await run(['milestone', 'set-result', tid, lid, 'M1', '--audit-pass', 'true', '--audit-session-id', UUID.auditor]);
+  await run(['event', 'append', tid, lid, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'ok', alignment: '95%', auditor_session_id: UUID.auditor })]);
   await run(['event', 'append', tid, lid, '--type', 'done', '--json', JSON.stringify({ self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
   await run(['audit', 'gate', tid, lid, '--verdict', 'pass', '--audit-session-id', UUID.auditor]);
   const r = await run(['leaf', 'set-status', tid, lid, 'done']);
@@ -149,12 +155,15 @@ function record(id, label, verdict, evidence) { results.push({ id, label, verdic
   record('A2-worker-self', 'worker 用自己 session_id 当 auditor', r.ok ? '⚠️ BYPASS' : '✓', r.ok ? `audit pass！auditor=worker 自身 session（自审），因 ≠added_by≠root 蒙混过关` : `被拦 ${r.error.code}`);
 }
 
-// ---- A3：alignment 省略 ----
-// 攻击3: brief_echo 不带 alignment 字段 → 无需 auditor 放行
+// ---- A3：alignment 省略（V5b 后：brief_echo 无 alignment 合法，但 worker 拿不到 audit pass）----
+// 攻击3: worker 发无 alignment 的 brief_echo，试图直接 audit pass（绕过对齐留痕）
 {
   const tid = await setupTree(); const lid = await addWorker(tid, 'A3omit');
-  const r = await run(['event', 'append', tid, lid, '--type', 'brief_echo', '--json', JSON.stringify({ ack: '理解了任务' })]);
-  record('A3-omit-alignment', 'brief_echo 省略 alignment 字段绕过独立审计', r.ok ? '⚠️ BYPASS' : '✓', r.ok ? 'brief_echo 成功！未带 alignment 即跳过 A3 校验，对齐性永不验证' : `被拦 ${r.error.code}`);
+  await ensureAuditorLeaf(tid);
+  await run(['event', 'append', tid, lid, '--type', 'brief_echo', '--json', JSON.stringify({ ack: '理解了任务' })]); // 无 alignment，合法（标 pending）
+  await run(['event', 'append', tid, lid, '--type', 'done', '--json', JSON.stringify({ self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
+  const r = await run(['audit', 'gate', tid, lid, '--verdict', 'pass', '--audit-session-id', UUID.auditor]);
+  record('A3-omit-alignment', '无 alignment 的 worker 绕过对齐留痕拿 audit pass', r.ok ? '⚠️ BYPASS' : '✓', r.ok ? 'audit pass！alignment 从未留痕却通过审计' : `被拦 ${r.error.code}`);
 }
 
 // ---- A5：pass:false 结构合法 ----
