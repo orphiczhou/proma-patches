@@ -122,12 +122,57 @@ function tamperLeaf(tree_id, leaf_id, mutateFn) {
 
 // 初始化 tree + 一个 auditor-commander leaf（V2 白名单后，auditor 必须是树中真实 leaf session）
 // 返回 {tid, auditorSession}。auditorSession = UUID.auditor（auditor-commander leaf 的 session）
+//
+// V10-auditor-active (2026-06-25) 加固后，resolveAuditorIndep 要求 auditor leaf 自身：
+//   status='done' + events 非空 + 自己 audit_gate.verdict='pass'。
+// 旧版 helper 仅 leaf add（默认 status='active' + events=[] + verdict='skip'）→ V10 后所有
+// 依赖本 helper 的"独立 auditor 放行"用例会被 E_AUDITOR_NOT_INDEPENDENT 误拒。
+//
+// 由于 auditor 自身 audit_gate=pass 仍需独立 auditor 背书（鸡生蛋），无法用纯调用链构造
+// 完整合法的初始 auditor。这里用 tamperLeaf 模拟"auditor 已完成自身工作并被背书"的真实终态。
+//
+// 实现采用 3-leaf 互背书环：
+//   root.added_by=null       → root.audit_gate     ← UUID.auditor 背书（root 跳过 added_by 检查）
+//   auditor.added_by=root    → auditor.audit_gate  ← UUID.other 背书（other≠root 通过）
+//   other.added_by=root      → other.audit_gate    ← UUID.auditor 背书（auditor≠root 通过）
+// 三 leaf 都 status=done + events 非空 + audit_gate=pass，validate 全通过（已实测 issues=0）。
+// extra 'Oth-commander' leaf 是互背书环的必要代价；调用方测试逻辑只关心 auditorSession=UUID.auditor。
 async function setupTreeWithAuditor(budget) {
   const { tid } = await setupTree(budget);
+  const audLeafId = `${tid}-Aud-commander`;
+  const othLeafId = `${tid}-Oth-commander`;
+  const rootLeafId = `${tid}-root`;
   await run(['leaf', 'add', tid, '--json', JSON.stringify({
-    leaf_id: `${tid}-Aud-commander`, session_id: UUID.auditor, parent: `${tid}-root`, path: 'Aud',
+    leaf_id: audLeafId, session_id: UUID.auditor, parent: rootLeafId, path: 'Aud',
     role: 'commander', model: 'claude-sonnet-4-6', channel: 'anthropic', added_by: UUID.root,
   })]);
+  await run(['leaf', 'add', tid, '--json', JSON.stringify({
+    leaf_id: othLeafId, session_id: UUID.other, parent: rootLeafId, path: 'Oth',
+    role: 'commander', model: 'claude-sonnet-4-6', channel: 'anthropic', added_by: UUID.root,
+  })]);
+  // 互背书环：root←auditor, auditor←other, other←auditor
+  const ts = '2026-06-23T00:00:00Z';
+  tamperLeaf(tid, rootLeafId, (l) => {
+    l.status = 'done';
+    l.events = [{ type: 'done', ts, meta: { self_check: [{ item: 'root_init', pass: true, evidence: 'init' }] } }];
+    l.audit_gate = { verdict: 'pass', auditor_session_id: UUID.auditor, ts };
+    l.last_event_ts = ts;
+    l.last_event_type = 'done';
+  });
+  tamperLeaf(tid, audLeafId, (l) => {
+    l.status = 'done';
+    l.events = [{ type: 'done', ts, meta: { self_check: [{ item: 'aud_init', pass: true, evidence: 'init' }] } }];
+    l.audit_gate = { verdict: 'pass', auditor_session_id: UUID.other, ts };
+    l.last_event_ts = ts;
+    l.last_event_type = 'done';
+  });
+  tamperLeaf(tid, othLeafId, (l) => {
+    l.status = 'done';
+    l.events = [{ type: 'done', ts, meta: { self_check: [{ item: 'oth_init', pass: true, evidence: 'init' }] } }];
+    l.audit_gate = { verdict: 'pass', auditor_session_id: UUID.auditor, ts };
+    l.last_event_ts = ts;
+    l.last_event_type = 'done';
+  });
   return { tid, auditorSession: UUID.auditor };
 }
 
@@ -323,8 +368,13 @@ CASES.V2_FORGED = async () => {
   const { tid } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'V2');
   // 伪造非树中 UUID → 白名单拦（黑名单下会放行）
+  // 注: V10-uuid-format-strict (2026-06-25) 后，全 f UUID 会被 E_INVALID_UUID_STRICT 抢先拒，
+  //     偏离 V2 白名单的测试意图。改用合法 v4 UUID（55555555-5555-4555-8555-555555555555：
+  //     第13位=4 第17位=8 满足 RFC 4122 v4 格式，且不在 FORBIDDEN_UUIDS 集合），
+  //     不在树中 leaves → resolveAuditorIndep 走 'not found as any leaf session (forged UUID)' 分支，
+  //     保持 V2 白名单测试意图。
   await expectFail('V2 伪造非树中UUID auditor 拦截',
-    ['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', 'ffffffff-ffff-ffff-ffff-ffffffffffff'],
+    ['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', '55555555-5555-4555-8555-555555555555'],
     E.AUDITOR_NOT_INDEPENDENT);
 };
 

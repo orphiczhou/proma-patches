@@ -1153,8 +1153,13 @@ function createExternalHttpBridge() {
       name: "tree",
       version: "0.7.0",
       tools: [
+        // ---- V10-helper (D4 Layer 1): 自助文档元工具 ----
+        // 任何 mcp__tree__* 调用前如果不确定用法，先 tree_help 拿 topic。
+        // 13 个 topic 覆盖：建树 / auditor 注册 / V10 加固 / 错误码 / 常见错误 / 完整指南。
+        // 错误返回也会自动附 help_topic 引用（run() catch 块）。
+        tt("tree_help", "Get help on a tree-system topic. 13 topics available: how_to_init | how_to_register_auditor | role_semantics | v10_constraints | self_audit_forbidden | borrowed_identity | naming_convention | common_mistakes | alignment_workflow | nudge_escalation | audit_tree_structure | error_code_index | full_guide. Call this BEFORE guessing how a tool works. Also: when other mcp__tree__* tools return errors with help_topic, follow the help_hint and call this with that topic.", { topic: z.string() }, (a) => ["help", a.topic], true),
         // ---- Maintain ----
-        tt("tree_init", "Initialize a new tree (creates tree dir + root leaf).", { tree_id: z.string(), root_brief: z.record(z.any()), root_dod: z.record(z.any()), session_id: z.string().optional(), model: z.string().optional(), channel: z.string().optional(), audit_meta: z.record(z.any()).optional() }, (a) => ["init", a.tree_id, "--root-brief", J(a.root_brief), "--root-dod", J(a.root_dod), ...(a.session_id ? ["--session-id", a.session_id] : []), ...(a.model ? ["--model", a.model] : []), ...(a.channel ? ["--channel", a.channel] : []), ...(a.audit_meta ? ["--audit-meta", J(a.audit_meta)] : [])]),
+        tt("tree_init", "Initialize a new tree (creates tree dir + root leaf). Returns tips.next_steps — follow them to register auditor and avoid common mistakes.", { tree_id: z.string(), root_brief: z.record(z.any()), root_dod: z.record(z.any()), session_id: z.string().optional(), model: z.string().optional(), channel: z.string().optional(), audit_meta: z.record(z.any()).optional() }, (a) => ["init", a.tree_id, "--root-brief", J(a.root_brief), "--root-dod", J(a.root_dod), ...(a.session_id ? ["--session-id", a.session_id] : []), ...(a.model ? ["--model", a.model] : []), ...(a.channel ? ["--channel", a.channel] : []), ...(a.audit_meta ? ["--audit-meta", J(a.audit_meta)] : [])]),
         tt("tree_validate", "Run all tree invariants (parent links, session_id uniqueness, path, done-worker independent audit_gate, context overflow). Returns {ok, issues}.", { tree_id: z.string() }, (a) => ["validate", a.tree_id], true),
         tt("tree_backup", "Create a timestamped backup of tree-state.json.", { tree_id: z.string(), label: z.string().optional() }, (a) => ["backup", a.tree_id, ...(a.label ? ["--label", a.label] : [])]),
         tt("tree_restore", "Restore tree-state.json from a backup file (basename in tree dir, or absolute path). Refuses non-compliant backups (v0.7 V1).", { tree_id: z.string(), backup_file: z.string() }, (a) => ["restore", a.tree_id, a.backup_file]),
@@ -1191,7 +1196,7 @@ function createExternalHttpBridge() {
     });
   };
 
-  log("[Patch v0.7+] Tree MCP server factory registered (mcp__tree__* — 27 tools wrapping tree-state.js)");
+  log("[Patch v0.7+] Tree MCP server factory registered (mcp__tree__* — 28 tools: 27 wrapping tree-state.js + 1 tree_help meta-tool [V10-helper D4])");
 })();
 
 

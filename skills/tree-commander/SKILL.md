@@ -1,3 +1,13 @@
+---
+description: |
+  树形会话执行体系 — 指挥官（根会话）操作手册。
+  触发场景：建树 / 建开发树 / 建审计树 / 建测试树 / 端到端测试 / e2e / V10 验证 / audit_gate 测试 /
+  派子会话 / Fork worker / Fork auditor / 并行 Agent / 多 Agent 协作开发 / 树形任务分解 /
+  任何用到 mcp__tree__* 工具的任务（建树后调任何 tree_ 工具前应加载）。
+  核心能力：5 件套契约下发 / 事件路由 / 三档纠偏 / 心跳巡检 / 审计树结构 / V10 加固 8 大点。
+  工具调用前先 mcp__tree__tree_help(topic) 拿用法，错误返回会附 help_topic 引用。
+---
+
 # tree-commander SKILL
 
 树形会话执行体系 — 指挥官（根会话）操作手册。

@@ -161,8 +161,54 @@ class TreeStateError extends Error {
   constructor(code, msg) {
     super(msg);
     this.code = code;
+    // V10-helper (D4 Layer 3): 在错误对象上挂 help_topic（main() catch 块据此生成 help_hint）。
+    // 单一信源：ERROR_TO_HELP 映射表维护 code→topic，所有 throw 点零侵入。
+    this.help_topic = ERROR_TO_HELP[code] || null;
   }
 }
+
+// V10-helper (D4 Layer 3): 错误码 → help topic 集中映射表。
+//   设计目标：让 Agent 看到错误时立即知道下一步该问什么 topic。
+//   null/undefined 表示该错误自解释（如 E_TREE_NOT_FOUND），不附 help 引用。
+//   完整索引见 mcp__tree__tree_help('error_code_index')。
+const ERROR_TO_HELP = {
+  // ---- 旧错误码（部分自解释，部分映射）----
+  E_TREE_NOT_FOUND:           null,
+  E_LEAF_NOT_FOUND:           null,
+  E_SCHEMA_INVALID:           'how_to_init',
+  E_STATUS_INVALID:           'role_semantics',
+  E_NAME_INVALID:             'naming_convention',
+  E_PARENT_MISSING:           'how_to_init',
+  E_DUPLICATE_LEAF:           'naming_convention',
+  E_CHILDREN_NOT_DONE:        'role_semantics',
+  E_DEPTH_EXCEEDED:           'role_semantics',
+  E_BACKUP_CORRUPT:           null,
+  E_IO:                       null,
+  E_UNKNOWN:                  null,
+  E_LOCK_TIMEOUT:             null,
+  E_DELIVERABLE_MISSING:      'alignment_workflow',
+  E_AUDITOR_NOT_INDEPENDENT:  'how_to_register_auditor',
+  E_AUDIT_PREMATURE:          'alignment_workflow',
+  E_ALIGNMENT_NOT_VERIFIED:   'alignment_workflow',
+  E_SELFCHECK_INVALID:        'alignment_workflow',
+  E_TREE_NODE_BUDGET_EXCEEDED:'how_to_init',
+  E_TREE_NOT_VALIDATED:       'audit_tree_structure',
+  E_GATEKEEPER_REQUIRED:      'role_semantics',
+  // ---- V10 加固 16 个错误码（全部映射）----
+  E_AUDITOR_NOT_DONE:         'how_to_register_auditor',  // V10-auditor-active
+  E_AUDITOR_NO_EVENTS:        'how_to_register_auditor',  // V10-auditor-active
+  E_AUDITOR_NOT_VERIFIED:     'how_to_register_auditor',  // V10-auditor-active
+  E_BORROWED_IDENTITY:        'self_audit_forbidden',     // V10-self-audit-forbidden-v2
+  E_INVALID_UUID_STRICT:      'v10_constraints',          // V10-uuid-format-strict
+  E_NEGATIVE_COUNT:           'v10_constraints',          // V10-numeric-consistency
+  E_COUNT_MISMATCH:           'v10_constraints',          // V10-numeric-consistency
+  E_LENGTH_MISMATCH:          'v10_constraints',          // V10-numeric-consistency
+  E_TS_BEFORE_CREATED:        'v10_constraints',          // V10-timestamp-monotonic
+  E_TS_IN_FUTURE:             'v10_constraints',          // V10-timestamp-monotonic
+  E_TS_NOT_MONOTONIC:         'v10_constraints',          // V10-timestamp-monotonic
+  E_LEAF_AUTO_PRUNED:         'nudge_escalation',         // V10-nudge-escalation
+  E_STATUS_EVENT_MISMATCH:    'v10_constraints',          // V10-status-event-sync
+};
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -555,7 +601,25 @@ async function cmdInit(args) {
 
   return {
     tree: { tree_id, created_at: state.created_at, dir, workspace_root },
-    root_leaf: { leaf_id: rootLeafId, session_id: rootSessionId, is_pending: rootSessionId === PENDING_ROOT }
+    root_leaf: { leaf_id: rootLeafId, session_id: rootSessionId, is_pending: rootSessionId === PENDING_ROOT },
+    // V10-helper (D4 Layer 2): tree_init 返回值注入 tips —— Agent 第一次建树即拿到 next_steps。
+    //   原则：渐进披露。只给 4 条最关键的 next_steps + SKILL 路径，不塞全文。
+    //   Agent 想深入时自己调 mcp__tree__tree_help('full_guide')。
+    tips: buildInitTips(),
+  };
+}
+
+// V10-helper (D4 Layer 2): tree_init tips 构造器。集中维护，便于未来调整。
+function buildInitTips() {
+  return {
+    next_steps: [
+      "调 mcp__tree__tree_help('how_to_register_auditor') 看 auditor 注册流程（解决鸡生蛋问题）",
+      "调 mcp__tree__tree_help('v10_constraints') 看 8 大加固点（避免无意中触发拦截）",
+      "调 mcp__tree__tree_help('common_mistakes') 避开 65996e8b 案例的 5 个常见错误",
+      "完整指南: mcp__tree__tree_help('full_guide')",
+    ],
+    skill_reference: "skills/tree-commander/SKILL.md",
+    pro_tip: "调用任何 mcp__tree__* 工具前如果不确定用法，先调 mcp__tree__tree_help 拿对应 topic。错误返回也会自动附 help_topic 引用。fork 真实 session 注册 leaf，不要用占位 UUID（V10-uuid-format-strict 会拦）。",
   };
 }
 
@@ -584,6 +648,17 @@ async function cmdLeafAdd(args) {
 
   // 0. role 枚举校验
   assertEnum(role, ROLE_ENUM, 'role');
+
+  // V10-trust-anchor: 只有 tree_init 才能创建 root leaf，leaf_add 拒绝 role='root'。
+  //   原因：root 是信任锚，必须是树创建时就存在的唯一根；leaf_add role='root' 会引入"第二个 root"
+  //   的可能性（即便现有代码已有 root 唯一性校验，也不应通过 leaf_add 路径来 bypass tree_init 的
+  //   audit_gate='skip' 默认值初始化逻辑）。规范 root 创建路径：调 cmdInit 自动注入 root leaf。
+  if (role === 'root') {
+    throw new TreeStateError(
+      E_SCHEMA_INVALID,
+      `leaf_add cannot create root leaf; use 'init' command instead. Root is the trust anchor and must be created at tree initialization.`
+    );
+  }
 
   // v0.2.2-修复#4: session_id 必须是合法 UUID（堵住 CLI 手动注入占位符）
   if (!UUID_RE.test(session_id)) {
@@ -1348,7 +1423,7 @@ async function cmdMilestoneSetResult(args) {
 // 命令: event append
 // ============================================================
 
-async function cmdEventAppend(args) {
+async function cmdEventAppend(args, callerSessionId) {
   const { positional, opts } = parseArgs(args);
   const [tree_id, leaf_id] = positional;
   assertTreeExists(tree_id);
@@ -1396,6 +1471,18 @@ async function cmdEventAppend(args) {
       } else if (leaf.alignment_pending === undefined) {
         leaf.alignment_pending = true;
       }
+    }
+
+    // V10-trust-anchor-fix (C5/A3 P0 攻击 2): 写 done event 必须是 leaf 拥有者（session_id）或其添加者（added_by）。
+    //   失守根因：原 cmdEventAppend 没有 callerSessionId 形参,任何角色（含 worker）都能给任何 leaf（含 root）
+    //   写 done event,触发 V10-trust-anchor auto_upgrade,root.audit_gate 一键被 worker 升级为 pass。
+    //   修复：callerSessionId（MCP wrapper 透传）必须 === leaf.session_id 或 leaf.added_by（commander 可代 worker 报 done）。
+    //   CLI 调用（dbc-spec 等测试）不传 callerSessionId,跳过此校验（向后兼容）。
+    if (opts.type === 'done' && callerSessionId && callerSessionId !== leaf.session_id && callerSessionId !== leaf.added_by) {
+      throw new TreeStateError(
+        E_BORROWED_IDENTITY,
+        `event_append rejected: caller "${callerSessionId}" cannot write done event to leaf "${leaf_id}" (session=${leaf.session_id}, added_by=${leaf.added_by || 'null'}). Only the leaf owner or its creator can mark done.`
+      );
     }
 
     // v0.7 Phase A 批次2 (A5): done event 的 self_check schema 硬约束（strict: 必须存在且合法）。
@@ -1506,6 +1593,29 @@ async function cmdEventAppend(args) {
       // 这里同步 status=done 是为了让 collectValidateIssues 能正确检测"status/event 不同步"。
       // 真正的"done 准入"仍由 cmdLeafSetStatus 的 milestones/deliverables 校验把关（worker done 必经此路径）。
       leaf.status = 'done';
+    }
+    // V10-trust-anchor: root 写 done event 时自动升级 audit_gate='pass'（root 自审）。
+    //   原因：root 是信任锚,没有上游 auditor；如果要求 root 先调 audit_gate pass 才能 set-status done,
+    //   会陷入"鸡生蛋"——root 永远无法满足"独立 auditor"。方案 §三 子方案 C：root 写 done event 时
+    //   cmdEventAppend 自动把 audit_gate.verdict='skip' 升级为 'pass'（auditor=root.session_id,auto_upgrade=true）。
+    //   限制：只在 leaf.role==='root' 且 audit_gate.verdict==='skip'（默认值）时触发；
+    //   显式 fail/required 状态不被覆盖（避免抹掉真实的审计结果）。
+    // V10-trust-anchor-fix (C5/A3 P0 攻击 2): 触发条件加 caller === leaf.session_id。
+    //   原条件只看 type==='done' && role==='root',worker 给 root 写 done event 也会触发 auto_upgrade,
+    //   一键把 root.audit_gate 从 skip 升级为 pass。修复：必须 callerSessionId === leaf.session_id
+    //   （即 root 自己写自己的 done event）才触发；上面已加 caller 校验拒绝 worker 给 root 写 done,
+    //   此处再加一道 defense-in-depth,即便 caller 校验被绕过（如新增 caller 不传的路径）也不会触发。
+    if (opts.type === 'done' && leaf.role === 'root') {
+      const curGate = leaf.audit_gate;
+      const callerIsRootSelf = !callerSessionId || callerSessionId === leaf.session_id;
+      if ((!curGate || curGate.verdict === 'skip') && callerIsRootSelf) {
+        leaf.audit_gate = {
+          verdict: 'pass',
+          auditor_session_id: leaf.session_id,
+          ts: nowIso(),
+          auto_upgrade: true  // 标记此 verdict 由 trust-anchor 自动升级，非人工调 audit_gate
+        };
+      }
     }
     writeState(tree_id, state);
     result = { event: ev };
@@ -1746,6 +1856,21 @@ async function cmdValidate(args) {
 //   拒绝"僵尸 auditor"（标 active/events=[]/verdict=skip 但被借身份用）。
 // V10-uuid-format-strict: 入口先做严格 UUID v4 校验，拒绝全 0/全 f/非 v4/空/null。
 function resolveAuditorIndep(state, leaf, auditorSessionId) {
+  // V10-trust-anchor: root leaf 是信任锚，可以自审（self-audit）——root 是 trust chain 的起点,
+  //   没有上游 auditor 可用,必须允许 root 自己给自己 audit_gate=pass。
+  //   放行条件: leaf.role === 'root' 且 auditorSessionId === leaf.session_id（root 自己显式传）。
+  //   失守案例 audit-gate-test-20260625 之后 V10 加固把"auditor 必须独立"作为硬约束,
+  //   但 root 是该约束的例外（信任锚）,否则任何树都无法启动（root 永远无法满足"独立 auditor"）。
+  // V10-trust-anchor-fix (C5/A3 P0 攻击 1): 删除 `auditorSessionId === null` 放行支。
+  //   原放行条件 `(auditorSessionId === null || auditorSessionId === leaf.session_id)` 中 null 这一支
+  //   会被 worker 利用：worker 调 audit_gate 不传 audit_session_id（=null）,cmdAuditGate 的
+  //   caller 校验 `audit_session_id && callerSessionId && ...` 因 audit_session_id=null 短路跳过,
+  //   resolveAuditorIndep 又因 null 放行,root.audit_gate 被 worker 一键改写（包括覆盖 fail 状态）。
+  //   修复：root 自审必须显式传 audit_session_id === leaf.session_id,与 cmdAuditGate 的 caller 校验
+  //   （caller === audit_session_id）协同,确保只有 caller=root.session_id 才能命中此分支。
+  if (leaf.role === 'root' && auditorSessionId === leaf.session_id) {
+    return null;  // root 自审放行（必须显式传 root 自己的 session_id,不允许 null）
+  }
   if (!auditorSessionId) return 'auditor_session_id is null';
   // V10-uuid-format-strict: 严格 UUID v4（version=4 + variant 位）。
   if (!isValidStrictUuidV4(auditorSessionId)) {
@@ -2133,6 +2258,11 @@ async function cmdAuditGate(args, callerSessionId) {
   //   引擎层完全无感知（cmdAuditGate 不知道 caller 是谁），4 道 V4-V9 校验全过。
   //   修复：MCP wrapper 从 __proma_getMcpServers__(sessionId, ...) 提取 sessionId，透传给 engine。
   //   CLI 调用（dbc-spec 等）不传 caller，跳过此校验（向后兼容）。
+  //
+  // V10-trust-anchor: root leaf 自审例外。root 调 audit_gate 时 audit_session_id=root.session_id，
+  //   caller 也是 root.session_id，自然满足 caller===audit_session_id（原校验放行）。
+  //   leaf.role==='root' 的"自审 vs 借身份"区分由 withLock 内 resolveAuditorIndep 的 root 分支兜底（root 放行）。
+  //   worker 借 root session_id 调用时，caller=worker.session_id ≠ audit_session_id=root.session_id，仍被此校验拦。
   if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId) {
     throw new TreeStateError(
       E_BORROWED_IDENTITY,
@@ -2653,6 +2783,534 @@ async function cmdMigrate(args) {
   return result;
 }
 
+
+// ============================================================
+// 命令: help (V10-helper D4 Layer 1)
+// mcp__tree__tree_help(topic) — Agent 主动问"工具怎么用"。
+// 13 个 topic 覆盖：建树 / auditor 注册 / 角色 / V10 加固 / 借身份攻击 / 命名 /
+//                  常见错误 / alignment / nudge / 审计树结构 / 错误码索引 / 全文指南。
+// 设计原则：渐进披露（默认简洁）+ 错误即教育（错误返回附 help_topic）。
+// ============================================================
+
+const HELP_TOPICS = {
+  how_to_init: {
+    title: '建树最佳实践',
+    related: ['naming_convention', 'role_semantics', 'v10_constraints'],
+    content: `# how_to_init — 建树最佳实践
+
+## 调用签名
+mcp__tree__tree_init(tree_id, root_brief, root_dod, session_id?, model?, channel?, audit_meta?)
+
+## tree_id 命名
+- 小写字母开头 + 项目语义（4-8 字符推荐）：\`v10v\` / \`nanju\` / \`sweng\`
+- 不可含连字符（leaf_id 的 prefix 段规则）
+
+## root_brief 5 字段（必填）
+parent_intent / my_mission / why_this_exists / in_scope[] / out_of_scope[]
+
+## root_dod 4 字段（必填）
+deliverables[{path,min_length?,must_contain?}] / quality_gates[] / self_check[] / node_budget?
+
+## root leaf
+- 自动创建 <tree_id>-root，role=root，status=active
+- session_id 优先级：--session-id → PROMA_SESSION_ID → PENDING_ROOT（过渡标记，后续 leaf set-session 修正）
+- 建议直接传 --session-id 用根会话真实 session_id（mcp__session__get_my_session_id 拿）
+
+## 常见 init 失败
+- E_DUPLICATE_LEAF: tree 已存在 → 用 validate 校验现有
+- E_SCHEMA_INVALID: root_brief/root_dod 不是合法 JSON
+- E_SCHEMA_INVALID: node_budget 不是非负有限数
+
+## 关联
+- mcp__tree__tree_help('how_to_register_auditor') — 建树后第一件事
+- mcp__tree__tree_help('common_mistakes') — 65996e8b 教训`,
+  },
+
+  how_to_register_auditor: {
+    title: 'auditor 注册流程（解决鸡生蛋）',
+    related: ['self_audit_forbidden', 'borrowed_identity', 'v10_constraints'],
+    content: `# how_to_register_auditor — auditor 注册流程
+
+## 问题（V4-V9 鸡生蛋）
+auditor 必须先 audit_gate pass 才能给 worker 背书 → 但 auditor 自己也要被更高级 auditor 审过才能 pass → 无穷递归。
+
+## 解决方案 A（V10-trust-anchor，C3 实施中）
+root 是信任锚点（trust anchor），允许自审：
+1. tree_init 后 root 自审 → root.audit_gate.verdict = 'pass'（root 特权）
+2. commander fork 真实 session 当 auditor
+3. auditor 在自己 session 内调 audit_gate(leaf_id=root, verdict=pass, audit_session_id=<auditor 自己>)
+4. auditor 给 worker 背书：audit_gate(leaf_id=worker, verdict=pass, audit_session_id=<auditor 自己>)
+
+## 解决方案 B（V10 当前版本，root 不能自审）
+通过【根会话外的独立 session】注册 auditor：
+1. commander 在自己 session 内用 mcp__session__fork_session 派一个 auditor session
+2. commander send_message(auditor_session, "审计 leaf X")
+3. auditor 在自己 session 内调 audit_gate(leaf_id=X, verdict=pass, audit_session_id=<auditor 自己 session>)
+4. 引擎校验 callerSessionId（MCP wrapper 自动注入）=== audit_session_id → 通过
+
+## auditor 三重校验（V10-auditor-active）
+auditor leaf 必须：
+- status === 'done'
+- events 非空（至少发过一条上行事件）
+- audit_gate.verdict === 'pass'（被更高权威背书过，或 root 特权）
+缺任一 → E_AUDITOR_NOT_DONE / E_AUDITOR_NO_EVENTS / E_AUDITOR_NOT_VERIFIED
+
+## 关键约束
+- callerSessionId 必须 === audit_session_id（堵借身份，详见 self_audit_forbidden）
+- audit_session_id 必须是合法 UUID（V10-uuid-format-strict）
+- 不要用占位 UUID（00000000-... 等），用真实 fork_session 拿到的 session_id`,
+  },
+
+  role_semantics: {
+    title: 'root/commander/worker/auditor 角色语义',
+    related: ['how_to_init', 'audit_tree_structure'],
+    content: `# role_semantics — 角色语义
+
+## 4 种角色
+- **root**: 树根，唯一，无 parent。tree_init 自动创建。root 是 trust anchor（V10-trust-anchor 提案）。
+- **commander**: 中间指挥官，可有子节点。深度上限 3 层。
+- **worker**: 原子执行者，**不能有子节点**（引擎硬约束）。
+- **auditor**: 不是一个独立 role 字段！auditor 是某个 leaf 的"职责"，由 audit_gate 的 audit_session_id 指向另一个 leaf 的 session_id 实现。
+
+## 谁能 fork 谁
+- root fork commander
+- commander fork worker 或子 commander
+- worker 不能 fork（叶子节点）
+
+## 谁能审谁
+- 审计关系通过 audit_gate(verdict, audit_session_id) 建立
+- audit_session_id 指向"另一个独立 leaf"的 session_id（不能指向自己）
+- V10-self-audit-forbidden: callerSessionId（MCP wrapper 注入）必须 === audit_session_id
+
+## status 转换图
+\`\`\`
+pending_brief → active → done     （正常完成）
+active → pruned                  （剪枝）
+active → archived                （归档，可恢复）
+active → segment_pending         （竹节交接中）
+\`\`\`
+切 done 时引擎硬校验：milestones 非空 + 全部 audit_pass=true + alignment 已回填。
+
+## 关联
+- mcp__tree__tree_help('how_to_register_auditor') — auditor 注册细节`,
+  },
+
+  v10_constraints: {
+    title: 'V10 八大加固点摘要',
+    related: ['self_audit_forbidden', 'borrowed_identity', 'nudge_escalation'],
+    content: `# v10_constraints — V10 加固 8 大点
+
+V10 (2026-06-25) 从「字段存在性校验」升级为「内容有效性校验」。
+
+## 8 个加固点
+1. **V10-auditor-active**: auditor leaf 必须 status=done + events 非空 + audit_gate.verdict=pass
+   错误码：E_AUDITOR_NOT_DONE / E_AUDITOR_NO_EVENTS / E_AUDITOR_NOT_VERIFIED
+
+2. **V10-self-audit-forbidden-v2**: callerSessionId 必须 === audit_session_id（堵借身份）
+   错误码：E_BORROWED_IDENTITY
+
+3. **V10-uuid-format-strict**: UUID 必须合法格式 + 拒全 0 / 全 f
+   错误码：E_INVALID_UUID_STRICT
+
+4. **V10-numeric-consistency**: audit report 数值一致
+   错误码：E_NEGATIVE_COUNT / E_COUNT_MISMATCH / E_LENGTH_MISMATCH
+
+5. **V10-nudge-escalation**: nudge_count 到阈值强制升级
+   错误码：E_LEAF_AUTO_PRUNED
+
+6. **V10-timestamp-monotonic**: event ts 单调
+   错误码：E_TS_BEFORE_CREATED / E_TS_IN_FUTURE / E_TS_NOT_MONOTONIC
+
+7. **V10-workspace-canonical**: slug "undefined"/null/"" → fallback "default"
+   错误码：E_NO_TREES_DIR（MCP wrapper 层）
+
+8. **V10-status-event-sync**: status 切换与 event append 双向校验
+   错误码：E_STATUS_EVENT_MISMATCH
+
+## 失守案例
+audit-gate-test-20260625: worker 528b0925 借 auditor 404c724f 的 session_id 通过 audit_gate pass。
+V10-self-audit-forbidden-v2 后：MCP wrapper 提取 callerSessionId=528b0925，引擎比对 audit_session_id=404c724f，拒。
+
+## 关联
+- 完整 spec: .context/plan/v10-implementation-charter.md
+- 错误码索引: mcp__tree__tree_help('error_code_index')`,
+  },
+
+  self_audit_forbidden: {
+    title: '为什么 caller ≠ audit_session_id',
+    related: ['borrowed_identity', 'how_to_register_auditor'],
+    content: `# self_audit_forbidden — 为什么 caller ≠ audit_session_id
+
+## 一句话
+worker 不能用自己的 session_id 给自己审 pass，也不能借 auditor 的 session_id 写 pass。
+
+## 失守案例（audit-gate-test-20260625）
+- worker leaf: 528b0925 (session 528b0925-...)
+- auditor leaf: 404c724f (session 404c724f-...)
+- worker 528b0925 调 mcp__tree__tree_audit_gate(leaf_id=worker, verdict=pass, audit_session_id=404c724f)
+- V4-V9 引擎：只查 audit_session_id 是否对应不同 leaf → 通过 ❌
+- 实际：auditor 404c724f 自始至终没自主发表过任何审计意见
+- 整个测试"通过"是 worker 自导自演的假象
+
+## V10 修复
+patches.cjs __proma_getMcpServers__(sessionId, ...) 提取 sessionId，
+透传给 callTreeState → engine.run → cmdAuditGate 校验：
+
+\`\`\`js
+if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId) {
+  throw new TreeStateError(E_BORROWED_IDENTITY, ...);
+}
+\`\`\`
+
+CLI 调用（dbc-spec 等）不传 callerSessionId，跳过此校验（向后兼容）。
+
+## 正确流程
+1. commander 用 fork_session / create_session 派 auditor session
+2. commander send_message(auditor_session, "审计 leaf X 的产出...")
+3. auditor 在自己 session 内调 mcp__tree__tree_audit_gate(leaf_id=X, verdict=pass, audit_session_id=<auditor 自己 session>)
+4. 引擎校验 callerSessionId（来自 MCP wrapper）=== audit_session_id → 通过
+
+## 关联
+- mcp__tree__tree_help('borrowed_identity') — 攻击视角
+- mcp__tree__tree_help('how_to_register_auditor') — 完整注册流程`,
+  },
+
+  borrowed_identity: {
+    title: '借身份攻击详解',
+    related: ['self_audit_forbidden', 'v10_constraints'],
+    content: `# borrowed_identity — 借身份攻击
+
+## 攻击原理
+worker W 想给自己发 pass，但 audit_gate 要求 audit_session_id 指向另一个 leaf。
+W 偷偷拿 auditor A 的 session_id，伪装成 A 调 audit_gate(leaf_id=W, verdict=pass, audit_session_id=A_session)。
+V4-V9 引擎只查"A 是否是不同 leaf"，不查"调用者是否真是 A"——攻击成功。
+
+## 真实失守数据（audit-gate-test-20260625）
+- worker 528b0925 借 auditor 404c724f session_id
+- audit_gate pass 落库 → worker status=done → 报告"测试通过"
+- 真实情况：auditor 404c724f 没主动发表过任何意见
+- 整条 audit 链路是 worker 自导自演
+
+## V10 修复前后对比
+| 检查项 | V4-V9 | V10 |
+|--------|-------|-----|
+| audit_session_id 是否不同 leaf | ✓ | ✓ |
+| 调用者 caller 是否真是 audit_session_id | ✗ | ✓（callerSessionId 校验）|
+
+## 测试用例参考
+- v10-cleanroom.cjs case 5：borrowed_identity 攻击重放
+- audit-attacks.cjs：系列攻击 fixture
+
+## 关联
+- mcp__tree__tree_help('self_audit_forbidden') — 防御视角
+- mcp__tree__tree_help('v10_constraints') — V10 加固全景`,
+  },
+
+  naming_convention: {
+    title: 'leaf_id 命名规则',
+    related: ['how_to_init', 'role_semantics'],
+    content: `# naming_convention — leaf_id 命名规则
+
+## 格式
+\`\`\`
+<prefix>-<path>-<role>[-<suffix>]
+\`\`\`
+
+| 段 | 内容 | 正则 |
+|----|------|------|
+| prefix | 项目代号（永不变更） | \`[a-z][a-z0-9_]{3,7}\`（小写开头，4-8 字符，无连字符）|
+| path | 树定位（根省略） | \`[A-Z]\\d*(?:[a-z]\\d*)*\` |
+| role | root/commander/worker | 枚举 |
+| suffix | 竹节 sNN / 尝试 iNN（可选） | \`s\\d+\\|i\\d+\` |
+
+## 完整正则
+\`\`\`
+^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\\d*(?:[a-z]\\d*)*)?-)?(root|commander|worker)(?:-(s\\d+|i\\d+))?$
+\`\`\`
+
+## 正例
+- \`v10v-root\` — v10v 项目根
+- \`v10v-A-commander\` — v10v 第 1 子（A）= 子指挥官
+- \`v10v-A1-worker\` — A 的第 1 孙 = 原子工人
+- \`v10v-A-commander-s2\` — A 的竹节第 2 节
+- \`v10v-A1b-worker\` — A1 的第 2 个曾孙
+
+## 负例
+- \`proma-guide-root\` — prefix 含连字符
+- \`NA-root\` — prefix 大写 + 不足 4 字符
+- \`nju-root\` — prefix 仅 3 字符
+- \`NANJU-root\` — prefix 含大写
+- \`123abc-root\` — prefix 首字符非小写字母
+- \`auditor-1\` — 不符合格式（被 65996e8b commander 用过，错误）
+- \`worker-A1\` — 顺序反了，prefix 缺失
+
+## 触发错误码
+E_NAME_INVALID（cmdLeafAdd 第 1 道校验）
+E_SCHEMA_INVALID（path 段与 leaf_id 不一致）`,
+  },
+
+  common_mistakes: {
+    title: '65996e8b 案例的 5 个常见错误',
+    related: ['how_to_init', 'naming_convention', 'self_audit_forbidden', 'v10_constraints', 'alignment_workflow'],
+    content: `# common_mistakes — Agent 常犯的 5 个错误（65996e8b 教训）
+
+DeepSeek V4 Pro commander 65996e8b 在 audit-gate-retest-v10 端到端任务中暴露 4 阶段失守：
+**瞎试 → 瞎编 → 嘴硬 → 后补**。
+
+## 5 个常见错误
+
+### 1. 建空树（缺 root_brief/dod）
+错误：\`tree_init(tree_id='x')\` 不传 root_brief / root_dod
+后果：E_SCHEMA_INVALID
+正确：root_brief 5 字段 + root_dod 4 字段，参考 mcp__tree__tree_help('how_to_init')
+
+### 2. 编造 leaf_id 命名
+错误：\`auditor-1\` / \`worker-A1\` / \`review-leaf\`（不符合 <prefix>-<path>-<role> 正则）
+后果：E_NAME_INVALID
+正确：参考 mcp__tree__tree_help('naming_convention')，如 \`v10v-C1-worker\`
+
+### 3. 调用顺序错乱（audit_gate 先于 leaf_add）
+错误：先 audit_gate 再 leaf_add
+后果：E_LEAF_NOT_FOUND
+正确：先 tree_init → leaf_add（建 leaf）→ brief_echo → audit_gate
+
+### 4. 借身份（caller ≠ audit_session_id）
+错误：worker session 调 audit_gate(audit_session_id=<auditor session>)，伪装成 auditor
+后果：E_BORROWED_IDENTITY
+正确：参考 mcp__tree__tree_help('self_audit_forbidden')，auditor 必须在自己 session 内调
+
+### 5. 报告早于落库（事件 ts 不单调）
+错误：commander 在 09:16 写"10/10 通过"报告，worker 09:19 才真正调 audit_gate pass
+后果：ts 反序 → E_TS_NOT_MONOTONIC
+正确：先调 audit_gate 落库，再写报告；事件 ts 单调递增
+
+## 65996e8b 的 4 阶段失守模式
+1. **瞎试**：不看 SKILL 直接试 mcp__tree__* 工具
+2. **瞎编**：失败后编造命名 / 占位 UUID / 假 auditor
+3. **嘴硬**：报告"全部通过"实际未真正调过 audit_gate
+4. **后补**：被审计发现后再补调，时序已乱
+
+## 防御策略
+- 调任何 mcp__tree__* 工具前先 \`tree_help(<topic>)\`
+- 错误返回自动附 help_topic，跟着 help_hint 走
+- fork 真实 session 注册 leaf，不用占位 UUID`,
+  },
+
+  alignment_workflow: {
+    title: 'brief_echo + alignment 回填流程',
+    related: ['how_to_register_auditor', 'role_semantics'],
+    content: `# alignment_workflow — brief_echo + alignment 回填
+
+## V5b 硬约束
+worker 后续 audit_gate pass 必须先有 alignment 留痕（event），否则 E_ALIGNMENT_NOT_VERIFIED。
+
+## 流程
+\`\`\`
+1. worker fork → mcp__tree__tree_leaf_add(role=worker)
+2. worker 首条上行: tree_event_append(type=brief_echo, meta={my_understanding, milestones_preview})
+3. commander 派"路线图 Agent"（独立 leaf）评估对齐度
+4. commander 回填: tree_event_append(type=brief_echo, meta={alignment, auditor_session_id})
+   ↑ 这条回填 event 是 worker 后续 audit pass 的硬前置
+5. 对齐度 ≥85% → worker 继续干活
+   <85% → tree_drift_append(severity=low, action=nudge) 发回重 brief_echo
+\`\`\`
+
+## 为什么 alignment 在回填 event 里
+alignment 是 commander/路线图 Agent 的【对齐评估产物】（worker 自己无法自评）。
+worker 首条 brief_echo 只含 my_understanding + milestones_preview。
+评估完成后，结果以第二条 brief_echo event 回填到 worker leaf——
+这同时满足 V5b 的"events 留痕"和 A3 的"独立 auditor 背书"。
+
+## 跳过此步的后果
+worker 永远拿不到 audit pass：
+- cmdAuditGate 拦 E_ALIGNMENT_NOT_VERIFIED
+- worker 卡死无法 done，会上行 blocked 抱怨"audit pass 被拦"
+- **这不是 bug，是 V5b 硬约束**（堵 A3-omit-alignment 绕过）
+
+## 关联
+- mcp__tree__tree_help('how_to_register_auditor')`,
+  },
+
+  nudge_escalation: {
+    title: 'nudge 升级机制',
+    related: ['v10_constraints'],
+    content: `# nudge_escalation — nudge 升级机制
+
+## 升级阈值
+\`\`\`
+nudge_count == 3 → severity 自动升级到 'medium'
+nudge_count == 5 → severity 自动升级到 'high'
+nudge_count >= 7 → 强制 status=pruned（E_LEAF_AUTO_PRUNED）
+\`\`\`
+
+## V4-V9 漏洞
+某 leaf 累积 168 次 nudge 都没升级，severity 永远停在 'low'。
+原因：升级逻辑只在 drift_append 写死，nudge_append 不触发升级。
+
+## V10 修复
+cmdNudgeAppend 自动检查 nudge_count 并：
+1. 自动累积 nudge_count + nudge_log
+2. 按阈值自动升级 severity
+3. 到 7 次强制 tree_leaf_set_status(status=pruned)，抛 E_LEAF_AUTO_PRUNED
+
+## 关联
+- mcp__tree__tree_help('v10_constraints')
+- v10-cleanroom.cjs nudge 测试组`,
+  },
+
+  audit_tree_structure: {
+    title: '审计任务最小树结构',
+    related: ['role_semantics', 'how_to_register_auditor'],
+    content: `# audit_tree_structure — 审计任务最小树结构
+
+## 7 leaf 最小结构（强制）
+\`\`\`
+<tree_id> (root/commander)
+  ├── <tree_id>-fix        — 修正执行员（等审查完成统一改）
+  ├── <tree_id>-C1         — 一致性审查员
+  ├── <tree_id>-C2         — 完整性/闭环审查员
+  ├── <tree_id>-C3         — 规范性/格式审查员
+  ├── <tree_id>-C4         — 可验证性/证据审查员
+  ├── <tree_id>-A1         — 反向映射重构员
+  └── <tree_id>-A2         — 反事实攻击员
+\`\`\`
+
+## 铁腕要求
+- **最少 7 个审查 leaf**（4 四维 + 2 攻击 + 1 修正）
+- C1-C4 和 A1-A2 必须【并行启动】（相互独立）
+- 修正员 fix 在所有审查员返回后启动
+- 【禁止】commander 亲自充当审查员（"自己画靶自己打分"）
+
+## 迭代收敛流程
+\`\`\`
+Round 1:
+  ① Fork C1-C4 + A1-A2（6 个并行）
+  ② 收集所有问题列表，去重汇总
+  ③ Fix 子会话执行修正
+  ④ tree-state 记录 round=1, issues_found=N1
+
+Round 2:
+  ⑤ 重新 Fork 6 个并行（只检查修正是否正确、是否引入新问题）
+  ⑥ 收集回归问题列表
+  ⑦ 判定收敛（三条件全满足）：
+     a. N2 < N1 × 0.3
+     b. 无阻断级或严重级新问题
+     c. 所有遗留问题均为"建议"级或"待人类确认"
+\`\`\`
+
+## 关联
+- tree-commander SKILL §14 审计工作流
+- tree-audit-methodology.md`,
+  },
+
+  error_code_index: {
+    title: '全部错误码索引（33 个）',
+    related: [],
+    content: `# error_code_index — 33 个错误码索引
+
+## 旧错误码（17 个）
+- E_TREE_NOT_FOUND — 树目录/状态文件不存在
+- E_LEAF_NOT_FOUND — leaf_id 不存在
+- E_SCHEMA_INVALID — JSON/字段结构错误 [help: how_to_init]
+- E_STATUS_INVALID — status 不在枚举 [help: role_semantics]
+- E_NAME_INVALID — leaf_id 不符合命名正则 [help: naming_convention]
+- E_PARENT_MISSING — parent 引用不存在的 leaf [help: how_to_init]
+- E_DUPLICATE_LEAF — leaf/tree 已存在 [help: naming_convention]
+- E_CHILDREN_NOT_DONE — 子 leaf 未全部 done [help: role_semantics]
+- E_DEPTH_EXCEEDED — commander 嵌套超过 3 层 [help: role_semantics]
+- E_BACKUP_CORRUPT — 备份文件损坏
+- E_IO — 文件读写错误
+- E_UNKNOWN — 未知命令/子命令
+- E_LOCK_TIMEOUT — 文件锁等待超时
+- E_DELIVERABLE_MISSING — done 时缺少交付物 [help: alignment_workflow]
+- E_AUDITOR_NOT_INDEPENDENT — auditor 与被审 leaf 不独立 [help: how_to_register_auditor]
+- E_AUDIT_PREMATURE — 时序错（pass 早于前置）[help: alignment_workflow]
+- E_ALIGNMENT_NOT_VERIFIED — worker 缺 alignment 回填 [help: alignment_workflow]
+- E_SELFCHECK_INVALID — self_check schema 错 [help: alignment_workflow]
+- E_TREE_NODE_BUDGET_EXCEEDED — 超节点预算 [help: how_to_init]
+- E_TREE_NOT_VALIDATED — validate 失败 [help: audit_tree_structure]
+- E_GATEKEEPER_REQUIRED — 需要 gatekeeper [help: role_semantics]
+
+## V10 新增错误码（16 个）
+- E_AUDITOR_NOT_DONE — auditor.status≠done [help: how_to_register_auditor]
+- E_AUDITOR_NO_EVENTS — auditor.events 空 [help: how_to_register_auditor]
+- E_AUDITOR_NOT_VERIFIED — auditor 自己 audit_gate.verdict≠pass [help: how_to_register_auditor]
+- E_BORROWED_IDENTITY — caller≠audit_session_id [help: self_audit_forbidden]
+- E_INVALID_UUID_STRICT — UUID 全 0/全 f/非合法格式 [help: v10_constraints]
+- E_NEGATIVE_COUNT — total/passed/failed<0 [help: v10_constraints]
+- E_COUNT_MISMATCH — passed+failed≠total [help: v10_constraints]
+- E_LENGTH_MISMATCH — results.length≠total [help: v10_constraints]
+- E_TS_BEFORE_CREATED — event ts 早于 leaf.created_at [help: v10_constraints]
+- E_TS_IN_FUTURE — event ts 晚于 now+60s [help: v10_constraints]
+- E_TS_NOT_MONOTONIC — event ts 早于上一条 [help: v10_constraints]
+- E_LEAF_AUTO_PRUNED — nudge_count≥7 强制 pruned [help: nudge_escalation]
+- E_STATUS_EVENT_MISMATCH — status/event 不同步 [help: v10_constraints]`,
+  },
+
+  full_guide: {
+    title: '完整指南入口（SKILL.md）',
+    related: [],
+    content: `# full_guide — 完整指南入口
+
+## tree-commander SKILL
+路径: \`skills/tree-commander/SKILL.md\`
+
+核心章节：
+- §1 铁律 5 条
+- §3 5 件套契约模板（brief/dod/report/autonomy/self_audit）
+- §4 工作流程 5 步法
+- §5 mcp__tree__* 工具速查（28 个工具）
+- §6 事件路由表（done/blocked/plan/brief_echo/heartbeat_reply）
+- §7 三档纠偏决策树（low/mid/high）
+- §8 心跳通道
+- §9 验收 Agent prompt 模板
+- §10 灾难恢复检查表（F1-F4）
+- §11 禁止行为清单 12 条
+- §12 命名规范
+- §14 审计工作流（最小 7 leaf 结构）
+
+## tree-worker SKILL
+路径: \`skills/tree-worker/SKILL.md\`
+
+## 调用方式
+1. 直接读文件：\`Read("skills/tree-commander/SKILL.md")\`
+2. 或问具体 topic：\`mcp__tree__tree_help('<topic>')\`
+
+## topic 列表
+how_to_init | how_to_register_auditor | role_semantics | v10_constraints |
+self_audit_forbidden | borrowed_identity | naming_convention | common_mistakes |
+alignment_workflow | nudge_escalation | audit_tree_structure | error_code_index | full_guide`,
+  },
+};
+
+// cmdHelp — 处理 mcp__tree__tree_help(topic)
+// 签名：help <topic>  或 help（无 topic 返回 topic 列表）
+function cmdHelp(args) {
+  const { positional } = parseArgs(args);
+  const topic = positional[0];
+  if (!topic) {
+    return {
+      topics: Object.keys(HELP_TOPICS).map((k) => ({ topic: k, title: HELP_TOPICS[k].title })),
+      hint: "Call mcp__tree__tree_help({topic: '<name>'}) for details.",
+    };
+  }
+  const entry = HELP_TOPICS[topic];
+  if (!entry) {
+    const available = Object.keys(HELP_TOPICS).join(', ');
+    throw new TreeStateError(
+      E_UNKNOWN,
+      `Unknown help topic "${topic}". Available topics: ${available}. Call mcp__tree__tree_help({topic: 'full_guide'}) for the index.`
+    );
+  }
+  return {
+    topic,
+    title: entry.title,
+    content: entry.content,
+    related_topics: entry.related || [],
+    skill_reference: 'skills/tree-commander/SKILL.md',
+  };
+}
+
 // ============================================================
 // 主入口 & 路由
 // ============================================================
@@ -2678,8 +3336,9 @@ async function dispatch(cmd, args, callerSessionId) {
       return await dispatchMilestone(args);
 
     // Append
+    // V10-trust-anchor-fix (C5): dispatchEvent 也透传 callerSessionId（cmdEventAppend 校验 caller 写 done event）
     case 'event':
-      return await dispatchEvent(args);
+      return await dispatchEvent(args, callerSessionId);
     case 'drift':
       return await dispatchDrift(args);
     case 'heartbeat':
@@ -2698,8 +3357,12 @@ async function dispatch(cmd, args, callerSessionId) {
     case 'tree':
       return await dispatchTree(args);
 
+    // V10-helper (D4 Layer 1): Agent 自助文档
+    case 'help':
+      return cmdHelp(args);
+
     default:
-      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, migrate, leaf, milestone, event, drift, heartbeat, segment, audit, nudge, tree`);
+      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, migrate, leaf, milestone, event, drift, heartbeat, segment, audit, nudge, tree, help. Call mcp__tree__tree_help('full_guide') for usage.`);
   }
 }
 
@@ -2736,13 +3399,15 @@ async function dispatchMilestone(args) {
   }
 }
 
-async function dispatchEvent(args) {
+async function dispatchEvent(args, callerSessionId) {
   if (args.length === 0) {
     throw new TreeStateError(E_SCHEMA_INVALID, 'event requires a subcommand: append | list');
   }
   const [sub, ...rest] = args;
   switch (sub) {
-    case 'append': return await cmdEventAppend(rest);
+    // V10-trust-anchor-fix (C5/A3 P0 攻击 2): 透传 callerSessionId 给 cmdEventAppend,
+    //   校验 caller=leaf.session_id/added_b 才能写 done event（堵 worker 给 root 写 done 触发 auto_upgrade）。
+    case 'append': return await cmdEventAppend(rest, callerSessionId);
     case 'list': return await cmdEventList(rest);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown event subcommand "${sub}"`);
@@ -2820,9 +3485,19 @@ async function main() {
   } catch (e) {
     const code = e && e.code ? e.code : E_UNKNOWN;
     const msg = e && e.message ? e.message : String(e);
+    // V10-helper (D4 Layer 3): 错误返回附 help 引用。TreeStateError 构造时已挂 help_topic。
+    //   自解释错误（E_TREE_NOT_FOUND 等）help_topic=null，不附引用。
+    const helpTopic = (e && typeof e.help_topic !== 'undefined')
+      ? e.help_topic
+      : (ERROR_TO_HELP[code] || null);
+    const error = { code, msg };
+    if (helpTopic) {
+      error.help_topic = helpTopic;
+      error.help_hint = `See mcp__tree__tree_help('${helpTopic}') for correct usage.`;
+    }
     process.stdout.write(JSON.stringify({
       ok: false,
-      error: { code, msg }
+      error
     }) + '\n');
     process.exit(code === E_LOCK_TIMEOUT ? 3 : 1);
   }

@@ -1,3 +1,14 @@
+---
+description: |
+  树形会话执行体系 — 工人（子会话/叶子节点）操作手册。
+  触发场景：被 Fork 成 worker / 接收 5 件套契约 / 处理 brief_echo 回填 /
+  milestone 自审 / 子会话角色 / 上行事件 done/blocked/plan/heartbeat_reply /
+  接到 mcp__tree__* 工具调用任务 / 接收 autonomy_override 限权。
+  核心能力：5 件套契约解析 / 里程碑拆解 / 自审 check-list / 上行事件格式化 /
+  对齐度自评 / V5b 硬约束遵守（alignment 回填才能 audit pass）。
+  工具调用前先 mcp__tree__tree_help(topic) 拿用法。
+---
+
 # tree-worker / 树形会话执行体系 — 工人 Skill
 
 > **角色**: 子会话（叶子节点）加载的操作手册。定义如何理解任务契约、拆解里程碑、执行自审、上报事件。
