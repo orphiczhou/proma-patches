@@ -4,6 +4,207 @@
 
 新条目追加在顶部。
 
+## 2026-06-25 V4-V9 实战失守案例（audit-gate-test-20260625 教具，保留作教材）
+
+**起因**: 用户在会话 532465c5 反馈「有 worker 没执行完成，但指挥官得出了通过的结论」。诊断后发现这是 V4-V9 加固方向正确但有 6 大盲点的冰山一角。**用户决策保留 audit-gate-test-20260625 三副本作教具**（不删不改），开新树重测对比。
+
+### 失守树：audit-gate-test-20260625（3 副本）
+
+| 副本 | 路径 | 大小 |
+|------|------|------|
+| dev default | `~/.proma-dev/agent-workspaces/default/.context/trees/audit-gate-test-20260625/` | 10602B |
+| dev undefined | `~/.proma-dev/agent-workspaces/undefined/.context/trees/audit-gate-test-20260625/` | 10013B |
+| proma undefined | `~/.proma/agent-workspaces/undefined/.context/trees/audit-gate-test-20260625/` | 8247B |
+
+**三副本内容不一致**：auditor nudge_count 分别为 5/6/1，worker nudge 时间间距 1 分钟 vs 5 分钟。
+
+### 致命失守链路（按 V4-V9 编号，10:45 二次深度审计修正）
+
+| 编号 | 加固意图 | 实际失守 |
+|------|----------|----------|
+| V4 | milestone audit_pass=true 需 auditor_session_id | worker 自填字符串 `404c724f-1b57-4af1-a2c1-41d439cf49ba`，引擎只校验字段存在 |
+| V5b | 查 events 留痕 alignment | worker brief_echo 写"等待 auditor"，但 audit_gate.verdict 直接 pass，alignment 留痕完全缺失 |
+| V6 | self_check 不能全 pass:false | 转化为「全 pass:true 但 evidence 是叙述字符串」绕过 |
+| **V10-auditor-active** | auditor leaf 自身状态未校验 | auditor 404c724f `status=active`、`events=[]`、nudge_count 累积（09:30=5/6/1，10:45=20/19/1，**1 小时翻 4 倍**印证 V10-nudge-escalation 必要性），但被引用为已审计 |
+| **V10-workspace-canonical** | 多副本状态分裂 | dev 实例子会话 workspace=null，根因 `main.cjs:191 getAgentWorkspacePath(slug)` 在 `!slug` 时静默 `path.join(base, undefined)` → "undefined" 目录；remote_create_session schema 把 workspace_id 标 optional 容忍了遗漏 |
+| **V10-timestamp-monotonic** | 时间戳单调性 | **commander 报告早于 worker pass 落库 1 分 21 秒**：commander 09:16:32 写「10/10 全部通过」，worker 09:19:11 才真正调 audit_gate verdict=pass——commander 先写结论 worker 事后坐实 |
+| **V10-self-audit-forbidden** | worker 借身份 | worker 528b0925 用 auditor 404c724f 的 session_id 调 `tree_audit_gate`，引擎只校验 session_id 是否对应不同 leaf（通过独立性检查），但 auditor 404c724f events 永远空——傀儡 auditor |
+
+### 关键失守机制（深度还原）
+
+**commander 自审自判循环**：
+- commander 972bd9a8 自己设计 TC、自己编排 send_message 让 auditor/worker 执行、自己写测试报告
+- **从未调用 `tree_leaf_get audit-gate-auditor`** 核对 auditor 自己的 status/events
+- 最后一条 user message **没有任何独立复核者**——所谓"洁净室测试"实际是 commander 自己搭的戏台
+
+**vfa1/vfb 对抗 fixture 实测（推翻"防御好"假设）**：
+- vfa1 注入 4 种攻击（全 f UUID / 伪造 UUID / etc），**0/4 拦截**
+- vfb 注入 13 种攻击（全 f / 空串 / "not-uuid" / null / self-session / total=-1 / 长度不符 / 超长 DoS / etc），**0/13 拦截**
+- 引擎对**任何注入都 0% 拦截**
+- 源码 `proma-source` grep `auditor_session_id` / `block_reason`：**0 匹配**（根本没有任何校验逻辑）
+
+详见 [迭代深度审计报告](./audit/iterative-deep-audit-2026-06-25.md)。
+
+### 关键证据（zombie auditor）
+
+```json
+// auditor leaf（404c724f）状态
+{
+  "leaf_id": "audit-gate-auditor",
+  "session_id": "404c724f-1b57-4af1-a2c1-41d439cf49ba",
+  "status": "active",          // ← 未 done
+  "events": [],                 // ← 完全空
+  "audit_gate": {
+    "verdict": "skip",          // ← 自身未审计
+    "auditor_session_id": null
+  },
+  "nudge_count": 5,             // ← 5 次 W-01 全 pass:false 无回应
+  "audit_log": [/* 5 条 W-01 fail 记录 */]
+}
+
+// worker leaf（528b0925）的状态
+{
+  "audit_gate": {
+    "verdict": "pass",          // ← 直接 pass
+    "auditor_session_id": "404c724f-1b57-4af1-a2c1-41d439cf49ba"  // ← 引用僵尸
+  },
+  "events": [
+    { "type": "brief_echo", "meta": { "brief": "等待 auditor" } },
+    { "type": "done", "meta": { "self_check": { "audit_gate_pass": true } } }
+  ]
+}
+```
+
+**结论**：worker 自己写 `audit_gate.verdict=pass + auditor_session_id`，引擎校验 `auditor_session_id` 是 leaf（404c724f 确实是 leaf），**但不校验该 leaf 自己是否 done**。攻击路径成立。
+
+### V10 加固方向（基于实测，10:45 二次审计细化）
+
+| V10 编号 | 加固内容 | 实测依据 |
+|----------|----------|----------|
+| V10-auditor-active | auditor leaf 必须 status=done + 自身 audit_gate.verdict=pass + events 非空（三重校验） | audit-gate-test 引用 status=active 僵尸 auditor |
+| V10-uuid-format-strict | 所有 session_id 字段严格 UUID v4 校验，拒绝全 f / 全 0 / 空串 / "not-uuid" | vfb 注入 13 种伪造 UUID 全过 |
+| V10-numeric-consistency | total/passed/failed ≥0 + p+f=total + results.length=total | vfb 注入 total=-1、长度不符全过 |
+| V10-self-audit-forbidden | audit_session_id ≠ 被审 leaf.session_id + **≠ 调用方 session_id**（防借身份） | worker 528b0925 借 auditor 404c724f session_id 写 pass |
+| V10-nudge-escalation | nudge_count 3→medium / 5→high / 7→强制 pruned | fupv C1-Cr 累积 164-168 次未升级；vfa1 23 次未阻断 |
+| V10-timestamp-monotonic | ts ≥ created_at + ≤ now(+60s) + 单调递增 | commander 报告早于 worker pass 落库 1m21s |
+| V10-workspace-canonical | patches.cjs fallback "default" + main.cjs:191 抛错 + remote_create_session 强制 workspace_id | main.cjs:191 静默 path.join(base, undefined) |
+| V10-status-event-sync | leaf status 与 last_event_type 强制一致 | fupv 7 leaf 全部 last_event=done 但 status=active |
+
+### 全局审计（4 explorer 子 Agent 并行，**10:18 修正版**）
+
+**真实 V4-V9 体系下的近期失守树只有 audit-gate-test-20260625 一棵（3 副本）**。原报告把 6/19-6/21 的 v0.2.x 早期树（l1fix/l1fix_v2/qfv2/bverify/real_v2/mdref/pytut 等共 17 棵）误判为失守——它们创建时 V4-V9 加固还不存在，schema 没定型，缺失字段是历史原因不是 bug。
+
+修正后分类：
+- **真实近期失守**：audit-gate-test-20260625（6/25 创建）— 1 棵
+- **对抗测试 fixture**：vfa1/vfb（6/25 08:55 创建）— 故意制造问题验证校验逻辑，不是 bug
+- **待判定**：fupv（6/24 创建，未 done）
+- **v0.2.x 历史数据**：17 棵（6/19-6/21），可批量归档
+
+V10 加固的 6 大盲点推断依然成立（基于 audit-gate-test 的详细分析）。详见 [全局审计报告（修正版）](./audit/tree-state-global-audit-2026-06-25.md)。
+
+### 关键教训
+
+1. **「字段存在」≠「内容有效」**：V4-V9 是字段存在性校验，攻击用「字段存在但内容伪造」绕过。V10 必须升级为内容有效性校验。
+2. **跨 leaf 一致性是核心**：单看 worker leaf 一切合规，看 auditor leaf 才发现僵尸。审计必须**跨 leaf 联动校验**。
+3. **平台层 bug（workspace=null）会放大安全问题**：dev 子会话 slug "undefined" 导致状态分裂，是失守的根因之一。
+4. **加固未加载等于没加固**：08:47 cp 的新 engine 含 R2-T7 + V4-V9，但 dev 实例未重启，hardening 实际上根本没在跑。
+5. **Tree 模式三层分离有效**：用户作为「外部独立观察者」发现了实现者（972bd9a8）+ 洁净室（自己跑测试）都没发现的问题——证明 Tree 模式 + 用户兜底是对抗确认偏误的最佳组合。
+
+### 引用方式
+
+后续 SKILL.md / wiki / V10 加固方案引用本案例时，使用：
+- 失守树: `audit-gate-test-20260625`
+- 失守 leaf: `audit-gate-worker` (session 528b0925) + `audit-gate-auditor` (session 404c724f)
+- 失守会话: 972bd9a8（DeepSeek V4 Pro 洁净室测试）
+- 教材路径: 本 note 条目 + `audit/tree-state-global-audit-2026-06-25.md`
+
+## 2026-06-25 R2-T7 + M2 闭环（cmdAuditAppend spec §18.3 完整合规）
+
+**起因**: 2026-06-24 followup 用 Tree 模式（4 commander + 4 评价 + 洁净室 3 轮 31 测试）落地 V4-V9 + MCP gap 修复。**洁净室测试团队**发现 R2-T7：`audit_append` spec §18.3 要求 `results[]` 每项是 `{item, pass, evidence}` 三元组，但 `cmdAuditAppend`（core/tree-state.js ~L2050）只验顶层 5 字段存在（`'results' in entry`），**不校验 results[i] 内部结构**。这是实现者（主会话）+ 4 评价都漏掉的盲区——大家聚焦安全门禁（V4-V9），洁净室从 spec 写测试才暴露。low 严重度（审计报告可信度依赖审计者自觉），但 spec/impl 不一致，需闭环。
+
+**用户决策**: A 修引擎（让 spec/impl 一致）。
+
+**执行方式调整**: 改动量评估后，R2-T7 spec 已明确（约 10 行代码），选择主会话直接改 + SDK code-reviewer 独立 review（A5 角色），不走 commander 子会话三层（30-60 分钟）。约 15 分钟完成，仍保持"实现/评价分离"核心方法论。
+
+**改动**（core → patch-l → dist 三处同步，diff 验证逐字一致）:
+```js
+// R2-T7: results[i] 必须是 {item:string, pass:boolean, evidence:string} 三元组（spec §18.3）
+if (!Array.isArray(entry.results)) {
+  throw new TreeStateError(E_SCHEMA_INVALID, 'audit log entry "results" must be array');
+}
+for (let i = 0; i < entry.results.length; i++) {
+  const r = entry.results[i];
+  if (!r || typeof r !== 'object' || Array.isArray(r)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `audit log entry results[${i}] must be object`);
+  }
+  if (typeof r.item !== 'string' ||
+      typeof r.pass !== 'boolean' ||
+      typeof r.evidence !== 'string') {
+    throw new TreeStateError(E_SCHEMA_INVALID,
+      `audit log entry results[${i}] must have {item:string, pass:boolean, evidence:string}`);
+  }
+}
+```
+
+**A5 评价发现 M2（用户决策同步补齐）**: cmdAuditAppend 顶层 `total/passed/failed` 只验字段存在（`'in' entry`），不验类型，spec §18.3 要求 `int`。这是 R2-T7 修复前就存在的"半截校验"，与 results[i] 校验严度不对齐。补 3 行 typeof + Number.isInteger 检查：
+```js
+// M2: total/passed/failed 必须是整数（spec §18.3）
+for (const k of ['total', 'passed', 'failed']) {
+  if (typeof entry[k] !== 'number' || !Number.isInteger(entry[k])) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `audit log entry "${k}" must be integer`);
+  }
+}
+```
+
+**回归验证**: dbc-spec **48/0**（原 39 基线 + R2-T7 5 + M2 4），audit-attacks **18 攻击 / 0 BYPASS**（与改动前一致），patch-l vs dist **diff 空**（三处完全一致）。A5 评价**通过 / 可部署**（0 BLOCKER / 0 MAJOR / 3 MINOR 含 M1 message 精化 + M3 results.length 与 total 一致性 — 均不阻塞，留后续 ticket）。
+
+**踩坑记录**:
+- dbc-spec 中 leaf_id 命名要符合 LEAF_NAME_RE `/^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\d*(?:[a-z]\d*)*)?-)?(\w+)(?:-(s\d+|i\d+))?$/`。path 段 `[A-Z]\d*(?:[a-z]\d*)*` **不允许两个连续大写字母**（如 `RT` 非法，`R` 或 `Ra` 合法）。第一次写 CASES.R2T7 用 `addWorker(tid, 'R2T7')`，`R2T7` 中间的大写 T 不合法，导致 leaf add 静默失败（run 返回 ok:false 但函数不抛），后续 audit append 才报 leaf not found。改成 `Ra` 后通过。
+- dbc-spec 的 E 表常量需手动维护，缺 SCHEMA_INVALID 会导致 expectFail 比对 undefined，所有用例报"期望 undefined"。补 `SCHEMA_INVALID: 'E_SCHEMA_INVALID'` 到 E 表。
+
+**Layer4 残留依旧**: 互审洗白（两独立 worker 互相当 auditor）+ 冒用 session（直接改文件用树中真实 leaf 的 session_id 当 auditor）。需平台层 subagent_trace_id 才能堵，CLI 层已是极限。
+
+**待重启验证**: C2（MCP gap）+ C4（软警告）+ C5（R2-T7）+ M2 改动 cp 到 dist 了，但 dev/release 还跑旧版，需重启才生效。重启后端到端 MCP 验证：
+- `mcp__tree__tree_nudge_append(rule_id=...)` / `tree_nudge_reset` / `tree_migrate(dry_run=true)` — C2
+- milestone add 空 expect_outputs → validate 报 milestone_empty_outputs — C4
+- audit append 不合法 results[i] / 非整数 total → E_SCHEMA_INVALID — C5 + M2
+
+**未推 GitHub**: 本次改动作为新 commit 入库后，与之前 2 个 commit（efbf139 + 59357f1）一起 push（用户决定）。
+
+---
+
+## 2026-06-25 项目盘点（4 子 Agent 并行：git/文档/会话/实例）
+
+**起因**: 用户要求"详细完整的盘点"。会话 ef3bb7f0 主上下文已积累 5 天进展（6/20 → 6/25），PROJECT-INDEX.md 头部时间戳滞后 4 天（6/20 11:00，实际内容已被 6/24 改但头部未同步）。派 4 个 explorer 并行盘点，主上下文保持干净。
+
+**4 个子 Agent 分工**:
+1. **Git 历史**（`d:\桌面\Agent 编程方法论实验-南大大一\proma-source`）→ 发现仓库自 6/15 18:27 后**完全冻结**在 v0.12.23，所有补丁演进在 orphiczhou/proma-patches 外部仓库
+2. **工作文档**（`.context/` 133 个 .md）→ 6/21 后新增/修改 47 个，引入 Layer 0-4 五层防御、DbC、Tree 模式三层分离、Phase A-G 等大量新概念
+3. **会话历史**（6/20 后 129 个 jsonl）→ 6/23 是高峰（58 个），最近活动围绕 V4-V9 DbC 加固；6/25 早晨会话 6e84f211 完成 V4-V9 followup（2 commit 入库）
+4. **实例部署**（D:\Proma*）→ 三实例 package.json 都是 v0.12.23 但 dist 内容远超；正式版被打包为 app.asar（135MB）与 dev/release **完全分叉**；tree-state.cjs 已被替换为 tree-engine.cjs；userData 迁移到 `@proma/<instance>/`
+
+**关键发现**:
+- **V4-V9 followup 已完成（6/25 早晨）**: Tree 模式首次完整实战（4 commander + 4 评价 + 洁净室 3 轮 31 测试 29 pass），2 commit 入库（`efbf139` + `59357f1`）。**洁净室发现 R2-T7**（audit_append results[i] 校验缺失，low）—— 证明 Tree 模式三层分离对抗确认偏误有效（实现者+4 评价都漏，洁净室才暴露）
+- **PROJECT-INDEX.md 状态**: 头部时间戳滞后 4 天，但 Layer 2 描述已被前序会话部分更新（V4-V9 行已存在，缺 V4-V9 followup 行 + Phase 体系 + Layer 0-4）
+- **正式版分叉严重**: D:\Proma 停在原始 v0.12.23（asar 打包），dev/release 已远超（tree-engine.cjs 2602/2471 行）
+- **Release tree-engine 落后 dev 131 行**: 需要重新同步
+
+**关键决策（本次盘点）**:
+- 派 4 个 explorer 并行盘点而非主上下文直接读 → 主上下文仅增加 ~3KB 摘要，原始数据留在子 Agent
+- 整合后更新 3 份文档：PROJECT-INDEX.md（头部+Layer 2+导航+卡点+心智模型）+ progress-report-2026-06-25.md（新建）+ note.md（本条目）
+
+**当前 P0 待办**（用户决策）:
+1. R2-T7 偏差：A 修引擎（推荐）/ B 修 spec / C 残留
+2. 重启 dev/release 加载 C2/C4 改动
+3. push 2 commits 到 GitHub
+
+**产出文件**:
+- `.context/PROJECT-INDEX.md`（头部 6/20 → 6/25，Layer 2 + V4-V9 followup 行，心智模型 7→11 条）
+- `.context/progress-report-2026-06-25.md`（新建，五天阶段性总结）
+- `.context/note.md`（本条目）
+
+**关键收获**: 4 子 Agent 并行盘点模式高效（4 路并发 ~2 分钟完成全部原始数据收集），主上下文保持干净。后续大型盘点可复用此模式。
+
 ## 2026-06-24 V4-V9 DbC 深度加固（tree-engine.cjs 9 个硬约束点）
 
 **起因**: audit-attacks.cjs 对抗测试实测 18 攻击 / 3 BYPASS(A3-omit/A5-pass-false/CP2) + 2 GAP(A4-budget0/MS-free-auditpass)。用 Tree 方法论（实现/测试/审计分离 + 自举 + 迭代收敛）推进，collaboration 独立审计子会话又发现 3 个实现者漏掉的绕过，共交付 **9 个 DbC 硬约束点**。

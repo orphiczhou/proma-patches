@@ -1,10 +1,163 @@
-# Q2: 树形会话可视化面板 — 侧边栏 UI 补丁
+# Q2: 树形体系硬化 — tree-state.js 修复 + 侧边栏 UI 面板
 
-> 版本: v1.0 | 日期: 2026-06-19 | 类型: 开发方案
+> 版本: v1.1（整合技术报告发现） | 日期: 2026-06-21 | 类型: 开发方案
+> 来源: Q1 v2 全深度验证 × 3 轮独立审计发现的 8 项问题
 
 ---
 
-## 一、问题与目标
+## 零、tree-state.js v0.2.2 硬化（Q1 v2 测试发现，优先于 UI 面板）
+
+> 来源: `technical-report-tree-system-issues.md` — Q1 v2 全深度验证 × 3 轮独立审计
+> 原则: 这些修复堵住"根会话虚空""CLI 手动注入""Events 空洞"三个结构性漏洞，是方法论合规的前提
+
+### 0.1 问题对照
+
+| 报告问题 | 严重度 | 修复方案 | Q3 天道对应规则 |
+|----------|:---:|------|------|
+| **#1 ROOT_PLACEHOLDER** — 根 session_id 不是真实 Agent 会话 | 阻断 | §0.2: init 自动创建 root leaf + validate 拒绝非 UUID | R-01（根唯一性） |
+| **#4 CLI 手动插入** — 非 root leaf 的 session_id 是占位符字符串 | 严重 | §0.3: leaf add UUID 校验 + added_by 追溯 | C-15（禁止 fork Worker）/ W-08（禁止直写 tree-state） |
+| **#5 Events 覆盖率 33%** — Worker 的 events 全是空的 | 严重 | §0.4: pending_brief 状态 + worker done 前置 events 检查 | W-01（brief_echo）+ W-12（上行消息格式） |
+| **#2 3 层 commander 未端到端验证** | 阻断 | §0.5: scope 措辞修正 + 补充真实 fork 链路测试 | C-10（max_commander_depth） |
+
+### 0.2 修复 #1：init 自动创建 root leaf
+
+**修改 `cmdInit` 函数**，在创建 tree-state.json 时自动创建 root leaf：
+
+```javascript
+// tree-state.js cmdInit 末尾新增
+const rootSessionId = opts['session-id'] || process.env.PROMA_SESSION_ID || 'PENDING_ROOT';
+state.leaves[`${treeId}-root`] = {
+  leaf_id: `${treeId}-root`,
+  session_id: rootSessionId,
+  parent: null,
+  path: '',
+  role: 'root',
+  model: opts.model || 'unknown',
+  channel: opts.channel || 'unknown',
+  status: 'active',
+  created_at: new Date().toISOString(),
+  added_by: null,
+  milestones: [],
+  events: [],
+  segment_chain: [],
+  drift_history: [],
+  autonomy_overrides: {}
+};
+```
+
+同时新增 **validate 规则**：拒绝非 UUID 格式的 root session_id：
+
+```javascript
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+for (const [id, leaf] of Object.entries(state.leaves)) {
+  if (leaf.role === 'root' && !UUID_RE.test(leaf.session_id) && leaf.session_id !== 'PENDING_ROOT') {
+    issues.push({ type: 'root_session_not_real', leaf_id: id,
+      detail: `root session_id "${leaf.session_id}" is not a valid UUID.` });
+  }
+}
+```
+
+`PENDING_ROOT` 是过渡标记（仅在使用 --session-id 和 PROMA_SESSION_ID 都不可用时回退），此时 validate 产生 warning（非 error），但要求首次真实操作前通过 `leaf set-session` 修正。
+
+**新增子命令**：`leaf set-session <tree_id> <leaf_id> <session_id>` — 修正 PENDING_ROOT 或恢复中需要更新 session_id 的场景。
+
+**工作量**：~30 行代码 + 1 个新子命令。
+
+### 0.3 修复 #4：leaf add UUID 校验 + added_by 追溯
+
+**`cmdLeafAdd` 中新增 session_id 校验**：
+
+```javascript
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if (!UUID_RE.test(session_id)) {
+  throw new TreeStateError(E_SCHEMA_INVALID,
+    `session_id "${session_id}" is not a valid UUID. Leaves must be created with real MCP session IDs.`);
+}
+```
+
+**`added_by` 字段强制**（非 root leaf）：
+
+```javascript
+if (role !== 'root') {
+  if (!added_by || !UUID_RE.test(added_by)) {
+    throw new TreeStateError(E_SCHEMA_INVALID,
+      'added_by (operator session_id) is required for non-root leaves');
+  }
+}
+```
+
+**validate 追溯检查**：非 root leaf 的 `added_by` 必须对应树中已存在的 leaf（且该 leaf 的 role ∈ {root, commander}）。
+
+**工作量**：~20 行代码。
+
+### 0.4 修复 #5：pending_brief 状态 + Worker done 前置 events 检查
+
+**新增 status 值 `pending_brief`**：
+
+Worker leaf 创建后初始状态为 `pending_brief`（而非直接 `active`）。Commander 收到 Worker 的 brief_echo 后通过 `event append` 写入 events，状态自动切换为 `active`。
+
+**Worker done 前置 events 检查**：
+
+```javascript
+// cmdLeafSetStatus 中 worker 专属检查
+if (leaf.role === 'worker' && newStatus === 'done') {
+  if (!Array.isArray(leaf.events) || leaf.events.length < 2) {
+    throw new TreeStateError(E_SCHEMA_INVALID,
+      `worker "${leafId}" must have >= 2 events (brief_echo + done) before set-status done, got ${leaf.events?.length || 0}`);
+  }
+  const hasBriefEcho = leaf.events.some(e => e.type === 'brief_echo');
+  const hasDone = leaf.events.some(e => e.type === 'done');
+  if (!hasBriefEcho || !hasDone) {
+    throw new TreeStateError(E_SCHEMA_INVALID,
+      `worker "${leafId}" events must include brief_echo and done before set-status done`);
+  }
+}
+```
+
+**工作量**：~20 行代码。
+
+### 0.5 修复 #2：scope 措辞修正 + 真实 3 层 fork 测试
+
+**scope 修正**（方法论文档措辞）：
+
+```markdown
+# 修改前
+"3层commander深度"
+
+# 修改后
+"3层commander容量验证（含第3层拒绝E_DEPTH_EXCEEDED）。已实现2层真实fork链路（root→子commander→孙commander），第3层commander深度验证超出当前测试范围。"
+```
+
+**补充端到端测试**（~15 分钟，3 个子会话）：
+
+```
+tree_id: q2depth
+root (fork from 当前会话)
+  └── X-commander (depth 1, fork from root)
+       └── Y-commander (depth 2, fork from X)
+            ├── Y-w1-worker (create_session)
+            └── Y-w2-worker (create_session)
+```
+
+验证：X 和 Y 通过 fork_session 创建并正常通信；Y 尝试创建曾孙 commander 被 E_DEPTH_EXCEEDED 拒绝。
+
+### 0.6 tree-state.js v0.2.2 变更汇总
+
+| # | 变更 | 代码量 | 优先级 |
+|---|------|:---:|:---:|
+| 0.2 | `cmdInit` 自动创建 root leaf | ~15行 | P0 |
+| 0.2 | validate: 拒绝非 UUID root session_id | ~10行 | P0 |
+| 0.2 | 新增 `leaf set-session` 子命令 | ~20行 | P1 |
+| 0.3 | `cmdLeafAdd`: UUID 校验 | ~5行 | P0 |
+| 0.3 | `cmdLeafAdd`: added_by 强制 | ~10行 | P0 |
+| 0.3 | validate: added_by 追溯检查 | ~10行 | P1 |
+| 0.4 | 新增 `pending_brief` 状态 + worker done events 检查 | ~20行 | P1 |
+| 0.5 | scope 措辞修正（文档） | 1行 | P2 |
+| **合计** | | **~90行** | |
+
+不修改 main.cjs。不修改 proma-dev-patches.cjs。不新增补丁。
+
+---
 
 ### 现状痛点
 
@@ -219,16 +372,22 @@ sed -i 's|</body>|<script src="./assets/proma-tree-view.js"></script>\n</body>|'
 
 ---
 
-## 六、与 Q1 的协同
+## 六、与 Q1 / Q3 的协同
 
-Q1 和 Q2 相互独立但互补：
+三个 Q 相互独立但互补：
 
-- Q1 解决"树结构正确性"（叶子干净上下文、role 正式化、分布式状态写入）
-- Q2 解决"树结构可视化"（侧边栏面板、实时刷新、点击导航）
+- **Q1** 解决"树结构正确性"（叶子干净上下文、role 正式化、分布式状态写入）
+- **Q2** 解决两件事：(a) tree-state.js 硬化——堵住根会话虚空、CLI 手动注入、Events 空洞三个结构性漏洞；(b) 侧边栏 UI 面板——让树可视化
+- **Q3**（天道运行官）强制执行方法论的流程规则——Q2 硬化后的 tree-state.js 校验为天道提供了更可靠的"第一道防线"
 
-Q2 的面板读取 tree-state.json，Q1 完善了 tree-state.json 的数据质量 → Q1 做得越好，Q2 面板显示的信息越准确。
+**依赖关系**：
+```
+Q2 §0 (tree-state.js 硬化) → Q1 (已在硬化后的 tree-state 上验证)
+                           → Q3 (天道依赖 tree-state.js 的 audit-gate / validate / events 校验)
+Q2 §1-8 (UI 面板) → Q3 之后实施（面板上展示天道的审计状态）
+```
 
-建议实施顺序：**先 Q1 再 Q2**。Q1 的 role 枚举和 parent 链规范化后，Q2 的面板才能正确区分枝杈/叶子并渲染层级关系。
+**实施顺序**：Q2 §0（tree-state.js 硬化）优先 → Q1 回归 → Q3 实施 → Q2 §1-8（UI 面板）
 
 ---
 
@@ -283,16 +442,31 @@ node tree-state.js milestone add demovis demovis-A-commander --json '{"id":"M1",
 
 ## 八、实施步骤总览
 
+### Part A: tree-state.js v0.2.2 硬化（优先）
+
 | 步骤 | 内容 | 预估 | 依赖 |
 | --- | --- | --- | --- |
-| 1 | 定位 main.cjs 中的 session 导航 API | 中 | — |
-| 2 | 实现 main.cjs 补丁 I（IPC handlers） | 中 | 步骤 1 |
-| 3 | 编写 proma-tree-view.js | 大 | — |
-| 4 | 编写 proma-tree-view.css | 小 | — |
-| 5 | 注入 index.html 引用 | 小 | — |
-| 6 | 部署 + Dev 实例集成测试 | 中 | 步骤 2-5 |
-| 7 | 暗色主题适配 | 小 | 步骤 6 |
-| 8 | 文档更新（wiki + 补丁清单） | 小 | 步骤 6 |
+| A1 | `cmdInit` 自动创建 root leaf | 小 | — |
+| A2 | leaf add UUID 校验 + added_by | 小 | — |
+| A3 | validate: root session_id + added_by 追溯 | 小 | A1, A2 |
+| A4 | pending_brief 状态 + Worker done events 检查 | 中 | A1 |
+| A5 | `leaf set-session` 子命令 | 小 | A1 |
+| A6 | scope 措辞修正 + 3 层 fork 测试 | 小 | A1 |
+| **Part A 合计** | **~90 行代码 + 1 新命令** | **~2h** | |
 
-**总预估**：约 3-4 个补丁的工作量（补丁 I-1 + I-2 + HTML 注入 + 前端文件），比现有补丁 A-H 中单个补丁略大，但远小于整个 patches.cjs 的体量。
+### Part B: 侧边栏 UI 面板（Part A 之后）
+
+| 步骤 | 内容 | 预估 | 依赖 |
+| --- | --- | --- | --- |
+| B1 | 定位 main.cjs 中的 session 导航 API | 中 | — |
+| B2 | 实现 main.cjs 补丁 L（IPC handlers） | 中 | B1 |
+| B3 | 编写 proma-tree-view.js | 大 | — |
+| B4 | 编写 proma-tree-view.css | 小 | — |
+| B5 | 注入 index.html 引用 | 小 | — |
+| B6 | 部署 + Dev 实例集成测试 | 中 | B2-B5 |
+| B7 | 暗色主题适配 | 小 | B6 |
+| B8 | 天道的 audit_log / nudge_log 状态展示 | 中 | Q3 完成后 |
+| **Part B 合计** | **~3-4 个补丁** | **~1d** | |
+
+**总预估**：Part A ~2h + Part B ~1d。Part A 不依赖补丁体系（纯 tree-state.js 修改），Part B 需新补丁 L。
 

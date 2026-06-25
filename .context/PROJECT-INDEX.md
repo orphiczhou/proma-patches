@@ -1,6 +1,6 @@
 # Proma 改造项目 — 知识索引
 
-> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-20 11:00
+> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-25 08:40（本次由 4 子 Agent 并行盘点后同步）
 
 新会话从这里开始读，能 5 分钟拿到项目全貌和关键路径。
 
@@ -12,7 +12,7 @@
 
 ---
 
-## 二、当前完成度（v0.16）
+## 二、当前完成度（v0.16.5 + v0.7+ 引擎 + V4-V9 DbC 加固 + Tree 模式实战）
 
 ### Layer 1 — MCP 基础设施 ✅ 完工（v0.16.5）
 
@@ -25,9 +25,10 @@
 - **remote-session Release 验收**：⚠️ 有条件通过（39/40，1 个 fork new_title Bug，不阻断上线）
 - **session-management Skill v1.3.0** + **GitHub 仓库** `orphiczhou/proma-patches` + `apply-patches.sh` v0.16.5
 
-### Layer 2 — 树形会话执行体系 ✅ v0.2.1 + v0.7 Phase A + v0.7+ 引擎内联 + v0.7 批次5 V4-V9 加固（工作区零源码）
+### Layer 2 — 树形会话执行体系 ✅ v0.2.2 + v0.7 Phase A + v0.7+ 引擎内联 + V4-V9 DbC 加固 + Tree 模式实战（工作区零源码）
 
-- **[2026-06-24] v0.7 批次5 V4-V9 DbC 深度加固**: tree-engine.cjs **9 个硬约束点**（V4/V5b/V6/V8/CP2/V9 + 审计[1][2][3]），audit-attacks **18 攻击 0 BYPASS**，dbc-spec **36/0**。Tree 方法论（实现/测试/审计分离 + 自举 + 迭代收敛）：collaboration 独立审计子会话对抗发现并修复 3 个实现者盲点（alignment_pending 标志篡改 / budget 字符串 / symlink）。关键教训：**安全检查不依赖可篡改布尔标志，验 events 留痕**。V4/V5b 破坏性（milestone set-result 需 auditor；worker done 需 alignment 回填）。Layer4 残留（互审洗白/冒用）。详见 [note.md](./note.md) + wiki §二十。**下一步**: 重启 dev 验证 / tree-commander SKILL alignment 职责 / Layer4
+- **[2026-06-25] V4-V9 followup（Tree 模式实战）**: 用 Tree 模式（4 commander 顺序 + 4 评价子 Agent + 洁净室 3 轮 31 测试 29 pass）落地 followup proposal，2 commit 入库（`efbf139` + `59357f1`）。C1 全量扫描 MCP schema、C2 修 3 个 gap（nudge_append 接口不兼容 / nudge_reset 工具缺失 / migrate dry_run）、C3 同步文档 role 枚举 + audit_append 结构、C4 加 milestone_empty_outputs 软警告。**洁净室发现 R2-T7**（audit_append results[i] 校验缺失，low，待用户决策 A/B/C）。**关键收获**：Tree 模式三层分离（实现/评价/洁净室）对抗确认偏误有效——R2-T7 是洁净室独立从 spec 写测试才暴露的（实现者+4 评价都漏）。dbc-spec 39/0、audit-attacks 18/0。**下一步**: 重启 dev/release 验证 C2/C4 / push GitHub / R2-T7 决策。详见 [followup 交接](./handoff/session-2026-06-25-followup-tree-mode.md) + [progress-report-2026-06-25](./progress-report-2026-06-25.md)
+- **[2026-06-24] V4-V9 DbC 深度加固**: tree-engine.cjs **9 个硬约束点**（V4/V5b/V6/V8/CP2/V9 + 审计[1][2][3]），audit-attacks **18 攻击 0 BYPASS**，dbc-spec **36/0**。Tree 方法论（实现/测试/审计分离 + 自举 + 迭代收敛）：collaboration 独立审计子会话对抗发现并修复 3 个实现者盲点（alignment_pending 标志篡改 / budget 字符串 / symlink）。关键教训：**安全检查不依赖可篡改布尔标志，验 events 留痕**。V4/V5b 破坏性（milestone set-result 需 auditor；worker done 需 alignment 回填）。Layer4 残留（互审洗白/冒用）。详见 [note.md](./note.md) + wiki §二十。**下一步**: 重启 dev 验证 / tree-commander SKILL alignment 职责 / Layer4
 - **[2026-06-23] v0.7+ 引擎内联 MCP**: tree-state.js(2428行)→`tree-engine.cjs` 内联进 patches.cjs 的 mcp__tree__*(27工具)，消除 spawn 包装，**工作区零源码泄漏**（agent 看不到改不到引擎代码）。`run(cmd,args,treesRoot?)`与CLI stdout等价；TREES_ROOT可注入；per-call treesRoot并发安全；findEngine自适应定位engine。验证: smoke+dbc-spec 21/0+audit-attacks 18/CRITICAL=0+A1独立审计子会话。部署 dist/(patches+engine)+激活SKILL+清理3处遗留。详见 [note.md](./note.md)。**下一步**: 重启验证/V4-V8/Phase D/Layer4
 - **[2026-06-23] v0.7 Phase A 完成** (commit `1757b5e`)：tree-state.js **+12 DbC 校验点**（A1-A7 + HARDEN2/HARDEN6 + V1/V2/V3 审计加固），把 SKILL.md 的"应当"升级为代码"必须"，对应 CP1-CP6 + SP1 + 节点预算 + 加固#2/#6。**实施**: 4 批次真实子会话(自举) + commander 独立验收(dbc-spec 21/0) + 独立对抗审计发现 BLOCKER 已修 V1(restore旁路)/V2(auditor白名单)/V3(expect_outputs非空)。重构提取 collectValidateIssues + resolveAuditorIndep。详见 [note.md](./note.md)。**下一步**: 部署+T1-T4回归 / Phase D / V4-V8深度加固 / Phase B-G / Layer 4 subagent_trace_id
 - **核心交付**：tree-state.js v0.2.2 + Phase A（ROLE_ENUM + E_DEPTH_EXCEEDED + 12 DbC + collectValidateIssues + resolveAuditorIndep 白名单 + migrate + 深度限制 + Worker禁子节点 + 根唯一性）、tree-commander SKILL v2.2、tree-worker SKILL v2.2、commander-methodology v1.2（13原则）
@@ -41,14 +42,15 @@
 
 ## 三、核心架构速查
 
-### 修改方式：两层
+### 修改方式：三层
 
 | 层 | 文件 | 适用 |
 |---|---|---|
-| `main.cjs` | sed 字符串替换 | 常量改、小段注入（补丁 A-G） |
-| `proma-dev-patches.cjs` | 独立插件文件 | 新增 MCP 工具、复杂逻辑 |
+| `main.cjs` | sed 字符串替换 | 常量改、小段注入（补丁 A-K） |
+| `proma-dev-patches.cjs` | 独立插件文件 | 新增 MCP 工具（27 个 tree_* + 11 session_* + 11 remote_*）、复杂逻辑 |
+| `tree-engine.cjs` | 内联进 patches.cjs 的 mcp__tree__*（v0.7+） | 树形会话引擎，工作区零源码泄漏（agent 看不到改不到） |
 
-**铁律**：不可从开源源码重构建 main.cjs —— 商业版有 15 个闭源模块（cloudAuth/sync/billing），源构建会导致登录失败。**正确方式：商业版 main.cjs + sed 补丁 + 插件文件。**
+**铁律**：不可从开源源码重构建 main.cjs —— 商业版有 15 个闭源模块（cloudAuth/sync/billing），源构建会导致登录失败。**正确方式：商业版 main.cjs + sed 补丁 + 插件文件 + 内联引擎。**
 
 ### 11 个核心补丁
 
@@ -99,13 +101,26 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 | **Q1 e2e验证** | `workspace-files/.context/q1-e2e-verification-report.md` | 7 leaf 端到端全通过 |
 | **Q1 全深度验证** | `workspace-files/.context/q1-full-depth-report.md` | 10 leaf 3层 38/38 全通过 |
 | **Q2 方案** | `workspace-files/.context/plan/q2-tree-ui-panel.md` v1.0 | 侧边栏树形UI面板（未实施） |
-| **最新交接** | `workspace-files/.context/handoff/session-2026-06-19-handoff.md` | Q1 v1.1 完结 → Q2 推进 |
+| **最新交接（6/25）** | `.context/handoff/session-2026-06-25-followup-tree-mode.md` | V4-V9 followup + Tree 模式实战 + R2-T7 待决策 |
+| **6/25 进度报告** | `.context/progress-report-2026-06-25.md` | 6/20→6/25 五天阶段性总结 |
+| **V4-V9 加固交接（6/24）** | `.context/handoff/session-2026-06-24-v4v9-hardening.md` | 9 DbC 硬约束点交付（独立审计迭代收敛） |
+| **Bridge 修复（6/24）** | `.context/handoff/session-2026-06-24-bridge-port-and-dbc.md` | 0.0.0.0 端口遮蔽 + DbC 运行时验证 |
+| **运行时验证（6/24）** | `.context/handoff/session-2026-06-24-runtime-verified.md` | 双实例 27 工具 + 4 DbC 拦截 |
+| **引擎内联（6/23）** | `.context/plan/tree-engine-inline-mcp.md` + `handoff/session-2026-06-23-v0.7plus-engine-inline.md` | tree-state.js(2428行) → tree-engine.cjs 内联 MCP（零源码泄漏） |
+| **Phase A（6/23）** | `.context/handoff/session-2026-06-23-v0.7-phaseA-mcp.md` | 12 DbC 校验点（commit 1757b5e） |
+| **专家审议 v1/v2（6/23）** | `.context/expert-review-2026-06-23/` + `expert-review-v2-2026-06-23/` | 五层防御架构 + 30/30/40 论断 |
+| **架构方案（6/23）** | `.context/architecture-plan-2026-06-23/` | 7 份方案（root-cause/defense/roadmap/decision-log 等） |
+| **v2 完整诊断（6/23）** | `.context/tree-system-architecture-analysis-2026-06-23.md` | Layer 0-4 五层防御深度报告 |
+| **Q1 v1.1 完结交接（6/19）** | `.context/handoff/session-2026-06-19-handoff.md` | Q1 v1.1 完结 → Q2 推进 |
 | 树形审计方法论 | `workspace-files/.context/tree-audit-methodology.md` | 终局验证 × 树形体系强制执行 |
 | remote-session 验收 | `workspace-files/.context/remote-session-release-report.md` | Release 验收 39/40 有条件通过 |
 | remote-session 提案 | `workspace-files/.context/proposal-remote-session-mcp.md` | 远端工具设计 + 实例命名 |
 | Layer 2 原始设计 | `workspace-files/.context/proma-dev-wiki-timeline-pruner.md` | 时间线剪枝者早期方案 |
 | 发布包 | `workspace-files/release/tree-system-v0.2.0/` | v0.2.0 初始版本（17 文件） |
-| Skill | `skills/tree-commander/SKILL.md` v2.2 / `skills/tree-worker/SKILL.md` v2.2 | Commander+Worker 操作手册 |
+| **Q3 硬约束方案** | `.context/plan/q3-tao-hard-constraint.md` v1.2 | TAO Watcher（35 条规则，audit-gate + Pulse + Auditor） |
+| **Tree 方法论** | `.context/handoff/session-2026-06-25-followup-tree-mode.md` §关键技术决策 | 实现/commander/评价/洁净室三层分离 |
+| **followup proposal** | `.context/tree-engine-followup-fixes-proposal.md` | V4-V9 后续专家评估清单（已落地） |
+| Skill | `skills/tree-commander/SKILL.md` v2.2 / `skills/tree-worker/SKILL.md` v2.2 | Commander+Worker 操作手册（v2.2 已补 V5b alignment 回填） |
 | Skill | `skills/session-management/SKILL.md` v1.3.0 | 会话管理技能 |
 | 部署 README | `workspace-files/README.md` + `AGENT-PROMPT.md` | 安装流程 |
 | GitHub | `orphiczhou/proma-patches` + `apply-patches.sh` v0.16.5 | 一键部署 |
@@ -123,41 +138,56 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 
 ## 五、当前卡点与待办
 
-### 🔴 卡点
+### 🔴 卡点 / 待决策（6/25）
 
-- **I3 并发竞态丢消息**：同一会话并发 fire-and-forget send_message 存在竞态条件，3 条并发中 2 条静默丢失。需排查 `runAgentHeadless` 并发守卫
-- **cloud-auth token 共享冲突**：Release 共享正式版数据时，token 刷新互相踢下线
+- **R2-T7 偏差待用户决策**：洁净室发现 audit_append 的 `results[i]` 内部结构无校验（spec 要求三元组 `{item, pass, evidence}`，但 engine 只验顶层字段）。low 严重度，**三选项**：A. 修引擎加 results[i] 校验（推荐）/ B. 修 spec 改"建议三元组但不强制" / C. 记录残留。详见 [followup 交接](./handoff/session-2026-06-25-followup-tree-mode.md)
+- **C2/C4 改动未加载**：followup 改了 patches.cjs（MCP gap）+ engine（软警告）已 cp 到 dev/release dist，但**实例未重启**仍是旧版。重启后端到端 MCP 验证：`tree_nudge_append` / `tree_nudge_reset` / `tree_migrate(dry_run=true)` / milestone 软警告
+- **2 commit 待 push**：`efbf139` + `59357f1` 已入库 orphiczhou/proma-patches，用户决定是否推 GitHub
+- **dev MCP workspace=null**：dev 子会话 slug "undefined" 导致 `mcp__tree__*` 直调不可用（影响 dev 实例 Tree 可用性）
+- **Layer 4 残留（平台层依赖）**：互审洗白（两 worker 互审）+ 冒用真实 session，需 subagent_trace_id 绑定（CLI 极限，非 bug）
 
 ### 🟡 已知限制
 
-- **remote-session fork new_title 忽略**：Fork 后标题始终追加 "(fork)"，new_title 参数不生效（中等严重度，不阻断）
-- **GLM 全线配额耗尽**：ZLM-CodingPlan 和 proma-official 的 GLM 模型均不可用。已验证可用：DeepSeek官方频道的 V4 Pro/Flash + MiniMax-M3
-- **notify 异步上报未验证**：所有子会话用 wait=true 同步模式，真正的事件通道异步路由未测试
-- **Commander prune/archive 级联未定义**（M5）
+- **正式版与 dev/release 分叉**：`D:\Proma\` 已打包为 `app.asar`（135MB 单文件），未应用任何 sed 补丁，停在原始 v0.12.23；dev/release 的 dist 已远超（tree-engine.cjs 2602/2471 行）。正式版未来同步需重打包
+- **三实例版本号一致但内容不同**：package.json 都是 v0.12.23，但 dev/tree-engine.cjs 2602 行 vs release 2471 行（release 是 fork 快照，已落后 131 行）
+- **remote-session fork new_title 忽略**：Fork 后标题始终追加 "(fork)"（中等，不阻断）
+- **GLM 全线配额耗尽**：DeepSeek 官方频道 V4 Pro/Flash 可用（channel `56ecefd2-...`）
+- **notify 异步上报未验证**：所有子会话用 wait=true 同步模式
+- **Commander prune/archive 级联未定义**（M5 / Phase D1）
+- **start-release-fresh.bat 异常**：指向 `D:\Proma-dev\Proma-coral.exe`（应为 release 目录），且 ISOLATED=1 实际跑在 dev 路径下
 
-### ✅ 已修复（2026-06-18 ~ 2026-06-19）
+### ✅ 已修复（2026-06-18 ~ 2026-06-25）
 
 | 版本 | 修复内容 |
 |------|---------|
 | v0.16.3 | Bug 1（补丁 H v2：跨频道/跨provider切换）、Bug 4（fork 跨 sdkSession 候选循环试错）、Bug 5（send_message 同步 meta） |
 | v0.16.4 | 补丁 I（禁更新）、补丁 J（AppUserModelId 隔离）、补丁 K（userData 动态路径） |
 | v0.16.5 | 补丁 K 修正：恢复 `ISOLATED === "1"` 双条件检查，防止 Release 误隔离 |
-| v0.2.1 | 洁净室审计 22 项修正 + L1Fix v2 审计（7 worker × 2 round） + Q1 v1.1 架构升级（role枚举/深度限制/migrate/Leaf Purity） |
+| v0.2.1 → v0.2.2 | 洁净室审计 22 项修正 + L1Fix v2 审计（7 worker × 2 round）+ Q1 v1.1 架构升级（role枚举/深度限制/migrate/Leaf Purity）+ ROOT_PLACEHOLDER/CLI 注入/Events 空洞修复 |
+| v0.7 Phase A（6/23） | 12 DbC 校验点（A1-A7 + HARDEN2/HARDEN6 + V1/V2/V3 审计加固）+ collectValidateIssues + resolveAuditorIndep 白名单 + migrate（commit `1757b5e`） |
+| v0.7+ 引擎内联（6/23） | tree-state.js(2428行) → `tree-engine.cjs` 内联进 patches.cjs MCP（27 工具），消除 spawn 包装，**工作区零源码泄漏** |
+| Bridge 修复（6/24） | Dev bridge 0.0.0.0:19876 端口遮蔽 bug（Windows bat 必须 ASCII），3 实例 bridge fallback 全通过 |
+| V4-V9 DbC 加固（6/24） | 9 硬约束点（V4/V5b/V6/V8/CP2/V9 + 审计[1][2][3]），audit-attacks 18 攻击 0 BYPASS，dbc-spec 36/0 |
+| V4-V9 followup（6/25） | MCP gap 批量修复（nudge_append/reset/migrate）+ 文档同步 + milestone 软警告。commit `efbf139` + `59357f1`。dbc-spec 39/0、audit-attacks 18/0、洁净室 29/31 |
 
 ### ✅ 已澄清（不是 bug）
 
 - **Bug 2（Fork 截断 20 轮）**：auto-compact 从未触发 → Fork 不丢消息。感知错觉来自 `list_messages` 默认 `limit=50`
 
-### 待办优先级
+### 待办优先级（6/25）
 
 | 优先级 | 任务 |
 |---|---|
-| P0 | Q3 硬约束体系设计+实施（进度控制） |
-| P1 | Q2 树形UI面板实施（补丁 L：proma-tree-view.js + IPC + index.html 注入） |
-| P1 | I3 并发竞态修复 |
-| P2 | remote-session fork new_title 修复 |
-| P2 | v0.3 心跳/内审/竹节交接编码实现 |
-| P3 | 模型列表缓存优化、IME 卡顿（已提 issue proma-ai/Proma#870） |
+| P0 | **R2-T7 决策**（A 修引擎 / B 修 spec / C 残留）—— 用户定 |
+| P0 | **重启 dev/release 验证 C2/C4**（用户操作）+ 端到端 MCP 测试 |
+| P1 | push 2 commits 到 GitHub（`git push origin master`） |
+| P1 | **tree-commander SKILL 补 alignment 回填职责**（审计[4]，worker 已补，commander 侧待补） |
+| P1 | **dev MCP workspace=null 排查**（slug "undefined"） |
+| P2 | Phase D：D1 prune/archive 级联语义 / D2 migrate 版本号 / D3 watcher silence_minutes |
+| P2 | Q2 树形 UI 面板（补丁 L）实施 — 已让位给 v0.7+ 引擎内联 |
+| P2 | Layer 4 subagent_trace_id（平台层，大工程，单独立项） |
+| P3 | 沉淀"Tree 模式多会话协作"为可复用 Skill |
+| P3 | remote-session fork new_title 修复 / I3 并发竞态 / 模型列表缓存 |
 
 ---
 
@@ -212,13 +242,17 @@ cp /tmp/main-patched.cjs D:/Proma-dev/resources/app/dist/main.cjs
 
 ## 七、关键心智模型
 
-1. **三层实例**：正式版（不可动）/ Dev（隔离双开调试）/ Release（NAME=release + ISOLATED=0，共享正式版数据）
+1. **三层实例**：正式版（不可动，已被 asar 打包，与 dev/release 完全分叉）/ Dev（隔离双开调试）/ Release（NAME=release + ISOLATED=0，共享正式版数据）
 2. **两变量体系**：`PROMA_INSTANCE_NAME` 管身份（remote-session 发现、AppUserModelId）/ `PROMA_INSTANCE_ISOLATED` 管数据隔离（1=独立、0=共享）
-3. **两层修改**：sed 改 main.cjs（轻量）/ 插件文件写复杂逻辑（自由）
-4. **两类 MCP 工具**：本地 `session`（进程内直连）/ 远端 `remote-session`（HTTP 自动发现，instance 参数）
+3. **三层修改**：sed 改 main.cjs（轻量补丁 A-K）/ patches.cjs 写 MCP 工具（27+11+11）/ tree-engine.cjs 内联（v0.7+ 工作区零源码）
+4. **两类 MCP 工具**：本地 `session`（进程内直连 global.__proma__）/ 远端 `remote-session`（HTTP 自动发现 19876-19895，instance 参数）
 5. **三种 send_message 模式**：wait 同步 / notify 异步 / fire-and-forget + 轮询
-6. **树形体系三层 role**：root（根，唯一，结构性变更）/ commander（子/孙，fork创建，受深度限制，leaf add+管理下属）/ worker（叶子，create_session 干净上下文，只上报不写 tree）
+6. **树形体系三层 role**：root（根，唯一，结构性变更）/ commander（子/孙，fork创建，受深度限制≤3，leaf add+管理下属）/ worker（叶子，create_session 干净上下文，只上报不写 tree）
 7. **AGPL 合规**：闭源插件通过 `global.__proma__` 桥接调用核心 API，不修改核心代码 → 不构成衍生作品
+8. **DbC（Design by Contract）+ Zero Trust 仲裁**：把 SKILL.md 的"应当"升级为代码"必须"，9 硬约束点（V4/V5b/V6/V8/CP2/V9 + 审计[1][2][3]），安全检查不依赖可篡改布尔标志（验 events 留痕）
+9. **Tree 模式三层分离**（对抗确认偏误）：实现（commander）/ 评价（独立子 Agent）/ 洁净室（独立团队，禁看实现者测试，从 spec 写测试）。R2-T7 是洁净室才暴露的（实现者+4 评价都漏）
+10. **五层防御 Layer 0-4**（v2 架构）：Layer 1 事中硬约束（最缺，已做 12 DbC + 9 V4-V9）/ Layer 4 subagent_trace_id（平台层依赖，未做）
+11. **30/30/40 论断**：prompt 30% + 模型 RLHF 30% + harness 40%（来自 Laban ICLR 2026 + Anthropic 多 Agent 实测）
 
 ---
 

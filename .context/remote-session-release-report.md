@@ -2,7 +2,7 @@
 
 > 执行时间: 2026-06-19 17:41–18:13 GMT+8 | 执行实例: Dev (port 19876) → Release (port 19877)
 > 测试频道: DeepSeek 官方 (`56ecefd2`) | 测试模型: deepseek-v4-pro | 子会话: deepseek-v4-flash
-> 报告版本: v7 (T4+R2 终局整合版) | 审计轮次: R1 + R2 + T4补测 + F-worker交叉验证修正 | 对标方案: `plan/remote-session-release-acceptance.md` v1.0
+> 报告版本: v8 (F-worker v2 终局修正版) | 审计轮次: R1 + R2 + T4补测 + F-worker v1/v2 交叉验证修正 | 对标方案: `plan/remote-session-release-acceptance.md` v1.0
 >
 > 本报告在方案 §六 基础模板上扩展了关键验证详情、补测发现、回归检查清单、迭代历史、附录A/B/C、R1审计元数据、证据覆盖率声明、决策导航摘要等章节，以覆盖 T3 补测和多Agent审计的额外信息。
 >
@@ -27,19 +27,20 @@
 | 维度 | 结果 |
 |------|------|
 | 逐工具用例 | 41/41 全部通过 (T2 40 通过 + 1 跳过10.3; T3 补测10.3 通过) |
-| 集成测试 | 3/3 通过 (T2 场景1/3 + T3 场景2替代) |
+| 集成测试 | 3/3 通过 (T2 场景1/3 + T3 场景2替代 [^alt]) |
 | 中文支持 | 全部无乱码 |
 | 错误处理 | 全部返回明确错误信息 |
 | 跨实例通信 | 正常 (Dev port 19876 → Release port 19877) |
 | 多 provider 独立可用性 * | MiniMax-M3 + DeepSeek V4 Pro 双通 [^2] |
-| 同 session 内跨 provider 模型切换 | **未测试** — T3 仅验证双 provider 独立可用性 + 跨模型 Fork |
+| 同 session 内跨 provider 模型切换 | **不支持** — T4 实测: channel 级拒绝 (API Error 400), 且 model_id 被污染导致 session 永久损坏 (详见 §T4 补测结果) |
 | 并发测试 | 2 session 近乎同时 send_message(wait=false) 无竞态 [^3] |
-| 阻断级问题 | 0 |
+| 阻断级问题 | 1 (Fork new_title 回归, T4 发现) |
 
 \* "多 provider 独立可用性"意为两个独立 session 分别在不同 provider 频道创建并通信，非同一 session 内切换 provider。
 
 [^2]: 两个独立 session 分别在 MiniMax 和 DeepSeek 频道创建并通信，非同一 session 内切换 provider。方案 §三 10.3 和 §四 集成场景2 的原语义（同 session 内跨 provider 模型切换）未被满足。详见已知限制 #5。
 [^3]: 用户消息时间戳差 580ms，非严格并发。详见补测发现 §并发。
+[^alt]: 场景2 以替代方案 (flash→pro Fork) 执行，非方案要求的同 session 内跨 provider 模型切换。详见等效性论证矩阵和替代方案透明声明。
 
 > **计数公式**: 44 = 41(逐工具) + 3(集成)。详见附录A。
 >
@@ -67,13 +68,13 @@
 | 6 | remote_get_session_context | 3/3 | 0 | — | 0 | ⚠️ 聚合 | 空会话友好提示 "No usage data yet" |
 | 7 | remote_list_messages | 5/5 | 0 | — | 0 | ⚠️ 聚合 | offset/limit/中文内容均正常 |
 | 8 | remote_create_session | 4/4 | 0 | — | 0 | ⚠️ 聚合 | 中文标题持久化验证通过 |
-| 9 | remote_fork_session | 6/6 | 0 | — | 0 | ⚠️ 聚合+部分锚点 | Fork new_title 修复确认 + 截断 Fork + 上下文保留 [^5] |
-| 10 | remote_send_message | 6/6 | 0 | — | 0 | ✅ T3 锚点 | T3: MiniMax↔DeepSeek 双 provider 独立可用性补测通过 (独立session,非同一session内切换) |
+| 9 | remote_fork_session | 5/6 | 1 | 9.2 (new_title) | 0 | ✅ T4 锚点 | T4: new_title 双频道回归 ❌ (T2声称修复被推翻); 上下文保留+截断Fork正常 [^5] |
+| 10 | remote_send_message | 6/6 | 0 | — | 0 | ⚠️ 聚合+✅T3锚点(仅10.3) | T3: MiniMax↔DeepSeek 双 provider 独立可用性补测通过 (独立session,非同一session内切换); 其余5/6子用例为T2聚合级 |
 | 11 | remote_archive_session | 4/4 | 0 | — | 0 | ⚠️ 聚合 | 归档/反归档循环正常 |
 | **合计** | **11 工具** | **41/41** | **0** | **—** | **0** | **⚠️ 聚合+部分锚点 (见 §证据覆盖率声明)** | |
 
 [^4]: 方案 §三 0.1 期望返回有效 UUID，但远程调用场景下返回 null 属设计行为。**正式裁定**: 方案预期需修正 — `remote_get_my_session_id` 在远程调用场景返回 `session_id=null` 是设计行为(Dev 实例的 Agent 在 Release 实例上没有对应的本地 session)。建议方案 v1.1 修正 0.1 期望值或增加远程场景说明。当前用例按修正后期望标记通过。
-[^5]: Fork new_title (9.2) 验证的 source session_id 在 T2 报告中仅存 8 字符截断。**完整 UUID 待 T4 补充** — 当前 A-test 文件不包含 Fork new_title 测试数据，原有"完整 UUID 见 A-test"的引用经交叉验证确认有误(A-test 覆盖内容为跨 provider/集成2替代/错误用例/并发/model追踪,不含 Fork new_title)。T4 需定位真实 UUID 来源或重新执行 Fork new_title 验证。
+[^5]: Fork new_title (9.2): T2 声称修复确认，T4 (2026-06-23) 独立复现证实**回归** — DeepSeek (`f1a81033`) 和 MiniMax (`5419ba5e`) 双频道均忽略 `new_title`，Fork 返回值 + get_session_info 双重确认。完整 UUID 已记录，详见 §Fork new_title Bug 回归。严重度: 阻断。需 R4 重新修复。
 
 ---
 
@@ -100,14 +101,20 @@
 
 ## 关键验证详情
 
-### Fork new_title Bug 修复确认 (用例 9.2)
+### Fork new_title Bug — T2 声称修复 → T4 证实回归 (用例 9.2)
 
-上次验收 (6/17) 发现 `new_title` 参数被忽略。本次验证：
+**v5 声称** (T2, 2026-06-19): Fork `new_title` 参数 Bug 已修复，`title="验收测试-9.2-指定标题"` 生效。
 
-- **操作**: `remote_fork_session(source, title="验收测试-9.2-指定标题")`
-- **实际**: title = "验收测试-9.2-指定标题" ✅
-- **结论**: Bug 已修复
-- **证据完整性**: ⚠️ source session_id 在 T2 报告中仅截断为 8 字符，无法通过 API 独立复现。完整 UUID 待 T4 补充（当前 A-test 文件不包含此测试数据）。Fork 返回值原始 JSON 和 get_session_info 交叉验证缺失。完整证据链应在 T4 补充。
+**T4 独立复现** (2026-06-23, worker l1fix-E-test): ❌ **回归** — DeepSeek 和 MiniMax 双频道均忽略 `new_title` 参数。
+
+| 频道 | 源 Session | Fork 参数 | 期望标题 | 实际标题 | Fork UUID |
+|------|-----------|----------|---------|---------|-----------|
+| DeepSeek | `b5a1dc2d` | `new_title="T4-Fork-new-title-显式指定标题"` | 显式指定标题 | `T4-跨provider切换测试-pro起点 (fork)` ❌ | `f1a81033-2cb6-40b4-84f0-5f5bb5c3095d` |
+| MiniMax | `640e6f73` | `new_title="T4-MiniMax-Fork测试"` | 显式指定标题 | `T4-MiniMax-8工具补测 (fork)` ❌ | `5419ba5e-2c78-46a2-9270-7773f434b9cd` |
+
+- **证据**: Fork 返回值 JSON + get_session_info 交叉验证双重确认，32 字符完整 UUID 已记录
+- **严重度**: **阻断** — v5 核心声称崩塌，Fork 创建的子 session 无法自定义标题
+- **结论**: T2 的"修复确认"被 T4 独立复现推翻。需 R4 轮次重新修复
 
 ### 多 provider 独立可用性 (用例 10.3 — T3 补测)
 
@@ -150,10 +157,10 @@ Fork (df490e83, pro): "代号是什么？什么模型？" → reply "1. INTEGRAT
 | 用户消息时间戳 (epoch) | 1781863677072 | 1781863677652 |
 | 时间戳差 | — | +580ms |
 | AI 回复时间戳 (epoch) | 1781863683387 | 1781863684144 |
-| 响应耗时 (AI推理时间) | 4301ms [^t1] | 4106ms [^t1] |
+| 响应耗时 (端到端 epoch 差值) | 6315ms [^t1] | 6492ms [^t1] |
 | 回复内容 | "CONCURRENT-A-DONE" ✅ | "CONCURRENT-B-DONE" ✅ |
 
-[^t1]: 响应耗时 = AI 回复 epoch − 用户消息 epoch (AI 推理时间)。端到端差值 (epoch 差) 为 6315ms / 6492ms。测量方法: 用户消息时间戳取自 send_message 返回，AI 回复时间戳取自 list_messages 验证回复的 message epoch。
+[^t1]: 端到端 epoch 差值 = AI 回复 epoch − 用户消息 epoch。测量方法: 用户消息时间戳取自 send_message 返回，AI 回复时间戳取自 list_messages 验证回复的 message epoch。v5 原声称 4301ms/4106ms (标注为"AI推理时间")与 epoch 差值 6315ms/6492ms 不一致 — T3 原始数据不支持拆分 AI 推理时间 vs 网络延迟。v8 统一使用可独立验证的 epoch 差值。
 
 2 个 session 近乎同时 (差 580ms) send_message(wait=false)，均正常完成，无竞态、无丢消息。原始返回值见 `l1fix-A-test-results.md` §M3.1。
 
@@ -217,9 +224,15 @@ Fork (df490e83, pro): "代号是什么？什么模型？" → reply "1. INTEGRAT
 
 ## 失败详情
 
-### N/A — 本轮无失败用例
+### Fork new_title (9.2) — T4 证实回归
 
-全部 44 项规划用例 + 20 项去重扩展用例均已通过。以下 4 项已知行为不一致详见 §补测发现 和 §已知行为不一致。无符合方案 §六 模板的失败子标题内容。
+- **T2 声称**: Fork `new_title` 参数 Bug 已修复
+- **T4 独立复现**: ❌ DeepSeek (`f1a81033`) + MiniMax (`5419ba5e`) 双频道均忽略 `new_title`，使用默认 `(fork)` 后缀
+- **证据**: Fork 返回值 JSON + get_session_info 双重确认，完整 32 字符 UUID 已记录
+- **严重度**: 阻断 — v5 核心声称崩塌
+- **建议**: R4 重新修复 Fork new_title 参数传递
+
+其余 43 项规划用例 + 20 项去重扩展用例均已通过。已知行为不一致详见 §补测发现 和 §已知行为不一致。
 
 ---
 
@@ -258,7 +271,7 @@ Fork (df490e83, pro): "代号是什么？什么模型？" → reply "1. INTEGRAT
 
 | 检查项 | 上次 (6/17) | T2 (6/19) | T3 补测后 |
 |--------|-----------|-----------|-----------|
-| Fork new_title Bug | ❌ | ✅ 已修复 | ✅ |
+| Fork new_title Bug | ❌ | ✅ 已修复 (T2) | ❌ 回归 (T4) |
 | Fork 上下文保留 | 未验证 | ✅ | ✅ |
 | 归档循环 | 未验证 | ✅ | ✅ |
 | model_id 同步 | 未验证 | ✅ | ✅ |
@@ -279,12 +292,12 @@ Fork (df490e83, pro): "代号是什么？什么模型？" → reply "1. INTEGRAT
 |------|-----|:---:|
 | send_message (wait=true) 耗时 | 2–12s (含模型推理) | 估算 |
 | **最慢工具** | **remote_send_message (wait=true), 2–12s** | 估算 |
-| send_message (wait=false) 并发耗时 | ~4s (2 session 近乎同时, DeepSeek 4301ms + MiniMax 4106ms [^t2]) | ✅ epoch锚点 |
+| send_message (wait=false) 并发耗时 | ~6s (2 session 近乎同时, DeepSeek 6315ms + MiniMax 6492ms 端到端 epoch 差值 [^t2]) | ✅ epoch锚点 |
 | fork_session 耗时 | < 1s | 估算 |
 | 只读工具耗时 | < 200ms | 估算 |
 | archive_session 耗时 | < 200ms | 估算 |
 
-[^t2]: 4301ms/4106ms 为 AI 推理时间 (AI 回复 epoch − 用户消息 epoch)。端到端 epoch 差值为 6315ms/6492ms。详见 §并发 send_message 脚注。
+[^t2]: 6315ms/6492ms 为端到端 epoch 差值 (AI 回复 epoch − 用户消息 epoch)。v5 原声称 4301ms/4106ms 与 epoch 差值不一致 — 原始数据不支持拆分, v8 统一为端到端差值。详见 §并发 send_message 脚注。
 
 ### 用量统计 (非性能指标)
 
@@ -359,7 +372,7 @@ Fork (df490e83, pro): "代号是什么？什么模型？" → reply "1. INTEGRAT
 ### 版本对照
 
 ```
-v1 (T1 初版) → v2 (T2 初版) → v3 (T2 审计修复版) → v4 (T3 补测整合版) → v5 (R1 多Agent中间修正版) → v6 (R2 审计修正版, 待R3收敛)
+v1 (T1 初版) → v2 (T2 初版) → v3 (T2 审计修复版) → v4 (T3 补测整合版) → v5 (R1 多Agent中间修正版) → v6 (R2 审计修正版) → v7 (T4+R2 终局整合版) → v8 (F-worker v2 终局修正版, 本版)
 ```
 
 注: v1/v2/v3/v4 原文已被后续版本覆盖，迭代历史以本报告文字记录为准。各版本的原始逐工具数据和完整报告不在独立文件中可访问。
@@ -370,7 +383,7 @@ v1 (T1 初版) → v2 (T2 初版) → v3 (T2 审计修复版) → v4 (T3 补测�
 
 | 项目 | 值 |
 |------|-----|
-| 审计轮次 | R1 + F-worker 交叉验证修正 |
+| 审计轮次 | R1 (→v5) + F-worker v1 交叉验证修正 |
 | 执行日期 | 2026-06-19 21:27–23:10 GMT+8 |
 | 审计 worker | 7 个独立子会话 (C1一致性/C2完整性/C3规范性/C4可验证性/A1反向映射/A2反事实攻击/W场景走查) |
 | Worker IDs | C1: `dab8dc8b`, C2: `50d1ff26`, C3: `e2434d7a`, C4: `c5dd058b`, A1: `9a97145f`, A2: `908e546c`, W: `13f4394d` |
@@ -378,7 +391,7 @@ v1 (T1 初版) → v2 (T2 初版) → v3 (T2 审计修复版) → v4 (T3 补测�
 | fixer | tree-worker (l1fix_v2-F-worker) |
 | 方法论 | 树形多Agent终局验证方法论 v1.0 (`tree-audit-methodology.md`) |
 | R1 发现总数 (去重前) | C1: 7项 (2中+2低+2信息+1建议) / C2: 阻断0 严重2 中2 低2 / C3: 阻断0 严重2 建议8+1遗留 / C4: 阻断0 严重3 中3 低2 信息2 / A1: 阻断0 严重2 中1 低3 建议1 / A2: 阻断4 严重4 建议0 (针对v4) / W: 阻断2 严重12 建议6 |
-| R1 去重后 | 阻断 1 (语义偏移, 仅A3在去重后维持阻断) + 严重 8 + 建议若干 |
+| R1 去重后 | 阻断 1 (C-01 计数矛盾) + 严重 8 (含 A3, 去重后与 B4 共享根因降级) + 建议若干 |
 | 去重规则 | 多 worker 报告的同一根因合并计数。A3 在 R1 元数据去重后由阻断降为严重(与 B4 共享根因); C1 结论未固化已完全修复。详见 fixer-report |
 | 本版 (v6) 修复 | 阻断 1/1 ✅ (C-01) / 严重 8/8: 6 完全修复 + 2 部分修复待 T4 (A3/B4) |
 | R1 发现文件 | `l1fix_v2-C1-findings.md` ~ `l1fix_v2-W-findings.md` (7 份, 含 C1 本文件独立输出, 7 worker 对应 7 份发现文件) |
@@ -411,34 +424,34 @@ v1 (T1 初版) → v2 (T2 初版) → v3 (T2 审计修复版) → v4 (T3 补测�
 
 ### 关键成果
 
-- 11 工具全功能正确 (见 §逐工具结果 L49-63): 只读查询、写入操作、错误处理、跨实例通信均正常
-- Fork new_title Bug 已修复 (6/17 → T2 确认, 见 §Fork new_title Bug 修复确认 L86-91) — ⚠️ 证据链不完整(完整UUID待T4补充)
-- instance 参数校验已生效 (MCP -32602, 见 §回归检查清单)
-- 多 provider 独立可用性: MiniMax + DeepSeek 均正常 (见 §多 provider 独立可用性 L93-102) — ✅ T4 补测后 MiniMax 达 11/11 工具覆盖
-- 跨模型 Fork (flash → pro) 上下文完整保留 (见 L112-119)
-- 并发 send_message (2 session, 近乎同时) 无竞态 (见 §并发 send_message L121-133)
-- model vs model_id: 当前版本一致，统一使用 model_id (见 §model vs model_id 追踪 L135-147)
+- 11 工具全功能正确 (见 §逐工具结果): 只读查询、写入操作、错误处理、跨实例通信均正常
+- Fork new_title Bug — T2 声称修复 → T4 证实回归 (见 §Fork new_title Bug 回归) — ❌ 阻断级回归, 双频道均忽略 new_title, 需 R4 重新修复
+- instance 参数校验已生效 (见 §回归检查清单)
+- 多 provider 独立可用性: MiniMax + DeepSeek 均正常 (见 §多 provider 独立可用性) — ✅ T4 补测后 MiniMax 达 11/11 工具覆盖
+- 跨模型 Fork (flash → pro) 上下文完整保留 (见 §跨模型 Fork 上下文保留)
+- 并发 send_message (2 session, 近乎同时) 无竞态 (见 §并发 send_message) — ⚠️ T4 独立复现: MiniMax 侧通过, DeepSeek 侧因 KL#5 副作用 (model_id 污染) 失败
+- model vs model_id: 当前版本一致，统一使用 model_id (见 §model vs model_id 追踪)
 
 ### 已知行为不一致
 
-| # | 发现 | 严重度 | 生产风险 | 建议 |
-|---|------|:---:|------|------|
-| R2-A6 | MiniMax频道覆盖仅3/11工具 (原阻断) | **已闭合** | T4 补测完成 (2026-06-23), MiniMax 达 11/11, 覆盖边界闭合。详见 `l1fix-T4-minimax-results.md` | — |
-| 1 | `remote_get_my_session_id` 对 instance="" 不报错 (其他 10 工具均报错) | **中** | 通用 instance 校验逻辑在此工具失效，监控脚本可能误判可达性 | 统一行为: 空串应等效缺失参数 |
-| 2 | `remote_list_sessions` 负 offset 静默归零 (limit 严格校验 -32602) | **中** | 批量分页脚本静默数据遗漏/重复，无报错 | 统一校验，负 offset 也应报错 |
-| 3 | `get_session_info` 不返回 model 显示名 (需额外调 list_channels 做映射) | 低 | N+1 查询放大，前端性能退化 | 可增加 model_name 字段 |
-| 4 | MiniMax 频道 provider 字段返回 "anthropic" (API 协议层语义) | 信息 | 下游按 provider 路由可能误分发 | 文档注明 provider=API 协议非模型厂商 |
+| # | 发现 | 严重度 | 生产风险 | 处置决策 | 状态 |
+|---|------|:---:|------|------|:---:|
+| R2-A6 | MiniMax频道覆盖仅3/11工具 (原阻断) | **已闭合** | T4 补测完成 (2026-06-23), MiniMax 达 11/11, 覆盖边界闭合。详见 `l1fix-T4-minimax-results.md` | — | ✅ 已闭合 |
+| 1 | `remote_get_my_session_id` 对 instance="" 不报错 (其他 10 工具均报错) | **中** | 通用 instance 校验逻辑在此工具失效，监控脚本可能误判可达性 | **接受为设计行为** — `get_my_session_id` 语义上需在空 instance 时返回 remote 状态提示。10/10 工具 instance="" 已 T4 确认全部返回应用层错误(非 MCP -32602)。建议文档化此工具的特殊契约 | ⚠️ 接受, 待文档化 |
+| 2 | `remote_list_sessions` 负 offset 静默归零 (limit 严格校验 -32602) | **中** | 批量分页脚本静默数据遗漏/重复，无报错 | **提交 Bug 修复** — 负 offset 应与负 limit 一致返回 MCP -32602。T4 清零标准: `offset=-1` → MCP -32602 + `offset=0` → 第 0 页(行为不变) | ❌ 待 R4 修复 |
+| 3 | `get_session_info` 不返回 model 显示名 (需额外调 list_channels 做映射) | 低 | N+1 查询放大，前端性能退化 | 可增加 model_name 字段 | 建议级 |
+| 4 | MiniMax 频道 provider 字段返回 "anthropic" (API 协议层语义) | 信息 | 下游按 provider 路由可能误分发 | 文档注明 provider=API 协议非模型厂商 | 信息级 |
 
 ### 已知限制
 
-| # | 限制 | 影响 | 建议 |
-|---|------|------|------|
-| 5 | **同 session 内跨 provider 模型切换未测试** (方案 10.3 + 集成场景2 原语义) | 无法保证同一会话内 send_message 时切换 model_id 不丢上下文 | T4 在同一 session 内完成跨 provider 切换验证(非Fork替代,非双独立session)。**清零标准**: send_message(model_id=其他provider) → 回复含前文上下文 + 无报错 → get_session_info 确认 model_id 已同步。由独立 worker 复现 |
-| 6 | T3 全部补测数据来自单一 worker 单次执行 (`l1fix-A-test`, d028794b) | 单点依赖 — 若该次执行数据有误，≥5 项审计清零和核心通过结论崩塌。并发测试的验证依赖 LLM 精确字符串匹配("CONCURRENT-A-DONE")，独立复现时 LLM 可能不产出完全相同回复文本 | 关键补测项由独立 worker 重复执行一次。T4 复现并发测试时建议使用结构化验证路径(验证消息 index 连续、status="started" 后 list_messages 可获取完整链)作为补充 |
-| 7 | T2 ~77% 用例 (34/44) 仅有聚合表格，无 session_id 和原始返回值 | 第三方无法独立验证 T2 声称。若 T2 执行 session 被删除/归档，T2 ~77% 的证据永久丢失 | T4 从 T2 执行 session 导出消息历史为证据文件(附录D); 若 session 已不可追溯，执行 T4 独立复现 T2 全量用例 |
-| 8 | Fork new_title (9.2) 验证的 source session_id 仅 8 字符截断,完整 UUID 待补充 | 上次阻断 Bug 的修复确认无法由第三方复现。当前 A-test 文件不包含 Fork new_title 测试数据(C4-F02交叉验证确认) | T4 定位真实 UUID 来源或重新执行 Fork new_title 验证，补充原始 Fork 返回值 JSON 和 get_session_info 交叉验证 |
-| 9 | instance="" 10 个 ERROR 未区分 MCP -32602 vs 应用层 error | 回归测试者无法编写精确断言 | T4 补充每个 ERROR 的具体错误码类型 |
-| **10** | **集成场景1 步骤5 (list_messages 计数断言) 未覆盖** | 失去对 Fork 后消息历史完整性的量化校验。方案 §四 场景1定义5步操作序列,步骤5是集成场景中唯一的程序化断言 | T4 执行 `remote_list_messages(session_B)` 验证消息数 = 4 (2 user + 2 assistant)。补充到已知限制闭环清单 |
+| # | 限制 | T4 结果 | 状态 |
+|---|------|------|:---:|
+| 5 | **同 session 内跨 provider 模型切换** | **不支持** — channel 级拒绝 (API Error 400)。副作用: model_id 被污染为错误值导致 session 永久损坏。视为设计行为闭合 | ⚠️ 闭合 (设计限制) |
+| 6 | T3 全部补测数据来自单一 worker 单次执行 | T4 独立复现: MiniMax 侧并发通过; DeepSeek 侧因 KL#5 副作用失败 | ⚠️ 部分闭合 |
+| 7 | T2 ~77% 用例仅有聚合表格 | T4 未覆盖 (T2 session 可访问性未验证) | ❌ 待 T2 证据导出 |
+| 8 | Fork new_title source session_id 截断 | T4: 完整 UUID (`f1a81033` + `5419ba5e`) + Fork 返回值 + get_session_info 双重确认。**但发现回归** — new_title 被忽略 | ✅ UUID 闭合 / ❌ Bug 回归 |
+| 9 | instance="" ERROR 未区分 MCP vs 应用层 | T4: 10/10 工具全部返回应用层错误 (非 MCP -32602) | ✅ 已闭合 |
+| **10** | 集成场景1 步骤5 list_messages 计数断言 | T4: count=26≠4 (Fork 全量复制历史含内部消息)。建议方案 v1.1 修正期望值 | ⚠️ 闭合 (方案需修正) |
 
 ### 方案 0.1 期望值矛盾裁定
 
@@ -484,14 +497,16 @@ DeepSeek 频道全 11 工具验证通过。MiniMax 频道 T4 补测后达到 11/
 
 **当前状态: NOT APPROVED FOR RELEASE**
 
-APPROVED FOR RELEASE 的充要条件 (T4后重新评估):
-1. 44/44 规划用例通过 (✅ 已满足 — 42/44按原方案+2/44替代方案)
-2. 0 阻断级问题 (✅ 已满足 — 去重后唯一阻断C-01已修复)
-3. 审计逐项验证通过 (⚠️ A3/B4 闭环但伴随副作用 — T4证实同session跨provider切换不被支持(channel级拒绝),视为设计行为; 但发现model_id污染副作用)
-4. 关键补测项有独立复现 (⚠️ 部分满足 — MiniMax 8工具独立复现通过,T3并发结论部分确认; 但发现Fork new_title回归与T2结论矛盾)
-5. R2 回归验证收敛 — N_new < N_R1 × 0.3 且零阻断/严重 (❌ T4新发现1严重回归(Fork new_title)+1严重副作用(model_id污染) — 未收敛)
+APPROVED FOR RELEASE 的充要条件 (v8 终局评估):
+1. 44/44 规划用例通过 (⚠️ 42/44按原方案+2/44替代方案; Fork new_title 9.2 失败 → 修正为 43/44)
+2. 0 阻断级问题 (❌ **Fork new_title Bug 回归** — v5 声称 T2 已修复, T4 独立复现证实双频道均忽略 new_title)
+3. 审计逐项验证通过 (⚠️ A3/B4 闭合但伴随 model_id 污染副作用; 同 session 跨 provider 切换视为设计限制)
+4. 关键补测项有独立复现 (⚠️ MiniMax 8 工具 T4 通过; T3 并发 MiniMax 侧确认 / DeepSeek 侧因 KL#5 副作用失败)
+5. R2 回归验证收敛 (❌ R2 审计收敛[^r2], 但 T4 新发现 1 阻断(Fork new_title)+1 严重(model_id 污染) → 需 R3/R4)
 
-当前满足 2/5 条件 (与v6持平)。T4闭合了条件3/4的部分缺口，但新回归阻止条件5达成。
+[^r2]: R2 独立审计 (l1fix-F-verify, 2026-06-23): CONVERGED, N_new=2 ≤ 2.7, 零新阻断。但该审计在 T4 执行前完成，未覆盖 T4 新发现。
+
+当前满足 **1/5** 条件。T4 闭合了 MiniMax 覆盖边界 + 错误码分类 + 集成步骤5 + Fork UUID，但 Fork new_title 回归 + model_id 污染阻止发布。
 
 ### R2 审计结果 (2026-06-19 完成)
 
@@ -539,12 +554,12 @@ T4 由 l1fix-E-test worker 执行，对标 v5 报告 6 项已知限制 (KL #5/#6
 
 T4 补测已于 2026-06-23 完成。新发现的 Fork new_title 回归和 model_id 污染需 R4 轮次修复。
 
-以下情况会导致 NOT APPROVED 或 APPROVED 撤销:
+以下情况会导致 NOT APPROVED 或 APPROVED 撤销 (v8 更新):
+- Fork new_title Bug 回归未修复 (当前阻断)
+- model_id 污染副作用未修复
 - R2 回归发现阻断/严重级新问题
-- 同 session 跨 provider 切换测试发现上下文丢失
 - T3 补测结论被独立复现推翻
 - 4 项已知不一致中任一项在生产环境导致数据丢失/静默错误
-- MiniMax 频道补测发现任何工具不可用
 
 ---
 
@@ -655,4 +670,28 @@ T3 扩展验证 (去重规则与明细):
 | 31 | C3-S15, C1-F07, C3-S16, C3-S17, C3-S18, C3-S19 | 多项规范性细节 | 元数据C1填充/版本标签修正/合计行填写/model追踪加强标注/总评计数表达优化 |
 | — | — | F-worker 修正 (本轮) | 31 项实质性修正，详见 `l1fix_v2-fixer-report.md` |
 | — | — | 报告结论降级 | NOT APPROVED FOR RELEASE (2/5 条件满足) |
+
+---
+
+## 附录D — F-worker v2 修改清单 (v7→v8)
+
+| # | 来源 | 问题 | v7→v8 修改 |
+|---|------|------|-----------|
+| 1 | R2-N01 | L381 A3 去重后状态三方矛盾 | 统一为 `阻断 1 (C-01) + 严重 8 (含 A3, 去重后与 B4 共享根因降级)` |
+| 2 | T4-F1 | Fork new_title 声称修复但 T4 证实回归 | §Fork new_title 重写为回归说明; 逐工具表 #9 6/6→5/6; 回归检查清单更新; 关键成果更新 |
+| 3 | T4-F1 | 阻断计数 0 | 总评 "阻断级问题: 0" → `1 (Fork new_title 回归, T4 发现)` |
+| 4 | T4-F2 | 跨 provider 切换未测试→不支持 | 总评行更新为 "不支持 + model_id 污染副作用" |
+| 5 | C2-R2-N01 | 已知不一致 #1/#2 无处置决策 | 表增加 "处置决策" + "状态" 列; #1 接受为设计行为 / #2 提交 Bug 修复 |
+| 6 | C2-R2-N01 | 已知限制表待 T4 | 已知限制表整合 T4 结果: #5 不支持, #6 部分闭合, #7 待导出, #8 UUID 闭合/Bug 回归, #9 已闭合, #10 闭合(方案修正) |
+| 7 | C3-R2-01 | 版本链停于 v6, 头部/元数据不一致 | 版本链 v1→v8; 头部 v7→v8; R1 元数据标注 →v5 级别 |
+| 8 | R2-N02 | 关键成果 7 项内联行号全部过期 | 全部改为节标题锚点; 并发项增加 T4 复现结果 |
+| 9 | C3-R2-02 | 工具10证据列 "✅T3锚点" 过度泛化 | 改为 `⚠️ 聚合+✅T3锚点(仅10.3)`; 备注补充其余子用例级别 |
+| 10 | C3-R2-05 | 替代方案标注距维度表太远 | 维度表行内增加 `[^alt]` 脚注 |
+| 11 | C4-R2-05 | 并发耗时矛盾 (4301 vs 6315ms) | 统一为 epoch 差值 6315ms/6492ms; [^t1] [^t2] 更新; 性能表同步 |
+| 12 | T4-F1 | 失败详情 "N/A 无失败" | 重写为 Fork new_title 失败详情 (含 T2 声称/T4 复现/证据/严重度) |
+| 13 | T4-F1 | 发布评估充要条件 2/5 | 重新评估为 1/5 (条件2 从 ✅→❌); 增加 R2 审计时序说明 |
+| 14 | T4-F1/F2 | 撤销条件过时 | 更新: Fork new_title 回归 + model_id 污染 列为当前阻断 |
+| 15 | T4 | MiniMax 覆盖边界矩阵 | MiniMax 列 3/11→11/11 (T4 补测) |
+| — | — | F-worker v2 修正 (本轮) | 15 项实质性修正，详见 `l1fix_v2-fixer-v2-report.md` |
+| — | — | 报告结论降级 | NOT APPROVED FOR RELEASE (1/5 条件满足, Fork new_title 阻断) |
 
