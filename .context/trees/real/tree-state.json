@@ -5963,9 +5963,18 @@
           "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
           "nudge_count": 639,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:58:43.085Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 640,
+          "send_message": false
         }
       ],
-      "nudge_count": 639,
+      "nudge_count": 640,
       "audit_log": [
         {
           "ts": "2026-06-21T12:27:39.435Z",
@@ -11073,6 +11082,14 @@
         },
         {
           "ts": "2026-06-25T12:53:43.227Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:58:43.085Z",
           "auditor": "tao-watcher-script",
           "rule_id": "R-03",
           "pass": false,

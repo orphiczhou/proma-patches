@@ -62,7 +62,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 142,
+      "nudge_count": 143,
       "nudge_log": [
         {
           "ts": "2026-06-25T01:00:42.314Z",
@@ -1340,6 +1340,15 @@
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 142,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:58:44.774Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 143,
           "send_message": false
         }
       ],
@@ -2694,6 +2703,14 @@
         },
         {
           "ts": "2026-06-25T12:53:45.025Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:58:44.774Z",
           "auditor": "tao-watcher-script",
           "rule_id": "W-01",
           "pass": false,

@@ -86,7 +86,7 @@
         "auditor_session_id": "ffffffff-0000-4000-8000-000000000001",
         "ts": "2026-06-21T13:57:41.823+08:00"
       },
-      "nudge_count": 639,
+      "nudge_count": 640,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.563Z",
@@ -5838,6 +5838,15 @@
           "suggest": "fork 一个 verify/audit worker 独立检查",
           "nudge_count": 639,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:58:44.578Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 640,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -10962,6 +10971,14 @@
         },
         {
           "ts": "2026-06-25T12:53:44.814Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:58:44.578Z",
           "auditor": "tao-watcher-script",
           "rule_id": "R-06",
           "pass": false,

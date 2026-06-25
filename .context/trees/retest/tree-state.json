@@ -5907,9 +5907,18 @@
           "suggest": "保留一个为 role=root, 其他改为有 parent",
           "nudge_count": 639,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:58:44.571Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 640,
+          "send_message": false
         }
       ],
-      "nudge_count": 639,
+      "nudge_count": 640,
       "audit_log": [
         {
           "ts": "2026-06-21T12:27:39.522Z",
@@ -11017,6 +11026,14 @@
         },
         {
           "ts": "2026-06-25T12:53:44.807Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:58:44.571Z",
           "auditor": "tao-watcher-script",
           "rule_id": "R-01",
           "pass": false,

@@ -118,7 +118,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 142,
+      "nudge_count": 143,
       "nudge_log": [
         {
           "ts": "2026-06-25T01:00:42.242Z",
@@ -1397,6 +1397,15 @@
           "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
           "nudge_count": 142,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:58:44.688Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 143,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -2585,6 +2594,14 @@
         },
         {
           "ts": "2026-06-25T12:53:44.931Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:58:44.688Z",
           "auditor": "tao-watcher-script",
           "rule_id": "C-02",
           "pass": false,
