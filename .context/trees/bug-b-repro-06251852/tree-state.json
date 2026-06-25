@@ -75,7 +75,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 17,
+      "nudge_count": 21,
       "nudge_log": [
         {
           "ts": "2026-06-25T11:04:45.791Z",
@@ -229,6 +229,42 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 17,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:38:39.041Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 18,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:43:39.054Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 19,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:48:39.113Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 20,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:53:39.075Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 21,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -362,6 +398,38 @@
         },
         {
           "ts": "2026-06-25T12:33:39.039Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:38:39.041Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:43:39.054Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:48:39.114Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:53:39.075Z",
           "auditor": "tao-watcher-script",
           "rule_id": "W-01",
           "pass": false,

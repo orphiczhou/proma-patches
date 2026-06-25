@@ -4,6 +4,45 @@
 
 新条目追加在顶部。
 
+## 2026-06-25 20:46 V10 Phase 3 收尾盘点（接力 a8111bf5 → bc005820）
+
+**起因**: 用户要求"调研最近的新会话做的状态盘点，更新项目状态"。距上次盘点（20:15）31 分钟，发现新主线会话 bc005820（DeepSeek V4 Pro）接力 a8111bf5 完成 V10 Phase 3 收尾。
+
+**关键事件链**:
+1. **a8111bf5 主线会话意外终止**：根因不是代码 bug，是 **TAO Watcher 规则错配**——把 worker 规则（W-01 brief_echo）发给根指挥官，强制要求不符合 role 的 YAML 回复格式，导致指挥官思维混乱
+2. **bc005820 接力完成 V10 Phase 3 收尾**（20:30-20:45）：
+   - **commit `30eb4fa`** V10 Phase 3 — Bug A/B 修复 + 代码同步到仓库 + 文档沉淀（20:36）
+   - 4 处引擎改动：A-1 cmdEventAppend L1498（只允许 leaf.session_id 自己写 done）+ A-2 cmdAuditGate L2337-2345（**Auditor #2 发现的 hasDone 漏洞**）+ B-3 cmdLeafAdd L705-718（**新错误码 `E_DUPLICATE_SESSION_ID`** + session_id 唯一性）+ B-4 resolveAuditorIndep L1897-1911（.filter 跳过 pruned）
+   - 代码同步：workspace-files 顶层新增 tree-engine.cjs（156KB/3602 行）+ proma-dev-patches.cjs（48KB→116KB）+ patch-l/ 同步 + .gitignore 屏蔽商业版
+   - 4 个 Auditor 审查回收（abf92aed / 76e5d898 / 1795cea8 / 1cdd1ecf）
+3. **Auditor #2 价值再次证明**：76e5d898 独立从攻击路径推导发现 hasDone 漏洞（实现者+A1 代码层评都漏）——Tree 模式三层分离（实现/评价/洁净室）对抗确认偏误又一次有效
+4. **跨工作区问题确认是设计外行为**：平台 `createAgentSession` (main.cjs:386651) 不校验 workspaceId + session-management SKILL 模式 4 明确教授跨工作区用法。9 个工作区（应只有 1 主 proma）
+
+**关键产出**（4 类 6 份核心文档）:
+- 交接：`.context/handoff/session-2026-06-25-v10-followup.md`
+- 跨工作区调查：`.context/cross-workspace-tree-issue-2026-06-25.md`（含 TAO Watcher 干扰根因）
+- 方法论：`.context/commander-methodology-v10.md`（5h/17 节点工程沉淀）
+- 入门向导：`.context/project-onboarding-guide-2026-06-25.md`（30 分钟图形化）
+- Bug 闭环（v10/）：bug-{a,b}-{investigation,fix-proposals,fix-validation}.md 共 4 份
+- V10 测试套件：a5-verify.cjs / helper-test.cjs / v10-trust-anchor-test.cjs
+
+**关键收获**:
+- **TAO Watcher 规则错配是平台设计外问题**：监督规则不按 role 区分，影响所有指挥官会话稳定性。需独立立项（按 root/commander/worker 应用不同规则集）
+- **Tree 模式 Auditor 独立审查有效**：Auditor #2 的发现证明，即使有 Cr 洁净室，Auditor 独立从攻击路径推导仍能发现新漏洞
+- **V10 已完成 Phase 1+2+3**：从「字段存在性校验」升级为「内容有效性校验」，164 测试全过，真实环境 V10 P2 e2e 生产就绪
+
+**当前 P0 待办**（用户决策 3 项）:
+1. push 4 commits 到 GitHub（30eb4fa 7d36cc7 f98805d 8c81cc5）
+2. 重启 dev 实例验证 Bug A/B 运行时行为
+3. 跨工作区清理（归档 tree-2 + 清理 5 个无价值工作区）+ TAO Watcher 修复
+
+**Git 状态**: orphiczhou/proma-patches 本地领先远程 4 个 commit；workspace-files 工作区有 12 个 tree-state.json 自动更新 + 2 个新文档未 commit（cross-workspace-tree-issue + v10-followup）
+
+**实例状态**:
+- Dev: tree-engine.cjs 3602 行（19:15 改，含 V10 P1+P2+P3 + Bug A/B，待重启）
+- Release: 2471 行（6/24 09:17，**用户明确指示不同步**）
+- 正式版: asar 打包，完全分叉
+
 ## 2026-06-25 V4-V9 实战失守案例（audit-gate-test-20260625 教具，保留作教材）
 
 **起因**: 用户在会话 532465c5 反馈「有 worker 没执行完成，但指挥官得出了通过的结论」。诊断后发现这是 V4-V9 加固方向正确但有 6 大盲点的冰山一角。**用户决策保留 audit-gate-test-20260625 三副本作教具**（不删不改），开新树重测对比。

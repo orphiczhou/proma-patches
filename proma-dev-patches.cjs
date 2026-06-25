@@ -2068,6 +2068,23 @@ async function checkAllRules(tree, workspace, cfg) {
   const all = [];
   const rulesEnabled = (cfg.rules_enabled && cfg.rules_enabled.length > 0) ? cfg.rules_enabled : null;
 
+  // 防御 (V10 Phase 3 followup): Bug B 复现树/历史脏数据中同 session_id 被多 leaf 复用,
+  // 此种 tree 已是病态, TAO Watcher 不应对其任何 leaf 发 nudge (避免鞭策错对象,
+  // 干扰主线指挥官). 根因: a8111bf5 同时在某 tree 是 root, 在另一 leaf (bug-b 复现)
+  // 又被注册成 worker, TAO Watcher 跑 W-01 后通过 runAgentHeadless 把"worker 缺 brief_echo"
+  // 注入根指挥官会话, 导致主线指挥官意外终止. 修复: session_id 共享 → 全部跳过.
+  const sessionUsage = new Map();
+  for (const leaf of Object.values(tree.state.leaves || {})) {
+    if (!leaf.session_id) continue;
+    sessionUsage.set(leaf.session_id, (sessionUsage.get(leaf.session_id) || 0) + 1);
+  }
+  const sharedSessions = new Set(
+    [...sessionUsage.entries()].filter(([, n]) => n > 1).map(([s]) => s)
+  );
+  function isSharedSessionLeaf(leaf) {
+    return !!(leaf.session_id && sharedSessions.has(leaf.session_id));
+  }
+
   function maybe(ruleId, fn, ...args) {
     if (rulesEnabled && !rulesEnabled.includes(ruleId)) return;
     try {
@@ -2085,6 +2102,11 @@ async function checkAllRules(tree, workspace, cfg) {
   maybe("R-05", ruleR05, tree);
   maybe("R-06", ruleR06, tree);
   for (const leaf of Object.values(tree.state.leaves)) {
+    if (isSharedSessionLeaf(leaf)) {
+      log("[Patch M] tree=" + tree.tree_id + " leaf=" + leaf.leaf_id +
+          " session_id shared by multiple leaves (bug-b-repro or dirty data), skip tier1 rules");
+      continue;
+    }
     maybe("C-02", ruleC02, leaf, tree);
     maybe("C-03", ruleC03, leaf, tree);
     maybe("C-06", ruleC06, leaf, tree);
@@ -2095,6 +2117,11 @@ async function checkAllRules(tree, workspace, cfg) {
   for (const leaf of Object.values(tree.state.leaves)) {
     // 只对活跃 leaf 跑 IPC 规则
     if (!["active", "pending_brief", "segment_pending"].includes(leaf.status)) continue;
+    if (isSharedSessionLeaf(leaf)) {
+      log("[Patch M] tree=" + tree.tree_id + " leaf=" + leaf.leaf_id +
+          " session_id shared by multiple leaves (bug-b-repro or dirty data), skip tier2 rules");
+      continue;
+    }
     maybe("W-01", ruleW01, leaf, tree);
     maybe("W-08", ruleW08, leaf, tree);
     maybe("W-11", ruleW11, leaf, tree);
