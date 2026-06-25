@@ -1,0 +1,12 @@
+# Tree state auto-backups (runtime)
+**/tree-state.backup.*.auto.json
+
+# Test sandbox backups
+release/tree-system-v0.2.2/test-sandbox/*.bak
+
+# TAO engine debug dumps
+tao-engine/
+
+# OS files
+.DS_Store
+Thumbs.db

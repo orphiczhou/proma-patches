@@ -1,0 +1,1422 @@
+{
+  "version": "1.0",
+  "tree_id": "vfa1",
+  "created_at": "2026-06-25T08:55:42.332+08:00",
+  "last_heartbeat": null,
+  "root_brief": {
+    "parent_intent": "verify C2/C4/C5 followup fixes"
+  },
+  "root_dod": {
+    "deliverables": [],
+    "node_budget": 10,
+    "max_depth": 3
+  },
+  "leaves": {
+    "vfa1-root": {
+      "leaf_id": "vfa1-root",
+      "session_id": "00000000-0000-0000-0000-000000000001",
+      "parent": null,
+      "path": "",
+      "role": "root",
+      "model": "unknown",
+      "channel": "unknown",
+      "status": "active",
+      "created_at": "2026-06-25T08:55:42.332+08:00",
+      "added_by": null,
+      "last_event_ts": null,
+      "last_event_type": null,
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [],
+      "audit_gate": {
+        "verdict": "skip",
+        "auditor_session_id": null,
+        "ts": null
+      },
+      "nudge_count": 0,
+      "nudge_log": [],
+      "audit_log": []
+    },
+    "vfa1-Aud-commander": {
+      "leaf_id": "vfa1-Aud-commander",
+      "session_id": "00000000-0000-0000-0000-0000000000A1",
+      "parent": "vfa1-root",
+      "path": "Aud",
+      "role": "commander",
+      "model": "test",
+      "channel": "local",
+      "status": "active",
+      "created_at": "2026-06-25T08:55:54.039+08:00",
+      "added_by": "00000000-0000-0000-0000-000000000001",
+      "last_event_ts": null,
+      "last_event_type": null,
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [],
+      "audit_gate": {
+        "verdict": "skip",
+        "auditor_session_id": null,
+        "ts": null
+      },
+      "nudge_count": 1,
+      "nudge_log": [
+        {
+          "ts": "2026-06-25T08:57:51.184+08:00",
+          "rule_id": "R3",
+          "severity": "low",
+          "nudge_count": 1
+        }
+      ],
+      "audit_log": []
+    },
+    "vfa1-Va-worker": {
+      "leaf_id": "vfa1-Va-worker",
+      "session_id": "00000000-0000-0000-0000-0000000000B1",
+      "parent": "vfa1-Aud-commander",
+      "path": "Va",
+      "role": "worker",
+      "model": "test",
+      "channel": "local",
+      "status": "pending_brief",
+      "created_at": "2026-06-25T08:56:04.712+08:00",
+      "added_by": "00000000-0000-0000-0000-0000000000A1",
+      "last_event_ts": null,
+      "last_event_type": null,
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [
+        {
+          "id": "M1",
+          "desc": "empty test",
+          "expect_outputs": [],
+          "status": "pending",
+          "audit_pass": null,
+          "note_path": null
+        },
+        {
+          "id": "M2",
+          "desc": "non-empty test",
+          "expect_outputs": [
+            "x.md"
+          ],
+          "status": "pending",
+          "audit_pass": null,
+          "note_path": null
+        }
+      ],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [],
+      "audit_gate": {
+        "verdict": "required",
+        "auditor_session_id": null,
+        "ts": null
+      },
+      "nudge_count": 71,
+      "nudge_log": [
+        {
+          "ts": "2026-06-25T01:00:42.242Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 1,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-25T01:02:26.755Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-25T01:09:26.527Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 3,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:13:15.680Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 4,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:17:27.086Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 5,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:22:26.777Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 6,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:27:26.693Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 7,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:32:27.608Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 8,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:37:26.928Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 9,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:42:26.945Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 10,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:47:27.077Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 11,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:52:26.973Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 12,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T01:57:26.821Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 13,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:02:26.747Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 14,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:07:26.765Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 15,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:12:26.760Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 16,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:17:26.911Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 17,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:22:30.165Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 18,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:27:31.088Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 19,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:32:32.521Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 20,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:37:32.577Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 21,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:42:32.474Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 22,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:47:31.742Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 23,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:52:32.442Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 24,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T02:57:32.108Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 25,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:02:33.118Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 26,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:07:32.022Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 27,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:12:31.510Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 28,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:17:32.494Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 29,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:22:32.210Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 30,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:27:30.304Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 31,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:32:28.404Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 32,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:37:28.490Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 33,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:42:27.260Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 34,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:47:28.965Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 35,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:52:27.456Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 36,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T03:57:27.242Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 37,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:02:27.983Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 38,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:07:27.441Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 39,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:12:27.628Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 40,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:17:27.668Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 41,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:22:29.172Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 42,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:27:29.276Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 43,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:32:27.834Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 44,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:37:28.674Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 45,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:42:28.339Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 46,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:47:27.981Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 47,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:52:28.049Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 48,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T04:57:28.345Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 49,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:02:28.214Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 50,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:07:27.743Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 51,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:12:27.873Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 52,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:17:27.829Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 53,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:22:27.855Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 54,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:27:27.864Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 55,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:32:28.231Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 56,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:37:28.263Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 57,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:42:28.101Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 58,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:47:28.240Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 59,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:52:27.906Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 60,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T05:57:27.998Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 61,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:02:28.388Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 62,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:07:28.115Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 63,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:12:28.001Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 64,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:17:28.126Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 65,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:22:28.117Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 66,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:27:28.139Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 67,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:32:28.333Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 68,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:37:28.259Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 69,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:42:17.070Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 70,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:47:17.177Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 71,
+          "send_message": false
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-25T08:57:12.357+08:00",
+          "auditor_session_id": "00000000-0000-0000-0000-0000000000A1",
+          "failed": 0,
+          "passed": 1,
+          "results": [
+            {
+              "evidence": "ok",
+              "item": "x",
+              "pass": true
+            }
+          ],
+          "total": 1
+        },
+        {
+          "ts": "2026-06-25T08:57:38.979+08:00",
+          "auditor_session_id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+          "failed": 0,
+          "passed": 1,
+          "results": [
+            {
+              "evidence": "ok",
+              "item": "x",
+              "pass": true
+            }
+          ],
+          "total": 1
+        },
+        {
+          "ts": "2026-06-25T08:57:56.031+08:00",
+          "auditor_session_id": "00000000-0000-0000-0000-0000000000A1",
+          "failed": 5,
+          "passed": 1,
+          "results": [],
+          "total": 2
+        },
+        {
+          "ts": "2026-06-25T08:58:09.467+08:00",
+          "auditor_session_id": "00000000-0000-0000-0000-0000000000A1",
+          "failed": 1,
+          "passed": 1,
+          "results": [
+            {
+              "evidence": "ok",
+              "item": "i1",
+              "pass": true
+            },
+            {
+              "evidence": "no",
+              "item": "i2",
+              "pass": false
+            }
+          ],
+          "total": 2
+        },
+        {
+          "ts": "2026-06-25T01:00:42.242Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:02:26.755Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:09:26.527Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:13:15.680Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:17:27.086Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:22:26.777Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:27:26.693Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:32:27.608Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:37:26.928Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:42:26.945Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:47:27.077Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:52:26.973Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T01:57:26.821Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:02:26.747Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:07:26.765Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:12:26.760Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:17:26.911Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:22:30.165Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:27:31.088Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:32:32.521Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:37:32.577Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:42:32.474Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:47:31.742Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:52:32.442Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T02:57:32.108Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:02:33.118Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:07:32.022Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:12:31.510Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:17:32.494Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:22:32.210Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:27:30.304Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:32:28.404Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:37:28.490Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:42:27.260Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:47:28.965Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:52:27.456Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T03:57:27.242Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:02:27.983Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:07:27.442Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:12:27.628Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:17:27.668Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:22:29.172Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:27:29.276Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:32:27.834Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:37:28.674Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:42:28.339Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:47:27.981Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:52:28.049Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T04:57:28.345Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:02:28.214Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:07:27.743Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:12:27.873Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:17:27.829Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:22:27.855Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:27:27.864Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:32:28.231Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:37:28.263Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:42:28.101Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:47:28.240Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:52:27.906Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T05:57:27.998Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:02:28.388Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:07:28.115Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:12:28.001Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:17:28.126Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:22:28.117Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:27:28.139Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:32:28.333Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:37:28.259Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:42:17.070Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:47:17.177Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        }
+      ]
+    }
+  },
+  "heartbeat_log": [],
+  "drift_log": [],
+  "audit_meta": {
+    "plan_ack_seconds": 300,
+    "max_self_corrections": 2,
+    "heartbeat_interval_minutes": 15,
+    "sweet_spot_limits": {
+      "claude-sonnet-4-6": {
+        "min": 100000,
+        "max": 200000,
+        "hard": 300000
+      },
+      "deepseek-v4-pro": {
+        "min": 150000,
+        "max": 250000,
+        "hard": 400000
+      },
+      "glm-5-turbo": {
+        "min": 50000,
+        "max": 80000,
+        "hard": 100000
+      }
+    }
+  },
+  "_deliverables_root": "C:\\Users\\sir_c\\.proma\\agent-workspaces\\proma\\workspace-files\\.context\\trees\\vfa1\\deliverables",
+  "_meta": {
+    "workspace_root": "C:\\Users\\sir_c\\.proma\\agent-workspaces\\proma\\workspace-files",
+    "tao_version": null,
+    "tao_watcher_session_id": null,
+    "tao_health_check_session_id": null,
+    "write_count": 14
+  }
+}
