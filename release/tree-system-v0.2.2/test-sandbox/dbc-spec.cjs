@@ -50,6 +50,7 @@ const E = {
   TREE_NODE_BUDGET_EXCEEDED:'E_TREE_NODE_BUDGET_EXCEEDED',// A4 (批次3)
   TREE_NOT_VALIDATED:       'E_TREE_NOT_VALIDATED',       // A6 (批次3)
   DEPTH_EXCEEDED:           'E_DEPTH_EXCEEDED',           // A9 已有 (T3)
+  SCHEMA_INVALID:           'E_SCHEMA_INVALID',           // R2-T7 (audit_append results[i] 子结构)
   // E_ROLE_INVALID 由 ROLE_ENUM 既有机制覆盖
 };
 
@@ -536,6 +537,48 @@ CASES.C4 = async () => {
   else fail('C4 非空 expect_outputs 不误报', `误报: ${JSON.stringify(hit2).slice(0, 100)}`);
 };
 
+// ---------- 批次5 (R2-T7): audit_append results[i] 三元组结构校验（spec §18.3）----------
+CASES.R2T7 = async () => {
+  console.log('\n[R2-T7] audit append report results[i] 必须是 {item,pass,evidence} 三元组 (E_SCHEMA_INVALID)');
+  const { tid, auditorSession } = await setupTreeWithAuditor();
+  const leafId = await addWorker(tid, 'Ra');
+  const base = { auditor_session_id: auditorSession, total: 1, passed: 1, failed: 0 };
+
+  // (a) results 非数组 → 拦
+  await expectFail('R2T7-a results 非数组拦截',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify(Object.assign({}, base, { results: 'not-array' }))],
+    E.SCHEMA_INVALID);
+  // (b) results[0] 非对象 → 拦
+  await expectFail('R2T7-b results[0] 非对象拦截',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify(Object.assign({}, base, { results: ['not-object'] }))],
+    E.SCHEMA_INVALID);
+  // (c) results[0] 缺 evidence → 拦
+  await expectFail('R2T7-c results[0] 缺 evidence 拦截',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify(Object.assign({}, base, { results: [{ item: 'x', pass: true }] }))],
+    E.SCHEMA_INVALID);
+  // (d) results[0].pass 类型错（字符串而非 boolean）→ 拦
+  await expectFail('R2T7-d results[0].pass 类型错拦截',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify(Object.assign({}, base, { results: [{ item: 'x', pass: 'true', evidence: 'e' }] }))],
+    E.SCHEMA_INVALID);
+  // (e) 合法三元组 → 放行
+  await expectOk('R2T7-e 合法三元组放行',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify(Object.assign({}, base, { results: [{ item: 'x', pass: true, evidence: 'e' }] }))]);
+
+  // M2: total/passed/failed 必须是整数（spec §18.3）
+  await expectFail('M2-a total 字符串拦截',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify({ auditor_session_id: auditorSession, total: '5', passed: 1, failed: 0, results: [] })],
+    E.SCHEMA_INVALID);
+  await expectFail('M2-b passed 浮点数拦截',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify({ auditor_session_id: auditorSession, total: 1, passed: 1.5, failed: 0, results: [] })],
+    E.SCHEMA_INVALID);
+  await expectFail('M2-c failed NaN 拦截',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify({ auditor_session_id: auditorSession, total: 1, passed: 1, failed: NaN, results: [] })],
+    E.SCHEMA_INVALID);
+  // M2-d 合法整数（含 0）放行
+  await expectOk('M2-d 合法整数（含 0）放行',
+    ['audit', 'append', tid, leafId, '--json', JSON.stringify({ auditor_session_id: auditorSession, total: 0, passed: 0, failed: 0, results: [] })]);
+};
+
 // ============================================================
 // 主入口
 // ============================================================
@@ -545,7 +588,7 @@ async function main() {
   console.log('被测引擎: patch-l/tree-engine.cjs (require, 不再 spawn tree-state.js)');
   console.log('============================================================');
   const filter = process.argv.slice(2);
-  const order = ['A1', 'A2', 'A7', 'A3', 'A5', 'A4', 'A6', 'HARDEN2', 'HARDEN6', 'V2_FORGED', 'V1_RESTORE', 'V3_EMPTY', 'T3', 'V8', 'V6', 'V5B', 'V4', 'CP2', 'V9', 'V5BT', 'C4'];
+  const order = ['A1', 'A2', 'A7', 'A3', 'A5', 'A4', 'A6', 'HARDEN2', 'HARDEN6', 'V2_FORGED', 'V1_RESTORE', 'V3_EMPTY', 'T3', 'V8', 'V6', 'V5B', 'V4', 'CP2', 'V9', 'V5BT', 'C4', 'R2T7'];
   for (const key of order) {
     if (filter.length > 0 && !filter.includes(key)) continue;
     if (typeof CASES[key] === 'function') await CASES[key]();

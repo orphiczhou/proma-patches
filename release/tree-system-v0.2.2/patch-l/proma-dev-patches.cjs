@@ -762,7 +762,33 @@ function createRemoteToolHandlers() {
     },
     remote_create_session: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "create_session", args, host));
+      // V10-workspace-canonical: 强制 workspace_id（堵 slug="undefined" 字符串污染 findTreesDirForWorkspace）。
+      //   失守案例 532465c5：调用方传 workspace_id=undefined，被序列化成 "undefined" 字符串，
+      //   下游 findTreesDirForWorkspace 直接返回 null，引擎层无感知。
+      //   修复：调用方必须显式传 workspace_id；缺失时尝试 fallback 到当前实例激活 workspace（findCurrentWorkspaceSlug），
+      //   仍无法确定则明确报错（不再静默放行 "undefined" 字符串）。
+      let payload = Object.assign({}, args);
+      if (!payload.workspace_id || payload.workspace_id === 'undefined' || payload.workspace_id === 'null') {
+        // 尝试 fallback：当前实例激活 workspace slug
+        let fallback = null;
+        try {
+          // findCurrentWorkspaceSlug 在 registerTreePanelIpc IIFE 里，这里独立实现一份轻量版
+          const a = api();
+          const sessions = a.listAgentSessions();
+          if (Array.isArray(sessions) && sessions.length > 0) {
+            const sorted = sessions.filter(s => s.workspaceId).sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0));
+            if (sorted[0] && sorted[0].workspaceId) {
+              try { fallback = a.getAgentWorkspace(sorted[0].workspaceId) && a.getAgentWorkspace(sorted[0].workspaceId).slug; } catch (_) {}
+            }
+          }
+        } catch (_) {}
+        if (fallback) {
+          payload.workspace_id = fallback;
+        } else {
+          return jsonResult({ ok: false, error: { code: 'E_WORKSPACE_REQUIRED', msg: 'remote_create_session: workspace_id is required (V10-workspace-canonical). Pass workspace_id explicitly, or set a current active workspace on this instance to use as fallback.' } });
+        }
+      }
+      return jsonResult(await remoteHttpPost(port, "create_session", payload, host));
     },
     remote_fork_session: async (args) => {
       const {host, port} = await resolve(args);
@@ -1069,8 +1095,14 @@ function createExternalHttpBridge() {
 
   // workspace → trees_dir 定位（复制 registerTreePanelIpc 内 discoverAllWorkspacesWithTrees 的核心；
   // 后者是 IIFE 局部函数，本模块级 createTreeMcpServer 无法访问，故独立实现一份）
+  // V10-workspace-canonical: slug "undefined"/null/"" → fallback "default"（堵 JSON.stringify(undefined)→"undefined" 字符串）
+  //   失守案例 532465c5：调用方传 workspace_id=undefined，被序列化成 "undefined" 字符串当 slug 用，
+  //   findTreesDirForWorkspace 直接返回 null，引擎层完全不知道是 fallback 失败。
   function findTreesDirForWorkspace(workspaceSlug) {
-    if (!workspaceSlug) return null;
+    // V10-workspace-canonical: fallback —— 空值或字符串 "undefined" 都视为缺失，尝试 "default"。
+    if (!workspaceSlug || workspaceSlug === 'undefined' || workspaceSlug === 'null') {
+      workspaceSlug = 'default';
+    }
     const os = require("os");
     const home = os.homedir();
     const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
@@ -1096,20 +1128,24 @@ function createExternalHttpBridge() {
   // 调内联引擎 engine.run(cmd, args)。返回 {ok,error?,...result}，与原 CLI stdout 一致。
   // 每次 call 前按 workspace 重设 TREES_ROOT（engine 模块级可变状态；Electron 主进程 JS 单线程，
   // MCP 调用串行，无竞态；dbc-spec 等独立进程各设各的）。
-  async function callTreeState(workspaceSlug, args) {
+  // V10-self-audit-forbidden-v2: 新增 callerSessionId 透传到 engine.run（cmdAuditGate 校验 caller==audit_session_id）。
+  async function callTreeState(workspaceSlug, args, callerSessionId) {
     const ws = findTreesDirForWorkspace(workspaceSlug);
     if (!ws) return { ok: false, error: { code: "E_NO_TREES_DIR", msg: `workspace "${workspaceSlug}" has no .context/trees/. Looked under ~/.proma[-dev]/agent-workspaces/${workspaceSlug}/{,workspace-files/}.context/trees/. Deploy tree-system to this workspace first.` } };
     const [cmd, ...rest] = Array.isArray(args) ? args : [];
     if (!cmd) return { ok: false, error: { code: "E_SCHEMA_INVALID", msg: "no tree command given" } };
     // per-call treesRoot: 显式安全，不依赖模块级共享 TREES_ROOT（多 workspace 并发场景防覆盖）
-    return await treeEngine.run(cmd, rest, ws.trees_dir);
+    return await treeEngine.run(cmd, rest, ws.trees_dir, callerSessionId);
   }
 
-  global.__proma_createTreeMcpServer__ = function (sdk, z, workspaceSlug) {
+  global.__proma_createTreeMcpServer__ = function (sdk, z, workspaceSlug, callerSessionId) {
     const RO = { annotations: { readOnlyHint: true } };
+    // V10-self-audit-forbidden-v2: callerSessionId 由 __proma_getMcpServers__(sessionId,...) 注入，
+    //   透传到 callTreeState → engine.run → cmdAuditGate（校验 caller==audit_session_id，堵借身份）。
+    //   失守案例：worker 528b0925 借 auditor 404c724f 的 session_id 调 audit_gate pass。
     const tt = (name, desc, schema, argBuilder, readOnly) => sdk.tool(
       name, desc, schema,
-      async (args) => jsonResult(await callTreeState(workspaceSlug, argBuilder(args))),
+      async (args) => jsonResult(await callTreeState(workspaceSlug, argBuilder(args), callerSessionId)),
       readOnly ? RO : undefined
     );
     const J = JSON.stringify;
@@ -1168,7 +1204,9 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
     const server = createSessionMcpServer(sdk, z, sessionId);
     const remoteServer = createRemoteSessionMcpServer(sdk, z);
     let treeServer;
-    try { treeServer = global.__proma_createTreeMcpServer__(sdk, z, workspaceSlug); }
+    // V10-self-audit-forbidden-v2: 把 sessionId 透传给 tree MCP factory，
+    //   最终传到 engine.cmdAuditGate 校验 caller==audit_session_id（堵借身份）。
+    try { treeServer = global.__proma_createTreeMcpServer__(sdk, z, workspaceSlug, sessionId); }
     catch (e) { log("ERROR creating tree MCP server: " + (e && e.message ? e.message : String(e))); treeServer = undefined; }
     return Object.assign({ session: server, "remote-session": remoteServer }, treeServer ? { tree: treeServer } : {});
   } catch (err) {

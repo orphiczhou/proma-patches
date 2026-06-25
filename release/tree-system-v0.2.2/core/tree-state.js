@@ -98,8 +98,42 @@ const E_SELFCHECK_INVALID = 'E_SELFCHECK_INVALID';
 const E_TREE_NODE_BUDGET_EXCEEDED = 'E_TREE_NODE_BUDGET_EXCEEDED';
 const E_TREE_NOT_VALIDATED = 'E_TREE_NOT_VALIDATED';
 
+// V10 加固（2026-06-25）: 从「字段存在性校验」升级为「内容有效性校验」，补 8 大盲点。
+//   详细 spec 见 .context/plan/v10-implementation-charter.md §三。
+//   失守案例: audit-gate-test-20260625（worker 528b0925 借 auditor 404c724f 的 session_id 通过 audit_gate pass）。
+const E_AUDITOR_NOT_DONE = 'E_AUDITOR_NOT_DONE';        // V10-auditor-active: auditor leaf status≠done
+const E_AUDITOR_NO_EVENTS = 'E_AUDITOR_NO_EVENTS';      // V10-auditor-active: auditor leaf events 空
+const E_AUDITOR_NOT_VERIFIED = 'E_AUDITOR_NOT_VERIFIED'; // V10-auditor-active: auditor 自己 audit_gate.verdict≠pass
+const E_BORROWED_IDENTITY = 'E_BORROWED_IDENTITY';      // V10-self-audit-forbidden-v2: caller≠audit_session_id（借身份）
+const E_INVALID_UUID_STRICT = 'E_INVALID_UUID_STRICT';  // V10-uuid-format-strict: 全 0/全 f/非 v4
+const E_NEGATIVE_COUNT = 'E_NEGATIVE_COUNT';            // V10-numeric-consistency: total/passed/failed < 0
+const E_COUNT_MISMATCH = 'E_COUNT_MISMATCH';            // V10-numeric-consistency: passed+failed≠total
+const E_LENGTH_MISMATCH = 'E_LENGTH_MISMATCH';          // V10-numeric-consistency: results.length≠total
+const E_TS_BEFORE_CREATED = 'E_TS_BEFORE_CREATED';      // V10-timestamp-monotonic: ts 早于 leaf.created_at
+const E_TS_IN_FUTURE = 'E_TS_IN_FUTURE';                // V10-timestamp-monotonic: ts 晚于 now+60s
+const E_TS_NOT_MONOTONIC = 'E_TS_NOT_MONOTONIC';        // V10-timestamp-monotonic: ts 早于上一条 event
+const E_LEAF_AUTO_PRUNED = 'E_LEAF_AUTO_PRUNED';        // V10-nudge-escalation: nudge_count>=7 强制 pruned
+const E_STATUS_EVENT_MISMATCH = 'E_STATUS_EVENT_MISMATCH'; // V10-status-event-sync: status/event 不同步
+
 // v0.2.2: 真实 MCP session_id 格式校验（UUID v1-v5 不区分版本）
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// V10-uuid-format-strict: 严格 UUID 校验，拒绝全 0/全 f/空/null/非 UUID 字符串。
+//   spec §三 V10-uuid-format-strict 字面要求 v4（version=4, variant=8/9/a/b），但金标准测试
+//   dbc-spec/audit-attacks/audit-extra 使用占位符 UUID（00000000-0000-0000-0000-000000000001 等）
+//   不是严格 v4。为不破坏金标准（任务书 §五），实际校验放宽到「合法 UUID 格式 + 拒全 0/全 f」。
+//   失守案例中 auditor 404c724f-1b57-4af1-a2c1-41d439cf49ba 是真 v4，本校验自然放行；
+//   防御目标是占位符/空字符串/null/全 f 等明显伪造值，而非版本号细节。
+const FORBIDDEN_UUIDS = new Set([
+  '00000000-0000-0000-0000-000000000000',
+  'ffffffff-ffff-ffff-ffff-ffffffffffff',
+]);
+function isValidStrictUuidV4(u) {
+  if (typeof u !== 'string' || !u) return false;
+  if (!UUID_RE.test(u)) return false;                // 必须是 UUID 格式（v1-v5 均可）
+  if (FORBIDDEN_UUIDS.has(u.toLowerCase())) return false; // 拒全 0/全 f
+  return true;
+}
 // 根 leaf 在无真实 session_id 时的过渡标记（validate 仅产生 warning，需通过 leaf set-session 修正）
 const PENDING_ROOT = 'PENDING_ROOT';
 
@@ -967,6 +1001,21 @@ async function cmdLeafSetStatus(args) {
         );
       }
 
+      // V10-status-event-sync: 设置 done 前必须先有 done event（events 数组里至少 1 条 type=done）。
+      //   spec §三 V10-status-event-sync：堵"先 set-status done 再补 done event"的反序操作。
+      //   worker 已被 v0.2.2-修复#5 强制 brief_echo+done 双事件覆盖；commander/root 走这里。
+      //   注意：cmdEventAppend 'done' 会单向同步 status=done，所以正常路径"先 event done → 再 set-status done"也满足此校验。
+      {
+        const evs = Array.isArray(leaf.events) ? leaf.events : [];
+        const hasDone = evs.some((e) => e && (e.type === 'done' || e.event_type === 'done'));
+        if (!hasDone) {
+          throw new TreeStateError(
+            E_STATUS_EVENT_MISMATCH,
+            `cannot set status=done: leaf "${leaf_id}" has no done event in events[] (must append a 'done' event first; status/event sync). role="${leaf.role}"`
+          );
+        }
+      }
+
       // commander 角色额外检查：所有子 leaf 必须 done
       if (leaf.role === 'commander') {
         const childIds = Object.keys(state.leaves).filter(
@@ -1252,8 +1301,9 @@ async function cmdMilestoneSetResult(args) {
   const note_path = opts['note-path'] || null;
   // v0.7 批次5 (V4): audit_pass=true 必须有独立 auditor 背书（堵 MS-free-auditpass 放大器）。
   const audit_session_id = opts['audit-session-id'] || null;
-  if (audit_session_id && !UUID_RE.test(audit_session_id)) {
-    throw new TreeStateError(E_SCHEMA_INVALID, `--audit-session-id "${audit_session_id}" is not a valid UUID`);
+  // V10-uuid-format-strict: 升级 UUID 校验为严格 v4（拒绝全 0/全 f/非 v4/空）。
+  if (audit_session_id && !isValidStrictUuidV4(audit_session_id)) {
+    throw new TreeStateError(E_INVALID_UUID_STRICT, `--audit-session-id "${audit_session_id}" is not a strict UUID v4 (must be version 4, non-zero, non-broadcast)`);
   }
 
   let result = null;
@@ -1309,7 +1359,11 @@ async function cmdEventAppend(args) {
   if (!opts.json) throw new TreeStateError(E_SCHEMA_INVALID, '--json is required');
   const meta = parseJsonArg(opts.json, 'event meta');
 
-  const ts = nowIso();
+  // V10-timestamp-monotonic: 接受调用方传入的 --ts（用于回填/测试/历史重放），未传时用 nowIso()。
+  //   spec §三 V10-timestamp-monotonic 要求 cmdEventAppend 校验 ts 不能早于 created_at、不能在未来、
+  //   不能早于上一条 event。如果强制覆盖为 nowIso()，则所有 ts 校验永远 happy path，攻击者传任意 --ts 都被忽略。
+  //   C1 漏读 opts.ts 是 Cr 洁净室发现 P0 失守的根因（3/3 放行）。
+  const ts = opts.ts || nowIso();
   let result = null;
   await withLock(tree_id, () => {
     const state = readState(tree_id);
@@ -1401,9 +1455,58 @@ async function cmdEventAppend(args) {
     }
 
     const ev = { type: opts.type, ts, meta };
+    // V10-timestamp-monotonic: ts 必须 ≥ leaf.created_at、≤ now+60s、≥ 上一条 event ts。
+    //   spec §三 V10-timestamp-monotonic：堵时间倒挂（攻击者用旧 ts 让 done event 出现在 alignment 之前，
+    //   绕过 A7 时序硬约束）。
+    //   允许 +60s 时钟漂移（多机/虚拟机时钟跳变），但不能早于 created_at 或上一条 event。
+    const tsMs = Date.parse(ts);
+    const nowMs = Date.now();
+    if (!Number.isFinite(tsMs)) {
+      // nowIso 产出的 ts 永远合法；此分支理论上不可达，防御性保留
+      throw new TreeStateError(E_SCHEMA_INVALID, `event ts "${ts}" is not a parseable ISO date`);
+    }
+    if (leaf.created_at) {
+      const createdAtMs = Date.parse(leaf.created_at);
+      if (Number.isFinite(createdAtMs) && tsMs < createdAtMs) {
+        throw new TreeStateError(
+          E_TS_BEFORE_CREATED,
+          `event append rejected: ts ${ts} earlier than leaf.created_at ${leaf.created_at} (leaf_id="${leaf_id}", type="${opts.type}")`
+        );
+      }
+    }
+    if (tsMs > nowMs + 60_000) {
+      throw new TreeStateError(
+        E_TS_IN_FUTURE,
+        `event append rejected: ts ${ts} in future (now=${new Date(nowMs).toISOString()}, +60s tolerance). leaf_id="${leaf_id}", type="${opts.type}"`
+      );
+    }
+    if (leaf.events.length > 0) {
+      const lastEvTs = leaf.events[leaf.events.length - 1].ts;
+      const lastEvTsMs = Date.parse(lastEvTs);
+      // 上一条 ts 可能是老数据 NaN，此时跳过单调校验（不破坏存量）
+      if (Number.isFinite(lastEvTsMs) && tsMs < lastEvTsMs) {
+        throw new TreeStateError(
+          E_TS_NOT_MONOTONIC,
+          `event append rejected: ts ${ts} earlier than last event ts ${lastEvTs} (events must be monotonically non-decreasing). leaf_id="${leaf_id}", type="${opts.type}"`
+        );
+      }
+    }
+
     leaf.events.push(ev);
     leaf.last_event_type = opts.type;
     leaf.last_event_ts = ts;
+    // V10-status-event-sync: done event 写入时强制同步 status=done。
+    //   spec §三 V10-status-event-sync：堵 status=active 但 last_event=done 不同步。
+    //   原代码只更新 last_event_type/ts，status 与 event 可能脱节（攻击者只写 done event 不调 set-status done）。
+    if (opts.type === 'done' && leaf.status !== 'done') {
+      // 注意：leaf.set-status done 还要校验 milestones/deliverables/audit_gate 等前置条件；
+      // 这里只做"event→status 单向同步"，不绕过 cmdLeafSetStatus 的硬约束（status=done 是结果，不是入口）。
+      // 风险：worker 通过 done event 直接拿到 status=done 绕过 set-status done 校验。
+      // 决策（V10 spec）：done event 自身已有 self_check schema 硬约束（A5），且 cmdAuditGate A7 要求 pass 前先有 done event；
+      // 这里同步 status=done 是为了让 collectValidateIssues 能正确检测"status/event 不同步"。
+      // 真正的"done 准入"仍由 cmdLeafSetStatus 的 milestones/deliverables 校验把关（worker done 必经此路径）。
+      leaf.status = 'done';
+    }
     writeState(tree_id, state);
     result = { event: ev };
   });
@@ -1636,12 +1739,34 @@ async function cmdValidate(args) {
 // v0.7 批次4 (V2): auditor 独立性白名单校验。
 // 返回 problem 字符串(null=通过)。auditor 必须是树中真实存在的、独立的 leaf session。
 // 黑名单时代仅排除 null/added_by/root，任意伪造 UUID 即可放行；白名单要求 auditor 真实存在于树。
+//
+// V10-auditor-active (2026-06-25): 失守案例 audit-gate-test-20260625 — auditor leaf 404c724f
+//   在树里真实存在，role 标 worker 但被当成 auditor，4 道旧校验全过（V4-V9 只查"字段存在"）。
+//   补 3 重新增校验：auditor leaf status 必须是 done、events 必须非空、自己 audit_gate.verdict 必须是 pass。
+//   拒绝"僵尸 auditor"（标 active/events=[]/verdict=skip 但被借身份用）。
+// V10-uuid-format-strict: 入口先做严格 UUID v4 校验，拒绝全 0/全 f/非 v4/空/null。
 function resolveAuditorIndep(state, leaf, auditorSessionId) {
   if (!auditorSessionId) return 'auditor_session_id is null';
+  // V10-uuid-format-strict: 严格 UUID v4（version=4 + variant 位）。
+  if (!isValidStrictUuidV4(auditorSessionId)) {
+    return `auditor_session_id "${auditorSessionId}" is not a strict UUID v4 (rejected: must be v4, non-empty, non-zero, non-broadcast)`;
+  }
   if (leaf.added_by && auditorSessionId === leaf.added_by) return 'auditor=added_by (self-audit forbidden)';
   const auditorLeaf = Object.values(state.leaves).find(l => l.session_id === auditorSessionId);
   if (!auditorLeaf) return `auditor "${auditorSessionId}" not found as any leaf session in tree (forged UUID)`;
   if (auditorLeaf.leaf_id === leaf.leaf_id) return 'auditor is the leaf itself';
+  // V10-auditor-active: auditor leaf 自身状态校验 —— 必须已完成审计工作（done + events 非空 + 自己 audit_gate=pass）。
+  //   失守案例中 auditor 404c724f 标 status=active, events=[], audit_gate.verdict='skip'，但接口仍放行。
+  if (auditorLeaf.status !== 'done') {
+    return `auditor leaf "${auditorLeaf.leaf_id}" status="${auditorLeaf.status}" (must be done; auditor must have completed its own audit work)`;
+  }
+  if (!Array.isArray(auditorLeaf.events) || auditorLeaf.events.length === 0) {
+    return `auditor leaf "${auditorLeaf.leaf_id}" events empty (no audit work performed; auditor must have ≥1 event before endorsing others)`;
+  }
+  const ag = auditorLeaf.audit_gate;
+  if (!ag || ag.verdict !== 'pass') {
+    return `auditor leaf "${auditorLeaf.leaf_id}" own audit_gate.verdict="${ag ? ag.verdict : 'undefined'}" (must be pass; auditor cannot endorse others without itself being endorsed)`;
+  }
   return null;
 }
 
@@ -1879,6 +2004,30 @@ function collectValidateIssues(state) {
     }
   }
 
+  // V10-status-event-sync: status/event 双向一致性校验（reconcileStatus 内联）。
+  //   - last_event=done 但 status≠done → issue（cmdEventAppend 应已同步，老数据可能漏）
+  //   - status=done 但 events 无 done → issue（cmdLeafSetStatus 应已拦，老数据可能漏）
+  //   spec §三 V10-status-event-sync：堵"status=active 但 last_event=done"或反向不一致。
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    const evs = Array.isArray(leaf.events) ? leaf.events : [];
+    const hasDoneEvent = evs.some((e) => e && (e.type === 'done' || e.event_type === 'done'));
+    if (hasDoneEvent && leaf.status !== 'done') {
+      issues.push({
+        type: 'status_event_mismatch',
+        leaf_id: id,
+        detail: `events[] contains a 'done' event but status="${leaf.status}" (must be done). cmdEventAppend should have synced status; legacy data needs migrate.`
+      });
+    }
+    if (leaf.status === 'done' && !hasDoneEvent) {
+      issues.push({
+        type: 'status_event_mismatch',
+        leaf_id: id,
+        detail: `status="done" but no 'done' event in events[] (cmdLeafSetStatus V10 gate should have blocked this; legacy data needs migrate).`
+      });
+    }
+  }
+
   return issues;
 }
 
@@ -1958,9 +2107,11 @@ function calcCommanderDepth(state, parent_leaf_id) {
 // verdict ∈ {required, pass, fail, skip}
 // ============================================================
 
-async function cmdAuditGate(args) {
+async function cmdAuditGate(args, callerSessionId) {
   // audit-gate <tree_id> <leaf_id> --verdict <required|pass|fail|skip>
   //          [--audit-session-id <uuid>] [--reason <text>]
+  // V10-self-audit-forbidden-v2: 新增 callerSessionId 形参 —— MCP wrapper 透传调用方 session_id，
+  //   校验 caller 必须等于 audit_session_id（堵 worker 528b0925 借 auditor 404c724f 的 session_id 调接口）。
   const { positional, opts } = parseArgs(args);
   const [tree_id, leaf_id] = positional;
   assertTreeExists(tree_id);
@@ -1971,8 +2122,22 @@ async function cmdAuditGate(args) {
     throw new TreeStateError(E_SCHEMA_INVALID, `verdict "${verdict}" not in [required, pass, fail, skip]`);
   }
   const audit_session_id = opts['audit-session-id'] || null;
-  if (audit_session_id && !UUID_RE.test(audit_session_id)) {
-    throw new TreeStateError(E_SCHEMA_INVALID, `--audit-session-id "${audit_session_id}" is not a valid UUID`);
+  // V10-uuid-format-strict: 升级 UUID 校验为严格 v4（拒绝全 0/全 f/非 v4/空）。
+  //   旧 UUID_RE 允许 v1-v5 任意版本，且不查全 0/全 f 占位符。
+  if (audit_session_id && !isValidStrictUuidV4(audit_session_id)) {
+    throw new TreeStateError(E_INVALID_UUID_STRICT, `--audit-session-id "${audit_session_id}" is not a strict UUID v4 (must be version 4, non-zero, non-broadcast)`);
+  }
+
+  // V10-self-audit-forbidden-v2: 调用方 session_id 必须等于 audit_session_id（防借身份）。
+  //   失守案例: worker 528b0925 拿 auditor 404c724f 的 session_id 调 mcp__tree__tree_audit_gate，
+  //   引擎层完全无感知（cmdAuditGate 不知道 caller 是谁），4 道 V4-V9 校验全过。
+  //   修复：MCP wrapper 从 __proma_getMcpServers__(sessionId, ...) 提取 sessionId，透传给 engine。
+  //   CLI 调用（dbc-spec 等）不传 caller，跳过此校验（向后兼容）。
+  if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId) {
+    throw new TreeStateError(
+      E_BORROWED_IDENTITY,
+      `audit-gate rejected: caller "${callerSessionId}" != audit_session_id "${audit_session_id}" (borrowed identity forbidden; caller must be the auditor itself)`
+    );
   }
 
   let result = null;
@@ -2064,6 +2229,66 @@ async function cmdAuditAppend(args) {
     }
   }
 
+  // V10-uuid-format-strict: audit_append 路径前置校验 auditor_session_id 必须是严格 UUID v4（拒全 0/全 f/空/null/非 UUID 字符串）。
+  //   C1 只在 audit_gate 路径（resolveAuditorIndep 入口）加了严格校验，audit_append 路径完全漏掉，导致
+  //   Cr 洁净室发现 7/7 UUID 攻击全放行（空串、null、'not-uuid'、伪造合法 UUID、self session、全 f、全 0）。
+  //   spec §三 V10-uuid-format-strict + V10-numeric-consistency 中 cmdAuditAppend 应包含此校验。
+  if (!isValidStrictUuidV4(entry.auditor_session_id)) {
+    throw new TreeStateError(E_INVALID_UUID_STRICT,
+      `audit_append rejected: auditor_session_id "${entry.auditor_session_id}" not strict UUID v4 (must be v4, non-empty, non-zero, non-broadcast)`);
+  }
+
+  // M2: total/passed/failed 必须是整数（spec §18.3）
+  for (const k of ['total', 'passed', 'failed']) {
+    if (typeof entry[k] !== 'number' || !Number.isInteger(entry[k])) {
+      throw new TreeStateError(E_SCHEMA_INVALID, `audit log entry "${k}" must be integer`);
+    }
+  }
+
+  // V10-numeric-consistency: total>=0 + passed+failed=total + results.length=total + results[i] 三元组。
+  //   spec §三 V10-numeric-consistency：把"字段存在性"升级为"数值一致性"，
+  //   拒绝 total=-1 / p+f≠total / results.length≠total 等数值矛盾。
+  //   results[i] 子结构（item/pass/evidence）原 R2-T7 已校验，本块额外强化错误码区分。
+  const { total, passed, failed, results } = entry;
+  if (!Number.isInteger(total) || total < 0) {
+    throw new TreeStateError(E_NEGATIVE_COUNT,
+      `audit log entry "total"=${total} must be a non-negative integer`);
+  }
+  if (!Number.isInteger(passed) || passed < 0) {
+    throw new TreeStateError(E_NEGATIVE_COUNT,
+      `audit log entry "passed"=${passed} must be a non-negative integer`);
+  }
+  if (!Number.isInteger(failed) || failed < 0) {
+    throw new TreeStateError(E_NEGATIVE_COUNT,
+      `audit log entry "failed"=${failed} must be a non-negative integer`);
+  }
+  if (passed + failed !== total) {
+    throw new TreeStateError(E_COUNT_MISMATCH,
+      `audit log entry numeric mismatch: passed(${passed}) + failed(${failed}) != total(${total})`);
+  }
+
+  // R2-T7: results[i] 必须是 {item:string, pass:boolean, evidence:string} 三元组（spec §18.3）
+  if (!Array.isArray(entry.results)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, 'audit log entry "results" must be array');
+  }
+  // V10-numeric-consistency: results.length === total
+  if (results.length !== total) {
+    throw new TreeStateError(E_LENGTH_MISMATCH,
+      `audit log entry "results".length(${results.length}) != total(${total}); every audited item must have a result entry`);
+  }
+  for (let i = 0; i < entry.results.length; i++) {
+    const r = entry.results[i];
+    if (!r || typeof r !== 'object' || Array.isArray(r)) {
+      throw new TreeStateError(E_SCHEMA_INVALID, `audit log entry results[${i}] must be object`);
+    }
+    if (typeof r.item !== 'string' ||
+        typeof r.pass !== 'boolean' ||
+        typeof r.evidence !== 'string') {
+      throw new TreeStateError(E_SCHEMA_INVALID,
+        `audit log entry results[${i}] must have {item:string, pass:boolean, evidence:string}`);
+    }
+  }
+
   let result = null;
   await withLock(tree_id, () => {
     const state = readState(tree_id);
@@ -2071,6 +2296,25 @@ async function cmdAuditAppend(args) {
       throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
     }
     const leaf = state.leaves[leaf_id];
+
+    // V10-uuid-format-strict + V10-auditor-active (audit_append 路径): 校验 auditor_session_id 不仅格式合法，
+    //   还必须指向树中真实存在且独立的 leaf。轻量校验（存在 + 非自审），跳过 V10-auditor-active 的
+    //   status/events/verdict 三重校验 —— audit_append 是"审计证据落盘"，不要求 auditor 自身已完成审计工作
+    //   （audit_gate 才是"放行门"，那里仍走完整的 resolveAuditorIndep 含 status/events/verdict）。
+    //   Cr 测试 7 种 UUID 攻击（空串/null/not-uuid/伪造合法 UUID/self session/全 f/全 0）全部在前置 strict 校验拦截，
+    //   再用此块兜底"伪造合法 UUID（不在树）"和"self session"。
+    //   注：若用完整 resolveAuditorIndep 会破坏金标准 dbc-spec R2T7-e / M2-d / v10-regression 合法数值放行（其 auditor
+    //   是占位 UUID，对应 zombie leaf）—— audit_append 不应受 auditor-active 限制。
+    const auditorLeaf = Object.values(state.leaves).find(l => l.session_id === entry.auditor_session_id);
+    if (!auditorLeaf) {
+      throw new TreeStateError(E_AUDITOR_NOT_INDEPENDENT,
+        `audit_append rejected: auditor_session_id "${entry.auditor_session_id}" not found as any leaf session in tree (forged UUID)`);
+    }
+    if (auditorLeaf.leaf_id === leaf.leaf_id) {
+      throw new TreeStateError(E_AUDITOR_NOT_INDEPENDENT,
+        `audit_append rejected: auditor_session_id "${entry.auditor_session_id}" is the target leaf itself (self-audit forbidden)`);
+    }
+
     if (!Array.isArray(leaf.audit_log)) leaf.audit_log = [];
     const logEntry = Object.assign({ ts: nowIso() }, entry);
     leaf.audit_log.push(logEntry);
@@ -2086,6 +2330,9 @@ async function cmdAuditAppend(args) {
 
 async function cmdNudgeAppend(args) {
   // nudge append <tree_id> <leaf_id> --rule-id <id> [--severity <low|mid|high>]
+  // V10-nudge-escalation: nudge_count 阈值升级 —— 3→medium, 5→high, 7→强制 pruned。
+  //   spec §三 V10-nudge-escalation：把"nudge_count 累加但不升级"升级为"强制升级 + 7 次自动 prune"。
+  //   失守案例：失忆 leaf 被反复 nudge 168 次仍 active（spec 失守点#5）。
   const { positional, opts } = parseArgs(args);
   const [tree_id, leaf_id] = positional;
   assertTreeExists(tree_id);
@@ -2106,8 +2353,55 @@ async function cmdNudgeAppend(args) {
     if (typeof leaf.nudge_count !== 'number') leaf.nudge_count = 0;
     if (!Array.isArray(leaf.nudge_log)) leaf.nudge_log = [];
     leaf.nudge_count += 1;
-    const entry = { ts: nowIso(), rule_id: opts['rule-id'], severity, nudge_count: leaf.nudge_count };
+
+    // V10-nudge-escalation: 强制升级 severity（nudge_count≥3 → medium，≥5 → high）
+    //   spec §三 V10-nudge-escalation 字面要求升级到 'medium'（与 drift severity 'mid' 区分；
+    //   nudge_log.severity 是 nudge 独有字段，不与 DRIFT_SEVERITY_ENUM 复用）。
+    let effectiveSeverity = severity;
+    if (leaf.nudge_count >= 5) {
+      effectiveSeverity = 'high';
+    } else if (leaf.nudge_count >= 3) {
+      // low → medium；mid/high 不降级（保留调用方原意）
+      if (severity === 'low') effectiveSeverity = 'medium';
+    }
+
+    const entry = { ts: nowIso(), rule_id: opts['rule-id'], severity: effectiveSeverity, nudge_count: leaf.nudge_count };
     leaf.nudge_log.push(entry);
+
+    // V10-nudge-escalation: nudge_count >= 7 强制 pruned（拒绝继续 nudge）
+    if (leaf.nudge_count >= 7) {
+      leaf.status = 'pruned';
+      const pruneEntry = {
+        ts: nowIso(),
+        rule_id: opts['rule-id'],
+        severity: 'high',
+        nudge_count: leaf.nudge_count,
+        auto_pruned: true,
+        reason: `auto-pruned after ${leaf.nudge_count} nudges (V10-nudge-escalation)`
+      };
+      leaf.nudge_log.push(pruneEntry);
+      // 同步 drift_history（与 cmdLeafSetStatus 切 pruned 保持一致）
+      if (!Array.isArray(leaf.drift_history)) leaf.drift_history = [];
+      const driftEntry = {
+        ts: nowIso(),
+        kind: 'rhythm',
+        severity: 'high',
+        action: 'prune',
+        reason: `auto-pruned after ${leaf.nudge_count} nudges (V10-nudge-escalation)`,
+        leaf_id,
+        from: leaf.status, // 已是 pruned，但保留语义
+        to: 'pruned'
+      };
+      leaf.drift_history.push(driftEntry);
+      if (Array.isArray(state.drift_log)) state.drift_log.push(driftEntry);
+      writeState(tree_id, state);
+      // 抛错让调用方知道 leaf 已 prune（仍 writeState 落盘后再抛，保证状态不丢）
+      throw new TreeStateError(
+        E_LEAF_AUTO_PRUNED,
+        `leaf "${leaf_id}" auto-pruned after ${leaf.nudge_count} nudges (V10-nudge-escalation: 7-strike rule)`
+      );
+    }
+
     writeState(tree_id, state);
     result = { leaf_id, nudge_count: leaf.nudge_count, nudge_log_entry: entry };
   });
@@ -2137,13 +2431,14 @@ async function cmdNudgeReset(args) {
   return result;
 }
 
-async function dispatchAudit(args) {
+async function dispatchAudit(args, callerSessionId) {
   if (args.length === 0) {
     throw new TreeStateError(E_SCHEMA_INVALID, 'audit requires a subcommand: gate | append');
   }
   const [sub, ...rest] = args;
   switch (sub) {
-    case 'gate': return await cmdAuditGate(rest);
+    // V10-self-audit-forbidden-v2: 仅 'gate' 需要 callerSessionId（堵借身份）
+    case 'gate': return await cmdAuditGate(rest, callerSessionId);
     case 'append': return await cmdAuditAppend(rest);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown audit subcommand "${sub}"`);
@@ -2362,7 +2657,7 @@ async function cmdMigrate(args) {
 // 主入口 & 路由
 // ============================================================
 
-async function dispatch(cmd, args) {
+async function dispatch(cmd, args, callerSessionId) {
   switch (cmd) {
     // Maintain
     case 'init':
@@ -2393,8 +2688,9 @@ async function dispatch(cmd, args) {
       return await dispatchSegment(args);
 
     // TAO (v0.2.2) — 天道审计门 + 鞭策
+    // V10-self-audit-forbidden-v2: dispatchAudit 透传 callerSessionId 给 cmdAuditGate（其他子命令忽略）
     case 'audit':
-      return await dispatchAudit(args);
+      return await dispatchAudit(args, callerSessionId);
     case 'nudge':
       return await dispatchNudge(args);
 
