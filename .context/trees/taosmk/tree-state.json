@@ -86,7 +86,7 @@
         "auditor_session_id": "ffffffff-0000-4000-8000-000000000001",
         "ts": "2026-06-21T13:57:41.823+08:00"
       },
-      "nudge_count": 568,
+      "nudge_count": 635,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.563Z",
@@ -5199,6 +5199,609 @@
           "suggest": "fork 一个 verify/audit worker 独立检查",
           "nudge_count": 568,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:52:17.335Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 569,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T06:57:16.871Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 570,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:02:17.560Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 571,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:07:18.439Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 572,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:12:17.506Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 573,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:17:18.110Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 574,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:22:19.708Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 575,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:27:17.388Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 576,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:32:17.015Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 577,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:37:17.333Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 578,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:42:17.330Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 579,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:47:17.932Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 580,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:52:19.077Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 581,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T07:57:17.689Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 582,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:02:17.305Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 583,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:07:17.290Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 584,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:12:17.078Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 585,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:17:17.308Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 586,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:22:17.031Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 587,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:27:17.232Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 588,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:32:17.219Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 589,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:37:17.799Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 590,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:42:18.387Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 591,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:47:20.443Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 592,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:52:21.061Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 593,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T08:57:19.367Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 594,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:02:19.489Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 595,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:07:20.144Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 596,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:12:19.828Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 597,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:17:19.731Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 598,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:22:19.071Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 599,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:27:22.258Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 600,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:32:20.582Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 601,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:36:00.354Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 602,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:40:56.576Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 603,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:46:01.609Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 604,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:51:02.161Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 605,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T09:56:02.524Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 606,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:01:00.170Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 607,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:05:58.991Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 608,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:11:01.936Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 609,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:16:01.461Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 610,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:20:55.971Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 611,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:25:55.651Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 612,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:31:02.936Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 613,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:35:56.805Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 614,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:38:46.836Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 615,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:43:43.975Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 616,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:48:43.823Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 617,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T10:53:43.816Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 618,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:05:04.766Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 619,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:22:33.900Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 620,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:23:44.183Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 621,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:28:44.200Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 622,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:33:44.311Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 623,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:38:44.271Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 624,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:43:44.198Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 625,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:48:44.215Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 626,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:53:44.269Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 627,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T11:58:44.351Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 628,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:03:44.550Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 629,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:08:45.153Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 630,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:13:44.503Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 631,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:18:44.583Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 632,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:23:45.332Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 633,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:28:47.032Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 634,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-25T12:33:44.769Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 635,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -9755,6 +10358,542 @@
         },
         {
           "ts": "2026-06-25T06:47:17.086Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:52:17.335Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T06:57:16.871Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:02:17.560Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:07:18.439Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:12:17.506Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:17:18.110Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:22:19.708Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:27:17.388Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:32:17.015Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:37:17.333Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:42:17.330Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:47:17.932Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:52:19.077Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T07:57:17.689Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:02:17.305Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:07:17.290Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:12:17.078Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:17:17.309Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:22:17.031Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:27:17.232Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:32:17.219Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:37:17.799Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:42:18.387Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:47:20.443Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:52:21.061Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T08:57:19.367Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:02:19.489Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:07:20.144Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:12:19.828Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:17:19.731Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:22:19.071Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:27:22.258Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:32:20.582Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:36:00.354Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:40:56.576Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:46:01.609Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:51:02.161Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T09:56:02.524Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:01:00.170Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:05:58.991Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:11:01.936Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:16:01.461Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:20:55.971Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:25:55.651Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:31:02.936Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:35:56.805Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:38:46.836Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:43:43.975Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:48:43.823Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T10:53:43.816Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:05:04.766Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:22:33.900Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:23:44.183Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:28:44.200Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:33:44.311Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:38:44.271Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:43:44.198Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:48:44.215Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:53:44.269Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T11:58:44.351Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:03:44.550Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:08:45.153Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:13:44.503Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:18:44.583Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:23:45.332Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:28:47.032Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-25T12:33:44.769Z",
           "auditor": "tao-watcher-script",
           "rule_id": "R-06",
           "pass": false,

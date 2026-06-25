@@ -7,6 +7,13 @@ release/tree-system-v0.2.2/test-sandbox/*.bak
 # TAO engine debug dumps
 tao-engine/
 
+# 临时工具打包（不进版本管理）
+session-cleaner.zip
+
+# 商业版原文件（不放 git，仅本地 dist）
+main.cjs
+preload.cjs
+
 # OS files
 .DS_Store
 Thumbs.db
