@@ -2144,6 +2144,25 @@ async function applyNudge(tree, violation, cfg) {
     const leaf = freshState.leaves[violation.leaf_id];
     if (!leaf) return;  // leaf 已删, 跳过
 
+    // 全局守卫 (V10 Phase 3 followup 加固, 补 commit 9c423b8 盲点):
+    // checkAllRules 入口的 isSharedSessionLeaf 守卫只覆盖接收 leaf 参数的子级规则
+    // (C-02/C-03/C-06/C-13 + Tier2 全部), 但 R-04/R-05/R-06 是 tree 级规则, 接收
+    // tree 参数, 内部循环 worker leaf 时不走过守卫. 运行时验证 (bugav tree) 证实
+    // R-04 仍会对共享 session_id 的 leaf 触发 nudge. 这里在 applyNudge 入口加
+    // 全局守卫, 覆盖所有规则产生的 violation, 彻底堵住鞭策错对象.
+    if (leaf.session_id) {
+      let sharedCount = 0;
+      for (const l of Object.values(freshState.leaves)) {
+        if (l.session_id === leaf.session_id) sharedCount++;
+      }
+      if (sharedCount > 1) {
+        log("[Patch M] applyNudge tree=" + tree.tree_id + " leaf=" + leaf.leaf_id +
+            " session_id " + leaf.session_id.slice(0, 8) + "... shared by " + sharedCount +
+            " leaves, skip nudge (bug-b-repro or dirty data, defensive guard)");
+        return;
+      }
+    }
+
     // 初始化 audit_log/nudge_log/nudge_count
     if (!Array.isArray(leaf.nudge_log)) leaf.nudge_log = [];
     if (typeof leaf.nudge_count !== "number") leaf.nudge_count = 0;
