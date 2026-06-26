@@ -2160,6 +2160,13 @@ async function checkAllRules(tree, workspace, cfg) {
     maybe("C-03", ruleC03, leaf, tree);
     maybe("C-06", ruleC06, leaf, tree);
     maybe("C-13", ruleC13, leaf, tree);
+    // V10 Phase 3 followup R5 (移到 Tier 1, 不依赖 status): tamper detection 必须对
+    // done leaf 跑, 因为篡改痕迹 (audit_gate=pass / audit_log pass=true) 都是 done
+    // 之后才看的. 之前放在 Tier 2 (有 status 守卫) 导致 v626 全 done tree 永远检测不到.
+    maybe("W-AUDIT-SELF", ruleAuditSelf, leaf, tree);
+    maybe("W-AUDIT-WORKER", ruleAuditWorker, leaf, tree);
+    maybe("W-AUDIT-TAMPER", ruleAuditTamper, leaf, tree);
+    maybe("W-AUDIT-NO-ALIGN", ruleAuditNoAlign, leaf, tree);
   }
 
   // Tier 2 (IPC)
@@ -2177,11 +2184,6 @@ async function checkAllRules(tree, workspace, cfg) {
     maybe("W-12", ruleW12, leaf, tree);
     maybe("C-11", ruleC11, leaf, tree);
     maybe("C-15", ruleC15, leaf, tree);
-    // V10 Phase 3 followup R5: audit tamper detection (v626 攻击驱动)
-    maybe("W-AUDIT-SELF", ruleAuditSelf, leaf, tree);
-    maybe("W-AUDIT-WORKER", ruleAuditWorker, leaf, tree);
-    maybe("W-AUDIT-TAMPER", ruleAuditTamper, leaf, tree);
-    maybe("W-AUDIT-NO-ALIGN", ruleAuditNoAlign, leaf, tree);
   }
 
   return all;
