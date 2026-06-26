@@ -86,7 +86,7 @@
         "auditor_session_id": "ffffffff-0000-4000-8000-000000000001",
         "ts": "2026-06-21T13:57:41.823+08:00"
       },
-      "nudge_count": 841,
+      "nudge_count": 887,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.563Z",
@@ -7656,6 +7656,420 @@
           "suggest": "fork 一个 verify/audit worker 独立检查",
           "nudge_count": 841,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-26T07:43:13.018Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 842,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T07:48:12.768Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 843,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T07:53:11.980Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 844,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T07:58:12.374Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 845,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:03:13.797Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 846,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:08:13.353Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 847,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:13:14.691Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 848,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:18:16.675Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 849,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:23:14.269Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 850,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:28:15.207Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 851,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:33:15.200Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 852,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:38:15.291Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 853,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:43:09.961Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 854,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T08:43:09.970Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 855,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:03:09.765Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 856,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:03:09.775Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 857,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:08:09.622Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 858,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:08:09.632Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 859,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:13:10.998Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 860,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:13:11.010Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 861,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:18:10.133Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 862,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:18:10.145Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 863,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:23:09.563Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 864,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:23:09.574Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 865,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:28:09.919Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 866,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:28:09.930Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 867,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:33:09.591Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 868,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:33:09.602Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 869,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:38:09.630Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 870,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:38:09.641Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 871,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:43:10.517Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 872,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:43:10.528Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 873,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:48:10.429Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 874,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:48:10.440Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 875,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:53:11.112Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 876,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:53:11.126Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 877,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:58:08.626Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 878,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T09:58:08.635Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 879,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T10:03:07.902Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 880,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T10:03:07.910Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 881,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T10:08:09.715Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 882,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T10:08:09.726Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 883,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T10:13:09.717Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 884,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T10:13:09.727Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 885,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T10:18:10.892Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 886,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T10:18:10.904Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 887,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -14400,6 +14814,374 @@
           "rule_id": "R-06",
           "pass": false,
           "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:43:13.018Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:48:12.768Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:53:11.980Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:58:12.374Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:03:13.797Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:08:13.353Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:13:14.691Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:18:16.675Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:23:14.269Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:28:15.207Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:33:15.200Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:38:15.291Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:43:09.961Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T08:43:09.970Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:03:09.765Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:03:09.775Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:08:09.622Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:08:09.632Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:13:10.998Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:13:11.010Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:18:10.133Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:18:10.145Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:23:09.563Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:23:09.574Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:28:09.919Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:28:09.930Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:33:09.591Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:33:09.602Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:38:09.630Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:38:09.641Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:43:10.517Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:43:10.528Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:48:10.429Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:48:10.440Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:53:11.112Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:53:11.126Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:58:08.626Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T09:58:08.635Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T10:03:07.902Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T10:03:07.910Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T10:08:09.715Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T10:08:09.726Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T10:13:09.717Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T10:13:09.727Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T10:18:10.892Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'taosmk-A1-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T10:18:10.904Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
           "degraded": false
         }
       ]

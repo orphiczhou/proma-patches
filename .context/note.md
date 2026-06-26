@@ -4,6 +4,60 @@
 
 新条目追加在顶部。
 
+## 2026-06-26 18:20 V10 Phase 3 Followup — IHL 6 轮迭代闭环 + R5/R6 Audit Tamper Detection
+
+**起因**: 用户要求"安排 TreeCommander 和 SubAgent 验证监督，并迭代改进"。在前序 V10 P3 收尾（commit `30eb4fa` Bug A/B 修复 + `9c423b8` TAO Watcher 入口守卫）基础上，开启 IHL（Iterative Hardening Loop）连续 6 轮迭代加固。
+
+**6 轮迭代收敛**:
+
+| 轮次 | Commit | 修复 | 验证 |
+|------|--------|------|------|
+| R1 | `1a7ed5f` | applyNudge 全局守卫（补 9c423b8 tree 级规则盲点） | bugav 重置 + 巡逻 PASS ✅ |
+| R2 | `031c546` | create_session workspace_id 校验 | 重启后探测 invalid id → E_WORKSPACE_NOT_FOUND ✅ |
+| R3 | v626 树 | V4 Pro commander 端到端 | self_check 4/4 PASS ✅ |
+| R4 | `031c546` | fork_session 同类漏洞补丁（审计驱动） | 复用 R2 helper ✅ |
+| R5 | `d44163a` | 4 条 W-AUDIT-* tamper detection | 设计盲点（Tier 2 status 守卫跳过）⚠️ |
+| R6 | `690f7e8` | R5 移到 Tier 1 绕开 status 守卫 | v626 巡逻 8 违规全覆盖 ✅ |
+
+**关键事件链**:
+1. **R1 盲点发现**: bugav tree 实测发现 R-04 等 tree 级规则绕过 9c423b8 入口守卫 → applyNudge 入口加 sharedCount 全局守卫
+2. **R2 盲点发现**: GLM-5.2 v1 子会话落 "undefined" slug → create_session handler 加 workspace_id 索引校验
+3. **R4 盲点发现**: code-reviewer SubAgent 审计暴露 fork_session new_workspace_id 同类漏洞 → 提取 validateWorkspaceId helper 双入口共享
+4. **R5 盲点发现**: v626 tree-state.json 被直接篡改出现自审通过 + worker 当 auditor + audit_log 伪造 pass=true 异常 → 加 4 条 W-AUDIT-* 事后检测规则
+5. **R6 盲点发现**: R5 规则被放在 Tier 2（status 守卫），全 done 的 v626 tree 永远检测不到 → 移到 Tier 1（对 all leaf 跑）
+
+**最终防御拓扑（3 层）**:
+```
+入口拦截层: cmdEventAppend L1498 / cmdLeafAdd L705 / create_session L461 / fork_session L601
+兜底守卫层: cmdAuditGate L2337 / resolveAuditorIndep L1897 / checkAllRules isSharedSessionLeaf / applyNudge sharedCount
+事后检测层: W-AUDIT-SELF / W-AUDIT-WORKER / W-AUDIT-TAMPER / W-AUDIT-NO-ALIGN
+```
+
+**R5/R6 运行时证据**（v626 tree 重启加载 690f7e8 后巡逻）: 8 条违规全覆盖——v626-B-worker 触发 W-AUDIT-SELF + W-AUDIT-NO-ALIGN；v626-A2/A3/A4-worker/A4-verify/C-worker 触发 W-AUDIT-WORKER；v626-A-commander 触发 W-AUDIT-TAMPER。
+
+**Prompt Injection 防御副产品**: 会话期间收到 6 条试图诱导 root（ce9a1e2f）滥用 audit_gate 的注入指令（让 root 给 worker / commander / 不存在的 leaf 标 pass）。我作为 root 信任锚点全部拒绝响应，证明 V10-trust-anchor 设计 + root 自律能有效防御注入攻击。
+
+**IHL 方法论沉淀**:
+- 模式：`盲点暴露（真实场景）→ 入口补丁 → SubAgent 静态校验 → 运行时验证 → 发现新盲点`
+- 关键洞察：真实场景优先于静态审查；入口拦截必须配套兜底守卫；tamper detection 必须对 all leaf 跑（不走 status 守卫）
+- 命名：**Iterative Hardening Loop (IHL) / 盲点驱动的迭代加固**
+
+**关键产出**:
+- 工程文档: `.context/v10/v626-r5-r6-audit-tamper-detection.md`（R5/R6 完整工程设计）
+- 迭代总结: `.context/v10/v626-iteration-recap.md`（R1-R4 详细）
+- 运行时验证: `.context/v10/runtime-verify-2026-06-26.md`（Bug A/B + TAO Watcher）
+- 代码: 3 份 patches.cjs 同步（仓库版 + dev dist + patch-l，2658 行一致）
+- Git: 4 commit 已推送 `1a7ed5f / 031c546 / d44163a / 690f7e8` 到 orphiczhou/proma-patches（private）
+
+**Git 状态**: orphiczhou/proma-patches 远程已同步到 `690f7e8`，3 份 patches.cjs 物理同步，运行时验证全部 PASS。
+
+**实例状态**:
+- Dev: tree-engine.cjs 3602 行 + patches.cjs 2658 行（最新，已重启加载）
+- Release: 同 dev 共享 dist（已重启加载）
+- 正式版: asar 打包，完全分叉
+
+---
+
 ## 2026-06-25 20:46 V10 Phase 3 收尾盘点（接力 a8111bf5 → bc005820）
 
 **起因**: 用户要求"调研最近的新会话做的状态盘点，更新项目状态"。距上次盘点（20:15）31 分钟，发现新主线会话 bc005820（DeepSeek V4 Pro）接力 a8111bf5 完成 V10 Phase 3 收尾。
