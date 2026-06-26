@@ -14,7 +14,7 @@
 - a8111bf5 根指挥官本身不是 worker，但收到 W-01 后被强制要求用 brief_echo YAML 块回复
 - 规则错配导致指挥官被"机械检查"拖累，最终意外终止
 
-**设计外问题**：TAO Watcher 没有按 role 区分规则。详见 [跨工作区调查报告 §七](../cross-workspace-tree-issue-2026-06-25.md#七tao-watcher-干扰指挥官的问题关联)
+**设计外问题**：TAO Watcher 没有按 role 区分规则。详见 [跨工作区调查报告 §七](./cross-workspace-tree-issue-2026-06-25.md#七tao-watcher-干扰指挥官的问题关联)
 
 ## 已完成（接力 a8111bf5）
 
@@ -96,7 +96,7 @@ git push origin master
 
 ### 🟢 跨工作区问题（独立立项）
 
-详见 [cross-workspace-tree-issue-2026-06-25.md](../cross-workspace-tree-issue-2026-06-25.md)。
+详见 [cross-workspace-tree-issue-2026-06-25.md](./cross-workspace-tree-issue-2026-06-25.md)。
 
 P0 待办：
 - 归档 tree-2 关键产出（v10-p2-e2e-report.md + v10p2-e2e tree-state.json）到 `proma/.context/audit/v10-p2/`

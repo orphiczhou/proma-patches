@@ -136,7 +136,7 @@
 - 引擎对**任何注入都 0% 拦截**
 - 源码 `proma-source` grep `auditor_session_id` / `block_reason`：**0 匹配**（根本没有任何校验逻辑）
 
-详见 [迭代深度审计报告](./audit/iterative-deep-audit-2026-06-25.md)。
+详见 [迭代深度审计报告](./active/iterative-deep-audit-2026-06-25.md)。
 
 ### 关键证据（zombie auditor）
 
@@ -193,7 +193,7 @@
 - **待判定**：fupv（6/24 创建，未 done）
 - **v0.2.x 历史数据**：17 棵（6/19-6/21），可批量归档
 
-V10 加固的 6 大盲点推断依然成立（基于 audit-gate-test 的详细分析）。详见 [全局审计报告（修正版）](./audit/tree-state-global-audit-2026-06-25.md)。
+V10 加固的 6 大盲点推断依然成立（基于 audit-gate-test 的详细分析）。详见 [全局审计报告（修正版）](./archive/audit/tree-state-global-audit-2026-06-25.md)。
 
 ### 关键教训
 
@@ -537,9 +537,9 @@ for (const k of ['total', 'passed', 'failed']) {
 
 ## 2026-06-23 专家组审议包 v2（架构层诊断 → 决议）
 
-**[审议包目录](./expert-review-v2-2026-06-23/)** — 包含 `00-handoff.md`（交接文件）+ `01-questions.md`（8 个详细决议题）+ `README.md`（阅读指南）。
+**[审议包目录](./reference/architecture/expert-review-v2-2026-06-23/)** — 包含 `00-handoff.md`（交接文件）+ `01-questions.md`（8 个详细决议题）+ `README.md`（阅读指南）。
 
-**配套完整报告**: [tree-system-architecture-analysis-2026-06-23.md](./tree-system-architecture-analysis-2026-06-23.md)
+**配套完整报告**: [tree-system-architecture-analysis-2026-06-23.md](./reference/design/tree-system-architecture-analysis-2026-06-23.md)
 
 **审议目标**: 决定 v2 报告核心论断是否批准 + v0.5/v0.6/v0.7 怎么合并 + 层级深度硬限制 + Capability Token 是否上 P0 + migrate 策略 + 测试方法。
 
@@ -559,7 +559,7 @@ for (const k of ['total', 'passed', 'failed']) {
 
 ## 2026-06-23 Tree 体系架构层诊断（跳出现象看本质，v2 含层级深度诊断）
 
-**[完整报告](./tree-system-architecture-analysis-2026-06-23.md)** — 综合三个 researcher subagent（开源框架 / LLM 行为学 / 工业控制模式）+ 架构师视角判断 + qfv2 实际数据回溯。
+**[完整报告](./reference/design/tree-system-architecture-analysis-2026-06-23.md)** — 综合三个 researcher subagent（开源框架 / LLM 行为学 / 工业控制模式）+ 架构师视角判断 + qfv2 实际数据回溯。
 
 **核心论断**：用户问的"是 prompt 问题还是模型 + harness 机制问题"——答案是**部分 prompt，更主要是机制**。靠 prompt 解 30%，剩下 70% 必须靠架构层硬约束 + 严格限制层级深度。
 

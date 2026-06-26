@@ -281,4 +281,4 @@ start "" "D:\Proma-dev\Proma-white.exe"
 *作者：周星星 + Proma Agent (Claude)*
 *日期：2026-06-16*
 *完整技术文档：[proma-dev-wiki.md](./.context/proma-dev-wiki.md)*
-*创新路线图：[proma-innovation-plan.md](./.context/proma-innovation-plan.md)*
+*创新路线图：[proma-innovation-plan.md](./.context/reference/design/proma-innovation-plan.md)*

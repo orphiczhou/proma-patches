@@ -198,7 +198,7 @@ TAO Watcher 没有按 role 区分规则——对所有 leaf 用同样的检查�
 
 ## 九、关联文档
 
-- [V10 Phase 3 收尾交接](./handoff/session-2026-06-25-v10-followup.md)
-- [commander-methodology-v10.md](./commander-methodology-v10.md)（v10 工程方法论）
-- [v10/bug-a-investigation.md](./v10/bug-a-investigation.md)（Bug A 调查）
-- [v10/bug-b-investigation.md](./v10/bug-b-investigation.md)（Bug B 调查）
+- [V10 Phase 3 收尾交接](./session-2026-06-25-v10-followup.md)
+- [commander-methodology-v10.md](../reference/methodology/commander-methodology-v10.md)（v10 工程方法论）
+- [v10/bug-a-investigation.md](../v10/bug-a-investigation.md)（Bug A 调查）
+- [v10/bug-b-investigation.md](../v10/bug-b-investigation.md)（Bug B 调查）

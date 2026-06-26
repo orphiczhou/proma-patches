@@ -70,7 +70,7 @@
 
 ## 关联
 
-- [TAO Watcher 修复文档](./v10/fix-tao-watcher-session-shared.md)
+- [TAO Watcher 修复文档](../v10/fix-tao-watcher-session-shared.md)
 - [跨工作区问题原始报告](./cross-workspace-tree-issue-2026-06-25.md)
-- [V10 P2 e2e 归档](./audit/v10-p2/)
-- [default 文档迁移目标](./user-assets/default/)
+- [V10 P2 e2e 归档](../audit/v10-p2/)
+- [default 文档迁移目标](../user-assets/default/)

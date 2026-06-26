@@ -183,5 +183,5 @@ async function applyNudge(tree, violation, cfg) {
 
 - [TAO Watcher 修复（commit 9c423b8）](./fix-tao-watcher-session-shared.md)
 - [Bug A/B 修复验证（commit 30eb4fa）](./bug-fix-validation.md)
-- [跨工作区问题报告](../cross-workspace-tree-issue-2026-06-25.md)
-- [V10 Phase 3 收尾交接](../handoff/session-2026-06-25-v10-followup.md)
+- [跨工作区问题报告](../active/cross-workspace-tree-issue-2026-06-25.md)
+- [V10 Phase 3 收尾交接](../active/session-2026-06-25-v10-followup.md)

@@ -27,10 +27,10 @@
 
 ### Layer 2 — 树形会话执行体系 ✅ v0.2.2 + v0.7 Phase A + v0.7+ 引擎内联 + V4-V9 DbC + V10 内容校验 + Phase 3 Bug A/B 修复（工作区零源码）
 
-- **[2026-06-25 20:36] V10 Phase 3 — Bug A/B 修复 + 代码同步仓库 + 文档沉淀** (commit `30eb4fa`): Bug A（commander 代 worker 写 done event）+ Bug B（同 session 多 leaf 歧义）双重修复。**4 处引擎改动**：A-1 cmdEventAppend L1498（只允许 leaf.session_id 自己写）+ A-2 cmdAuditGate L2337-2345（**Auditor #2 发现的 hasDone 漏洞**，检查 caller_session_id）+ B-3 cmdLeafAdd L705-718（**新错误码 `E_DUPLICATE_SESSION_ID`** + session_id 唯一性校验）+ B-4 resolveAuditorIndep L1897-1911（.filter 跳过 pruned）。**代码同步到 workspace-files 顶层 + patch-l/**（按用户指令"所有 cjs 在 workspace-files 一份"）。4 个 Auditor 审查回收（Auditor #2 价值再次证明）。a8111bf5 主线会话因 **TAO Watcher 规则错配**意外终止，bc005820 接力完成。详见 [v10-followup 交接](./handoff/session-2026-06-25-v10-followup.md) + [跨工作区问题报告](./cross-workspace-tree-issue-2026-06-25.md)。**下一步**: push 4 commits / 重启 dev 验证 / 跨工作区清理
-- **[2026-06-25 17:55] V10 Phase 2 — root-as-trust-anchor + Agent helper 配套**: 详见 [v10/](./v10/) 17 份报告 + [v10-p2-e2e-report](../../tree-2/workspace-files/.context/v10-p2-e2e-report.md)。V10 8 大加固点（auditor-active / self-audit-v2 / uuid-strict / numeric-consistency / nudge-escalation / timestamp-monotonic / workspace-canonical / status-event-sync）+ Trust Anchor（root 自审特例解决鸡生蛋）+ D4 Helper 4 层自助文档（堵模型层失守）。164 测试全过，真实环境 V10 Phase 2 e2e 生产就绪
-- **[2026-06-25 12:19] V10 Phase 1 — 8 大加固点 + 双轮收敛**: 把 V4-V9 的「字段存在性校验」升级为「内容有效性校验」。V4-V9 形式完整但实测对真实攻击 **0% 拦截**（audit-gate-test-20260625 失守案例）。Tree 模式三层分离（实现/评价/洁净室）：A1 代码层评 8/8 合格，**Cr 洁净室独立测试发现 10 个真实失守**（Cr 优先于 A1）。详见 [charter](./plan/v10-implementation-charter.md) + [commander-methodology-v10](./commander-methodology-v10.md)
-- **[2026-06-25 08:35] V4-V9 followup（Tree 模式实战早期）**: 用 Tree 模式（4 commander 顺序 + 4 评价子 Agent + 洁净室 3 轮 31 测试 29 pass）落地 followup proposal，2 commit 入库（`efbf139` + `59357f1`）。C1 全量扫描 MCP schema、C2 修 3 个 gap（nudge_append 接口不兼容 / nudge_reset 工具缺失 / migrate dry_run）、C3 同步文档 role 枚举 + audit_append 结构、C4 加 milestone_empty_outputs 软警告。**洁净室发现 R2-T7**（audit_append results[i] 校验缺失，low，待用户决策 A/B/C）。**关键收获**：Tree 模式三层分离（实现/评价/洁净室）对抗确认偏误有效——R2-T7 是洁净室独立从 spec 写测试才暴露的（实现者+4 评价都漏）。dbc-spec 39/0、audit-attacks 18/0。**下一步**: 重启 dev/release 验证 C2/C4 / push GitHub / R2-T7 决策。详见 [followup 交接](./handoff/session-2026-06-25-followup-tree-mode.md) + [progress-report-2026-06-25](./progress-report-2026-06-25.md)
+- **[2026-06-25 20:36] V10 Phase 3 — Bug A/B 修复 + 代码同步仓库 + 文档沉淀** (commit `30eb4fa`): Bug A（commander 代 worker 写 done event）+ Bug B（同 session 多 leaf 歧义）双重修复。**4 处引擎改动**：A-1 cmdEventAppend L1498（只允许 leaf.session_id 自己写）+ A-2 cmdAuditGate L2337-2345（**Auditor #2 发现的 hasDone 漏洞**，检查 caller_session_id）+ B-3 cmdLeafAdd L705-718（**新错误码 `E_DUPLICATE_SESSION_ID`** + session_id 唯一性校验）+ B-4 resolveAuditorIndep L1897-1911（.filter 跳过 pruned）。**代码同步到 workspace-files 顶层 + patch-l/**（按用户指令"所有 cjs 在 workspace-files 一份"）。4 个 Auditor 审查回收（Auditor #2 价值再次证明）。a8111bf5 主线会话因 **TAO Watcher 规则错配**意外终止，bc005820 接力完成。详见 [v10-followup 交接](./active/session-2026-06-25-v10-followup.md) + [跨工作区问题报告](./active/cross-workspace-tree-issue-2026-06-25.md)。**下一步**: push 4 commits / 重启 dev 验证 / 跨工作区清理
+- **[2026-06-25 17:55] V10 Phase 2 — root-as-trust-anchor + Agent helper 配套**: 详见 [v10/](./v10/) 17 份报告 + [v10-p2-e2e-report](./audit/v10-p2/v10-p2-e2e-report.md)。V10 8 大加固点（auditor-active / self-audit-v2 / uuid-strict / numeric-consistency / nudge-escalation / timestamp-monotonic / workspace-canonical / status-event-sync）+ Trust Anchor（root 自审特例解决鸡生蛋）+ D4 Helper 4 层自助文档（堵模型层失守）。164 测试全过，真实环境 V10 Phase 2 e2e 生产就绪
+- **[2026-06-25 12:19] V10 Phase 1 — 8 大加固点 + 双轮收敛**: 把 V4-V9 的「字段存在性校验」升级为「内容有效性校验」。V4-V9 形式完整但实测对真实攻击 **0% 拦截**（audit-gate-test-20260625 失守案例）。Tree 模式三层分离（实现/评价/洁净室）：A1 代码层评 8/8 合格，**Cr 洁净室独立测试发现 10 个真实失守**（Cr 优先于 A1）。详见 [charter](./reference/plans/v10-implementation-charter.md) + [commander-methodology-v10](./reference/methodology/commander-methodology-v10.md)
+- **[2026-06-25 08:35] V4-V9 followup（Tree 模式实战早期）**: 用 Tree 模式（4 commander 顺序 + 4 评价子 Agent + 洁净室 3 轮 31 测试 29 pass）落地 followup proposal，2 commit 入库（`efbf139` + `59357f1`）。C1 全量扫描 MCP schema、C2 修 3 个 gap（nudge_append 接口不兼容 / nudge_reset 工具缺失 / migrate dry_run）、C3 同步文档 role 枚举 + audit_append 结构、C4 加 milestone_empty_outputs 软警告。**洁净室发现 R2-T7**（audit_append results[i] 校验缺失，low，待用户决策 A/B/C）。**关键收获**：Tree 模式三层分离（实现/评价/洁净室）对抗确认偏误有效——R2-T7 是洁净室独立从 spec 写测试才暴露的（实现者+4 评价都漏）。dbc-spec 39/0、audit-attacks 18/0。**下一步**: 重启 dev/release 验证 C2/C4 / push GitHub / R2-T7 决策。详见 [followup 交接](./active/session-2026-06-25-followup-tree-mode.md) + [progress-report-2026-06-25](./active/progress-report-2026-06-25.md)
 - **[2026-06-24] V4-V9 DbC 深度加固**: tree-engine.cjs **9 个硬约束点**（V4/V5b/V6/V8/CP2/V9 + 审计[1][2][3]），audit-attacks **18 攻击 0 BYPASS**，dbc-spec **36/0**。Tree 方法论（实现/测试/审计分离 + 自举 + 迭代收敛）：collaboration 独立审计子会话对抗发现并修复 3 个实现者盲点（alignment_pending 标志篡改 / budget 字符串 / symlink）。关键教训：**安全检查不依赖可篡改布尔标志，验 events 留痕**。V4/V5b 破坏性（milestone set-result 需 auditor；worker done 需 alignment 回填）。Layer4 残留（互审洗白/冒用）。详见 [note.md](./note.md) + wiki §二十。**下一步**: 重启 dev 验证 / tree-commander SKILL alignment 职责 / Layer4
 - **[2026-06-23] v0.7+ 引擎内联 MCP**: tree-state.js(2428行)→`tree-engine.cjs` 内联进 patches.cjs 的 mcp__tree__*(27工具)，消除 spawn 包装，**工作区零源码泄漏**（agent 看不到改不到引擎代码）。`run(cmd,args,treesRoot?)`与CLI stdout等价；TREES_ROOT可注入；per-call treesRoot并发安全；findEngine自适应定位engine。验证: smoke+dbc-spec 21/0+audit-attacks 18/CRITICAL=0+A1独立审计子会话。部署 dist/(patches+engine)+激活SKILL+清理3处遗留。详见 [note.md](./note.md)。**下一步**: 重启验证/V4-V8/Phase D/Layer4
 - **[2026-06-23] v0.7 Phase A 完成** (commit `1757b5e`)：tree-state.js **+12 DbC 校验点**（A1-A7 + HARDEN2/HARDEN6 + V1/V2/V3 审计加固），把 SKILL.md 的"应当"升级为代码"必须"，对应 CP1-CP6 + SP1 + 节点预算 + 加固#2/#6。**实施**: 4 批次真实子会话(自举) + commander 独立验收(dbc-spec 21/0) + 独立对抗审计发现 BLOCKER 已修 V1(restore旁路)/V2(auditor白名单)/V3(expect_outputs非空)。重构提取 collectValidateIssues + resolveAuditorIndep。详见 [note.md](./note.md)。**下一步**: 部署+T1-T4回归 / Phase D / V4-V8深度加固 / Phase B-G / Layer 4 subagent_trace_id
@@ -38,7 +38,7 @@
 - **Q1 v2 验证**（2026-06-21）：全深度 3 层测试 + 3 轮独立 Agent Team 审计，发现 8 项问题（2 阻断/3 严重/2 中等/1 低），核心引擎功能正确但方法论合规性存在结构性缺陷
 - **Q2 方案**（v1.1 更新）：(a) **tree-state.js v0.2.2 硬化**（修复 ROOT_PLACEHOLDER、CLI 手动注入、Events 空洞——~90行代码）；(b) 侧边栏树形可视化面板（需新补丁 L）
 - **Q3 方案**（v1.2）：天道运行官硬约束流程执行体系（35条规则，audit-gate + Pulse + Auditor + 自检，不新增补丁）
-- **技术报告**：[`.context/technical-report-tree-system-issues.md`](technical-report-tree-system-issues.md) — Q1 v2 8 项问题详细分析与解决方案
+- **技术报告**：[`.context/reference/design/technical-report-tree-system-issues.md`](./reference/design/technical-report-tree-system-issues.md) — Q1 v2 8 项问题详细分析与解决方案
 - **已知限制**：notify未验证、心跳/内审仅方案、竹节交接未实现、I3并发竞态、Commander prune级联未定义
 
 ---
@@ -92,45 +92,66 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 
 ## 四、关键文档导航
 
+### 工程入口文档（仓库根，新人必读）
+
 | 文档 | 路径 | 用途 |
 |---|---|---|
-| **本索引** | `workspace-files/.context/PROJECT-INDEX.md` | 入口 |
-| 总路线图 | `workspace-files/.context/proma-innovation-plan.md` | 两层架构总览 + 优先级 |
-| 完整技术 Wiki | `workspace-files/.context/proma-dev-wiki.md`（更新至 v0.16.5/v0.2.1） | 补丁命令、架构、测试记录、版本历史 |
-| Layer 2 设计 | `workspace-files/.context/tree-commander-design.md` v1.3 | 树形体系完整设计文档 |
-| 树形方法论 | `workspace-files/.context/commander-methodology.md` v1.2 | 13原则（含Leaf Purity+分布式写入+三层深度） |
-| **进度审计** | `workspace-files/.context/progress-report-2026-06-19.md` | v0.1/v0.2 完成度全面摸底 |
-| **Q1 方案** | `workspace-files/.context/plan/q1-state-architecture.md` v1.1 | role枚举+深度限制+分布式写入 |
-| **Q1 e2e验证** | `workspace-files/.context/q1-e2e-verification-report.md` | 7 leaf 端到端全通过 |
-| **Q1 全深度验证** | `workspace-files/.context/q1-full-depth-report.md` | 10 leaf 3层 38/38 全通过 |
-| **Q2 方案** | `workspace-files/.context/plan/q2-tree-ui-panel.md` v1.0 | 侧边栏树形UI面板（未实施） |
-| **最新交接 V10 Phase 3** | `.context/handoff/session-2026-06-25-v10-followup.md` | Bug A/B 修复 + commit 30eb4fa + 文档沉淀 |
-| **跨工作区问题报告** | `.context/cross-workspace-tree-issue-2026-06-25.md` | 9 个工作区调查 + TAO Watcher 干扰根因 + 修复方案 |
-| **V10 工程方法论** | `.context/commander-methodology-v10.md` | 5h/17 节点 Tree 模式加固工程实战沉淀 |
-| **30 分钟入门向导** | `.context/project-onboarding-guide-2026-06-25.md` | 图形化 + 类比 + 通俗讲解（新会话/新人） |
-| **V10 文档全集** | `.context/v10/` | 20+ 份报告（charter/C1-C5/A1-A5/Cr/Cr2/D4/e2e/bug-a/b） |
+| **README** | `workspace-files/README.md` | 项目主入口（Quick Start + 架构 + 文档导航） |
+| **LICENSE** | `workspace-files/LICENSE` | AGPL-3.0 + 闭源插件 ADDENDUM |
+| **CHANGELOG** | `workspace-files/CHANGELOG.md` | v0.16.0 → V10 P3 版本演进 |
+| **ARCHITECTURE** | `workspace-files/ARCHITECTURE.md` | 系统架构 + 三层防御拓扑 + 关键设计决策 |
+| **API** | `workspace-files/API.md` | 53 个 MCP 工具完整参考（12+12+29） |
+| **SECURITY** | `workspace-files/SECURITY.md` | 安全模型 + 威胁模型 + 漏洞报告流程 |
+| **DEPLOYMENT** | `workspace-files/DEPLOYMENT.md` | 三实例部署 step-by-step + 已知坑 |
+| **DEVELOPMENT** | `workspace-files/DEVELOPMENT.md` | 开发指南 + Tree 模式 + IHL 方法论 |
+| **TESTING** | `workspace-files/TESTING.md` | 测试金字塔 + 6 套金标准 + Tier 1/2 规则 |
+
+### 知识沉淀（`.context/`）
+
+| 文档 | 路径 | 用途 |
+|---|---|---|
+| **本索引** | `workspace-files/.context/PROJECT-INDEX.md` | 知识沉淀层入口 |
+| **目录导航** | `workspace-files/.context/README.md` | `.context/` 目录速查（新人 30 秒上手） |
+| **入门向导** | `workspace-files/.context/project-onboarding-guide-2026-06-25.md` | 图形化 30 分钟建立心智模型 |
+| **长期笔记** | `workspace-files/.context/note.md` | 按日期追加的调研笔记（顶部最新） |
+| **技术 Wiki** | `workspace-files/.context/proma-dev-wiki.md` | 补丁命令 + 架构 + 测试记录 + 版本历史 |
+| **活跃文档** | `workspace-files/.context/active/` | 当前还在用的（8 份交接/进度/审计） |
+| **跨阶段参考** | `workspace-files/.context/reference/` | 设计/方法论/架构/方案/模板/测试计划 |
+| **历史归档** | `workspace-files/.context/archive/` | 一次性历史报告（按主题分目录） |
+| **V10 专题** | `workspace-files/.context/v10/` | V10 加固全集（自包含，24+ 份报告） |
+| 总路线图 | `workspace-files/.context/reference/design/proma-innovation-plan.md` | 两层架构总览 + 优先级 |
+| Layer 2 设计 | `workspace-files/.context/reference/design/tree-commander-design.md` v1.3 | 树形体系完整设计文档 |
+| 树形方法论 | `workspace-files/.context/reference/methodology/commander-methodology.md` v1.2 | 13原则（含Leaf Purity+分布式写入+三层深度） |
+| **进度审计** | `workspace-files/.context/archive/2026-06-handoff/progress-report-2026-06-19.md` | v0.1/v0.2 完成度全面摸底（已归档） |
+| **Q1 方案** | `workspace-files/.context/reference/plans/q1-state-architecture.md` v1.1 | role枚举+深度限制+分布式写入 |
+| **Q1 e2e验证** | `workspace-files/.context/archive/2026-06-q1q3-audit/q1-e2e-verification-report.md` | 7 leaf 端到端全通过（已归档） |
+| **Q1 全深度验证** | `workspace-files/.context/archive/2026-06-q1q3-audit/q1-full-depth-report.md` | 10 leaf 3层 38/38 全通过（已归档） |
+| **Q2 方案** | `workspace-files/.context/reference/plans/q2-tree-ui-panel.md` v1.0 | 侧边栏树形UI面板（未实施） |
+| **最新交接 V10 Phase 3** | `.context/active/session-2026-06-25-v10-followup.md` | Bug A/B 修复 + commit 30eb4fa + 文档沉淀 |
+| **跨工作区问题报告** | `.context/active/cross-workspace-tree-issue-2026-06-25.md` | 9 个工作区调查 + TAO Watcher 干扰根因 + 修复方案 |
+| **V10 工程方法论** | `.context/reference/methodology/commander-methodology-v10.md` | 5h/17 节点 Tree 模式加固工程实战沉淀 |
 | **V10 P2 e2e 报告** | `~/.proma/agent-workspaces/tree-2/workspace-files/.context/v10-p2-e2e-report.md` | 真实 MCP 环境 6 阶段测试（tree-2 工作区，待归档） |
 | **V10 Phase 2 交接** | （隐含在 v10/ 文档集） | root-as-trust-anchor + D4 Helper + Phase 2 e2e |
 | **V10 Phase 1 交接** | （隐含在 v10/ 文档集） | 8 大加固点 + 双轮收敛 + Cr 优先于 A1 |
-| **最新交接（6/25 早晨）** | `.context/handoff/session-2026-06-25-followup-tree-mode.md` | V4-V9 followup + Tree 模式实战 + R2-T7 待决策 |
-| **6/25 进度报告** | `.context/progress-report-2026-06-25.md` | 6/20→6/25 五天阶段性总结 |
-| **V4-V9 加固交接（6/24）** | `.context/handoff/session-2026-06-24-v4v9-hardening.md` | 9 DbC 硬约束点交付（独立审计迭代收敛） |
-| **Bridge 修复（6/24）** | `.context/handoff/session-2026-06-24-bridge-port-and-dbc.md` | 0.0.0.0 端口遮蔽 + DbC 运行时验证 |
-| **运行时验证（6/24）** | `.context/handoff/session-2026-06-24-runtime-verified.md` | 双实例 27 工具 + 4 DbC 拦截 |
-| **引擎内联（6/23）** | `.context/plan/tree-engine-inline-mcp.md` + `handoff/session-2026-06-23-v0.7plus-engine-inline.md` | tree-state.js(2428行) → tree-engine.cjs 内联 MCP（零源码泄漏） |
-| **Phase A（6/23）** | `.context/handoff/session-2026-06-23-v0.7-phaseA-mcp.md` | 12 DbC 校验点（commit 1757b5e） |
-| **专家审议 v1/v2（6/23）** | `.context/expert-review-2026-06-23/` + `expert-review-v2-2026-06-23/` | 五层防御架构 + 30/30/40 论断 |
-| **架构方案（6/23）** | `.context/architecture-plan-2026-06-23/` | 7 份方案（root-cause/defense/roadmap/decision-log 等） |
-| **v2 完整诊断（6/23）** | `.context/tree-system-architecture-analysis-2026-06-23.md` | Layer 0-4 五层防御深度报告 |
-| **Q1 v1.1 完结交接（6/19）** | `.context/handoff/session-2026-06-19-handoff.md` | Q1 v1.1 完结 → Q2 推进 |
-| 树形审计方法论 | `workspace-files/.context/tree-audit-methodology.md` | 终局验证 × 树形体系强制执行 |
-| remote-session 验收 | `workspace-files/.context/remote-session-release-report.md` | Release 验收 39/40 有条件通过 |
-| remote-session 提案 | `workspace-files/.context/proposal-remote-session-mcp.md` | 远端工具设计 + 实例命名 |
-| Layer 2 原始设计 | `workspace-files/.context/proma-dev-wiki-timeline-pruner.md` | 时间线剪枝者早期方案 |
+| **最新交接（6/25 早晨）** | `.context/active/session-2026-06-25-followup-tree-mode.md` | V4-V9 followup + Tree 模式实战 + R2-T7 待决策 |
+| **6/25 进度报告** | `.context/active/progress-report-2026-06-25.md` | 6/20→6/25 五天阶段性总结 |
+| **V4-V9 加固交接（6/24）** | `.context/archive/2026-06-handoff/session-2026-06-24-v4v9-hardening.md` | 9 DbC 硬约束点交付（独立审计迭代收敛）（已归档） |
+| **Bridge 修复（6/24）** | `.context/archive/2026-06-handoff/session-2026-06-24-bridge-port-and-dbc.md` | 0.0.0.0 端口遮蔽 + DbC 运行时验证（已归档） |
+| **运行时验证（6/24）** | `.context/archive/2026-06-handoff/session-2026-06-24-runtime-verified.md` | 双实例 27 工具 + 4 DbC 拦截（已归档） |
+| **引擎内联（6/23）** | `.context/reference/plans/tree-engine-inline-mcp.md` + `archive/2026-06-handoff/session-2026-06-23-v0.7plus-engine-inline.md` | tree-state.js(2428行) → tree-engine.cjs 内联 MCP（零源码泄漏） |
+| **Phase A（6/23）** | `.context/archive/2026-06-handoff/session-2026-06-23-v0.7-phaseA-mcp.md` | 12 DbC 校验点（commit 1757b5e）（已归档） |
+| **专家审议 v1/v2（6/23）** | `.context/reference/architecture/expert-review-2026-06-23/` + `reference/architecture/expert-review-v2-2026-06-23/` | 五层防御架构 + 30/30/40 论断 |
+| **架构方案（6/23）** | `.context/reference/architecture/architecture-plan-2026-06-23/` | 7 份方案（root-cause/defense/roadmap/decision-log 等） |
+| **v2 完整诊断（6/23）** | `.context/reference/design/tree-system-architecture-analysis-2026-06-23.md` | Layer 0-4 五层防御深度报告 |
+| **Q1 v1.1 完结交接（6/19）** | `.context/archive/2026-06-handoff/session-2026-06-19-handoff.md` | Q1 v1.1 完结 → Q2 推进（已归档） |
+| 树形审计方法论 | `workspace-files/.context/reference/methodology/tree-audit-methodology.md` | 终局验证 × 树形体系强制执行 |
+| remote-session 验收 | `workspace-files/.context/reference/test-plans/remote-session-release-report.md` | Release 验收 39/40 有条件通过 |
+| remote-session 提案 | `workspace-files/.context/reference/design/proposal-remote-session-mcp.md` | 远端工具设计 + 实例命名 |
+| Layer 2 原始设计 | `workspace-files/.context/reference/design/proma-dev-wiki-timeline-pruner.md` | 时间线剪枝者早期方案 |
 | 发布包 | `workspace-files/release/tree-system-v0.2.0/` | v0.2.0 初始版本（17 文件） |
-| **Q3 硬约束方案** | `.context/plan/q3-tao-hard-constraint.md` v1.2 | TAO Watcher（35 条规则，audit-gate + Pulse + Auditor） |
-| **Tree 方法论** | `.context/handoff/session-2026-06-25-followup-tree-mode.md` §关键技术决策 | 实现/commander/评价/洁净室三层分离 |
-| **followup proposal** | `.context/tree-engine-followup-fixes-proposal.md` | V4-V9 后续专家评估清单（已落地） |
+| **Q3 硬约束方案** | `.context/reference/plans/q3-tao-hard-constraint.md` v1.2 | TAO Watcher（35 条规则，audit-gate + Pulse + Auditor） |
+| **Tree 方法论** | `.context/active/session-2026-06-25-followup-tree-mode.md` §关键技术决策 | 实现/commander/评价/洁净室三层分离 |
+| **followup proposal** | `.context/reference/design/tree-engine-followup-fixes-proposal.md` | V4-V9 后续专家评估清单（已落地） |
 | Skill | `skills/tree-commander/SKILL.md` v2.2 / `skills/tree-worker/SKILL.md` v2.2 | Commander+Worker 操作手册（v2.2 已补 V5b alignment 回填） |
 | Skill | `skills/session-management/SKILL.md` v1.3.0 | 会话管理技能 |
 | 部署 README | `workspace-files/README.md` + `AGENT-PROMPT.md` | 安装流程 |
@@ -153,7 +174,7 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 
 - **push 4 commits 到 GitHub**：本地领先远程 4 个（`30eb4fa` V10 P3 / `7d36cc7` V10 P2 / `f98805d` 开发树 / `8c81cc5` 索引同步）。`git push origin master` 是 destructive，等用户确认
 - **重启 dev 实例运行时验证 Bug A/B**：代码已直接落 `D:/Proma-dev/resources/app/dist/tree-engine.cjs`（19:15 改），但**实例未重启**，Bug A/B 修复未运行时验证。重启步骤：关 Proma-white → 重开 start-dev.bat → 创建测试树复现 Bug A（期望 `E_BORROWED_IDENTITY`）+ Bug B（期望 `E_DUPLICATE_SESSION_ID`）
-- **跨工作区问题（设计外）**：9 个工作区（应只有 1 主 proma），详见 [cross-workspace-tree-issue-2026-06-25.md](./cross-workspace-tree-issue-2026-06-25.md)。P0：归档 tree-2 关键产出（v10-p2-e2e-report.md + v10p2-e2e tree-state.json）到 proma/.context/audit/v10-p2/ + 清理 5 个无价值工作区（undefined / tree-1 / 4×workspace-*）
+- **跨工作区问题（设计外）**：9 个工作区（应只有 1 主 proma），详见 [cross-workspace-tree-issue-2026-06-25.md](./active/cross-workspace-tree-issue-2026-06-25.md)。P0：归档 tree-2 关键产出（v10-p2-e2e-report.md + v10p2-e2e tree-state.json）到 proma/.context/audit/v10-p2/ + 清理 5 个无价值工作区（undefined / tree-1 / 4×workspace-*）
 - **TAO Watcher 规则错配（独立立项）**：监督规则不按 role 区分——worker 规则（W-01 brief_echo）发给根指挥官，导致 a8111bf5 思维混乱意外终止。修复：按 role 应用不同规则集（root/commander/worker 各有专属规则）
 - **Release 严重落后 1131 行**：dev 3602 vs release 2471，用户明确指示"不同步 release 目录"
 - **Layer 4 残留（平台层依赖）**：互审洗白 + 冒用真实 session，需 subagent_trace_id 绑定

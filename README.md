@@ -1,360 +1,472 @@
-# Proma 定制补丁集 (v0.16.5)
+# Proma 改造项目
 
-> 基于 Proma 商业版 v0.12.23，通过 sed 补丁 + 插件文件增强 Agent 能力。11 个补丁 (A-K)，22 个 MCP 工具。
-> **给人看也给 Agent 看 — Agent 读完后能交互式帮用户安装。**
+> 基于 Proma 商业版（AGPL-3.0）的多 Agent 树形会话执行体系。
+> **核心策略：开源做壳，闭源做肉。**
+
+[![Version](https://img.shields.io/badge/version-v0.16.5%20%2B%20V10%20Phase%203-blue.svg)](.context/PROJECT-INDEX.md)
+[![Layer 1](https://img.shields.io/badge/Layer%201-MCP%20%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD-brightgreen.svg)](#layer-1--mcp-基础设施)
+[![Layer 2](https://img.shields.io/badge/Layer%202-%E6%A0%91%E5%BD%A2%E4%BC%9A%E8%AF%9D%E6%89%A7%E8%A1%8C%E4%BD%93%E7%B3%BB-orange.svg)](#layer-2--树形会话执行体系)
+[![DbC](https://img.shields.io/badge/DbC-21%20%E6%A0%A1%E9%AA%8C%E7%82%B9%20%2B%20V10%208%20%E5%8A%A0%E5%9B%BA-red.svg)](#21-dbc-校验点速查)
+[![IHL](https://img.shields.io/badge/IHL-6%20%E8%BD%AE%E8%BF%AD%E4%BB%A3%E5%8A%A0%E5%9B%BA-purple.svg)](#v10-phase-3--ihl-迭代加固)
+[![License](https://img.shields.io/badge/license-AGPL--3.0%20%2B%20ADDENDUM-lightgrey.svg)](LICENSE)
+[![GitHub](https://img.shields.io/badge/repo-orphiczhou%2Fproma--patches-black.svg)](https://github.com/orphiczhou/proma-patches)
 
 ---
 
-## 给 Agent 读的（先看这里）
+## 一句话定位
 
-如果用户让你"给 Proma 打补丁"或"安装 Proma 增强功能"，请按以下流程操作：
+> 通过 **sed 补丁 + 独立插件文件** 给 Proma 商业版（写字楼）加装 AI 军队指挥系统（安保系统），让 LLM 多 agent 协作从"靠 prompt 求着遵守"变成"绕不过的代码强制"。
 
-### 第一步：确认环境
+---
 
-询问用户:
-1. Proma 正式版安装路径（默认 `D:\Proma`）
-2. 选择哪种部署方式（见第二步）
+## 项目状态（截至 2026-06-26）
 
-### 第二步：让用户选基础模块（三选一）
-
-| 模块 | 适用场景 | 与正式版关系 | 需重新登录？ |
-|---|---|---|---|
-| **A. 双开开发版** | 开发调试，两者同时用 | 隔离，`~/.proma-dev/` 独立 | 需同步登录态 |
-| **B. Release 并行版** | 日常替代使用 | 共享 `~/.proma/`，互斥运行 | 不需要 |
-| **C. 直接改正式版** | 不想维护多份副本 | 直接修改原版 | 不需要（不推荐） |
-
-> 推荐：日常用选 B，开发调试选 A。
-
-### 第三步：让用户选增强模块
-
-| 模块 | 功能 | 
+| 维度 | 状态 |
 |---|---|
-| **1. DeepSeek 子Agent 升级** | 子Agent `flash` → `pro` |
-| **2. 会话管理 MCP 工具** | 11 个 session 工具（创建/查询/Fork/发消息/归档/上下文） |
-| **3. 频道+模型元数据覆盖** | MCP 创建会话后端自动走正确模型 |
-| **4. UI 模型同步** | 模型选择器自动显示正确模型名 |
-| **5. 外部 MCP 服务** | 跨实例调用（任何 MCP 客户端可操控 Proma 会话） |
-| **6. EXE + 托盘图标** | 自定义颜色图标（png-to-ico + rcedit） |
-| **7. 跨渠道防护 (v0.12)** | 跨渠道切换模型不触发 "Session 已失效" |
-
-推荐组合：只想强子Agent→1 / Agent管理多会话→2+3+4+7 / 外部操控Proma→2+3+5+7 / 全都要→2+3+4+5+7（1已含）
-
-### 第四步：执行安装
-
-方式一：运行 `bash apply-patches.sh` 一键安装。
-方式二：按所选模块手动执行下方命令。
-
-### 第五步：验证
-
-安装后验证：双击启动脚本 → 开 Agent 会话 → 说"用 list_channels 列出可用渠道"。
+| 当前版本 | **v0.16.5 + V10 Phase 3 + IHL 6 轮迭代加固** |
+| Layer 1 — MCP 基础设施 | 完工。22 个 session/remote 工具 + 11 个核心补丁 |
+| Layer 2 — 树形会话执行体系 | 接近完工。27 个 tree 工具 + 21 DbC + V10 八大加固 + IHL 6 轮 |
+| 主代码量 | tree-engine.cjs **3602 行** + proma-dev-patches.cjs **2658 行** + main.cjs sed 补丁 11 处 |
+| 部署实例 | Dev `D:\Proma-dev\`（隔离）+ Release `D:\Proma-release\`（共享） |
+| 上游仓库 | [orphiczhou/proma-patches](https://github.com/orphiczhou/proma-patches)（私有） |
+| 测试覆盖 | dbc-spec 48/0 + audit-attacks 18/0 + v10-cleanroom 54/54 + v10-regression 14/0 |
 
 ---
 
-## 前置：提取商业版 main.cjs
+## 目录
 
-```bash
-npx asar extract D:/Proma/resources/app.asar /tmp/proma-app
-cp /tmp/proma-app/dist/main.cjs /tmp/main-patched.cjs
-```
+- [核心交付](#核心交付)
+- [Quick Start（5 分钟）](#quick-start5-分钟)
+- [架构图](#架构图)
+- [三层实例说明](#三层实例说明)
+- [21 DbC 校验点速查](#21-dbc-校验点速查)
+- [V10 Phase 3 — IHL 迭代加固](#v10-phase-3--ihl-迭代加固)
+- [文档导航矩阵](#文档导航矩阵)
+- [快速命令速查](#快速命令速查)
+- [License 声明](#license-声明)
+- [贡献](#贡献)
 
 ---
 
-## 模块 A：双开开发版（`D:\Proma-dev`）
+## 核心交付
 
-独立数据目录（`~/.proma-dev/`），可与正式版同时运行。
+### Layer 1 — MCP 基础设施
 
-```bash
-# 1. 复制正式版
-cp -r D:/Proma D:/Proma-dev
+22 个 MCP 工具 + 11 个核心补丁 + 三实例隔离体系，把 Proma 商业版从单机应用改造成可被外部 MCP 客户端操控的 Agent 平台。
 
-# 2. 解包 ASAR
-cd D:/Proma-dev/resources
-npx asar extract app.asar app
-mv app.asar app.asar.disabled
+**11 个核心补丁（A-K）**：
 
-# 3. 合并原生模块
-cp -r app.asar.unpacked/node_modules/* app/node_modules/
-
-# 4. 创建启动脚本
-cat > D:/Proma-dev/start-dev.bat << 'BAT'
-@echo off
-set PROMA_DEV=1
-start "" "D:\Proma-dev\Proma-white.exe"
-BAT
-```
-
-### 模块 A-续：同步认证和会话数据（关键！）
-
-**这一步是 Agent 最容易失败的地方。请仔细执行。**
-
-#### A5a. 同步 Proma 配置文件（始终可执行，正式版运行时也能复制）
-
-```bash
-mkdir -p ~/.proma-dev
-cp ~/.proma/cloud-auth.json ~/.proma-dev/ 2>/dev/null \
-  || echo "[SKIP] cloud-auth.json 不存在，dev 版需重新登录 Google"
-cp ~/.proma/channels.json ~/.proma-dev/ 2>/dev/null \
-  || echo "[SKIP] channels.json 不存在，dev 版需重新配渠道"
-cp ~/.proma/user-profile.json ~/.proma-dev/ 2>/dev/null \
-  || echo "[SKIP] user-profile.json 不存在，不影响使用"
-```
-
-#### A5b. 同步 Electron session 数据（必须先关正式版！）
-
-**正式版运行时文件被锁定，必须先关闭正式版，否则此步一定失败。**
-
-路径说明：
-- `%APPDATA%` = `C:\Users\<你的用户名>\AppData\Roaming`
-- `@proma/electron/` = 正式版数据
-- `@proma/electron-dev/` = dev 版数据（PROMA_DEV=1 时启用）
-
-```bash
-echo "正在同步 Electron session 数据（正式版必须已关闭！）..."
-
-echo "  [1/3] Network (cookies, Google OAuth tokens)..."
-cp -r "$APPDATA/@proma/electron/Network" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
-  && echo "    ✅ OK" || echo "    ❌ FAIL — 正式版可能未关，关闭后重试"
-
-echo "  [2/3] Session Storage..."
-cp -r "$APPDATA/@proma/electron/Session Storage" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
-  && echo "    ✅ OK" || echo "    ❌ FAIL"
-
-echo "  [3/3] Local Storage..."
-cp -r "$APPDATA/@proma/electron/Local Storage" "$APPDATA/@proma/electron-dev/" 2>/dev/null \
-  && echo "    ✅ OK" || echo "    ❌ FAIL"
-```
-
-#### A5c. 验证
-
-```bash
-echo "=== 数据同步验证 ==="
-ls ~/.proma-dev/cloud-auth.json >/dev/null 2>&1 && echo "  ✅ cloud-auth.json" || echo "  ⚠️  缺失（需登录 Google）"
-ls ~/.proma-dev/channels.json >/dev/null 2>&1 && echo "  ✅ channels.json" || echo "  ⚠️  缺失（需重新配渠道）"
-ls "$APPDATA/@proma/electron-dev/Network" >/dev/null 2>&1 && echo "  ✅ Network (免登录)" || echo "  ⚠️  Network 缺失（手动登录 OAuth 即可）"
-```
-
-#### Agent 常见失败速查
-
-| 错误 | 原因 | 修复 |
+| 补丁 | 功能 | 关键 |
 |---|---|---|
-| `cp: cannot stat .../Network` | `$APPDATA` 没展开 | `echo $APPDATA` 确认，或用绝对路径 |
-| `cp: Permission denied` | 正式版未关 | 关正式版 → 任务管理器确认 → 重试 |
-| dev 版启动后要求重新登录 | Network 没复制成功 | 手动登录一次 Google OAuth 即可 |
-| `~/.proma-dev/` 不存在 | 没建目录 | `mkdir -p ~/.proma-dev` |
+| A | MCP 钩子注入 | `global.__proma_getMcpServers__` |
+| B | API 桥接 + 加载插件 | 导出 12 个核心 API 给 patches.cjs |
+| C1-5 | 频道+模型元数据覆盖 | MCP 创建会话走后端正确频道/模型 |
+| D+E | Renderer 同步 + 守卫移除 | UI 模型选择器与 metadata 同步 |
+| F | 跨渠道 sdkSessionId 防护 | 已被补丁 H v2 替代 |
+| G | CLAUDE_CONFIG_DIR 无条件覆盖 | 修复 Dev fork 失败 0/3 → 3/3 |
+| H | 跨频道/跨 provider 模型切换完整修复 | channelId 或 modelId 任一变化 → 清 sdkSessionId + 同步 meta |
+| I | 禁用更新检查 | `initAutoUpdater` 首行 return |
+| J | AppUserModelId 动态隔离 | `com.proma.{NAME}`，三版任务栏独立 |
+| K | userData 路径动态化 | `electron-{NAME}`（v0.16.5 修正：双条件 ISOLATED+NAME） |
+
+**22 个 MCP 工具**：
+
+- 本地 `mcp__session__*`（11 个，进程内直连 `global.__proma__`）：`get_my_session_id` / `list_channels` / `list_workspaces` / `list_sessions` / `get_session_info` / `get_session_context` / `list_messages` / `create_session` / `fork_session` / `send_message` / `archive_session`
+- 远端 `mcp__remote-session__*`（11 个，HTTP 自动端口扫描 19876-19895）：与本地一一对应的 `remote_*` 工具
+
+**send_message 三模式**：`wait=true` 同步返回 / `notify=true` 异步通知 / `wait=false` + 轮询回收。
 
 ---
 
-## 模块 B：Release 并行版（`D:\Proma-release`）
+### Layer 2 — 树形会话执行体系
 
-**共享正式版数据（`~/.proma/`），不需要重新登录。** 与正式版互斥运行（关一个开另一个）。
+27 个 `mcp__tree__*` 工具 + 21 DbC 硬约束点 + V10 八大加固 + IHL 6 轮迭代，构建一套让 AI 多 agent 协作像军队指挥一样有纪律的执行体系。
 
-### B1. 复制正式版 + 提取
+**三层角色（像军队编制）**：
 
-```bash
-cp -r D:/Proma D:/Proma-release
-
-# 提取 main.cjs（ASAR 保持打包不解开）
-npx asar extract D:/Proma-release/resources/app.asar /tmp/release-app
-cp /tmp/release-app/dist/main.cjs /tmp/main-patched.cjs
+```
+                    用户
+                      │
+              ╔═══════════════╗
+              ║   ROOT 司令   ║  ← 唯一，定战略
+              ╚══════╤════════╝
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+      commander  commander  commander  ← 拆任务 + 管下属
+          │          │
+       ┌──┴──┐    ┌──┴──┐
+       ▼     ▼    ▼     ▼
+     worker worker worker worker  ← 干活 + 上报，不指挥
 ```
 
-### B2. 打补丁
+**三条铁律（已硬化进代码，绕不过）**：
 
-在 `/tmp/main-patched.cjs` 上打需要的补丁（见增强模块 1-7），**但跳过补丁 E（PROMA_DEV 隔离）**——Release 版共享数据无需隔离。**补丁 F（跨渠道防护）必须打**，适用于所有版本。
-
-```bash
-# 按增强模块顺序逐一执行 sed 命令
-# 注意：跳过 PROMA_DEV 补丁（仅模块 A 需要）
-```
-
-### B3. 替换 main.cjs 并重新打包 ASAR
-
-```bash
-# 替换
-cp /tmp/main-patched.cjs /tmp/release-app/dist/main.cjs
-
-# 重新打包
-cd /tmp/release-app
-npx asar pack . D:/Proma-release/resources/app.asar
-
-echo "asar 更新时间:"
-ls -la D:/Proma-release/resources/app.asar | awk '{print $6,$7,$8}'
-```
-
-### B4. 部署插件文件（放在 ASAR 外部）
-
-Release 版 ASAR 不解包，插件文件需放在 asar 同级 `dist/` 目录。`require("./proma-dev-patches.cjs")` 先查 asar 内部，找不到则查文件系统。
-
-```bash
-mkdir -p D:/Proma-release/resources/app/dist
-cp proma-dev-patches.cjs D:/Proma-release/resources/app/dist/
-cp proma-mcp-server.cjs D:/Proma-release/resources/app/dist/
-
-# 验证
-ls D:/Proma-release/resources/app/dist/proma-dev-patches.cjs \
-  && echo "✅ 插件已部署" || echo "❌ 插件部署失败"
-```
-
-### B5. 创建启动脚本
-
-```bash
-cat > D:/Proma-release/start-release.bat << 'BAT'
-@echo off
-start "" "D:\Proma-release\Proma.exe"
-BAT
-```
-
-### B6. 对齐版本号
-
-```bash
-# 需要在 asar 打包前修改 package.json 版本号
-# 如果在 B3 打包前已执行过版本号 sed，此步已完成
-```
-
-### Dev 版 vs Release 版
-
-| | Dev 版 (A) | Release 版 (B) |
+| 铁律 | 实现位置 | 错误码 |
 |---|---|---|
-| 安装路径 | `D:\Proma-dev` | `D:\Proma-release` |
-| 数据目录 | `~/.proma-dev/` 独立 | `~/.proma/` 共享 |
-| 与正式版双开 | ✅ 可以 | ❌ 互斥 |
-| 需重新登录 | 需同步数据 | 不需要 |
-| ASAR 状态 | 解包 (app/) | 保持打包 (app.asar) |
-| 补丁 E (PROMA_DEV) | 需要 | 不需要 |
-| 补丁 F (跨渠道防护) | 需要 | 需要 |
-| 适用场景 | 开发调试 | 日常替代使用 |
-| 启动脚本 | start-dev.bat | start-release.bat |
+| root 唯一 | `cmdInit` | `E_DUPLICATE_LEAF` |
+| 深度 ≤ 3 | `cmdLeafAdd` | `E_DEPTH_EXCEEDED` |
+| worker 不能再 fork | `cmdLeafAdd` + role enum | `E_ROLE_INVALID` |
+
+**27 个 mcp__tree__* 工具**：`tree_init` / `tree_leaf_add` / `tree_leaf_get` / `tree_leaf_list_active` / `tree_leaf_list_all` / `tree_leaf_set_status` / `tree_leaf_set_session` / `tree_leaf_set_context` / `tree_leaf_set_last_event` / `tree_leaf_autonomy_override` / `tree_milestone_add` / `tree_milestone_set_result` / `tree_event_append` / `tree_event_list` / `tree_audit_append` / `tree_audit_gate` / `tree_nudge_append` / `tree_nudge_reset` / `tree_drift_append` / `tree_drift_list` / `tree_segment_append` / `tree_heartbeat_append` / `tree_heartbeat_tail` / `tree_validate` / `tree_migrate` / `tree_backup` / `tree_restore` / `tree_tree_dump` / `tree_help`
 
 ---
 
-## 增强模块
+## Quick Start（5 分钟）
 
-### 模块 1：DeepSeek 子Agent 升级 → V4 Pro
+### 前置
 
-```bash
-sed -i 's/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-flash"/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-pro"/g' /tmp/main-patched.cjs
-```
+- Windows 11（macOS/Linux 同理，路径替换即可）
+- 已安装 Proma 商业版到 `D:\Proma\`
+- Node.js ≥ 18（用于 `npx asar`）
+- Git Bash（执行 `apply-patches.sh`）
+- Claude Code（可选，用于外部 MCP 桥接）
 
-### 模块 2：会话管理 MCP 工具（11 个）
-
-#### 补丁 A — MCP 钩子
-```bash
-sed -i 's|          const dynamicCtx = buildDynamicContext({|if(typeof global.__proma_getMcpServers__==="function"){const __h=global.__proma_getMcpServers__(sessionId,workspaceSlug,sdk);if(__h)Object.assign(mcpServers,__h);}\n          const dynamicCtx = buildDynamicContext({|' /tmp/main-patched.cjs
-```
-
-#### 补丁 B — API 桥接 + 加载插件
-```bash
-sed -i 's|^init_index();$|init_index();\nglobal.__proma__={createAgentSession,forkAgentSession,listAgentSessions,getAgentSessionMeta,updateAgentSessionMeta,deleteAgentSession,listChannels,getChannelById,getAgentWorkspace,listAgentWorkspaces,getAgentSessionSDKMessages,runAgentHeadless};\ntry{require("./proma-dev-patches.cjs");}catch(e){console.error("[Plugin] load failed:",e);}|' /tmp/main-patched.cjs
-```
-
-#### 部署插件文件
-
-将仓库中的 `proma-dev-patches.cjs` 放到 `[安装目录]/resources/app/dist/proma-dev-patches.cjs`
-
-**11 个工具：** get_my_session_id / list_channels / list_workspaces / list_sessions / get_session_info / get_session_context / list_messages / create_session / fork_session / send_message / archive_session
-
-### 模块 3：频道+模型元数据覆盖
+### 步骤
 
 ```bash
-sed -i 's@const channel = getChannelById(channelId);@const __effChannelId = getAgentSessionMeta(sessionId)?.channelId || channelId;\n        const channel = getChannelById(__effChannelId);@' /tmp/main-patched.cjs
-sed -i '405686,405695{s@apiKey = decryptApiKey(channelId);@apiKey = decryptApiKey(__effChannelId);@}' /tmp/main-patched.cjs 2>/dev/null || true
-sed -i '405150,406160{s@this.autoGenerateTitle(sessionId, userMessage, channelId,@this.autoGenerateTitle(sessionId, userMessage, __effChannelId,@}' /tmp/main-patched.cjs 2>/dev/null || true
-sed -i 's@let resolvedModel = modelId || DEFAULT_MODEL_ID;@let resolvedModel = getAgentSessionMeta(sessionId)?.modelId || modelId || DEFAULT_MODEL_ID;@' /tmp/main-patched.cjs
-sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' /tmp/main-patched.cjs
+# 1. clone 本仓库
+git clone https://github.com/orphiczhou/proma-patches.git
+cd proma-patches
+
+# 2. 一键打补丁（自动解包 asar + 应用 11 补丁 + 部署插件）
+bash apply-patches.sh
+
+# 3. 启动三层实例中的一个
+#    - Dev 版（隔离双开调试）
+D:/Proma-dev/start-dev.bat          # PROMA_INSTANCE_NAME=dev  +  ISOLATED=1
+
+#    - Release 版（日常使用，共享正式版数据）
+D:/Proma-release/start-release.bat  # PROMA_INSTANCE_NAME=release  +  ISOLATED=0
+
+# 4. 验证：在 Proma 里开 Agent 会话，调一个 tree 工具
+#    对 AI 说："用 mcp__tree__tree_init 创建一棵测试树"
 ```
 
-> **注意：** C2/C3 补丁的行号范围（405686-405695）是 v0.12.23 的值。其他版本行号可能漂移，脚本会自动跳过并通过 `|| true` 继续执行。跳过不影响核心功能。
+### 验证清单
 
-### 模块 4：UI 模型同步
+- [ ] Proma 启动后任务栏图标正确（Dev 白色 / Release 珊瑚色）
+- [ ] 对 AI 说"用 list_channels 列出可用渠道" → 返回 JSON
+- [ ] 对 AI 说"用 mcp__tree__tree_init 创建一棵测试树" → 返回 `tree_id`
+- [ ] 对 AI 说"用 mcp__tree__tree_help how_to_init" → 返回使用帮助
 
-```bash
-# Dev 版（ASAR 已解包）
-cp -r /tmp/app/dist/renderer/* D:/Proma-dev/resources/app/dist/renderer/
-sed -i 's/if(qe.has(e))return qe;//g' D:/Proma-dev/resources/app/dist/renderer/assets/index-*.js
-
-# Release 版（需在 B3 打包前放入 /tmp/release-app/dist/renderer/）
-cp -r /tmp/app/dist/renderer/* /tmp/release-app/dist/renderer/
-sed -i 's/if(qe.has(e))return qe;//g' /tmp/release-app/dist/renderer/assets/index-*.js
-```
-
-### 模块 5：外部 MCP 服务
-
-将 `proma-mcp-server.cjs` 放到 `[安装目录]/resources/app/dist/`。插件自动启动 localhost HTTP bridge（端口 19876-19895 自动选择）。MCP server 启动时自动扫描端口发现目标实例（`--dev` / `--release` 参数）。
+### 外部 MCP 客户端接入
 
 Claude Code 配置（`.claude/mcp.json`）：
+
 ```json
 {
   "mcpServers": {
     "proma-dev-session": {
       "command": "node",
       "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs", "--dev"]
+    },
+    "proma-dev-tree": {
+      "command": "node",
+      "args": ["D:\\Proma-dev\\resources\\app\\dist\\proma-mcp-server.cjs", "--dev"]
     }
   }
 }
 ```
-Release 版改用 `--release` 并修正路径。
 
-### 模块 6：EXE + 托盘图标改色
-
-Proma 安装目录 `resources/proma-logos/` 下有 16 种预置颜色（`proma-coral.png`, `proma-blue.png`, `proma-emerald.png`, `proma-purple.png`, `proma-gradient.png` 等），可直接选用。
-
-**前置：** `npm install -g png-to-ico rcedit`
-
-**托盘图标**（sed 补丁）：
-```bash
-sed -i 's/"iconTemplate.png"/"proma-color.png"/g' /tmp/main-patched.cjs
-```
-
-**EXE 图标**（png-to-ico + rcedit）：
-```bash
-# 1. PNG → ICO
-png-to-ico resources/proma-logos/proma-coral.png > icon.ico
-
-# 2. 注入 EXE — 关键：必须 cp 到新文件再注入！
-#    直接 rcedit 原文件会报 "Unable to commit changes"（进程锁）
-cp Proma.exe Proma-new.exe
-rcedit Proma-new.exe --set-icon icon.ico
-
-# 3. 窗口/任务栏图标
-cp resources/proma-logos/proma-coral.png resources/icon.png
-cp icon.ico resources/icon.ico
-```
-
-### 模块 7：跨渠道 sdkSessionId 断裂防护（v0.12 新增）
-
-防止 UI 中跨渠道切换模型时 SDK 报告 "Session 已失效"。检测到 renderer 渠道与元数据不一致时自动清除 `sdkSessionId` 走上下文回填。
-
-```bash
-sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId\&\&sessionMeta?.channelId\&\&channelId!==sessionMeta.channelId){existingSdkSessionId=void 0;}@' /tmp/main-patched.cjs
-```
+Release 版改用 `--release` 参数并修正路径。
 
 ---
 
-## 补丁速查表
+## 架构图
 
-| 补丁 | 功能 | Dev(A) | Release(B) |
+```
+┌──────────────────────────────────────────────────────────┐
+│  Proma 商业版（开源 + 闭源混合）                          │
+│  ────────────────────────────────────────────────────    │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │  闭源插件层（不开源，受 ADDENDUM 保护）            │    │
+│  │  ──────────────────────────────────────────      │    │
+│  │                                                  │    │
+│  │  ┌────────────────────────────────────────────┐  │    │
+│  │  │  树形会话执行体系（Tree System）            │  │    │
+│  │  │  tree-engine.cjs（3602 行，21 DbC 校验点） │  │    │
+│  │  │                                            │  │    │
+│  │  │  - 三层角色：root / commander / worker     │  │    │
+│  │  │  - 27 个 mcp__tree__* MCP 工具             │  │    │
+│  │  │  - V10 八大加固 + IHL 6 轮迭代             │  │    │
+│  │  │  - TAO Watcher 35 条监督规则               │  │    │
+│  │  └────────────────────────────────────────────┘  │    │
+│  │                                                  │    │
+│  │  ┌────────────────────────────────────────────┐  │    │
+│  │  │  MCP 基础设施（proma-dev-patches.cjs）     │  │    │
+│  │  │  - 22 个 session/remote 工具               │  │    │
+│  │  │  - localhost HTTP bridge (19876-19895)     │  │    │
+│  │  │  - 外部 MCP 接入（proma-mcp-server.cjs）   │  │    │
+│  │  └────────────────────────────────────────────┘  │    │
+│  └──────────────────────────────────────────────────┘    │
+│       ↑ 加补丁的方式（不重写主楼）：                      │
+│       sed 补丁（11 个 A-K）→ 改 main.cjs（轻量）          │
+│       独立插件文件          → patches.cjs（自由）         │
+│       内联引擎              → tree-engine.cjs（核心）     │
+└──────────────────────────────────────────────────────────┘
+```
+
+### 修改方式：三层
+
+| 层 | 文件 | 适用 |
+|---|---|---|
+| `main.cjs` | sed 字符串替换 | 常量改、小段注入（补丁 A-K） |
+| `proma-dev-patches.cjs` | 独立插件文件 | 新增 MCP 工具、复杂业务逻辑 |
+| `tree-engine.cjs` | 内联进 patches.cjs 的 mcp__tree__*（v0.7+） | 树形会话引擎，工作区零源码泄漏 |
+
+**铁律**：不可从开源源码重构建 main.cjs —— 商业版有 15 个闭源模块（cloudAuth / sync / billing / SDK），源构建会导致登录失败。**正确方式：商业版 main.cjs + sed 补丁 + 插件文件 + 内联引擎。**
+
+---
+
+## 三层实例说明
+
+| 实例 | 路径 | 数据目录 | ISOLATED | 适用场景 |
+|---|---|---|---|---|
+| 正式版 | `D:\Proma\` | `~/.proma/` | — | 不可动，已被 asar 打包（135MB），作为对照 |
+| Dev 版 | `D:\Proma-dev\` | `~/.proma-dev/` | `1` | 隔离双开调试，可与正式版同时运行 |
+| Release 版 | `D:\Proma-release\` | `~/.proma/`（共享） | `0` | 日常替代使用，与正式版互斥 |
+
+### 实例隔离规则
+
+```
+PROMA_INSTANCE_ISOLATED=1  →  @proma/electron-{NAME}/  +  ~/.proma-{NAME}/   (隔离)
+PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (共享正式版)
+未设置                       →  默认共享（兼容旧脚本）
+```
+
+**两变量体系**（v0.16.5 修正）：
+- `PROMA_INSTANCE_NAME` 管身份（remote-session 发现、AppUserModelId、任务栏图标颜色）
+- `PROMA_INSTANCE_ISOLATED` 管数据隔离（1=独立 `~/.proma-{NAME}/`，0=共享 `~/.proma/`）
+
+---
+
+## 21 DbC 校验点速查
+
+Design by Contract（契约式编程）—— 每个 tree-engine 子命令就像海关，前置/后置/不变式三层检查，把 SKILL.md 的"应当"升级为代码"必须"。
+
+| 批次 | 时间 | 数量 | 堵什么 |
 |---|---|---|---|
-| A | MCP 钩子注入 | ✅ | ✅ |
-| B | API 桥接 + 插件加载 | ✅ | ✅ |
-| C1-5 | 频道+模型元数据覆盖 | ✅ | ✅ |
-| D+E | Renderer 同步 + 守卫移除 | ✅ | ✅ |
-| 1 | DeepSeek 子Agent → V4 Pro | ✅ | ✅ |
-| E (PROMA_DEV) | userData 隔离 | ✅ | ❌ 不需要 |
-| F (v0.12) | 跨渠道 sdkSessionId 防护 | ✅ | ✅ |
-| 3 | 托盘图标白色 | ✅ | ✅ |
-| 6 | EXE 图标改色 (png-to-ico) | ✅ | ✅ |
-| V | 版本号对齐 | ✅ | ✅ |
+| **Phase A** | 6/23 | 12 点 | 文件幻觉 / 自审自过 / 节点失控 / 伪自检 / validate 失败续跑 / 时序倒挂（CP1-CP6 + SP1 + 加固#2/#6 + V1/V2/V3） |
+| **V4-V9** | 6/24 | 9 点 | budget 短路 / alignment 标志篡改 / milestone 自审 / expect_outputs 路径遍历 / symlink 逃逸 |
+| **R2-T7 + M2** | 6/25 早晨 | 2 处 | audit_append results[i] 三元组 / total 整数类型 |
+| **V10 八大** | 6/25 下午 | 8 点 | 僵尸 auditor / UUID 严格 / 数值一致性 / 借身份 / nudge 升级 / 时间戳单调 / workspace canonical / status-event 同步 |
+| **C5 root 信任锚修复** | 6/25 下午 | 2 处 | worker 用 null 给 root 调 audit_gate pass / worker 给 root 写 done event 触发 auto_upgrade |
+| **Bug A/B + IHL** | 6/25-6/26 | 6 处 | commander 代 worker 写 done event / 同 session 多 leaf 歧义 / workspace_id 校验 / tamper detection 4 规则 |
+
+**对抗测试金标准**（每轮加固都跑这些）：
+
+| 测试套件 | 通过率 |
+|---|---|
+| `test-sandbox/dbc-spec.cjs` | **48/0** |
+| `test-sandbox/audit-attacks.cjs` | **18 攻击 / 0 BYPASS** |
+| `test-sandbox/v10-cleanroom.cjs` | **54/54** |
+| `test-sandbox/v10-regression.cjs` | 14/0 |
+| `test-sandbox/audit-extra.cjs` | 21 case |
+| 真实环境 e2e（V10 P2） | 6 阶段全通过 |
 
 ---
 
-## 卸载
+## V10 Phase 3 — IHL 迭代加固
+
+V10 升级把"字段存在性校验"升级为"内容有效性校验"。在 V10 Phase 3 之后，**IHL（Iterative Hardening Loop / 盲点驱动的迭代加固）** 闭环运行 6 轮，每轮发现一个真实场景盲点 → 入口补丁 → SubAgent 静态校验 → 运行时验证。
+
+| 轮次 | Commit | 修复 | 验证 |
+|---|---|---|---|
+| R1 | `1a7ed5f` | applyNudge 全局守卫（补 9c423b8 tree 级规则盲点） | bugav 重置 + 巡逻 PASS |
+| R2 | `031c546` | create_session workspace_id 校验 | invalid id → `E_WORKSPACE_NOT_FOUND` |
+| R3 | v626 树 | V4 Pro commander 端到端 | self_check 4/4 PASS |
+| R4 | `031c546` | fork_session 同类漏洞补丁（审计驱动） | 复用 R2 helper |
+| R5 | `d44163a` | 4 条 W-AUDIT-* tamper detection | 设计盲点（Tier 2 status 守卫跳过） |
+| R6 | `690f7e8` | R5 移到 Tier 1 绕开 status 守卫 | v626 巡逻 8 违规全覆盖 |
+
+**最终防御拓扑（3 层）**：
+
+```
+入口拦截层: cmdEventAppend L1498 / cmdLeafAdd L705 / create_session L461 / fork_session L601
+兜底守卫层: cmdAuditGate L2337 / resolveAuditorIndep L1897 / checkAllRules / applyNudge
+事后检测层: W-AUDIT-SELF / W-AUDIT-WORKER / W-AUDIT-TAMPER / W-AUDIT-NO-ALIGN
+```
+
+**IHL 方法论沉淀**：
+- 模式：`盲点暴露（真实场景）→ 入口补丁 → SubAgent 静态校验 → 运行时验证 → 发现新盲点`
+- 关键洞察：真实场景优先于静态审查；入口拦截必须配套兜底守卫；tamper detection 必须对 all leaf 跑（不走 status 守卫）
+
+---
+
+## 文档导航矩阵
+
+### 入口与索引（必读）
+
+| 文档 | 路径 | 用途 |
+|---|---|---|
+| **Project Index** | [`.context/PROJECT-INDEX.md`](.context/PROJECT-INDEX.md) | 项目索引（5 分钟拿全貌 + 关键路径） |
+| **图形化向导** | [`.context/project-onboarding-guide-2026-06-25.md`](.context/project-onboarding-guide-2026-06-25.md) | 30 分钟建立完整心智模型（图形化 + 类比 + 通俗） |
+| **进度笔记** | [`.context/note.md`](.context/note.md) | 长期调研笔记（按日期追加在顶部） |
+| **完整技术 Wiki** | [`.context/proma-dev-wiki.md`](.context/proma-dev-wiki.md) | 补丁命令、架构、测试记录、版本历史（73KB） |
+| **最新进度报告** | [`.context/active/progress-report-2026-06-25.md`](.context/active/progress-report-2026-06-25.md) | 6/20→6/25 五天阶段性总结 |
+
+### 设计与方案
+
+| 文档 | 路径 | 用途 |
+|---|---|---|
+| Tree 体系设计 | [`.context/reference/design/tree-commander-design.md`](.context/reference/design/tree-commander-design.md) v1.3 | 树形体系完整设计文档 |
+| Commander 方法论 | [`.context/reference/methodology/commander-methodology.md`](.context/reference/methodology/commander-methodology.md) v1.2 | 13 原则（Leaf Purity + 分布式写入 + 三层深度） |
+| V10 工程方法论 | [`.context/reference/methodology/commander-methodology-v10.md`](.context/reference/methodology/commander-methodology-v10.md) | 5h/17 节点 Tree 模式加固工程实战沉淀 |
+| 五层防御架构 | [`.context/reference/architecture/architecture-plan-2026-06-23/`](.context/reference/architecture/architecture-plan-2026-06-23/) | Layer 0-4 完整诊断（7 份方案） |
+| 完整诊断报告 | [`.context/reference/design/tree-system-architecture-analysis-2026-06-23.md`](.context/reference/design/tree-system-architecture-analysis-2026-06-23.md) | Layer 0-4 五层防御深度报告 |
+| Q3 硬约束方案 | [`.context/reference/plans/q3-tao-hard-constraint.md`](.context/reference/plans/q3-tao-hard-constraint.md) v1.2 | TAO Watcher 35 条规则 |
+
+### V10 加固专题
+
+| 文档 | 路径 | 用途 |
+|---|---|---|
+| V10 双轮收敛 | [`.context/v10/convergence-judgment.md`](.context/v10/convergence-judgment.md) | V10 双轮收敛报告 |
+| C1 实施报告 | [`.context/v10/c1-implementation-report.md`](.context/v10/c1-implementation-report.md) | 8 大加固点 |
+| C2 修复报告 | [`.context/v10/c2-fix-report.md`](.context/v10/c2-fix-report.md) | P0/P1/P2 修复 |
+| C5 信任锚修复 | [`.context/v10/c5-trust-anchor-fix-report.md`](.context/v10/c5-trust-anchor-fix-report.md) | root 信任锚 |
+| A5 验证报告 | [`.context/v10/a5-verify-report.md`](.context/v10/a5-verify-report.md) | 独立验证 |
+| R5/R6 设计 | [`.context/v10/v626-r5-r6-audit-tamper-detection.md`](.context/v10/v626-r5-r6-audit-tamper-detection.md) | tamper detection 完整工程设计 |
+| IHL 迭代总结 | [`.context/v10/v626-iteration-recap.md`](.context/v10/v626-iteration-recap.md) | R1-R4 详细 |
+
+### 交接文档（按时间倒序）
+
+| 文档 | 时段 |
+|---|---|
+| [`.context/active/session-2026-06-25-v10-followup.md`](.context/active/session-2026-06-25-v10-followup.md) | V10 Phase 3 + Bug A/B 修复 |
+| [`.context/active/session-2026-06-25-followup-tree-mode.md`](.context/active/session-2026-06-25-followup-tree-mode.md) | V4-V9 followup + Tree 模式实战 |
+| [`.context/archive/2026-06-handoff/session-2026-06-24-v4v9-hardening.md`](.context/archive/2026-06-handoff/session-2026-06-24-v4v9-hardening.md) | V4-V9 9 硬约束点交付 |
+| [`.context/archive/2026-06-handoff/session-2026-06-24-bridge-port-and-dbc.md`](.context/archive/2026-06-handoff/session-2026-06-24-bridge-port-and-dbc.md) | Bridge 修复 + DbC 运行时验证 |
+| [`.context/archive/2026-06-handoff/session-2026-06-23-v0.7plus-engine-inline.md`](.context/archive/2026-06-handoff/session-2026-06-23-v0.7plus-engine-inline.md) | 引擎内联 MCP |
+| [`.context/archive/2026-06-handoff/session-2026-06-23-v0.7-phaseA-mcp.md`](.context/archive/2026-06-handoff/session-2026-06-23-v0.7-phaseA-mcp.md) | Phase A 12 DbC 校验点 |
+
+### 部署源码（绝对路径）
+
+| 文件 | 部署路径 |
+|---|---|
+| 引擎部署版 | `D:\Proma-dev\resources\app\dist\tree-engine.cjs`（3602 行） |
+| 插件部署版 | `D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs`（2658 行） |
+| MCP 桥接 | `D:\Proma-dev\resources\app\dist\proma-mcp-server.cjs` |
+| 仓库源 | `workspace-files/tree-engine.cjs` + `proma-dev-patches.cjs`（与部署版字字节同步） |
+
+---
+
+## 快速命令速查
+
+### 启动
+
+```bash
+# Dev 版（双开，隔离数据）
+D:\Proma-dev\start-dev.bat           # PROMA_INSTANCE_NAME=dev  +  ISOLATED=1
+
+# Release 版（日常使用，共享正式版数据）
+D:\Proma-release\start-release.bat   # PROMA_INSTANCE_NAME=release  +  ISOLATED=0
+```
+
+### 部署插件（改完代码后）
+
+```bash
+# Dev 版
+cp proma-dev-patches.cjs D:/Proma-dev/resources/app/dist/
+cp tree-engine.cjs       D:/Proma-dev/resources/app/dist/
+cp proma-mcp-server.cjs  D:/Proma-dev/resources/app/dist/
+# 重启 Dev 实例
+
+# Release 版（ASAR 不解包，插件放 asar 同级 dist/）
+cp proma-dev-patches.cjs D:/Proma-release/resources/app/dist/
+cp tree-engine.cjs       D:/Proma-release/resources/app/dist/
+cp proma-mcp-server.cjs  D:/Proma-release/resources/app/dist/
+```
+
+### 一键打补丁
+
+```bash
+bash apply-patches.sh
+```
+
+### 卸载
 
 ```bash
 bash uninstall.sh
-# 或手动：rm -rf D:/Proma-dev ~/.proma-dev（Dev 版）
-# 或手动：rm -rf D:/Proma-release（Release 版）
+# 或手动：
+#   rm -rf D:/Proma-dev ~/.proma-dev         （Dev 版）
+#   rm -rf D:/Proma-release                  （Release 版）
 ```
 
-## 许可证
+---
 
-补丁命令和插件代码为独立作品，基于对 Proma（AGPL-3.0）运行时环境的互操作。按 MIT 许可发布。
+## 关键心智模型（11 条）
+
+1. **三层实例**：正式版（不动）/ Dev（隔离双开调试）/ Release（NAME=release + ISOLATED=0，共享正式版数据）
+2. **两变量体系**：`PROMA_INSTANCE_NAME` 管身份 / `PROMA_INSTANCE_ISOLATED` 管数据隔离
+3. **三层修改**：sed 改 main.cjs（轻量补丁 A-K）/ patches.cjs 写 MCP 工具（27+11+11）/ tree-engine.cjs 内联（v0.7+ 工作区零源码）
+4. **三类 MCP 工具**：本地 `session`（进程内直连 `global.__proma__`）/ 远端 `remote-session`（HTTP 自动发现 19876-19895）/ `tree`（27 个 Tree 操作）
+5. **三种 send_message 模式**：wait 同步 / notify 异步 / fire-and-forget + 轮询
+6. **树形体系三层 role**：root（根，唯一，结构性变更）/ commander（子/孙，fork 创建，受深度限制 ≤ 3）/ worker（叶子，create_session 干净上下文，只上报不写 tree）
+7. **AGPL 合规**：闭源插件通过 `global.__proma__` 桥接调用核心 API，不修改核心代码 → 不构成衍生作品
+8. **DbC（Design by Contract）+ Zero Trust 仲裁**：把 SKILL.md 的"应当"升级为代码"必须"，21 硬约束点，安全检查不依赖可篡改布尔标志（验 events 留痕）
+9. **Tree 模式三层分离**（对抗确认偏误）：实现（commander）/ 评价（独立子 Agent）/ 洁净室（独立团队，禁看实现者测试，从 spec 写测试）
+10. **五层防御 Layer 0-4**：Layer 0 行为引导（SKILL.md）/ Layer 1 事中硬约束（DbC 21 点 + V10 + IHL）/ Layer 2 主动 Supervision（设计完成，未实现）/ Layer 3 TAO Watcher（60%，缺 Liveness）/ Layer 4 模型契约（subagent_trace_id，平台层依赖）
+11. **30/30/40 论断**：prompt 30% + 模型 RLHF 30% + harness 40%（来自 Laban ICLR 2026 + Anthropic 多 Agent 实测）
+
+---
+
+## License 声明
+
+本仓库采用 **双许可证** 模型。完整文本见 [LICENSE](LICENSE)。
+
+### 开源部分（AGPL-3.0）
+
+下列组件按 GNU Affero General Public License v3.0 发布：
+
+- 本仓库的 `apply-patches.sh`、`uninstall.sh`、`README.md`、`CHANGELOG.md` 等部署脚本与文档
+- 所有 `.context/` 目录下的设计与方案文档（除非明确标注受 ADDENDUM 约束）
+- 配置模板与示例
+
+### 闭源部分（受 ADDENDUM 保护）
+
+下列组件为闭源附加组件，**不适用 AGPL-3.0**，版权所有 © 2026 周星星 (orphiczhou)，保留所有权利：
+
+- `proma-dev-patches.cjs`（主插件，含 27 + 11 + 11 个 MCP 工具）
+- `tree-engine.cjs`（含 tree-state 引擎逻辑、21 DbC、TAO Watcher 规则）
+- `proma-mcp-server.cjs`（外部 stdio MCP 桥接）
+- `skills/` 下的核心方法论文件
+
+**允许**：阅读、学习、内部使用（在自己的 Proma 部署中应用补丁）。
+**禁止**：复制、修改、再分发、商业使用上述闭源组件。
+**商业授权**：如需商业使用或参与开发，请通过 [orphiczhou/proma-patches](https://github.com/orphiczhou/proma-patches) 联系作者。
+
+### 双许可证边界
+
+- **上游 Proma 商业版**（`D:\Proma\*`）：AGPL-3.0（由上游作者授权）
+- **本仓库开源壳**（部署脚本 + 文档）：AGPL-3.0
+- **本仓库闭源插件**（引擎 + 主插件 + MCP 桥接 + 方法论 Skill）：本 ADDENDUM
+- **用户工作区数据**（`~/.proma*/` 下所有 tree-state.json、会话、消息、deliverables）：归属用户
+
+---
+
+## 贡献
+
+欢迎通过 [orphiczhou/proma-patches](https://github.com/orphiczhou/proma-patches) 提交 Issue 和 Pull Request。
+
+- **工程文档**：见 `DEVELOPMENT.md`（待补）和 [`.context/reference/methodology/commander-methodology-v10.md`](.context/reference/methodology/commander-methodology-v10.md)
+- **提交规范**：参考现有 commit message 风格（V10 Phase X / vX.Y.Z / Bug A/B）
+- **代码审查**：使用 Tree 模式三层分离（实现 / 评价 / 洁净室），见 [`.context/active/session-2026-06-25-followup-tree-mode.md`](.context/active/session-2026-06-25-followup-tree-mode.md)
+
+提交贡献即表示你授予版权持有人永久、不可撤销、免版税的许可，以使用、修改和再分发你的贡献。
+
+---
+
+## 相关链接
+
+- **GitHub 仓库**：[orphiczhou/proma-patches](https://github.com/orphiczhou/proma-patches)
+- **完整变更日志**：[CHANGELOG.md](CHANGELOG.md)
+- **完整许可证**：[LICENSE](LICENSE)
+- **图形化入门向导**：[`.context/project-onboarding-guide-2026-06-25.md`](.context/project-onboarding-guide-2026-06-25.md)
+- **项目索引**：[`.context/PROJECT-INDEX.md`](.context/PROJECT-INDEX.md)
+
+---
+
+> 维护：周星星 (orphiczhou) | 最后更新：2026-06-26
+> 配合 [`PROJECT-INDEX.md`](.context/PROJECT-INDEX.md) + [`note.md`](.context/note.md) 食用，新会话 5 分钟拿全貌。

@@ -149,7 +149,7 @@ async function checkAllRules(tree, workspace, cfg) {
 
 ## 关联文档
 
-- [V10 Phase 3 收尾交接](../handoff/session-2026-06-25-v10-followup.md)
-- [跨工作区问题报告 §七 TAO Watcher 关联](../cross-workspace-tree-issue-2026-06-25.md)
+- [V10 Phase 3 收尾交接](../active/session-2026-06-25-v10-followup.md)
+- [跨工作区问题报告 §七 TAO Watcher 关联](../active/cross-workspace-tree-issue-2026-06-25.md)
 - [Bug B 调查](./bug-b-investigation.md)（session_id 复用根因）
 - [Bug B-3 修复](./bug-fix-validation.md)（cmdLeafAdd 入口拦截）

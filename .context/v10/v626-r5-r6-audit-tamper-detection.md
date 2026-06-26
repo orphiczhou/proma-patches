@@ -320,12 +320,12 @@ root 自审必须显式传 `audit_session_id === leaf.session_id`，与 cmdAudit
 ### 迭代总结
 - [v626 3 轮迭代 recap](./v626-iteration-recap.md) — R1-R4 详细
 - [runtime-verify-2026-06-26](./runtime-verify-2026-06-26.md) — Bug A/B + TAO Watcher 运行时验证
-- [跨工作区问题报告](../cross-workspace-tree-issue-2026-06-25.md)
+- [跨工作区问题报告](../active/cross-workspace-tree-issue-2026-06-25.md)
 
 ### 调查报告
 - [Bug A 调查](./bug-a-investigation.md)
 - [Bug B 调查](./bug-b-investigation.md)
-- [commander-methodology-v10](../commander-methodology-v10.md) — V10 工程方法论
+- [commander-methodology-v10](../reference/methodology/commander-methodology-v10.md) — V10 工程方法论
 
 ### 代码
 - `proma-dev-patches.cjs`（2658 行，3 份同步）

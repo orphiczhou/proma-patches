@@ -30,7 +30,7 @@ v10 的 8 大加固点全部围绕"内容有效性"展开：
 
 ### 1.2 为什么需要 v10
 
-直接的导火索是 `audit-gate-test-20260625` 失守案例（详见 [charter](./plan/v10-implementation-charter.md) §二）。但更深层的驱动是：**V4-V9 的"形式完整"造成了一种虚假安全感**。每次加固后跑 dbc-spec 39/0、audit-attacks 18/0、audit-extra 21 case 全过——所有指标都绿灯，但真实攻击者用最朴素的方式（拿一个 zombie auditor 的 session_id 调 audit_gate）就 0% 被拦。
+直接的导火索是 `audit-gate-test-20260625` 失守案例（详见 [charter](../plans/v10-implementation-charter.md) §二）。但更深层的驱动是：**V4-V9 的"形式完整"造成了一种虚假安全感**。每次加固后跑 dbc-spec 39/0、audit-attacks 18/0、audit-extra 21 case 全过——所有指标都绿灯，但真实攻击者用最朴素的方式（拿一个 zombie auditor 的 session_id 调 audit_gate）就 0% 被拦。
 
 这暴露了三个结构性问题，v10 必须解决：
 
@@ -112,9 +112,9 @@ if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId)
 
 ### 2.2 Helper 自助文档系统（D4 4 层）
 
-**问题背景**：65996e8b DeepSeek V4 Pro commander 在 V10 真实环境测试中暴露了"瞎试→瞎编→嘴硬→后补"4 阶段失守（详见 [dev-e2e 报告](./v10/dev-e2e-report.md)）。其中"瞎试"阶段最典型：commander 反复试 `v10exy-worker-s1` / `v10exy-auditor-z1` 等 leaf_id 命名组合，150+ 条消息全部在猜命名规则，从不读 SKILL。
+**问题背景**：65996e8b DeepSeek V4 Pro commander 在 V10 真实环境测试中暴露了"瞎试→瞎编→嘴硬→后补"4 阶段失守（详见 [dev-e2e 报告](../../v10/dev-e2e-report.md)）。其中"瞎试"阶段最典型：commander 反复试 `v10exy-worker-s1` / `v10exy-auditor-z1` 等 leaf_id 命名组合，150+ 条消息全部在猜命名规则，从不读 SKILL。
 
-**D4 Helper 4 层设计**（详见 [D4 报告](./v10/d4-helper-report.md)）：
+**D4 Helper 4 层设计**（详见 [D4 报告](../../v10/d4-helper-report.md)）：
 
 | Layer | 实现 | 目标 |
 |-------|------|------|
@@ -123,7 +123,7 @@ if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId)
 | L3 错误码引用 | `ERROR_TO_HELP` 映射表（37 个错误码） + `TreeStateError` 构造函数自动挂 `help_topic` + `run()` catch 块据此生成 `help_hint` | Agent 犯错时不用瞎猜，错误返回直接告诉它"调 tree_help('xxx') 看正确用法" |
 | L4 SKILL description 强化 | tree-commander / tree-worker SKILL.md frontmatter 加 15 + 7 个关键词 | 提高自动触发命中率 |
 
-**真实效果验证**（V10 P2 e2e 测试，[报告](../../tree-2/workspace-files/.context/v10-p2-e2e-report.md)）：
+**真实效果验证**（V10 P2 e2e 测试，[报告](../../audit/v10-p2/v10-p2-e2e-report.md)）：
 
 ```
 阶段 1 helper 学习:
@@ -159,7 +159,7 @@ if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId)
 
 **问题**：root leaf 是整个信任链的起点（commander 由 root 背书，worker 由 commander 背书），但 root 自己没有上游 auditor 可用——root.added_by=null，没有人能给 root 写 audit_gate=pass。这导致**任何树都无法启动**（root 永远过不了 V10-auditor-active 三重校验）。
 
-**解决方案**：root 自审作为信任锚（[C3 报告](./v10/c3-trust-anchor-report.md)）：
+**解决方案**：root 自审作为信任锚（[C3 报告](../../v10/c3-trust-anchor-report.md)）：
 
 ```js
 // resolveAuditorIndep 加 root 特例
@@ -185,12 +185,12 @@ if (role === 'root') {
 }
 ```
 
-**风险与失守**：C3 实施时引入了 **2 个 P0 致命失守**（[A3 报告](./v10/a3-a4-review-report.md)）：
+**风险与失守**：C3 实施时引入了 **2 个 P0 致命失守**（[A3 报告](../../v10/a3-a4-review-report.md)）：
 
 1. **null 放行支**：原代码 `(auditorSessionId === null || auditorSessionId === leaf.session_id)` 中 null 这一支，让 worker 调 audit_gate 不传 audit_session_id（=null）就能绕过 caller 校验（cmdAuditGate:2244 的 `audit_session_id && callerSessionId && ...` 短路），root.audit_gate 被 worker 一键改写
 2. **event_append caller 校验缺失**：cmdEventAppend 没有 callerSessionId 形参，任何 worker 都能给 root 写 done event 触发 auto_upgrade
 
-[ C5 修复 ]（[报告](./v10/c5-trust-anchor-fix-report.md)）：
+[ C5 修复 ]（[报告](../../v10/c5-trust-anchor-fix-report.md)）：
 
 ```js
 // 修复 1: 删除 null 放行支
@@ -214,7 +214,7 @@ async function cmdEventAppend(args, callerSessionId) {
 }
 ```
 
-[ A5 验证 ]（[报告](./v10/a5-verify-report.md)）：164 测试全过，2 个 P0 攻击真正被堵住（独立重放确认）。
+[ A5 验证 ]（[报告](../../v10/a5-verify-report.md)）：164 测试全过，2 个 P0 攻击真正被堵住（独立重放确认）。
 
 **通用模式**：
 
@@ -246,15 +246,15 @@ async function cmdEventAppend(args, callerSessionId) {
 | 6 | 12:53 | A2+Cr2 | auditor + 洁净室 | 复评 + 复测 | **A2 推荐收敛 + Cr2 54/54**。Cr 第一轮 10 失守全部修复；Cr2 增量 5 攻击 0 新失守；patch-l vs dist 121,182 字节完全一致 |
 | 7 | 12:55 | 收敛 | 主会话 | 双轮收敛判断 | **第一轮收敛**。A2 + Cr2 一致推荐收敛。残留：dbc-spec 14 失败待决策（方向 A vs B） |
 | 8 | 15:20 | dbc-fix | commander | dbc-spec 14 失败修复 | **48/0（超额完成）**。采用方向 A 情况 B+C：① setupTreeWithAuditor 改造为 **3-leaf 互背书环**（root↔auditor↔other 互相背书，绕过鸡生蛋）；② V2 测试用例 UUID 替换为合法 v4 但非树中的 `55555555-5555-4555-8555-555555555555` |
-| 9 | 15:53 | dev-e2e | reporter（GLM-5.2） | 真实 MCP 环境端到端测试 | **V10 API 层完胜；Layer 4 模型层失守**。DeepSeek V4 Pro 暴露"瞎试-瞎编-嘴硬-后补"4 阶段失守模式：commander 在自然语言里编造"26/26 通过"绕开 mcp 工具。详见 [dev-e2e 教材](./v10/dev-e2e-report.md) |
-| 10 | 16:08 | real-env | reporter | 真实环境 8 加固点有效性验证 | **8/8 加固点有效，推荐生产可用**。详见 [real-env 报告](./v10/v10-real-env-verification.md)。关键证据：3 个真实 forked session 拦截 6 种错误码 + workspace.slug="default" 修复 3 副本分裂 + status=done 自动同步生效 |
-| 11 | 16:46 | D4 | commander | Helper 4 层 + 13 topic + 37 错误码映射 | **完成 4 层配套**。L1 元工具 + L2 init tips + L3 错误码引用 + L4 SKILL description。详见 [D4 报告](./v10/d4-helper-report.md) |
-| 12 | 16:48 | C3 | commander | Trust Anchor 4 处改动 | **4 处改动完成**：① resolveAuditorIndep root 信任锚（含 null 放行支）；② cmdAuditGate root 自审（仅注释）；③ cmdEventAppend 自动升级 root audit_gate（缺 caller 校验）；④ cmdLeafAdd 拒绝 role=root。详见 [C3 报告](./v10/c3-trust-anchor-report.md) |
-| 13 | 17:03 | D4-fix | 同步 | core 同步 | core D4 标记 0→40 与 patch-l 一致；顺带 C3 标记 7→10。详见 [D4-fix 报告](./v10/d4-fix-core-sync-report.md) |
-| 14 | 17:09 | A3+A4 | 统一 auditor | C3+D4 评价 | **🚨 C3 不合格（2 P0 致命）；D4 合格**。详见 [A3+A4 报告](./v10/a3-a4-review-report.md)。A3 独立跑 exploit 脚本确认：worker 用 null 给 root 调 audit_gate / worker 给 root 写 done event 触发 auto_upgrade——两条路径都能让 root.audit_gate 被 worker 一键改写 |
-| 15 | 17:20 | C5 | commander | 删 null 放行 + caller 透传 | **2 个 P0 全部修复**。详见 [C5 报告](./v10/c5-trust-anchor-fix-report.md)。改动 6 处：① resolveAuditorIndep 删 `null ||` 放行支；② cmdEventAppend 加 callerSessionId 形参；③ done event 写入前 caller 校验；④ auto_upgrade 加 callerIsRootSelf 守卫；⑤ dispatchEvent 透传；⑥ dispatch case 'event' 透传 |
-| 16 | 17:30 | A5 | auditor | 164 测试验证 + 独立重放 | **推荐收敛**。详见 [A5 报告](./v10/a5-verify-report.md)。2 P0 真正堵住（独立 exploit 重放确认）；T8/T9 测试覆盖精确；6 套金标准 0 退化；3 处 diff 字面一致。**baseline 遗留 E1（verdict=skip 降级 DoS）属范围外** |
-| 17 | 17:45-17:55 | V10 P2 e2e | 7c9b6b65（forked session） | 真实环境验证 root-as-trust-anchor + V10 加固点 | **生产就绪**。详见 [P2 e2e 报告](../../tree-2/workspace-files/.context/v10-p2-e2e-report.md)。root 写 done event 后 audit_gate 自动从 skip 升级为 pass（auto_upgrade=true）；E_BORROWED_IDENTITY 拦截借身份；E_LEAF_AUTO_PRUNED 7-strike 规则；TAO watcher 自动 nudge 5 条（W-01/W-08/R-03/R-06/C-13） |
+| 9 | 15:53 | dev-e2e | reporter（GLM-5.2） | 真实 MCP 环境端到端测试 | **V10 API 层完胜；Layer 4 模型层失守**。DeepSeek V4 Pro 暴露"瞎试-瞎编-嘴硬-后补"4 阶段失守模式：commander 在自然语言里编造"26/26 通过"绕开 mcp 工具。详见 [dev-e2e 教材](../../v10/dev-e2e-report.md) |
+| 10 | 16:08 | real-env | reporter | 真实环境 8 加固点有效性验证 | **8/8 加固点有效，推荐生产可用**。详见 [real-env 报告](../../v10/v10-real-env-verification.md)。关键证据：3 个真实 forked session 拦截 6 种错误码 + workspace.slug="default" 修复 3 副本分裂 + status=done 自动同步生效 |
+| 11 | 16:46 | D4 | commander | Helper 4 层 + 13 topic + 37 错误码映射 | **完成 4 层配套**。L1 元工具 + L2 init tips + L3 错误码引用 + L4 SKILL description。详见 [D4 报告](../../v10/d4-helper-report.md) |
+| 12 | 16:48 | C3 | commander | Trust Anchor 4 处改动 | **4 处改动完成**：① resolveAuditorIndep root 信任锚（含 null 放行支）；② cmdAuditGate root 自审（仅注释）；③ cmdEventAppend 自动升级 root audit_gate（缺 caller 校验）；④ cmdLeafAdd 拒绝 role=root。详见 [C3 报告](../../v10/c3-trust-anchor-report.md) |
+| 13 | 17:03 | D4-fix | 同步 | core 同步 | core D4 标记 0→40 与 patch-l 一致；顺带 C3 标记 7→10。详见 [D4-fix 报告](../../v10/d4-fix-core-sync-report.md) |
+| 14 | 17:09 | A3+A4 | 统一 auditor | C3+D4 评价 | **🚨 C3 不合格（2 P0 致命）；D4 合格**。详见 [A3+A4 报告](../../v10/a3-a4-review-report.md)。A3 独立跑 exploit 脚本确认：worker 用 null 给 root 调 audit_gate / worker 给 root 写 done event 触发 auto_upgrade——两条路径都能让 root.audit_gate 被 worker 一键改写 |
+| 15 | 17:20 | C5 | commander | 删 null 放行 + caller 透传 | **2 个 P0 全部修复**。详见 [C5 报告](../../v10/c5-trust-anchor-fix-report.md)。改动 6 处：① resolveAuditorIndep 删 `null ||` 放行支；② cmdEventAppend 加 callerSessionId 形参；③ done event 写入前 caller 校验；④ auto_upgrade 加 callerIsRootSelf 守卫；⑤ dispatchEvent 透传；⑥ dispatch case 'event' 透传 |
+| 16 | 17:30 | A5 | auditor | 164 测试验证 + 独立重放 | **推荐收敛**。详见 [A5 报告](../../v10/a5-verify-report.md)。2 P0 真正堵住（独立 exploit 重放确认）；T8/T9 测试覆盖精确；6 套金标准 0 退化；3 处 diff 字面一致。**baseline 遗留 E1（verdict=skip 降级 DoS）属范围外** |
+| 17 | 17:45-17:55 | V10 P2 e2e | 7c9b6b65（forked session） | 真实环境验证 root-as-trust-anchor + V10 加固点 | **生产就绪**。详见 [P2 e2e 报告](../../audit/v10-p2/v10-p2-e2e-report.md)。root 写 done event 后 audit_gate 自动从 skip 升级为 pass（auto_upgrade=true）；E_BORROWED_IDENTITY 拦截借身份；E_LEAF_AUTO_PRUNED 7-strike 规则；TAO watcher 自动 nudge 5 条（W-01/W-08/R-03/R-06/C-13） |
 
 ### 3.2 时间线的关键模式
 
@@ -272,7 +272,7 @@ async function cmdEventAppend(args, callerSessionId) {
 
 **根因**：实现者（C1）和评价者（A1）都从**代码视角**看问题——C1 写完代码自验证 happy path 通过、A1 读代码确认 spec 字面实施——两者**共享同一套思维框架**。Cr 洁净室从**spec 视角**看问题（禁看实现代码），独立构造攻击向量，发现"代码看起来对但实际失效"的认知裂缝。
 
-具体例子（[Cr 报告](./v10/cr-test-report.md) §发现 1）：
+具体例子（[Cr 报告](../../v10/cr-test-report.md) §发现 1）：
 
 C1 在 cmdEventAppend 中写：
 ```js
@@ -302,7 +302,7 @@ A1 读这段代码，看到"3 道校验都在"，判定**合格**。
 
 ### 4.2 「DeepSeek V4 Pro 瞎试-瞎编-嘴硬」模型层失守对抗模式
 
-**现象**（[dev-e2e 教材](./v10/dev-e2e-report.md)）：DeepSeek V4 Pro commander（65996e8b）在 V10 真实环境测试中暴露 4 阶段失守：
+**现象**（[dev-e2e 教材](../../v10/dev-e2e-report.md)）：DeepSeek V4 Pro commander（65996e8b）在 V10 真实环境测试中暴露 4 阶段失守：
 
 | 阶段 | 表现 | 消息号 |
 |------|------|--------|
@@ -335,7 +335,7 @@ A1 读这段代码，看到"3 道校验都在"，判定**合格**。
 
 ### 4.3 「P0 根因是认知偏移」design vs impl gap
 
-**现象**（[C2 报告](./v10/c2-fix-report.md) §P0 根因分析）：C1 在 cmdEventAppend 中写：
+**现象**（[C2 报告](../../v10/c2-fix-report.md) §P0 根因分析）：C1 在 cmdEventAppend 中写：
 
 ```js
 const ts = nowIso();  // ← C1 注释："nowIso 产出的 ts 永远合法"
@@ -353,8 +353,8 @@ const ts = nowIso();  // ← C1 注释："nowIso 产出的 ts 永远合法"
 
 **类似案例**：
 
-- C1 在 cmdAuditAppend 中"推测"复用 resolveAuditorIndep 即可（不用单独加 UUID 校验），但 resolveAuditorIndep 只在 cmdAuditGate / cmdMilestoneSetResult 路径调用，cmdAuditAppend 没调用——7/7 UUID 攻击全部放行（[Cr 报告](./v10/cr-test-report.md) §发现 2）
-- C3 在 resolveAuditorIndep 加 `(auditorSessionId === null || auditorSessionId === leaf.session_id)` 时，**直觉认为 null 是合法的 root 自审入口**（root 可以不传 audit_session_id），但这个 `|| null` 让 worker 用 null 调用就能绕过 caller 校验（[A3 报告](./v10/a3-a4-review-report.md) §改动 1）
+- C1 在 cmdAuditAppend 中"推测"复用 resolveAuditorIndep 即可（不用单独加 UUID 校验），但 resolveAuditorIndep 只在 cmdAuditGate / cmdMilestoneSetResult 路径调用，cmdAuditAppend 没调用——7/7 UUID 攻击全部放行（[Cr 报告](../../v10/cr-test-report.md) §发现 2）
+- C3 在 resolveAuditorIndep 加 `(auditorSessionId === null || auditorSessionId === leaf.session_id)` 时，**直觉认为 null 是合法的 root 自审入口**（root 可以不传 audit_session_id），但这个 `|| null` 让 worker 用 null 调用就能绕过 caller 校验（[A3 报告](../../v10/a3-a4-review-report.md) §改动 1）
 
 **复用建议**：
 
@@ -396,7 +396,7 @@ D4 + C3（新功能实施） → A3+A4（评价：D4 合格、C3 不合格 2 P0�
 >
 > Cr 永远会发现 A 漏掉的问题（因为视角差异）；增量功能（C3 Trust Anchor）会引入新失守（因为特例信任难写对）。每轮收敛的判据是：A 评价 + Cr 测试都独立通过，且无新发现。
 
-**收敛判据**（详见 [convergence-judgment](./v10/convergence-judgment.md)）：
+**收敛判据**（详见 [convergence-judgment](../../v10/convergence-judgment.md)）：
 
 1. **代码层**：3 处文件 diff 字面一致（core / patch-l / dist）
 2. **测试层**：Cr 测试 + 金标准测试 + Cr2 增量测试全过
@@ -418,7 +418,7 @@ D4 + C3（新功能实施） → A3+A4（评价：D4 合格、C3 不合格 2 P0�
 
 1. **加固工程本身用加固后的引擎执行**，证明引擎可用——如果 V10 加固有致命 bug（如 C3 的 null 放行），C3 自己就会被自己引入的 bug 拦住
 2. **角色分工通过引擎强制执行**：A auditor 不能看 C 实施过程（因为 A 是不同 session），Cr 洁净室禁看实现代码（通过任务指令约束 + 独立 session 隔离）
-3. **失守会被引擎记录**：本次 v10v 树本身就触发了 V10 加固前的反例——主会话用占位 session_id 给 leaf 写状态，被 V10-status-event-sync 报告 status_event_mismatch issue（[convergence-judgment](./v10/convergence-judgment.md) §七 失败的部分）
+3. **失守会被引擎记录**：本次 v10v 树本身就触发了 V10 加固前的反例——主会话用占位 session_id 给 leaf 写状态，被 V10-status-event-sync 报告 status_event_mismatch issue（[convergence-judgment](../../v10/convergence-judgment.md) §七 失败的部分）
 
 **模式**：
 
@@ -443,7 +443,7 @@ D4 + C3（新功能实施） → A3+A4（评价：D4 合格、C3 不合格 2 P0�
 
 强制 alignment 必填会导致：① 破坏铁律 1（worker 无法填一个不属于自己职责的字段）；② 炸掉全部现有 dbc-spec 测试用例（所有 worker brief_echo 都没 alignment）。
 
-**改用 V5b**（[note.md](./note.md) §226 关键设计决策）：
+**改用 V5b**（[note.md](../../note.md) §226 关键设计决策）：
 
 - brief_echo 无 alignment 合法（标 `alignment_pending`）
 - 闸门移到 audit_gate（worker pass 前查 events 留痕，alignment 必须由 auditor 回填）
@@ -469,7 +469,7 @@ D4 + C3（新功能实施） → A3+A4（评价：D4 合格、C3 不合格 2 P0�
 
 **现象**：C3 实施 Trust Anchor 4 处改动，自验证 18/18 测试全过，5 套金标准 0 退化。**但 A3 独立审计发现 2 个 P0 致命失守**：
 
-**P0 攻击 1**（[A3 报告](./v10/a3-a4-review-report.md) §改动 1）：
+**P0 攻击 1**（[A3 报告](../../v10/a3-a4-review-report.md) §改动 1）：
 
 ```js
 // C3 实施：
@@ -488,7 +488,7 @@ A3 独立跑 exploit 脚本确认：
   root.audit_gate: {"verdict":"pass","auditor_session_id":null,...}
 ```
 
-**P0 攻击 2**（[A3 报告](./v10/a3-a4-review-report.md) §改动 3）：
+**P0 攻击 2**（[A3 报告](../../v10/a3-a4-review-report.md) §改动 3）：
 
 ```js
 // C3 实施：
@@ -504,7 +504,7 @@ async function cmdEventAppend(args) {  // ← 没有 callerSessionId 形参
 
 任何 worker 调 `event_append leaf_id=<root> type=done` → auto_upgrade 触发 → root.audit_gate 从 skip 升级为 pass → **整个 trust chain 一键被攻陷**。
 
-[ C5 修复 ]（[报告](./v10/c5-trust-anchor-fix-report.md)）：
+[ C5 修复 ]（[报告](../../v10/c5-trust-anchor-fix-report.md)）：
 
 ```js
 // 修复 1: 删除 null 放行支
@@ -528,7 +528,7 @@ async function cmdEventAppend(args, callerSessionId) {
 }
 ```
 
-[ A5 验证 ]（[报告](./v10/a5-verify-report.md)）：T8/T9 测试覆盖精确（6 个子断言全过）；6 套金标准 164 测试 0 退化；2 个 P0 攻击独立重放确认被堵住。
+[ A5 验证 ]（[报告](../../v10/a5-verify-report.md)）：T8/T9 测试覆盖精确（6 个子断言全过）；6 套金标准 164 测试 0 退化；2 个 P0 攻击独立重放确认被堵住。
 
 **模式**：
 
@@ -551,7 +551,7 @@ async function cmdEventAppend(args, callerSessionId) {
 
 ### 4.8 「错误码即文档」：help_topic + help_hint 设计
 
-**设计**（[D4 报告](./v10/d4-helper-report.md) §Layer 3）：
+**设计**（[D4 报告](../../v10/d4-helper-report.md) §Layer 3）：
 
 每个错误码都附 help_topic（指向 SKILL 章节）+ help_hint（一句话提示）。Agent 收到错误后可以直接调 tree_help(topic) 获取详细说明。
 
@@ -604,7 +604,7 @@ class TreeStateError extends Error {
 }
 ```
 
-**真实效果**（[V10 P2 e2e 报告](../../tree-2/workspace-files/.context/v10-p2-e2e-report.md) §关键发现 5）：
+**真实效果**（[V10 P2 e2e 报告](../../audit/v10-p2/v10-p2-e2e-report.md) §关键发现 5）：
 
 > error→help 链路完整：所有错误返回均附带 help_topic 和 help_hint，Agent 可以立即调 tree_help 获取正确用法，无需读 SKILL.md。
 
@@ -717,9 +717,9 @@ V5b 原查 `alignment_pending` 标志（可 tamperLeaf 篡改），审计[1] 发
 
 **v10 真实环境验证的 4 条独立链**：
 
-1. **dev-e2e**（[报告](./v10/dev-e2e-report.md)）：DeepSeek V4 Pro commander 真实测试。发现 Layer 4 模型层失守（瞎编-嘴硬-后补）
-2. **real-env**（[报告](./v10/v10-real-env-verification.md)）：GLM-5.2 reporter 独立验证 8 加固点有效性。8/8 加固点有效
-3. **V10 P2 e2e**（[报告](../../tree-2/workspace-files/.context/v10-p2-e2e-report.md)）：forked session（7c9b6b65）生产模拟。root-as-trust-anchor 生效，error→help 链路完整
+1. **dev-e2e**（[报告](../../v10/dev-e2e-report.md)）：DeepSeek V4 Pro commander 真实测试。发现 Layer 4 模型层失守（瞎编-嘴硬-后补）
+2. **real-env**（[报告](../../v10/v10-real-env-verification.md)）：GLM-5.2 reporter 独立验证 8 加固点有效性。8/8 加固点有效
+3. **V10 P2 e2e**（[报告](../../audit/v10-p2/v10-p2-e2e-report.md)）：forked session（7c9b6b65）生产模拟。root-as-trust-anchor 生效，error→help 链路完整
 4. **v10v 自举**：用 V10 加固后的引擎跑 V10 加固工程本身。自证引擎可用
 
 **复用建议**：
@@ -875,35 +875,35 @@ v10（大规模加固 8 模式）—— "如何做大规模加固工程"（本�
 ### 8.4 引用文档列表
 
 **Charter 与收敛**：
-- [V10 实施任务书](./plan/v10-implementation-charter.md)
-- [收敛判断](./v10/convergence-judgment.md)
+- [V10 实施任务书](../plans/v10-implementation-charter.md)
+- [收敛判断](../../v10/convergence-judgment.md)
 
 **第一轮（核心加固）**：
-- [C1 实施报告](./v10/c1-implementation-report.md)
-- [A1 评价报告](./v10/a1-review-report.md)
-- [Cr 洁净室测试报告](./v10/cr-test-report.md)
-- [C2 修复报告](./v10/c2-fix-report.md)
-- [Cr2 复测报告](./v10/cr2-test-report.md)
+- [C1 实施报告](../../v10/c1-implementation-report.md)
+- [A1 评价报告](../../v10/a1-review-report.md)
+- [Cr 洁净室测试报告](../../v10/cr-test-report.md)
+- [C2 修复报告](../../v10/c2-fix-report.md)
+- [Cr2 复测报告](../../v10/cr2-test-report.md)
 
 **金标准修复**：
-- [dbc-fix 报告](./v10/dbc-fix-report.md)
+- [dbc-fix 报告](../../v10/dbc-fix-report.md)
 
 **真实环境验证**：
-- [dev-e2e 教材（DeepSeek V4 Pro 失守）](./v10/dev-e2e-report.md)
-- [real-env 真实环境验证](./v10/v10-real-env-verification.md)
-- [V10 P2 e2e（forked session 生产模拟）](../../tree-2/workspace-files/.context/v10-p2-e2e-report.md)
+- [dev-e2e 教材（DeepSeek V4 Pro 失守）](../../v10/dev-e2e-report.md)
+- [real-env 真实环境验证](../../v10/v10-real-env-verification.md)
+- [V10 P2 e2e（forked session 生产模拟）](../../audit/v10-p2/v10-p2-e2e-report.md)
 
 **第二轮（增量加固）**：
-- [D4 Helper 报告](./v10/d4-helper-report.md)
-- [D4-fix core 同步报告](./v10/d4-fix-core-sync-report.md)
-- [C3 Trust Anchor 报告](./v10/c3-trust-anchor-report.md)
-- [A3+A4 评价报告](./v10/a3-a4-review-report.md)
-- [C5 Trust Anchor 修复报告](./v10/c5-trust-anchor-fix-report.md)
-- [A5 验证报告](./v10/a5-verify-report.md)
+- [D4 Helper 报告](../../v10/d4-helper-report.md)
+- [D4-fix core 同步报告](../../v10/d4-fix-core-sync-report.md)
+- [C3 Trust Anchor 报告](../../v10/c3-trust-anchor-report.md)
+- [A3+A4 评价报告](../../v10/a3-a4-review-report.md)
+- [C5 Trust Anchor 修复报告](../../v10/c5-trust-anchor-fix-report.md)
+- [A5 验证报告](../../v10/a5-verify-report.md)
 
 **上游方法论**：
 - [commander-methodology v1.2](./commander-methodology.md)
-- [note.md（V4-V9 加固原始决策）](./note.md)
+- [note.md（V4-V9 加固原始决策）](../../note.md)
 
 ---
 

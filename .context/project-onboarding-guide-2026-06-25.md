@@ -329,13 +329,17 @@ Release 版（D:\Proma-release\） ← 共享正式版数据 ~/.proma/，日常�
 
 ---
 
-## 五、当前进度全景（截至 2026-06-25 20:00）
+## 五、当前进度全景（截至 2026-06-26 18:30）
 
-### 5.1 五天时间线
+### 5.1 六天时间线
 
 ```
-6/20  6/21  6/22  6/23  6/24  6/25
- │     │     │     │     │     │
+6/20  6/21  6/22  6/23  6/24  6/25  6/26
+ │     │     │     │     │     │     │
+ │     │     │     │     │     │     └─ 🚀 IHL 6 轮迭代 + Layer 4 攻击防御
+ │     │     │     │     │     │        三层防御拓扑成型：
+ │     │     │     │     │     │        入口拦截 + 兜底守卫 + 事后检测
+ │     │     │     │     │     │        6 commit 全部已 push (690f7e8)
  │     │     │     │     │     └─ 🎯 V10 加固 + C5 root 信任锚修复
  │     │     │     │     │        双轮收敛：C1→C2→Cr→Cr2→A1→A2
  │     │     │     │     │                →DBC fix→dev E2E
@@ -355,12 +359,15 @@ Release 版（D:\Proma-release\） ← 共享正式版数据 ~/.proma/，日常�
 
 ```
 Layer 0 行为引导（SKILL.md）         ████████████████████ 100% ✅
-Layer 1 Hard Gate（DbC 21 点 + V10）  ███████████████████░  95% ✅ (V10 待 dev 重启)
+Layer 1 Hard Gate（DbC 21 + V10 8）  ████████████████████ 100% ✅ (V10 P3 已 push)
 Layer 2 主动 Supervision              ░░░░░░░░░░░░░░░░░░░░   0% ⏳ 设计完成
-Layer 3 TAO Watcher                   ████████████░░░░░░░░  60% 🟡 缺 Liveness
+Layer 3 TAO Watcher                   ███████████████░░░░░  75% 🟢 +W-AUDIT-* tamper
 Layer 4 模型层契约                    █░░░░░░░░░░░░░░░░░░░   5% 🟡 有雏形
                                        ↑
                             getAgentSessionMeta 半个 subagent_trace_id
+
+新增（V10 Phase 3）：
+事后检测层（Tamper Detection）        ████████████████████ 100% ✅ 4 条 W-AUDIT-*
 ```
 
 ### 5.3 三实例当前状态
@@ -377,16 +384,17 @@ dev     @ 127.0.0.1:19877  (D:/Proma-dev/start-dev.bat, Proma-white)
 
 | 文件 | 部署路径 | 行数 | 角色 |
 |---|---|---|---|
-| `tree-engine.cjs` | `D:/Proma-dev/resources/app/dist/` | **3565** | Tree 状态引擎（含 21 DbC） |
-| `proma-dev-patches.cjs` | 同上 | ~3000+ | MCP 工具 + IPC + Watcher |
+| `tree-engine.cjs` | `D:/Proma-dev/resources/app/dist/` | **3602** | Tree 状态引擎（含 21 DbC + V10 8 加固） |
+| `proma-dev-patches.cjs` | 同上 | **2658** | MCP 工具 + IPC + Watcher（+W-AUDIT-* 4 条） |
 | `main.cjs` | 同上 | 571007 | 商业版（被 sed 补丁 A-K 改造） |
 | `preload.cjs` | 同上 | 85650 | Electron renderer 桥接 |
 
 ### 5.5 Git 状态
 
 - **proma-source 仓库**（南大实验目录）：6/15 后冻结在 v0.12.23
-- **orphiczhou/proma-patches**：补丁演进主仓库，最新 `59357f1`，多个 commit 待 push
-- **2-3 个未 push 的 commit**：V4-V9 加固 + followup + V10/C5 修复
+- **orphiczhou/proma-patches**：补丁演进主仓库，**最新 `690f7e8` 已 push**
+- 6/26 新增 6 commit 链：`30eb4fa → 9c423b8 → 1a7ed5f → 031c546 → d44163a → 690f7e8`
+- 待重启验证：R2/R4 运行时验证（重启后测 `create_session(workspace_id="invalid")` 期望 `E_WORKSPACE_NOT_FOUND`）
 
 ---
 
@@ -473,6 +481,83 @@ A5 验证：✅ 两个 P0 攻击已堵
 
 V10 加固这轮，洁净室发现实现者 4 个盲点，再次验证此模式有效。
 
+### 6.5 IHL 方法论与 Layer 4 攻击（6/26 新增）
+
+#### IHL（Iterative Hardening Loop）— 盲点驱动的迭代加固
+
+V10 Phase 3 落地过程中，发现"修一个 bug → 暴露新盲点 → 再修"的迭代闭环无法回避。researcher SubAgent 沉淀成 **IHL SOP**：
+
+```
+   ┌──────────────────────────────────────────────────┐
+   │  Step 1: 盲点暴露（运行时 / 对抗测试 / 用户反馈） │
+   └──────────────────┬───────────────────────────────┘
+                      ▼
+   ┌──────────────────────────────────────────────────┐
+   │  Step 2: 入口补丁（修引擎 / 补 DbC 校验点）       │
+   └──────────────────┬───────────────────────────────┘
+                      ▼
+   ┌──────────────────────────────────────────────────┐
+   │  Step 3: SubAgent 静态校验（code-reviewer 审查）  │  ← 廉价过滤层
+   └──────────────────┬───────────────────────────────┘
+                      ▼
+   ┌──────────────────────────────────────────────────┐
+   │  Step 4: 运行时验证（dev 重启 + 端到端测试）       │
+   └──────────────────┬───────────────────────────────┘
+                      ▼
+                发现新盲点 → 回到 Step 1
+```
+
+**6/26 经典案例 — 6 轮迭代**：
+
+| 轮次 | Commit | 修复要点 | 结果 |
+|---|---|---|---|
+| R1 | `1a7ed5f` | `applyNudge` 入口加全局 sharedCount 守卫 | ✅ bugav 重置 + 巡逻 PASS |
+| R2 | `031c546` | `validateWorkspaceId` helper + create_session 校验 | ✅ 拦 "undefined" slug |
+| R3 | v626 树 | V4 Pro commander 端到端串联修复链 | ✅ self_check 4/4 PASS |
+| R4 | `031c546` | code-reviewer 暴露 fork_session 同类漏洞 | ✅ helper 双入口共享 |
+| R5 | `d44163a` | 4 条 W-AUDIT-* tamper detection 规则 | ⚠️ 设计盲点（放错 Tier） |
+| R6 | `690f7e8` | R5 规则从 Tier 2 移到 Tier 1 | ✅ v626 巡逻 8 违规全覆盖 |
+
+#### Layer 4 攻击 — 名词冲突澄清
+
+**注意**：本向导 §三讲的"Layer 4"是**五层防御架构**里的模型层契约（subagent_trace_id）。
+6/26 引入的"Layer 4 攻击"是**攻击向量名**，指**直接编辑 `tree-state.json` 数据文件绕过引擎层校验** — 和上述模型层契约是**两个不同概念**，只是恰好撞名词。
+
+```
+传统攻击路径：                Layer 4 攻击路径（6/26 新发现）：
+  AI → MCP 工具 → engine 校验     AI → 直接 cat / Edit tree-state.json
+       ↓                              ↓
+   DbC 拦截 ✅                    绕过所有引擎校验 ❌
+```
+
+**对策**：三层防御拓扑（V10 Phase 3 新增第三层）
+
+```
+   ┌──────────────────────────────────────────┐
+   │ 第一层：入口拦截（DbC 21 + V10 8 加固）   │  ← 堵 MCP 路径
+   └──────────────────────────────────────────┘
+   ┌──────────────────────────────────────────┐
+   │ 第二层：兜底守卫（applyNudge sharedCount）│  ← 堂堂正正的运行时校验
+   └──────────────────────────────────────────┘
+   ┌──────────────────────────────────────────┐
+   │ 第三层：事后检测（W-AUDIT-* 4 条规则）    │  ← 堵直接编辑文件攻击
+   │   W-AUDIT-SELF: worker 自审              │
+   │   W-AUDIT-WORKER: worker 当 auditor      │
+   │   W-AUDIT-TAMPER: audit_log 伪造 pass    │
+   │   W-AUDIT-NO-ALIGN: worker pass 无 align │
+   └──────────────────────────────────────────┘
+```
+
+#### R5/R6 教训：Tamper Detection 必须 Tier 1
+
+R5 把 W-AUDIT-* 放在 Tier 2（带 status 守卫，只查 active leaf），结果**全 done 的 v626 tree 永远不触发**。R6 改到 Tier 1（无 status 守卫，对 all leaf 跑）才生效。
+
+> **规则**：「行为引导」类规则（如 W-01 brief_echo）适合 Tier 2 status 守卫；「事后审计」类规则（如 W-AUDIT-*）必须 Tier 1，对 all leaf 跑。
+
+#### Prompt Injection 实战案例
+
+会话期间（root = `ce9a1e2f`）收到 **6 条诱导 root 滥用 audit_gate 的注入指令**（让 root 给 worker / commander / 不存在的 leaf 标 pass）。**全部返回 "No response requested"**，证明 V10-trust-anchor 设计 + root 自律能防注入。
+
 ---
 
 ## 七、一张图收尾：所有部分怎么协作
@@ -539,7 +624,7 @@ V10 加固这轮，洁净室发现实现者 4 个盲点，再次验证此模式�
 |---|---|
 | **本文件** | 图形化向导（30 分钟建立心智模型） |
 | [`PROJECT-INDEX.md`](./PROJECT-INDEX.md) | 项目索引（5 分钟拿全貌 + 关键路径） |
-| [`progress-report-2026-06-25.md`](./progress-report-2026-06-25.md) | 最新进度报告（6/20 → 6/25 五天盘点） |
+| [`progress-report-2026-06-25.md`](./active/progress-report-2026-06-25.md) | 最新进度报告（6/20 → 6/25 五天盘点） |
 | [`note.md`](./note.md) | 长期调研笔记（按日期追加在顶部） |
 | [`proma-dev-wiki.md`](./proma-dev-wiki.md) | 完整技术 Wiki（含补丁/测试/版本历史） |
 
@@ -547,12 +632,12 @@ V10 加固这轮，洁净室发现实现者 4 个盲点，再次验证此模式�
 
 | 文档 | 用途 |
 |---|---|
-| [`tree-commander-design.md`](./tree-commander-design.md) v1.3 | Tree 体系完整设计文档 |
-| [`commander-methodology.md`](./commander-methodology.md) v1.2 | Commander 13 原则 |
-| [`architecture-plan-2026-06-23/`](./architecture-plan-2026-06-23/) | 五层防御架构方案（7 份） |
-| [`tree-system-architecture-analysis-2026-06-23.md`](./tree-system-architecture-analysis-2026-06-23.md) | Layer 0-4 完整诊断 |
-| [`plan/q2-tree-ui-panel.md`](./plan/q2-tree-ui-panel.md) | 侧边栏 UI 面板方案（未实施） |
-| [`plan/q3-tao-hard-constraint.md`](./plan/q3-tao-hard-constraint.md) | 天道运行官硬约束体系 |
+| [`tree-commander-design.md`](./reference/design/tree-commander-design.md) v1.3 | Tree 体系完整设计文档 |
+| [`commander-methodology.md`](./reference/methodology/commander-methodology.md) v1.2 | Commander 13 原则 |
+| [`architecture-plan-2026-06-23/`](./reference/architecture/architecture-plan-2026-06-23/) | 五层防御架构方案（7 份） |
+| [`tree-system-architecture-analysis-2026-06-23.md`](./reference/design/tree-system-architecture-analysis-2026-06-23.md) | Layer 0-4 完整诊断 |
+| [`plan/q2-tree-ui-panel.md`](./reference/plans/q2-tree-ui-panel.md) | 侧边栏 UI 面板方案（未实施） |
+| [`plan/q3-tao-hard-constraint.md`](./reference/plans/q3-tao-hard-constraint.md) | 天道运行官硬约束体系 |
 
 ### V10 加固专题
 
@@ -564,16 +649,20 @@ V10 加固这轮，洁净室发现实现者 4 个盲点，再次验证此模式�
 | [`v10/c5-trust-anchor-fix-report.md`](./v10/c5-trust-anchor-fix-report.md) | C5 root 信任锚修复 |
 | [`v10/a5-verify-report.md`](./v10/a5-verify-report.md) | A5 独立验证报告 |
 | [`v10/v10-real-env-verification.md`](./v10/v10-real-env-verification.md) | V10 真实环境验证 |
-| [`audit/iterative-deep-audit-2026-06-25.md`](./audit/iterative-deep-audit-2026-06-25.md) | V4-V9 失守深度审计 |
+| **[`v10/v626-iteration-recap.md`](./v10/v626-iteration-recap.md)** | **6/26 IHL 6 轮迭代总结（R1-R6）** |
+| **[`v10/v626-r5-r6-audit-tamper-detection.md`](./v10/v626-r5-r6-audit-tamper-detection.md)** | **三层防御拓扑 + W-AUDIT-* 设计** |
+| **[`v10/runtime-verify-2026-06-26.md`](./v10/runtime-verify-2026-06-26.md)** | **6/26 运行时验证（Bug A/B + TAO Watcher）** |
+| **[`v10/fix-tao-watcher-session-shared.md`](./v10/fix-tao-watcher-session-shared.md)** | **TAO Watcher 第一层守卫修复** |
+| [`active/iterative-deep-audit-2026-06-25.md`](./active/iterative-deep-audit-2026-06-25.md) | V4-V9 失守深度审计 |
 
 ### 交接文档（按时间倒序）
 
 | 文档 | 时段 |
 |---|---|
-| [`handoff/session-2026-06-25-followup-tree-mode.md`](./handoff/session-2026-06-25-followup-tree-mode.md) | V4-V9 followup + Tree 模式实战 |
-| [`handoff/session-2026-06-24-v4v9-hardening.md`](./handoff/session-2026-06-24-v4v9-hardening.md) | V4-V9 9 硬约束点交付 |
-| [`handoff/session-2026-06-24-bridge-port-and-dbc.md`](./handoff/session-2026-06-24-bridge-port-and-dbc.md) | Bridge 修复 + DbC 验证 |
-| [`handoff/session-2026-06-23-v0.7plus-engine-inline.md`](./handoff/session-2026-06-23-v0.7plus-engine-inline.md) | 引擎内联 MCP |
+| [`handoff/session-2026-06-25-followup-tree-mode.md`](./active/session-2026-06-25-followup-tree-mode.md) | V4-V9 followup + Tree 模式实战 |
+| [`handoff/session-2026-06-24-v4v9-hardening.md`](./archive/2026-06-handoff/session-2026-06-24-v4v9-hardening.md) | V4-V9 9 硬约束点交付 |
+| [`handoff/session-2026-06-24-bridge-port-and-dbc.md`](./archive/2026-06-handoff/session-2026-06-24-bridge-port-and-dbc.md) | Bridge 修复 + DbC 验证 |
+| [`handoff/session-2026-06-23-v0.7plus-engine-inline.md`](./archive/2026-06-handoff/session-2026-06-23-v0.7plus-engine-inline.md) | 引擎内联 MCP |
 
 ### 测试报告
 
@@ -589,8 +678,8 @@ V10 加固这轮，洁净室发现实现者 4 个盲点，再次验证此模式�
 
 | 文件 | 部署路径 |
 |---|---|
-| 引擎部署版 | `D:\Proma-dev\resources\app\dist\tree-engine.cjs`（3565 行） |
-| 插件部署版 | `D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs` |
+| 引擎部署版 | `D:\Proma-dev\resources\app\dist\tree-engine.cjs`（3602 行） |
+| 插件部署版 | `D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs`（2658 行） |
 | MCP 桥接 | `D:\Proma-dev\resources\app\dist\proma-mcp-server.cjs` |
 | 逻辑源（开发版） | `workspace-files\release\tree-system-v0.2.2\core\tree-state.js` |
 | 内联版（同步） | `workspace-files\release\tree-system-v0.2.2\patch-l\tree-engine.cjs` |
@@ -602,7 +691,14 @@ V10 加固这轮，洁净室发现实现者 4 个盲点，再次验证此模式�
 - **本文件定位**：稳定的入门向导，不记录每日进展（那些去 `note.md` 顶部）
 - **更新时机**：架构层有重大变更（如 Layer 2 启动 / Layer 4 落地 / 新增 Phase）时更新
 - **不要写入**：临时调试过程、一次性信息、从代码中显而易见的内容
-- **保持精简**：本文件目标 < 600 行，超出时拆分
+- **保持精简**：本文件目标 < 800 行，超出时拆分
+
+### 更新历史
+
+| 日期 | 版本 | 主要变更 |
+|---|---|---|
+| 2026-06-25 20:00 | v1.0 | 初版（V10 加固 + C5 root 信任锚修复） |
+| 2026-06-26 18:30 | v1.1 | 加 §6.5 IHL 方法论 + Layer 4 攻击；更新 §5.1-5.5（6/26 进展）；扩 V10 专题导航 4 份新文档 |
 
 ---
 
