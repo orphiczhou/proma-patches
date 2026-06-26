@@ -356,7 +356,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 830,
+      "nudge_count": 839,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.233Z",
@@ -7827,6 +7827,87 @@
           "suggest": "fork 一个 verify/audit worker 独立检查",
           "nudge_count": 830,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-26T05:53:20.333Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 831,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T05:55:59.494Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 832,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:00:59.267Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 833,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:05:59.490Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 834,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:10:59.924Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 835,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:14:49.904Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 836,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:19:47.862Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 837,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:24:47.948Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 838,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:29:47.871Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 839,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -14469,6 +14550,78 @@
           "pass": false,
           "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-26T05:53:20.333Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T05:55:59.494Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:00:59.267Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:05:59.490Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:10:59.924Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:14:49.904Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:19:47.862Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:24:47.948Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:29:47.871Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix-C-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
         }
       ]
     },
@@ -14610,7 +14763,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 820,
+      "nudge_count": 829,
       "nudge_log": [
         {
           "ts": "2026-06-23T00:57:07.337Z",
@@ -21991,6 +22144,87 @@
           "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
           "nudge_count": 820,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-26T05:53:20.292Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 821,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T05:55:59.452Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 822,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:00:59.235Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 823,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:05:59.455Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 824,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:10:59.884Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 825,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:14:49.863Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 826,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:19:47.833Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 827,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:24:47.921Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 828,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T06:29:47.840Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 829,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -28548,6 +28782,78 @@
         },
         {
           "ts": "2026-06-26T05:47:41.121Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T05:53:20.292Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T05:55:59.452Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:00:59.235Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:05:59.455Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:10:59.884Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:14:49.863Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:19:47.833Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:24:47.921Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix-E-test' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:29:47.840Z",
           "auditor": "tao-watcher-script",
           "rule_id": "R-03",
           "pass": false,

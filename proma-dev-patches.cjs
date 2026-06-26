@@ -171,6 +171,38 @@ function api() {
   return global.__proma__;
 }
 
+// V10 Phase 3 followup (cross-workspace hardening):
+// 校验 workspace_id 是否在 workspace 索引中合法. 用于 create_session + fork_session
+// 双入口拦截, 避免 slug "undefined" 孤儿 / 跨工作区漂移 / mcp__tree__* 失败.
+// 返回 {ok: true} 或 {ok: false, error: {...}}. best-effort: listAgentWorkspaces
+// 抛错时不阻断 (返回 ok=true 但 log 警告, 与 list_sessions 等 house style 一致).
+function validateWorkspaceId(workspaceId) {
+  if (!workspaceId) return { ok: true };  // 未指定, 走默认 fallback
+  // trim 防止 "   " 绕过
+  const trimmed = (typeof workspaceId === 'string') ? workspaceId.trim() : workspaceId;
+  if (!trimmed) return { ok: true };
+  let validIds = null;
+  try {
+    const workspaces = api().listAgentWorkspaces() || [];
+    validIds = new Set(workspaces.map(w => w.id));
+  } catch (e) {
+    log("validateWorkspaceId: listAgentWorkspaces failed, skip validation: " + (e && e.message));
+    return { ok: true };
+  }
+  if (validIds.has(trimmed)) return { ok: true, normalized: trimmed };
+  const validList = [...validIds].slice(0, 5).join(', ');
+  const total = validIds.size;
+  return {
+    ok: false,
+    error: {
+      code: 'E_WORKSPACE_NOT_FOUND',
+      msg: `workspace_id "${trimmed}" not in workspace index. Valid ids: ${validList}${total > 5 ? ` ...(${total} total)` : ''}. Use list_workspaces to see all.`,
+      help_hint: 'Use mcp__session__list_workspaces to list valid workspace ids.',
+      normalized: trimmed,
+    }
+  };
+}
+
 // ---- 7 个纯 handler（不依赖 sdk/zod，可在内部 MCP server 和 HTTP bridge 间共享）----
 function createToolHandlers(sourceSessionId) {
   return {
@@ -442,9 +474,19 @@ function createToolHandlers(sourceSessionId) {
         }
       }
 
+      // V10 Phase 3 followup (cross-workspace hardening, cross-workspace-tree-issue §五 P1):
+      // 校验 args.workspace_id 必须在 workspace 索引中合法. 之前直接透传, 导致
+      // commander 跨工作区建 session → slug "undefined" bug 孤儿 / 跨工作区漂移 /
+      // mcp__tree__* 工具失败. 运行时再现: GLM-5.2 v1 落 "undefined" slug → E_NO_TREES_DIR.
+      const wsCheck = validateWorkspaceId(args.workspace_id);
+      if (!wsCheck.ok) return jsonResult({ ok: false, error: wsCheck.error });
+      const workspaceId = wsCheck.normalized || args.workspace_id;
+      // 未指定 workspace_id 时不强制, createAgentSession 内部有 fallback, 加上
+      // findTreesDirForWorkspace 的 slug "undefined" fallback 保护 (V10 已修).
+
       try {
-        const meta = a.createAgentSession(args.title, args.channel_id, args.workspace_id, modelId);
-        log(`Session created: ${meta.id.slice(0, 8)} "${meta.title}" channel=${args.channel_id} model=${modelId}`);
+        const meta = a.createAgentSession(args.title, args.channel_id, workspaceId, modelId);
+        log(`Session created: ${meta.id.slice(0, 8)} "${meta.title}" channel=${args.channel_id} workspace=${workspaceId || '(default)'} model=${modelId}`);
         return jsonResult({
           session: {
             id: meta.id,
@@ -529,7 +571,14 @@ function createToolHandlers(sourceSessionId) {
         if (effectiveChannelId) updates.channelId = effectiveChannelId;
         const effectiveModelId = args.new_model_id || source.modelId;
         if (effectiveModelId) updates.modelId = effectiveModelId;
-        if (args.new_workspace_id) updates.workspaceId = args.new_workspace_id;
+        // V10 Phase 3 followup (cross-workspace hardening, 补 create_session 同类漏洞):
+        // fork_session 的 new_workspace_id 之前直接透传, 是 create_session 防御的
+        // 最直接绕过途径 (代码审计 SubAgent 发现). 共享 validateWorkspaceId helper.
+        if (args.new_workspace_id) {
+          const wsCheck = validateWorkspaceId(args.new_workspace_id);
+          if (!wsCheck.ok) return jsonResult({ ok: false, error: wsCheck.error });
+          updates.workspaceId = wsCheck.normalized || args.new_workspace_id;
+        }
 
         a.updateAgentSessionMeta(forked.id, updates);
         Object.assign(forked, updates);
