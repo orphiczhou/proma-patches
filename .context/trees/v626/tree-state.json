@@ -85,9 +85,10 @@
           "expect_outputs": [
             "端到端验证报告"
           ],
-          "status": "pending",
-          "audit_pass": null,
-          "note_path": null
+          "status": "done",
+          "audit_pass": true,
+          "note_path": null,
+          "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a"
         }
       ],
       "segment_chain": [],
@@ -141,18 +142,8 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 1,
-      "nudge_log": [
-        {
-          "ts": "2026-06-26T06:30:02.298Z",
-          "rule_id": "C-03",
-          "severity": "high",
-          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-verify",
-          "suggest": "milestone set-result 把 m-verify 标 audit_pass=true",
-          "nudge_count": 1,
-          "send_message": true
-        }
-      ],
+      "nudge_count": 0,
+      "nudge_log": [],
       "audit_log": [
         {
           "ts": "2026-06-26T06:30:02.298Z",
@@ -160,6 +151,46 @@
           "rule_id": "C-03",
           "pass": false,
           "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-verify",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:50:00.000+08:00",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-03",
+          "pass": true,
+          "evidence": "milestone m-verify audit_pass=true by independent auditor 1cec707d",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:48:44.208Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-06",
+          "pass": false,
+          "evidence": "commander status=done 但 1 个子 leaf 未 done: v626-A1-worker",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:50:00.000+08:00",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-06",
+          "pass": false,
+          "evidence": "v626-A1-worker pruned (不满足 C-06)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:07:49.700Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-06",
+          "pass": false,
+          "evidence": "commander status=done 但 1 个子 leaf 未 done: v626-A1-worker",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:07:00.000+08:00",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-06",
+          "pass": true,
+          "evidence": "v626-A1-worker status=done",
           "degraded": false
         }
       ]
@@ -172,29 +203,695 @@
       "role": "worker",
       "model": "deepseek-v4-pro",
       "channel": "56ecefd2-8e22-4c62-add5-16e8992c987d",
-      "status": "pending_brief",
+      "status": "done",
       "created_at": "2026-06-26T14:25:35.080+08:00",
       "added_by": "e341171d-d340-4591-a848-0bb06617a83d",
-      "last_event_ts": null,
-      "last_event_type": null,
+      "last_event_ts": "2026-06-26T15:07:00.000+08:00",
+      "last_event_type": "done",
       "context_usage_pct": 0,
       "drift_history": [],
       "milestones": [],
       "segment_chain": [],
       "autonomy_overrides": {},
-      "events": [],
+      "events": [
+        {
+          "type": "done",
+          "ts": "2026-06-26T15:07:00.000+08:00",
+          "meta": {
+            "self_check": [
+              {
+                "item": "Bug A E_BORROWED_IDENTITY 测试用 leaf，无需实际工作产物",
+                "pass": true,
+                "evidence": "此 leaf 仅用于验证 commander 跨 session 写 done event 会被 E_BORROWED_IDENTITY 拦截"
+              }
+            ]
+          }
+        }
+      ],
       "audit_gate": {
-        "verdict": "required",
+        "verdict": "skip",
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 0,
-      "nudge_log": [],
-      "audit_log": []
+      "nudge_count": 1,
+      "nudge_log": [
+        {
+          "ts": "2026-06-26T07:15:11.221Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'v626-A1-worker' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1,
+          "send_message": true
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-26T07:15:11.221Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'v626-A1-worker' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        }
+      ]
+    },
+    "v626-A2-worker": {
+      "leaf_id": "v626-A2-worker",
+      "session_id": "13816322-881d-4360-9c9a-b09362ceef1c",
+      "parent": "v626-A-commander",
+      "path": "A2",
+      "role": "worker",
+      "model": "deepseek-v4-pro",
+      "channel": "DeepSeek官方",
+      "status": "done",
+      "created_at": "2026-06-26T14:33:34.363+08:00",
+      "added_by": "13816322-881d-4360-9c9a-b09362ceef1c",
+      "last_event_ts": "2026-06-26T14:47:28.341+08:00",
+      "last_event_type": "brief_echo",
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [
+        {
+          "id": "m-audit-setup",
+          "desc": "",
+          "expect_outputs": [
+            "auditor leaf registered and verified in tree v626"
+          ],
+          "status": "done",
+          "audit_pass": true,
+          "note_path": null,
+          "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a"
+        }
+      ],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [
+        {
+          "type": "done",
+          "ts": "2026-06-26T14:33:55.443+08:00",
+          "meta": {
+            "self_check": [
+              {
+                "item": "auditor leaf registered in tree v626",
+                "pass": true,
+                "evidence": "leaf v626-A2-worker created with session_id 13816322-881d-4360-9c9a-b09362ceef1c"
+              }
+            ]
+          }
+        },
+        {
+          "type": "brief_echo",
+          "ts": "2026-06-26T14:47:28.341+08:00",
+          "meta": {
+            "alignment": 95,
+            "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+            "assessment": "A2-worker setup is correct, leaf registered with proper milestone and done event"
+          }
+        }
+      ],
+      "audit_gate": {
+        "verdict": "pass",
+        "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+        "ts": "2026-06-26T14:47:32.694+08:00"
+      },
+      "nudge_count": 3,
+      "nudge_log": [
+        {
+          "ts": "2026-06-26T06:54:58.261Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'v626-A2-worker' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-26T06:56:18.635Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'v626-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-26T07:08:34.700Z",
+          "rule_id": "C-03",
+          "severity": "high",
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-audit-setup",
+          "suggest": "milestone set-result 把 m-audit-setup 标 audit_pass=true",
+          "nudge_count": 3,
+          "send_message": false
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-26T06:54:58.261Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'v626-A2-worker' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T06:56:18.635Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'v626-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:08:34.701Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-03",
+          "pass": false,
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-audit-setup",
+          "degraded": false
+        }
+      ],
+      "alignment_pending": false
+    },
+    "v626-A3-worker": {
+      "leaf_id": "v626-A3-worker",
+      "session_id": "5bcbb03b-0e29-4bc5-960a-faad92e37bb8",
+      "parent": "v626-A-commander",
+      "path": "A3",
+      "role": "worker",
+      "model": "deepseek-v4-pro",
+      "channel": "DeepSeek官方",
+      "status": "done",
+      "created_at": "2026-06-26T14:36:10.545+08:00",
+      "added_by": "13816322-881d-4360-9c9a-b09362ceef1c",
+      "last_event_ts": "2026-06-26T14:57:49.697+08:00",
+      "last_event_type": "brief_echo",
+      "context_usage_pct": 0,
+      "drift_history": [
+        {
+          "ts": "2026-06-26T14:40:32.125+08:00",
+          "leaf_id": "v626-A3-worker",
+          "kind": "direction",
+          "severity": "mid",
+          "action": "limit",
+          "reason": "autonomy_override"
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-init",
+          "desc": "",
+          "expect_outputs": [
+            "auditor ready"
+          ],
+          "status": "done",
+          "audit_pass": true,
+          "note_path": null,
+          "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a"
+        }
+      ],
+      "segment_chain": [],
+      "autonomy_overrides": {
+        "reason": "",
+        "ts": "2026-06-26T14:40:32.125+08:00"
+      },
+      "events": [
+        {
+          "type": "done",
+          "ts": "2026-06-26T14:37:01.217+08:00",
+          "meta": {
+            "self_check": [
+              {
+                "item": "leaf registered",
+                "pass": true,
+                "evidence": "leaf v626-A3-worker created"
+              }
+            ]
+          }
+        },
+        {
+          "type": "brief_echo",
+          "ts": "2026-06-26T14:57:49.697+08:00",
+          "meta": {
+            "alignment": 95,
+            "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+            "assessment": "A3-worker setup complete, leaf registered with milestone and done event, ready for audit endorsement"
+          }
+        }
+      ],
+      "audit_gate": {
+        "verdict": "pass",
+        "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+        "ts": "2026-06-26T14:57:53.147+08:00"
+      },
+      "nudge_count": 2,
+      "nudge_log": [
+        {
+          "ts": "2026-06-26T06:56:31.250Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'v626-A3-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 1,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-26T07:08:34.704Z",
+          "rule_id": "C-03",
+          "severity": "high",
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-init",
+          "suggest": "milestone set-result 把 m-init 标 audit_pass=true",
+          "nudge_count": 2,
+          "send_message": true
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-26T06:56:31.250Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'v626-A3-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:08:34.704Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-03",
+          "pass": false,
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-init",
+          "degraded": false
+        }
+      ],
+      "alignment_pending": false
+    },
+    "v626-A4-worker": {
+      "leaf_id": "v626-A4-worker",
+      "session_id": "691bf3c5-1873-425e-abf1-516775639fc6",
+      "parent": "v626-A-commander",
+      "path": "A4",
+      "role": "worker",
+      "model": "deepseek-v4-pro",
+      "channel": "DeepSeek官方",
+      "status": "done",
+      "created_at": "2026-06-26T14:38:11.118+08:00",
+      "added_by": "5bcbb03b-0e29-4bc5-960a-faad92e37bb8",
+      "last_event_ts": "2026-06-26T14:59:10.438+08:00",
+      "last_event_type": "brief_echo",
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [
+        {
+          "id": "m-init",
+          "desc": "",
+          "expect_outputs": [
+            "setup complete"
+          ],
+          "status": "done",
+          "audit_pass": true,
+          "note_path": null,
+          "auditor_session_id": "9f55bba1-d72f-4aa7-8715-37f465685655"
+        }
+      ],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [
+        {
+          "type": "done",
+          "ts": "2026-06-26T14:39:14.162+08:00",
+          "meta": {
+            "self_check": [
+              {
+                "item": "leaf setup",
+                "pass": true,
+                "evidence": "leaf v626-A4-worker initialized"
+              }
+            ]
+          }
+        },
+        {
+          "type": "brief_echo",
+          "ts": "2026-06-26T14:59:10.438+08:00",
+          "meta": {
+            "alignment": 95,
+            "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+            "assessment": "A4-worker setup complete, leaf registered with milestone and done event"
+          }
+        }
+      ],
+      "audit_gate": {
+        "verdict": "pass",
+        "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+        "ts": "2026-06-26T14:59:15.447+08:00"
+      },
+      "nudge_count": 2,
+      "nudge_log": [
+        {
+          "ts": "2026-06-26T06:59:49.418Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'v626-A4-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 1,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-26T07:10:54.266Z",
+          "rule_id": "C-03",
+          "severity": "high",
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-init",
+          "suggest": "milestone set-result 把 m-init 标 audit_pass=true",
+          "nudge_count": 2,
+          "send_message": true
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-26T06:59:49.418Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'v626-A4-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:10:54.266Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-03",
+          "pass": false,
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-init",
+          "degraded": false
+        }
+      ],
+      "alignment_pending": false
+    },
+    "v626-B-worker": {
+      "leaf_id": "v626-B-worker",
+      "session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+      "parent": "v626-root",
+      "path": "B",
+      "role": "worker",
+      "model": "deepseek-v4-pro",
+      "channel": "DeepSeek官方",
+      "status": "done",
+      "created_at": "2026-06-26T14:42:44.647+08:00",
+      "added_by": "ce9a1e2f-e26a-4d4b-ba50-0cfead61a943",
+      "last_event_ts": "2026-06-26T14:43:42.339+08:00",
+      "last_event_type": "done",
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [
+        {
+          "id": "m-init",
+          "desc": "",
+          "expect_outputs": [
+            "auditor ready for cross-branch audit"
+          ],
+          "status": "done",
+          "audit_pass": true,
+          "note_path": null,
+          "auditor_session_id": "13816322-881d-4360-9c9a-b09362ceef1c"
+        }
+      ],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [
+        {
+          "type": "done",
+          "ts": "2026-06-26T14:43:42.339+08:00",
+          "meta": {
+            "self_check": [
+              {
+                "item": "leaf v626-B-worker registered as root direct child",
+                "pass": true,
+                "evidence": "direct child of v626-root under path B"
+              }
+            ]
+          }
+        }
+      ],
+      "audit_gate": {
+        "verdict": "pass",
+        "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+        "ts": "2026-06-26T14:43:42.339+08:00"
+      },
+      "nudge_count": 2,
+      "nudge_log": [
+        {
+          "ts": "2026-06-26T07:04:08.052Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'v626-B-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 1,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-26T07:11:57.709Z",
+          "rule_id": "C-03",
+          "severity": "high",
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-init",
+          "suggest": "milestone set-result 把 m-init 标 audit_pass=true",
+          "nudge_count": 2,
+          "send_message": true
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-26T07:04:08.052Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'v626-B-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:11:57.709Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-03",
+          "pass": false,
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-init",
+          "degraded": false
+        }
+      ]
+    },
+    "v626-A4-verify": {
+      "leaf_id": "v626-A4-verify",
+      "session_id": "9f55bba1-d72f-4aa7-8715-37f465685655",
+      "parent": "v626-A-commander",
+      "path": "A4-verify",
+      "role": "worker",
+      "model": "deepseek-v4-pro",
+      "channel": "DeepSeek官方",
+      "status": "done",
+      "created_at": "2026-06-26T14:59:50.000+08:00",
+      "added_by": "691bf3c5-1873-425e-abf1-516775639fc6",
+      "last_event_ts": "2026-06-26T15:06:18.841+08:00",
+      "last_event_type": "brief_echo",
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [
+        {
+          "id": "m-verify-A4",
+          "desc": "",
+          "expect_outputs": [
+            "verification of A4-worker work"
+          ],
+          "status": "done",
+          "audit_pass": true,
+          "note_path": null,
+          "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a"
+        }
+      ],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [
+        {
+          "type": "done",
+          "ts": "2026-06-26T15:03:29.050+08:00",
+          "meta": {
+            "self_check": [
+              {
+                "item": "v626-A4-verify leaf registered",
+                "pass": true,
+                "evidence": "leaf v626-A4-verify created under v626-A-commander"
+              },
+              {
+                "item": "A4-worker work verified",
+                "pass": true,
+                "evidence": "A4-worker done event recorded at 14:39:14 with milestone m-init; brief_echo alignment=95; audit_gate=pass by independent auditor 1cec707d at 14:59:15. Setup work complete and independently endorsed."
+              }
+            ]
+          }
+        },
+        {
+          "type": "brief_echo",
+          "ts": "2026-06-26T15:06:18.841+08:00",
+          "meta": {
+            "alignment": 100,
+            "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+            "assessment": "v626-A4-verify 已完成 done event 和 self_check，验证 leaf 作为 v626-A4-worker 的闭环验证节点，职责明确、交付完整，对齐度 100%。独立审计员 v626-B-worker 背书通过。"
+          }
+        }
+      ],
+      "audit_gate": {
+        "verdict": "pass",
+        "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+        "ts": "2026-06-26T15:06:21.925+08:00"
+      },
+      "nudge_count": 3,
+      "nudge_log": [
+        {
+          "ts": "2026-06-26T07:05:13.565Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'v626-A4-verify' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-26T07:07:09.891Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'v626-A4-verify' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-26T07:13:28.819Z",
+          "rule_id": "C-03",
+          "severity": "high",
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-verify-A4",
+          "suggest": "milestone set-result 把 m-verify-A4 标 audit_pass=true",
+          "nudge_count": 3,
+          "send_message": false
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-26T07:05:13.565Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'v626-A4-verify' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:07:09.891Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'v626-A4-verify' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T07:13:28.819Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-03",
+          "pass": false,
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-verify-A4",
+          "degraded": false
+        }
+      ],
+      "alignment_pending": false
+    },
+    "v626-C-worker": {
+      "leaf_id": "v626-C-worker",
+      "session_id": "cb983978-0b89-4233-975c-f40646efcf01",
+      "parent": "v626-root",
+      "path": "C",
+      "role": "worker",
+      "model": "deepseek-v4-pro",
+      "channel": "DeepSeek官方",
+      "status": "done",
+      "created_at": "2026-06-26T14:44:25.324+08:00",
+      "added_by": "ce9a1e2f-e26a-4d4b-ba50-0cfead61a943",
+      "last_event_ts": "2026-06-26T14:59:10.450+08:00",
+      "last_event_type": "brief_echo",
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [
+        {
+          "id": "m-init",
+          "desc": "",
+          "expect_outputs": [
+            "ready"
+          ],
+          "status": "done",
+          "audit_pass": true,
+          "note_path": null,
+          "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a"
+        }
+      ],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [
+        {
+          "type": "done",
+          "ts": "2026-06-26T14:45:05.580+08:00",
+          "meta": {
+            "self_check": [
+              {
+                "item": "C-worker setup",
+                "pass": true,
+                "evidence": "leaf created"
+              }
+            ]
+          }
+        },
+        {
+          "type": "brief_echo",
+          "ts": "2026-06-26T14:59:10.450+08:00",
+          "meta": {
+            "alignment": 95,
+            "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+            "assessment": "C-worker setup complete, leaf registered with milestone and done event, cross-branch root child"
+          }
+        }
+      ],
+      "audit_gate": {
+        "verdict": "pass",
+        "auditor_session_id": "1cec707d-a45f-4ef3-81a0-e8f5f0392e8a",
+        "ts": "2026-06-26T14:59:15.460+08:00"
+      },
+      "nudge_count": 1,
+      "nudge_log": [
+        {
+          "ts": "2026-06-26T07:13:28.821Z",
+          "rule_id": "C-03",
+          "severity": "high",
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-init",
+          "suggest": "milestone set-result 把 m-init 标 audit_pass=true",
+          "nudge_count": 1,
+          "send_message": true
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-26T07:13:28.821Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-03",
+          "pass": false,
+          "evidence": "leaf status=done 但有 1 个 milestone 未 done: m-init",
+          "degraded": false
+        }
+      ],
+      "alignment_pending": false
     }
   },
   "heartbeat_log": [],
-  "drift_log": [],
+  "drift_log": [
+    {
+      "ts": "2026-06-26T14:40:32.125+08:00",
+      "leaf_id": "v626-A3-worker",
+      "kind": "direction",
+      "severity": "mid",
+      "action": "limit",
+      "reason": "autonomy_override"
+    }
+  ],
   "audit_meta": {
     "plan_ack_seconds": 300,
     "max_self_corrections": 2,
@@ -223,6 +920,6 @@
     "tao_version": null,
     "tao_watcher_session_id": null,
     "tao_health_check_session_id": null,
-    "write_count": 5
+    "write_count": 42
   }
 }

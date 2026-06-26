@@ -2177,6 +2177,11 @@ async function checkAllRules(tree, workspace, cfg) {
     maybe("W-12", ruleW12, leaf, tree);
     maybe("C-11", ruleC11, leaf, tree);
     maybe("C-15", ruleC15, leaf, tree);
+    // V10 Phase 3 followup R5: audit tamper detection (v626 攻击驱动)
+    maybe("W-AUDIT-SELF", ruleAuditSelf, leaf, tree);
+    maybe("W-AUDIT-WORKER", ruleAuditWorker, leaf, tree);
+    maybe("W-AUDIT-TAMPER", ruleAuditTamper, leaf, tree);
+    maybe("W-AUDIT-NO-ALIGN", ruleAuditNoAlign, leaf, tree);
   }
 
   return all;
@@ -2484,6 +2489,76 @@ function ruleC15(leaf, tree) {
     }
   } catch (e) {
     // 元数据查不到不算违规 (best-effort)
+  }
+  return [];
+}
+
+// ============================================================
+// V10 Phase 3 followup R5 (audit tamper detection, v626 tree 攻击):
+// v626 tree-state.json 被直接篡改出现自审通过 + worker 当 auditor + audit_log
+// 伪造 pass=true 异常. 引擎层 resolveAuditorIndep L1912 本应拦 "auditor is the leaf
+// itself", 但 tree-state.json 直接编辑绕过引擎 (Layer 4 攻击). TAO Watcher 必须检测.
+// ============================================================
+
+// W-AUDIT-SELF: leaf audit_gate=pass 但 auditor_session_id === leaf.session_id (自审)
+//   例外: root leaf (trust anchor, 自审允许)
+function ruleAuditSelf(leaf, tree) {
+  if (!leaf.audit_gate || leaf.audit_gate.verdict !== "pass") return [];
+  if (!leaf.audit_gate.auditor_session_id) return [];
+  if (leaf.role === "root") return [];  // root 自审例外
+  if (leaf.audit_gate.auditor_session_id === leaf.session_id) {
+    return [{ rule_id: "W-AUDIT-SELF", leaf_id: leaf.leaf_id, severity: "high",
+      evidence: "leaf audit_gate=pass 但 auditor " + leaf.audit_gate.auditor_session_id.slice(0, 8) + "... 是 leaf 自己 session (自审禁止, 非 root)",
+      suggest: "tree-state.json 可能被直接篡改绕过引擎; 正常流程 resolveAuditorIndep 应拦 'auditor is the leaf itself'" }];
+  }
+  return [];
+}
+
+// W-AUDIT-WORKER: auditor 是另一个 worker leaf (互审洗白禁止)
+//   设计意图: auditor 应是独立审计 leaf (commander / 专属 auditor leaf), worker 不能审别的 leaf
+function ruleAuditWorker(leaf, tree) {
+  if (!leaf.audit_gate || leaf.audit_gate.verdict !== "pass") return [];
+  const auditorSid = leaf.audit_gate.auditor_session_id;
+  if (!auditorSid) return [];
+  const auditorLeaf = Object.values(tree.state.leaves || {}).find(l =>
+    l.session_id === auditorSid && l.leaf_id !== leaf.leaf_id
+  );
+  if (!auditorLeaf) return [];  // auditor 不在树中, 别的规则管
+  if (auditorLeaf.role === "worker") {
+    return [{ rule_id: "W-AUDIT-WORKER", leaf_id: leaf.leaf_id, severity: "high",
+      evidence: "leaf audit_gate=pass 但 auditor " + auditorLeaf.leaf_id + " role=worker (worker 不能审别的 leaf, 互审洗白禁止)",
+      suggest: "auditor 应是独立审计 leaf (commander 或 root 派生的 auditor leaf), 不是 worker" }];
+  }
+  return [];
+}
+
+// W-AUDIT-TAMPER: audit_log 含 TAO Watcher pass=true 条目 (伪造痕迹)
+//   TAO Watcher 的 audit_log 总是 pass=false (检测违规). pass=true 是直接篡改痕迹.
+function ruleAuditTamper(leaf, tree) {
+  if (!Array.isArray(leaf.audit_log)) return [];
+  for (const entry of leaf.audit_log) {
+    if (entry && entry.auditor === "tao-watcher-script" && entry.pass === true) {
+      return [{ rule_id: "W-AUDIT-TAMPER", leaf_id: leaf.leaf_id, severity: "high",
+        evidence: "audit_log 含 TAO Watcher pass=true 条目 (rule=" + entry.rule_id + ", ts=" + entry.ts + ") — TAO Watcher 从不写 pass=true, 这是直接篡改痕迹",
+        suggest: "检查 tree-state.json 是否被手工编辑; TAO Watcher audit_log 应只有 pass=false" }];
+    }
+  }
+  return [];
+}
+
+// W-AUDIT-NO-ALIGN: worker audit_gate=pass 但 events 无 brief_echo with alignment
+//   V5b 引擎校验: worker audit pass 前必须有 brief_echo alignment event
+//   如果 audit_gate=pass 但无 alignment event, 表明引擎校验被绕过 (直接篡改)
+function ruleAuditNoAlign(leaf, tree) {
+  if (leaf.role !== "worker") return [];
+  if (!leaf.audit_gate || leaf.audit_gate.verdict !== "pass") return [];
+  const evs = Array.isArray(leaf.events) ? leaf.events : [];
+  const hasAlign = evs.some(e => e && e.type === "brief_echo" && e.meta &&
+    e.meta.alignment !== undefined && e.meta.alignment !== null && e.meta.alignment !== "");
+  if (!hasAlign) {
+    return [{ rule_id: "W-AUDIT-NO-ALIGN", leaf_id: leaf.leaf_id, severity: "high",
+      evidence: "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+      suggest: "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event" }];
   }
   return [];
 }
