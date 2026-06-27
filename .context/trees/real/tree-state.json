@@ -8204,9 +8204,2394 @@
           "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
           "nudge_count": 888,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-26T11:53:05.339Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 889,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T11:57:59.836Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 890,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:03:04.448Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 891,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:08:00.571Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 892,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:13:05.832Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 893,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:18:04.670Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 894,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:23:05.408Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 895,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:28:05.498Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 896,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:33:03.959Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 897,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:38:06.969Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 898,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:43:06.910Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 899,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:48:07.217Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 900,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:53:10.417Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 901,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:58:08.701Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 902,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:03:07.718Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 903,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:08:09.237Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 904,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:13:08.876Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 905,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:18:07.658Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 906,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:23:08.514Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 907,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:28:07.889Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 908,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:33:03.505Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 909,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:38:03.155Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 910,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:43:02.977Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 911,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:48:02.849Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 912,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:53:03.135Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 913,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:58:03.092Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 914,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:03:02.554Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 915,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:08:02.647Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 916,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:13:03.300Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 917,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:18:02.938Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 918,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:23:03.151Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 919,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:28:03.140Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 920,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:33:03.365Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 921,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:38:03.281Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 922,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:43:02.696Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 923,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:48:02.862Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 924,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:53:02.737Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 925,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:58:03.177Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 926,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:03:02.804Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 927,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:08:02.727Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 928,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:13:03.221Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 929,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:18:03.112Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 930,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:23:03.136Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 931,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:28:02.946Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 932,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:33:03.102Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 933,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:38:03.018Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 934,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:43:02.822Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 935,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:48:03.203Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 936,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:53:02.980Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 937,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:58:03.165Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 938,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:03:03.100Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 939,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:08:03.075Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 940,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:13:02.998Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 941,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:18:03.135Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 942,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:23:03.527Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 943,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:28:03.352Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 944,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:33:03.563Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 945,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:38:03.551Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 946,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:43:03.359Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 947,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:48:03.204Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 948,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:53:03.450Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 949,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:58:03.429Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 950,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:03:03.495Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 951,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:08:03.431Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 952,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:13:03.590Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 953,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:18:03.420Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 954,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:23:03.730Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 955,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:28:03.231Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 956,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:33:04.106Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 957,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:38:03.781Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 958,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:43:04.909Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 959,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:48:03.879Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 960,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:53:04.644Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 961,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:58:04.655Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 962,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:03:04.680Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 963,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:08:04.706Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 964,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:13:05.018Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 965,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:18:04.685Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 966,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:23:05.018Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 967,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:28:05.473Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 968,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:33:04.671Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 969,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:38:04.525Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 970,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:43:05.221Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 971,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:48:04.936Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 972,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:53:04.575Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 973,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:58:04.479Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 974,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:03:03.937Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 975,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:08:04.541Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 976,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:13:04.216Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 977,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:18:04.631Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 978,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:23:04.831Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 979,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:28:03.929Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 980,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:33:05.314Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 981,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:38:05.175Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 982,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:43:05.179Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 983,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:48:05.433Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 984,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:53:04.960Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 985,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:58:05.099Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 986,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:03:05.682Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 987,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:08:05.204Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 988,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:13:04.922Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 989,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:18:05.793Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 990,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:23:05.421Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 991,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:28:04.751Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 992,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:33:05.021Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 993,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:38:04.967Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 994,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:43:05.606Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 995,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:48:05.842Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 996,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:53:05.657Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 997,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:58:05.667Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 998,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:03:05.673Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 999,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:08:05.039Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1000,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:13:05.461Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1001,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:18:04.740Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1002,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:23:04.728Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1003,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:28:04.406Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1004,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:33:04.151Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1005,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:38:04.262Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1006,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:43:04.543Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1007,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:48:04.949Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1008,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:53:04.641Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1009,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:58:04.662Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1010,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:03:04.921Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1011,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:08:04.425Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1012,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:13:04.764Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1013,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:18:04.882Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1014,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:23:04.868Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1015,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:28:05.030Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1016,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:33:04.590Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1017,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:38:05.012Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1018,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:43:05.084Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1019,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:48:04.802Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1020,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:53:05.074Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1021,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:58:05.227Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1022,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:03:04.972Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1023,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:08:05.020Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1024,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:13:05.628Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1025,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:18:04.920Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1026,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:23:05.575Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1027,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:28:05.644Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1028,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:33:05.454Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1029,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:38:05.773Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1030,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:43:06.412Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1031,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:48:06.553Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1032,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:53:05.740Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1033,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:58:05.637Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1034,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:03:05.749Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1035,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:08:05.611Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1036,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:13:05.707Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1037,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:18:05.837Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1038,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:23:06.610Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1039,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:28:05.699Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1040,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:33:06.585Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1041,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:38:05.820Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1042,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:43:06.383Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1043,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:48:06.569Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1044,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:53:05.970Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1045,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:58:06.385Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1046,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:03:06.351Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1047,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:08:05.744Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1048,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:13:05.666Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1049,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:18:06.037Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1050,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:23:07.358Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1051,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:28:06.844Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1052,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:33:02.783Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1053,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:38:04.731Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1054,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:43:02.414Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1055,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:48:03.294Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1056,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:53:02.800Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1057,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:58:05.853Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1058,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:03:05.842Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1059,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:08:05.800Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1060,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:13:02.882Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1061,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:18:03.205Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1062,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:23:03.924Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1063,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:28:04.737Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1064,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:33:03.464Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1065,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:38:03.062Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1066,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:43:03.187Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1067,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:48:03.706Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1068,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:53:02.705Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1069,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:58:02.797Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1070,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:03:02.970Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1071,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:08:02.982Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1072,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:13:03.402Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1073,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:18:03.319Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1074,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:23:02.939Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1075,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:28:02.902Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1076,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:33:02.927Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1077,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:38:02.893Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1078,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:43:02.997Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1079,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:48:03.000Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1080,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:53:03.142Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1081,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:58:03.137Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1082,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:03:03.064Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1083,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:08:03.044Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1084,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:13:03.654Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1085,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:18:03.285Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1086,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:23:03.511Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1087,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:28:03.307Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1088,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:33:03.265Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1089,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:38:04.817Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1090,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:43:05.679Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1091,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:48:06.807Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1092,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:53:07.552Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1093,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:58:06.401Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1094,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:03:14.293Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1095,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:08:13.137Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1096,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:13:04.576Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1097,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:18:05.902Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1098,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:23:03.866Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1099,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:28:03.971Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1100,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:33:03.790Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1101,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:38:04.288Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1102,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:43:04.477Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1103,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:48:03.849Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1104,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:53:03.992Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1105,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:58:04.050Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1106,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:00:07.820Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1107,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:05:09.721Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1108,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:10:07.949Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1109,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:15:16.134Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1110,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:20:05.920Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1111,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:25:05.296Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1112,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:30:05.401Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1113,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:35:06.046Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1114,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:40:05.145Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1115,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:45:05.955Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1116,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:50:06.115Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1117,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:55:05.658Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1118,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:00:06.154Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1119,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:05:05.788Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1120,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:10:07.890Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1121,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:15:07.065Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1122,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:20:05.998Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1123,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:25:05.183Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1124,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:30:05.114Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1125,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:35:05.217Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1126,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:40:04.936Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1127,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:45:04.957Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1128,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:50:05.048Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1129,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:55:05.043Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1130,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:00:05.075Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1131,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:05:05.135Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1132,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:10:05.132Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1133,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:15:05.123Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1134,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:20:06.117Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1135,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:25:05.736Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1136,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:30:05.570Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1137,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:33:59.163Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1138,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:38:57.228Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1139,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:43:57.112Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1140,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:48:57.451Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1141,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:53:58.322Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1142,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:59:02.792Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1143,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T09:03:58.237Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1144,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T09:08:59.117Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1145,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T09:13:58.543Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1146,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T09:18:58.834Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1147,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:37:59.462Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1148,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:43:00.800Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1149,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:48:00.948Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1150,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:53:18.677Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1151,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:58:14.935Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1152,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:03:03.806Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 1153,
+          "send_message": false
         }
       ],
-      "nudge_count": 888,
+      "nudge_count": 1153,
       "audit_log": [
         {
           "ts": "2026-06-21T12:27:39.435Z",
@@ -15306,6 +17691,2126 @@
         },
         {
           "ts": "2026-06-26T11:48:05.676Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T11:53:05.339Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T11:57:59.836Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:03:04.449Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:08:00.572Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:13:05.832Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:18:04.670Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:23:05.408Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:28:05.498Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:33:03.959Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:38:06.969Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:43:06.910Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:48:07.217Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:53:10.417Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:58:08.701Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:03:07.719Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:08:09.237Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:13:08.876Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:18:07.658Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:23:08.514Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:28:07.889Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:33:03.505Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:38:03.155Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:43:02.977Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:48:02.849Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:53:03.135Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:58:03.092Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:03:02.554Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:08:02.647Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:13:03.300Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:18:02.938Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:23:03.151Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:28:03.140Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:33:03.365Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:38:03.281Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:43:02.696Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:48:02.862Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:53:02.737Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:58:03.177Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:03:02.804Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:08:02.727Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:13:03.221Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:18:03.112Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:23:03.136Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:28:02.946Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:33:03.102Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:38:03.018Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:43:02.822Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:48:03.203Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:53:02.980Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:58:03.165Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:03:03.100Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:08:03.075Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:13:02.998Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:18:03.135Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:23:03.527Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:28:03.352Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:33:03.563Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:38:03.551Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:43:03.359Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:48:03.204Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:53:03.450Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:58:03.429Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:03:03.495Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:08:03.431Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:13:03.590Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:18:03.420Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:23:03.730Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:28:03.231Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:33:04.106Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:38:03.781Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:43:04.909Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:48:03.879Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:53:04.644Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:58:04.655Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:03:04.680Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:08:04.706Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:13:05.018Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:18:04.685Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:23:05.018Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:28:05.473Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:33:04.671Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:38:04.525Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:43:05.221Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:48:04.936Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:53:04.575Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:58:04.479Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:03:03.937Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:08:04.541Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:13:04.216Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:18:04.631Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:23:04.831Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:28:03.929Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:33:05.314Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:38:05.175Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:43:05.180Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:48:05.433Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:53:04.960Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:58:05.099Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:03:05.682Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:08:05.204Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:13:04.922Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:18:05.793Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:23:05.421Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:28:04.751Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:33:05.021Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:38:04.967Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:43:05.606Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:48:05.842Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:53:05.657Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:58:05.667Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:03:05.673Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:08:05.039Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:13:05.461Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:18:04.740Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:23:04.728Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:28:04.406Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:33:04.151Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:38:04.262Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:43:04.543Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:48:04.949Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:53:04.641Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:58:04.662Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:03:04.921Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:08:04.425Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:13:04.764Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:18:04.882Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:23:04.868Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:28:05.030Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:33:04.590Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:38:05.012Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:43:05.084Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:48:04.802Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:53:05.074Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:58:05.227Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:03:04.972Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:08:05.020Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:13:05.628Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:18:04.920Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:23:05.575Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:28:05.644Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:33:05.454Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:38:05.773Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:43:06.412Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:48:06.553Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:53:05.740Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:58:05.637Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:03:05.749Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:08:05.611Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:13:05.707Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:18:05.837Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:23:06.610Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:28:05.699Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:33:06.585Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:38:05.820Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:43:06.383Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:48:06.569Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:53:05.970Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:58:06.385Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:03:06.351Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:08:05.744Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:13:05.666Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:18:06.037Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:23:07.358Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:28:06.844Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:33:02.783Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:38:04.731Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:43:02.414Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:48:03.294Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:53:02.800Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:58:05.853Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:03:05.842Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:08:05.800Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:13:02.882Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:18:03.205Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:23:03.924Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:28:04.737Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:33:03.464Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:38:03.062Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:43:03.187Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:48:03.706Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:53:02.705Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:58:02.797Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:03:02.970Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:08:02.982Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:13:03.402Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:18:03.319Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:23:02.939Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:28:02.902Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:33:02.927Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:38:02.893Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:43:02.997Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:48:03.000Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:53:03.142Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:58:03.137Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:03:03.064Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:08:03.044Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:13:03.654Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:18:03.285Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:23:03.511Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:28:03.307Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:33:03.265Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:38:04.817Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:43:05.679Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:48:06.807Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:53:07.552Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:58:06.401Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:03:14.293Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:08:13.137Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:13:04.576Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:18:05.902Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:23:03.866Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:28:03.971Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:33:03.790Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:38:04.288Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:43:04.477Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:48:03.849Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:53:03.992Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:58:04.050Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:00:07.820Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:05:09.721Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:10:07.949Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:15:16.134Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:20:05.920Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:25:05.296Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:30:05.401Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:35:06.046Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:40:05.145Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:45:05.955Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:50:06.115Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:55:05.658Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:00:06.154Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:05:05.788Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:10:07.890Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:15:07.065Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:20:05.998Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:25:05.183Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:30:05.114Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:35:05.217Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:40:04.936Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:45:04.957Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:50:05.048Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:55:05.043Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:00:05.075Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:05:05.135Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:10:05.132Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:15:05.123Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:20:06.117Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:25:05.736Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:30:05.570Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:33:59.163Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:38:57.228Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:43:57.112Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:48:57.451Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:53:58.322Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:59:02.792Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T09:03:58.237Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T09:08:59.117Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T09:13:58.543Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T09:18:58.834Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:37:59.462Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:43:00.800Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:48:00.948Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:53:18.677Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:58:14.935Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'real-F1-polish' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:03:03.806Z",
           "auditor": "tao-watcher-script",
           "rule_id": "R-03",
           "pass": false,

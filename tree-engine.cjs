@@ -72,6 +72,41 @@ const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
 const ROLE_ENUM = ['root', 'commander', 'worker'];
 
+// V9+ Phase 4 (R2 P0 / B9 修复): nudge rule_id 白名单 + role→rule 适用性表。
+//   背景：R1 洁净室 B9 暴露 — tree_nudge_append 接受任意 rule_id 字符串（含 "INVALID-RULE-99"），
+//   无白名单 / role 校验 / 洪水限制。攻击向量：恶意 automation 可通过洪水 nudge 制造噪音、
+//   误导 root 决策；树级规则可无差别施加给任意 role。
+//   修复：维护白名单（与 patches.cjs TAO Watcher 规则集同步）+ 每条规则绑定适用 role 列表。
+//   规则集来源：patches.cjs 行 1937+（Tier1 R-*）、1944+（Tier2 C-*）、2005+（Tier3 W-*）、
+//   2148+（W-AUDIT-*）。
+const NUDGE_RULE_WHITELIST = {
+  // Tier 1 — 全局规则（root/commander/worker 通用）
+  'R-01': ['root', 'commander', 'worker'],
+  'R-03': ['root', 'commander', 'worker'],
+  'R-04': ['root', 'commander', 'worker'],
+  'R-05': ['root', 'commander', 'worker'],
+  'R-06': ['root', 'commander', 'worker'],
+  // Tier 2 — Commander 角色规则
+  'C-02': ['commander'],
+  'C-03': ['commander'],
+  'C-06': ['commander'],
+  'C-11': ['commander'],
+  'C-13': ['commander'],
+  'C-15': ['commander'],
+  // Tier 3 — Worker 角色规则
+  'W-01': ['worker'],
+  'W-08': ['worker'],
+  'W-11': ['worker'],
+  'W-12': ['worker'],
+  // Tier 4 — 审计事后检测（W-AUDIT-* 仅 worker；审计员 P1 反馈：patches.cjs 中挂在 worker 分支）
+  'W-AUDIT-SELF': ['worker'],
+  'W-AUDIT-WORKER': ['worker'],
+  'W-AUDIT-TAMPER': ['worker'],
+  'W-AUDIT-NO-ALIGN': ['worker'],
+};
+// V9+ Phase 4 (R2 P0 / B9): 洪水限制 — 单 leaf 累计 nudge 上限（与 V10 7-strike auto-prune 协同）
+const NUDGE_FLOOD_LIMIT_PER_LEAF = 20;
+
 // 错误码 (附录 A.1)
 const E_LOCK_TIMEOUT = 'E_LOCK_TIMEOUT';
 const E_TREE_NOT_FOUND = 'E_TREE_NOT_FOUND';
@@ -115,9 +150,19 @@ const E_TS_IN_FUTURE = 'E_TS_IN_FUTURE';                // V10-timestamp-monoton
 const E_TS_NOT_MONOTONIC = 'E_TS_NOT_MONOTONIC';        // V10-timestamp-monotonic: ts 早于上一条 event
 const E_LEAF_AUTO_PRUNED = 'E_LEAF_AUTO_PRUNED';        // V10-nudge-escalation: nudge_count>=7 强制 pruned
 const E_STATUS_EVENT_MISMATCH = 'E_STATUS_EVENT_MISMATCH'; // V10-status-event-sync: status/event 不同步
+// L2-root-cause (层2 身份校验根治): session_id 格式合法但不是真实存在的 Agent session。
+//   堵根因A — 旧校验只查 UUID 格式从不校验 session 是否真实存在，任意合规格式 UUID 都能注册成树成员/auditor。
+//   详见 workspace-files/.context/plan/layer2-tree-engine-design.md §三方案A + §四UUID映射表。
+const E_SESSION_NOT_ALIVE = 'E_SESSION_NOT_ALIVE';
 
 // v0.2.2: 真实 MCP session_id 格式校验（UUID v1-v5 不区分版本）
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// V9+ Phase 5 (R3 P0 / D2-B1 修复): 占位 UUID 模式（00000000-0000-0000-0000-XXXXXXXXXXXX）
+//   dbc-spec/zombie 等金标准测试用此类 UUID 走"直接 JSON 写入"路径，对应 zombie leaf 场景。
+//   cmdLeafAdd 入口校验 added_by 时跳过占位 UUID，避免误伤历史 migrate 数据。
+//   与 collectValidateIssues 行 2312 的局部 PLACEHOLDER_UUID_PATTERN 同模式（模块顶层以便复用）。
+const PLACEHOLDER_UUID_PATTERN_TOP = /^00000000-0000-0000-0000-[0-9]{12}$/;
 
 // V10-uuid-format-strict: 严格 UUID 校验，拒绝全 0/全 f/空/null/非 UUID 字符串。
 //   spec §三 V10-uuid-format-strict 字面要求 v4（version=4, variant=8/9/a/b），但金标准测试
@@ -134,6 +179,49 @@ function isValidStrictUuidV4(u) {
   if (!UUID_RE.test(u)) return false;                // 必须是 UUID 格式（v1-v5 均可）
   if (FORBIDDEN_UUIDS.has(u.toLowerCase())) return false; // 拒全 0/全 f
   return true;
+}
+
+// L2-root-cause: 入口写入校验（throw 风格 + 拒占位前缀 + 真实性校验）。用于所有 cmdXxx 写入入口。
+//   D1-a verifier 优先：checkSessionAlive 返回 ok=true（真实 / bypass-error）→ 放行并跳过占位前缀检查
+//   （金标准占位前缀 UUID 靠测试注入的 mock verifier 放行，UUID 常量零改动）。
+//   ok=false 且无 bypass → verifier 明确说不真实 → throw E_SESSION_NOT_ALIVE（根因A根治）。
+//   bypass-no-verifier（CLI/未注入）→ 退化为严格格式，拒占位前缀（堵 CLI 占位伪造）。
+//   注：assertMcpEntrySessionId / checkSessionAlive 均为函数声明（提升），运行时调用时模块已加载完毕。
+function assertMcpEntrySessionId(sid, field) {
+  const f = field || 'session_id';
+  if (typeof sid !== 'string' || !sid) {
+    throw new TreeStateError(E_INVALID_UUID_STRICT, `${f} is empty or not a string`);
+  }
+  if (!UUID_RE.test(sid)) {
+    throw new TreeStateError(E_INVALID_UUID_STRICT, `${f} "${sid}" is not a valid UUID`);
+  }
+  if (FORBIDDEN_UUIDS.has(sid.toLowerCase())) {
+    throw new TreeStateError(E_INVALID_UUID_STRICT, `${f} "${sid}" is forbidden (all-zero/all-broadcast)`);
+  }
+  const alive = checkSessionAlive(sid);
+  // D1-a verifier 优先（三态分支）：
+  //   ① verifier 真实确认(ok=true 且无 bypass) → 放行，跳过占位前缀检查（金标准占位 UUID 靠 mock 放行）。
+  //   ② verifier 明确拒绝(ok=false 且无 bypass) → throw E_SESSION_NOT_ALIVE（根因A根治）。
+  //   ③ bypass(no-verifier=CLI / verifier-error=best-effort) → 退化为严格格式，拒占位前缀（堵 CLI 占位伪造）。
+  if (alive.ok && !alive.bypass) return true;
+  if (alive.ok === false && !alive.bypass) {
+    throw new TreeStateError(E_SESSION_NOT_ALIVE, `${f} "${sid}" is not a live Agent session (session does not exist). Use a real session_id from create_session/fork_session.`);
+  }
+  // bypass 分支：退化为严格格式，拒占位前缀（堵 CLI/未注入路径的占位伪造）
+  if (PLACEHOLDER_UUID_PATTERN_TOP.test(sid)) {
+    throw new TreeStateError(E_INVALID_UUID_STRICT, `${f} "${sid}" is a placeholder UUID (00000000-...); real Agent session required (no verifier injected — CLI/legacy mode rejects placeholder UUIDs).`);
+  }
+  return true;
+}
+
+// L2-root-cause: validate 只读校验（return boolean，允许占位前缀，不调 verifier）。
+//   兼容历史 migrate 数据 + 金标准 zombie leaf。全 0/全 f 仍返回 false（比旧 UUID_RE 更严）。
+function assertValidatePathSessionId(sid) {
+  if (typeof sid !== 'string' || !sid) return false;
+  if (sid === PENDING_ROOT) return true;              // root 过渡标记，validate 放行
+  if (!UUID_RE.test(sid)) return false;
+  if (FORBIDDEN_UUIDS.has(sid.toLowerCase())) return false;
+  return true;                                        // 允许占位前缀（兼容历史/金标准 zombie）
 }
 // 根 leaf 在无真实 session_id 时的过渡标记（validate 仅产生 warning，需通过 leaf set-session 修正）
 const PENDING_ROOT = 'PENDING_ROOT';
@@ -212,6 +300,7 @@ const ERROR_TO_HELP = {
   E_TS_NOT_MONOTONIC:         'v10_constraints',          // V10-timestamp-monotonic
   E_LEAF_AUTO_PRUNED:         'nudge_escalation',         // V10-nudge-escalation
   E_STATUS_EVENT_MISMATCH:    'v10_constraints',          // V10-status-event-sync
+  E_SESSION_NOT_ALIVE:        'session_liveness',         // L2-root-cause: session 不真实存在
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -253,6 +342,45 @@ function assertEnum(value, enumArr, label, errCode) {
       code,
       `${label} "${value}" not in allowed enum [${enumArr.join(', ')}]`
     );
+  }
+}
+
+// V9+ Phase 4 (R2 P0): expect_outputs 路径安全校验共享函数。
+//   背景：R1 洁净室 B12 暴露 — V9 守卫仅在 cmdLeafSetStatus(done) 时校验路径，
+//   攻击者可先用 milestone_add / event_append 注入 "/etc/passwd"、"..\\..\.." 等恶意路径，
+//   再走 done 才被拦截，但恶意路径已持久化到 tree-state.json，存在路径遍历读系统文件风险。
+//   修复：在 expect_outputs 入库前（任何接受该字段的入口）即时校验。
+//   规则：① 必须是非空字符串 ② 禁止绝对路径 ③ 禁止 .. 路径遍历 ④ 规范化后不能逃逸 deliverables/
+function assertSafeExpectOutputs(outputs, context) {
+  if (outputs === undefined || outputs === null) return;
+  if (!Array.isArray(outputs)) {
+    throw new TreeStateError(
+      E_SCHEMA_INVALID,
+      `${context}: expect_outputs must be an array, got ${typeof outputs}`
+    );
+  }
+  for (let i = 0; i < outputs.length; i++) {
+    const p = outputs[i];
+    if (typeof p !== 'string' || p.length === 0) {
+      throw new TreeStateError(
+        E_DELIVERABLE_MISSING,
+        `${context}: expect_outputs[${i}] must be a non-empty string, got ${p === null ? 'null' : typeof p}`
+      );
+    }
+    if (path.isAbsolute(p)) {
+      throw new TreeStateError(
+        E_DELIVERABLE_MISSING,
+        `${context}: expect_outputs[${i}] "${p}" must be a relative path under deliverables/ (absolute paths forbidden — system files cannot masquerade as work products)`
+      );
+    }
+    // 规范化后检测 .. 遍历（同时覆盖 Windows 反斜杠 \ 和 POSIX 正斜杠 /）
+    const normalized = path.normalize(p).replace(/\\/g, '/');
+    if (normalized === '..' || normalized.startsWith('../') || normalized.includes('/../')) {
+      throw new TreeStateError(
+        E_DELIVERABLE_MISSING,
+        `${context}: expect_outputs[${i}] "${p}" contains path traversal (.. forbidden — must stay under deliverables/)`
+      );
+    }
   }
 }
 
@@ -664,22 +792,20 @@ async function cmdLeafAdd(args) {
     );
   }
 
-  // v0.2.2-修复#4: session_id 必须是合法 UUID（堵住 CLI 手动注入占位符）
-  if (!UUID_RE.test(session_id)) {
-    throw new TreeStateError(
-      E_SCHEMA_INVALID,
-      `session_id "${session_id}" is not a valid UUID. Leaves must be created with real MCP session IDs from fork_session or create_session.`
-    );
-  }
+  // v0.2.2-修复#4 + L2-root-cause: session_id 必须是合法 UUID 且真实存在（堵 CLI 占位符 + 伪造 session）。
+  //   assertMcpEntrySessionId: 格式 + 拒占位前缀 + verifier 真实性校验（根因A根治）。
+  assertMcpEntrySessionId(session_id, 'session_id');
 
-  // v0.2.2-修复#4: 非 root leaf 必须传 added_by（操作者追溯链）
+  // v0.2.2-修复#4 + L2-root-cause: 非 root leaf 必须传 added_by（操作者追溯链）且真实存在。
+  //   assertMcpEntrySessionId: 格式 + 拒占位前缀 + verifier 真实性校验（根因A根治）。
   if (role !== 'root') {
-    if (!added_by || !UUID_RE.test(added_by)) {
+    if (!added_by) {
       throw new TreeStateError(
         E_SCHEMA_INVALID,
-        'added_by (operator session_id) is required for non-root leaves and must be a valid UUID'
+        'added_by (operator session_id) is required for non-root leaves'
       );
     }
+    assertMcpEntrySessionId(added_by, 'added_by');
   }
 
   // 1. 命名校验
@@ -714,6 +840,43 @@ async function cmdLeafAdd(args) {
         E_DUPLICATE_SESSION_ID,
         `session_id "${session_id}" already used by leaf "${sessionConflict.leaf_id}". Each session can only register one leaf per tree.`
       );
+    }
+
+    // V9+ Phase 5 (R3 P0 / D2-B1 修复): added_by 事前校验
+    //   失守根因：R2 洁净室 D2-B1 暴露 — tree_leaf_add 接受任意 UUID 作为 added_by，
+    //   仅 tree_validate 事后检测 added_by_not_in_tree。恶意 worker 可伪造 commander 身份添加 leaf。
+    //   修复：参考 cmdEventAppend 的 Bug A 修复（行 1584）+ resolveAuditorIndep 的 root 扩展（行 1978+），
+    //   事前校验 added_by 必须满足以下任一：
+    //   ① 是树内某个 leaf 的 session_id（合法操作者，通常是 commander 或 root）
+    //   ② 是 root 的 added_by（向后兼容历史数据，root 自创建无父）
+    //   额外禁止：worker 不能担任 added_by（worker 是原子叶，无权添加子 leaf）
+    //   金标准兼容：dbc-spec/zombie 等测试用占位 UUID（00000000-0000-0000-0000-000000000001），
+    //   走"直接 JSON 写入"路径，cmdLeafAdd 路径不应被占位 UUID 影响 —— 但 cmdLeafAdd 是 MCP 入口，
+    //   不会有占位 UUID 流入（金标准测试用直接 fs.writeFileSync 绕过 cmdLeafAdd）。这里跳过占位 UUID
+    //   仅作为防御性兜底，避免误伤历史 migrate 数据。
+    if (role !== 'root' && added_by) {
+      // L2-root-cause: 占位前缀跳过已移除 —— 占位/伪造 UUID 由入口 assertMcpEntrySessionId（verifier）统一拦截。
+      //   verifier 未注入(CLI)时 assertMcpEntrySessionId 已拒占位前缀，到这里 added_by 必为真实 session；
+      //   verifier 注入(金标准 mock)时占位 UUID 靠 mock 放行，此处查树内 leaf 存在性（root session 必在树内）。
+      const addedByLeaf = Object.values(state.leaves).find((l) => l.session_id === added_by);
+      if (!addedByLeaf) {
+        // 也允许 root leaf 的 added_by（历史 root 数据可能 added_by 自指或为占位）
+        const rootLeaf = Object.values(state.leaves).find(
+          (l) => l.parent === null && l.role === 'root'
+        );
+        const isRootAddedBy = rootLeaf && rootLeaf.added_by === added_by;
+        if (!isRootAddedBy) {
+          throw new TreeStateError(
+            E_BORROWED_IDENTITY,
+            `leaf_add rejected: added_by "${added_by}" not found as any leaf session in tree (possible forged identity). added_by must be the session_id of an existing leaf (typically commander or root). [D2-B1]`
+          );
+        }
+      } else if (addedByLeaf.role === 'worker') {
+        throw new TreeStateError(
+          E_BORROWED_IDENTITY,
+          `leaf_add rejected: added_by "${added_by}" maps to leaf "${addedByLeaf.leaf_id}" with role=worker (workers cannot add child leaves — only root/commander can). [D2-B1]`
+        );
+      }
     }
 
     if (parent !== null) {
@@ -1237,12 +1400,8 @@ async function cmdLeafSetSession(args) {
   assertTreeExists(tree_id);
   if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
   if (!new_session_id) throw new TreeStateError(E_SCHEMA_INVALID, 'new_session_id is required');
-  if (!UUID_RE.test(new_session_id)) {
-    throw new TreeStateError(
-      E_SCHEMA_INVALID,
-      `new_session_id "${new_session_id}" is not a valid UUID`
-    );
-  }
+  // L2-root-cause: new_session_id 必须合法且真实存在（堵 CLI 占位 + 伪造 session）。
+  assertMcpEntrySessionId(new_session_id, 'new_session_id');
 
   let result = null;
   await withLock(tree_id, () => {
@@ -1345,6 +1504,10 @@ async function cmdMilestoneAdd(args) {
   if (input.expect_outputs !== undefined && !Array.isArray(input.expect_outputs)) {
     throw new TreeStateError(E_SCHEMA_INVALID, 'milestone.expect_outputs must be an array');
   }
+  // V9+ Phase 4 (R2 P0 / B12 修复): milestone add 时即时校验 expect_outputs 路径安全。
+  //   失守根因：V9 守卫只在 set-status=done 时校验，攻击者可先 add 恶意路径再触发 done
+  //   才被拦截，但恶意路径已持久化。修复：在 add 入口即时拦截绝对路径 + 路径遍历。
+  assertSafeExpectOutputs(input.expect_outputs, `milestone_add "${input.id}"`);
 
   let result = null;
   await withLock(tree_id, () => {
@@ -1451,6 +1614,14 @@ async function cmdEventAppend(args, callerSessionId) {
 
   if (!opts.json) throw new TreeStateError(E_SCHEMA_INVALID, '--json is required');
   const meta = parseJsonArg(opts.json, 'event meta');
+
+  // V9+ Phase 4 (R2 P0 / B12 修复): event append 时即时校验 meta.expect_outputs 路径安全。
+  //   攻击向量：通过 event meta 携带 expect_outputs 数组注入 "/etc/passwd" 等系统路径，
+  //   绕过 V9 守卫（仅 set-status=done 时检查 milestone.expect_outputs）。
+  //   修复：在 event meta 解析后立即校验 meta.expect_outputs（如果存在）。
+  if (meta && meta.expect_outputs !== undefined) {
+    assertSafeExpectOutputs(meta.expect_outputs, `event_append type="${opts.type}" meta.expect_outputs`);
+  }
 
   // V10-timestamp-monotonic: 接受调用方传入的 --ts（用于回填/测试/历史重放），未传时用 nowIso()。
   //   spec §三 V10-timestamp-monotonic 要求 cmdEventAppend 校验 ts 不能早于 created_at、不能在未来、
@@ -1888,10 +2059,49 @@ function resolveAuditorIndep(state, leaf, auditorSessionId) {
   if (leaf.role === 'root' && auditorSessionId === leaf.session_id) {
     return null;  // root 自审放行（必须显式传 root 自己的 session_id,不允许 null）
   }
+
+  // V9+ Phase 4 (R2 P1 / Auditor 死锁修复): root leaf 可担任任意非 root leaf 的 auditor。
+  //   失守根因：worker 占满 node_budget 后无法创建独立 auditor leaf（创建新 leaf 触发
+  //   E_TREE_NODE_BUDGET_EXCEEDED），但 worker 又必须通过 audit_gate 才能 done，
+  //   而 audit_gate 要求独立 auditor —— 形成"鸡生蛋"死锁。
+  //   R1 洁净室 C 系列建议：让 root 作为全局 trust anchor 显式打破死锁。
+  //   设计权衡：
+  //   ① 仅 root leaf（parent=null + role='root'）能触发，commander/worker 无此特权
+  //   ② 必须显式传 auditor_session_id === root.session_id（与 cmdAuditGate caller 校验协同）
+  //   ③ root 是 trust chain 起点，已有自审特权；扩展为 root 可审任意非 root leaf 是自然延伸
+  //   ④ 不破坏"独立 auditor"语义（root 独立于所有 worker/commander，是不可质疑的信任源）
+  //   审计员 P0 反馈修复：return null 前必须校验 root leaf 自身状态（status/events），
+  //     防止 root 被注入后一键给所有 worker 背书 pass（绕过 V10-auditor-active）。
+  //     要求：root status 必须非 archived/pruned（活跃），且至少有 1 个 event（已开展工作）。
+  if (leaf.role !== 'root' && auditorSessionId) {
+    const rootLeaf = Object.values(state.leaves).find(
+      (l) => l.parent === null && l.role === 'root' && l.session_id === auditorSessionId
+    );
+    if (rootLeaf && rootLeaf.leaf_id !== leaf.leaf_id) {
+      // root 自身最低状态校验（审计员 P0 反馈：堵 root 被注入后一键背书）
+      if (rootLeaf.status === 'archived' || rootLeaf.status === 'pruned') {
+        return `root leaf "${rootLeaf.leaf_id}" status="${rootLeaf.status}" (must be active/done to serve as auditor; archived/pruned root cannot endorse)`;
+      }
+      if (!Array.isArray(rootLeaf.events) || rootLeaf.events.length === 0) {
+        return `root leaf "${rootLeaf.leaf_id}" events empty (root must have ≥1 event before endorsing others — minimum activity guard)`;
+      }
+      return null;  // root 担任非 root leaf 的 auditor，放行（trust anchor 死锁修复）
+    }
+  }
+
   if (!auditorSessionId) return 'auditor_session_id is null';
   // V10-uuid-format-strict: 严格 UUID v4（version=4 + variant 位）。
   if (!isValidStrictUuidV4(auditorSessionId)) {
     return `auditor_session_id "${auditorSessionId}" is not a strict UUID v4 (rejected: must be v4, non-empty, non-zero, non-broadcast)`;
+  }
+  // L2-root-cause: 真实性校验（return 风格，保持 resolveAuditorIndep 的 issue 语义，D3 决策）。
+  //   verifier 明确拒绝 → return problem 字符串 → cmdAuditGate/cmdMilestoneSetResult 统一 throw E_AUDITOR_NOT_INDEPENDENT
+  //   （错误码不变，兼容 dbc-spec V2_FORGED 等断言；verifier 未注入/异常 → bypass 不阻断）。
+  {
+    const alive = checkSessionAlive(auditorSessionId);
+    if (!alive.ok && !alive.bypass) {
+      return `auditor_session_id "${auditorSessionId}" is not a live Agent session (does not exist)`;
+    }
   }
   if (leaf.added_by && auditorSessionId === leaf.added_by) return 'auditor=added_by (self-audit forbidden)';
   // Bug B 修复：auditor session → leaf 解析时 fallthrough 逻辑
@@ -2045,7 +2255,8 @@ function collectValidateIssues(state) {
   for (const id of leafIds) {
     const leaf = leaves[id];
     if (leaf.role === 'root') {
-      if (leaf.session_id !== PENDING_ROOT && !UUID_RE.test(leaf.session_id)) {
+      // L2-root-cause: validate 只读校验（允许占位前缀兼容历史，拒全0/全f；PENDING_ROOT 放行）
+      if (!assertValidatePathSessionId(leaf.session_id)) {
         issues.push({
           type: 'root_session_not_real',
           leaf_id: id,
@@ -2070,7 +2281,8 @@ function collectValidateIssues(state) {
       });
       continue;
     }
-    if (!UUID_RE.test(addedBy)) {
+    // L2-root-cause: validate 只读校验（允许占位前缀兼容历史，拒全0/全f）
+    if (!assertValidatePathSessionId(addedBy)) {
       issues.push({
         type: 'added_by_invalid',
         leaf_id: id,
@@ -2180,6 +2392,70 @@ function collectValidateIssues(state) {
         leaf_id: id,
         detail: `status="done" but no 'done' event in events[] (cmdLeafSetStatus V10 gate should have blocked this; legacy data needs migrate).`
       });
+    }
+  }
+
+  // V9+ Phase 4 (R2 P0 / B5): audit_log 伪造检测（W-AUDIT-TAMPER 专用校验项）。
+  //   失守根因：R1 洁净室 B5 暴露 — 直接 JSON 篡改 tree-state.json 可注入合规格式 audit_log 条目
+  //   （auditor_session_id 不存在于 leaves 中），仅被通用 alignment/status 检出，缺专用校验。
+  //   修复：新增 audit_log_integrity 检查项，对每个 leaf.audit_log 条目交叉验证：
+  //   ① auditor_session_id 必须在 leaves 中存在（堵伪造 UUID）
+  //   ② auditor leaf role 不能是 worker（worker 不能担任 auditor — W-AUDIT-WORKER 关联）
+  //   ③ 数值一致性（total = passed + failed，results.length = total）
+  //   金标准兼容（审计员 P0 反馈）：dbc-spec/audit-attacks 等金标准测试用占位 UUID
+  //   （00000000-0000-0000-0000-000000000001 等）走"直接 JSON 写入"路径，对应 zombie leaf
+  //   场景。这种历史数据非攻击，跳过校验以避免破坏金标准。
+  // L2-root-cause: 占位跳过已移除（#13/#14）—— 占位 UUID 真实性由写入时 assertMcpEntrySessionId + verifier 保证。
+  //   validate 只做 assertValidatePathSessionId 格式校验 + 树内 leaf 存在性交叉校验（下方）。
+  //   伪造 auditor 即便绕过写入直接篡改 JSON，validate 也能报 audit_log_integrity（树内无对应 leaf）。双面冲突消除。
+  const sessionToLeafMap = new Map();
+  for (const id of leafIds) {
+    const l = leaves[id];
+    if (l && l.session_id) sessionToLeafMap.set(l.session_id, l);
+  }
+  for (const id of leafIds) {
+    const leaf = leaves[id];
+    const auditLog = Array.isArray(leaf.audit_log) ? leaf.audit_log : [];
+    for (let i = 0; i < auditLog.length; i++) {
+      const entry = auditLog[i];
+      if (!entry || typeof entry !== 'object') continue;
+      const auditorSession = entry.auditor_session_id;
+      // L2-root-cause: 占位跳过已移除 —— 统一走树内 leaf 存在性交叉校验（①）。
+      // ① auditor_session_id 必须在 leaves 中存在
+      const auditorLeaf = auditorSession ? sessionToLeafMap.get(auditorSession) : null;
+      if (!auditorLeaf) {
+        issues.push({
+          type: 'audit_log_integrity',
+          leaf_id: id,
+          detail: `audit_log[${i}].auditor_session_id "${auditorSession}" not found as any leaf session in tree (possible W-AUDIT-TAMPER: forged audit_log entry injected via direct JSON tampering).`
+        });
+        continue;
+      }
+      // ② auditor leaf role 不能是 worker（worker 无资格担任 auditor）
+      if (auditorLeaf.role === 'worker') {
+        issues.push({
+          type: 'audit_log_integrity',
+          leaf_id: id,
+          detail: `audit_log[${i}].auditor_session_id "${auditorSession}" maps to leaf "${auditorLeaf.leaf_id}" with role=worker (workers cannot serve as auditors — related to W-AUDIT-WORKER).`
+        });
+      }
+      // ③ 数值一致性（如果 entry 同时含 total/passed/failed 字段）
+      if (typeof entry.total === 'number' && typeof entry.passed === 'number' && typeof entry.failed === 'number') {
+        if (entry.passed + entry.failed !== entry.total) {
+          issues.push({
+            type: 'audit_log_integrity',
+            leaf_id: id,
+            detail: `audit_log[${i}] numeric inconsistency: passed(${entry.passed}) + failed(${entry.failed}) != total(${entry.total}). Possible tampering.`
+          });
+        }
+        if (Array.isArray(entry.results) && entry.results.length !== entry.total) {
+          issues.push({
+            type: 'audit_log_integrity',
+            leaf_id: id,
+            detail: `audit_log[${i}] numeric inconsistency: results.length(${entry.results.length}) != total(${entry.total}). Possible tampering.`
+          });
+        }
+      }
     }
   }
 
@@ -2403,10 +2679,9 @@ async function cmdAuditAppend(args) {
   //   C1 只在 audit_gate 路径（resolveAuditorIndep 入口）加了严格校验，audit_append 路径完全漏掉，导致
   //   Cr 洁净室发现 7/7 UUID 攻击全放行（空串、null、'not-uuid'、伪造合法 UUID、self session、全 f、全 0）。
   //   spec §三 V10-uuid-format-strict + V10-numeric-consistency 中 cmdAuditAppend 应包含此校验。
-  if (!isValidStrictUuidV4(entry.auditor_session_id)) {
-    throw new TreeStateError(E_INVALID_UUID_STRICT,
-      `audit_append rejected: auditor_session_id "${entry.auditor_session_id}" not strict UUID v4 (must be v4, non-empty, non-zero, non-broadcast)`);
-  }
+  // L2-root-cause: auditor_session_id 必须合法且真实存在（堵伪造 auditor 写 audit_log，根因A根治）。
+  //   旧 isValidStrictUuidV4 只查格式，任意合规格式 UUID 都能写 audit_log；现加 verifier 真实性校验。
+  assertMcpEntrySessionId(entry.auditor_session_id, 'auditor_session_id');
 
   // M2: total/passed/failed 必须是整数（spec §18.3）
   for (const k of ['total', 'passed', 'failed']) {
@@ -2485,6 +2760,21 @@ async function cmdAuditAppend(args) {
         `audit_append rejected: auditor_session_id "${entry.auditor_session_id}" is the target leaf itself (self-audit forbidden)`);
     }
 
+    // V9+ Phase 5 (R3 P0 / D2-R3 修复): auditor 角色检查 — 拒绝 worker 担任 auditor
+    //   失守根因：R2 洁净室 D2-R3 暴露 — cmdAuditAppend 仅校验 auditor 存在 + 非自身，
+    //   允许任意非自身 leaf 担任 auditor，包括 worker。worker 可通过 API 路径冒充 auditor
+    //   给其他 leaf 写 audit_log（B5 跨 leaf 注入）。
+    //   audit_log_integrity 的 role===worker 检查只在 tree_validate 时报告 issue（事后），
+    //   不在入口拦截，导致攻击发生时返回 ok:true。
+    //   修复：cmdAuditAppend 入口直接拒绝 worker 担任 auditor，与 audit_log_integrity 第 ② 项对齐。
+    //   worker 是原子叶，无审计资格；只有 root/commander 可以为其他 leaf 背书审计结果。
+    if (auditorLeaf.role === 'worker') {
+      throw new TreeStateError(
+        E_AUDITOR_NOT_INDEPENDENT,
+        `audit_append rejected: auditor_session_id "${entry.auditor_session_id}" maps to leaf "${auditorLeaf.leaf_id}" with role=worker (workers cannot serve as auditors — only root/commander can endorse others). [D2-R3]`
+      );
+    }
+
     if (!Array.isArray(leaf.audit_log)) leaf.audit_log = [];
     const logEntry = Object.assign({ ts: nowIso() }, entry);
     leaf.audit_log.push(logEntry);
@@ -2503,6 +2793,9 @@ async function cmdNudgeAppend(args) {
   // V10-nudge-escalation: nudge_count 阈值升级 —— 3→medium, 5→high, 7→强制 pruned。
   //   spec §三 V10-nudge-escalation：把"nudge_count 累加但不升级"升级为"强制升级 + 7 次自动 prune"。
   //   失守案例：失忆 leaf 被反复 nudge 168 次仍 active（spec 失守点#5）。
+  // V9+ Phase 4 (R2 P0 / B9 修复): rule_id 白名单 + role→rule 适用性 + 洪水限制。
+  //   失守根因：原 cmdNudgeAppend 接受任意 rule_id 字符串（含 "INVALID-RULE-99"），
+  //   无白名单 / role 校验。攻击者可洪水 nudge 制造噪音、误导 root 决策。
   const { positional, opts } = parseArgs(args);
   const [tree_id, leaf_id] = positional;
   assertTreeExists(tree_id);
@@ -2513,6 +2806,16 @@ async function cmdNudgeAppend(args) {
     throw new TreeStateError(E_SCHEMA_INVALID, `severity "${severity}" not in [low, mid, high]`);
   }
 
+  // V9+ Phase 4 (R2 P0 / B9): rule_id 白名单校验（在 withLock 外提前拦截，避免无效 IO）。
+  const allowedRoles = NUDGE_RULE_WHITELIST[opts['rule-id']];
+  if (!allowedRoles) {
+    throw new TreeStateError(
+      E_NAME_INVALID,
+      `nudge_append rejected: rule_id "${opts['rule-id']}" not in whitelist [${Object.keys(NUDGE_RULE_WHITELIST).join(', ')}]. ` +
+        `Invalid or unregistered rule_id forbidden (B9: rule injection guard).`
+    );
+  }
+
   let result = null;
   await withLock(tree_id, () => {
     const state = readState(tree_id);
@@ -2520,8 +2823,24 @@ async function cmdNudgeAppend(args) {
       throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
     }
     const leaf = state.leaves[leaf_id];
+    // V9+ Phase 4 (R2 P0 / B9): role→rule 适用性校验（rule 必须匹配 leaf.role）。
+    if (!allowedRoles.includes(leaf.role)) {
+      throw new TreeStateError(
+        E_STATUS_INVALID,
+        `nudge_append rejected: rule_id "${opts['rule-id']}" applies to roles [${allowedRoles.join(', ')}], ` +
+          `but leaf "${leaf_id}" has role "${leaf.role}". Rule-target role mismatch (B9: role applicability guard).`
+      );
+    }
     if (typeof leaf.nudge_count !== 'number') leaf.nudge_count = 0;
     if (!Array.isArray(leaf.nudge_log)) leaf.nudge_log = [];
+    // V9+ Phase 4 (R2 P0 / B9): 洪水限制（单 leaf 累计上限，防止恶意 automation 滥用）。
+    if (leaf.nudge_count >= NUDGE_FLOOD_LIMIT_PER_LEAF) {
+      throw new TreeStateError(
+        E_SCHEMA_INVALID,
+        `nudge_append rejected: leaf "${leaf_id}" nudge_count ${leaf.nudge_count} reached flood limit ${NUDGE_FLOOD_LIMIT_PER_LEAF}. ` +
+          `Possible abuse — too many nudges on a single leaf (B9: flood guard).`
+      );
+    }
     leaf.nudge_count += 1;
 
     // V10-nudge-escalation: 强制升级 severity（nudge_count≥3 → medium，≥5 → high）
@@ -3514,6 +3833,24 @@ function setTreesRoot(p) {
   TREES_ROOT = path.resolve(p);
 }
 
+// L2-root-cause (方案A): session 真实性校验注入回调。
+//   patches.cjs require 本模块后注入真 verifier（调 global.__proma__.getAgentSessionMeta 判断存在性）。
+//   未注入（CLI/老测试）→ checkSessionAlive 返回 bypass → assertMcpEntrySessionId 跳过真实性校验（向后兼容）。
+//   设计依据：复用既有 setTreesRoot setter 注入哲学，零新概念，不改 run 签名（详见设计文档 §三方案A）。
+let __verifySessionAlive = null;                      // (sid) => boolean|null; null=未注入(CLI/测试兼容)
+function setSessionVerifier(fn) {
+  __verifySessionAlive = (typeof fn === 'function') ? fn : null;
+}
+// 返回 { ok, bypass? }：ok=true 放行（真实 / bypass-error / bypass-no-verifier）；
+//   ok=false 且无 bypass=verifier 明确拒绝（session 不真实）；bypass 字段存在=未注入或异常（best-effort 不阻断）。
+function checkSessionAlive(sid) {
+  if (!__verifySessionAlive) return { ok: true, bypass: 'no-verifier' };
+  let alive;
+  try { alive = __verifySessionAlive(sid); } catch (_) { alive = null; }
+  if (alive === null || alive === undefined) return { ok: true, bypass: 'verifier-error' };
+  return { ok: !!alive };
+}
+
 function getTreesRoot() {
   return TREES_ROOT;
 }
@@ -3582,7 +3919,10 @@ module.exports = {
     E_NEGATIVE_COUNT, E_COUNT_MISMATCH, E_LENGTH_MISMATCH,
     E_TS_BEFORE_CREATED, E_TS_IN_FUTURE, E_TS_NOT_MONOTONIC,
     E_LEAF_AUTO_PRUNED, E_STATUS_EVENT_MISMATCH,
+    // L2-root-cause (层2 身份校验根治) 新增：session 格式合法但不真实存在
+    E_SESSION_NOT_ALIVE,
   },
+  setSessionVerifier,
 };
 
 // CLI shim: node tree-engine.cjs <cmd> [args] —— stdout 输出与原 tree-state.js 完全一致。

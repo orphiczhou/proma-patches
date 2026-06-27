@@ -8148,9 +8148,2394 @@
           "suggest": "保留一个为 role=root, 其他改为有 parent",
           "nudge_count": 888,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-26T11:53:09.768Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 889,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T11:58:02.357Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 890,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:03:10.542Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 891,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:08:06.231Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 892,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:13:10.410Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 893,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:18:08.678Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 894,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:23:09.713Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 895,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:28:09.915Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 896,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:33:09.651Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 897,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:38:11.883Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 898,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:43:11.855Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 899,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:48:11.983Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 900,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:53:16.678Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 901,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T12:58:13.654Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 902,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:03:12.758Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 903,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:08:14.231Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 904,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:13:13.890Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 905,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:18:14.081Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 906,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:23:13.657Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 907,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:28:13.083Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 908,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:33:06.985Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 909,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:38:06.675Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 910,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:43:06.280Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 911,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:48:06.247Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 912,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:53:06.642Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 913,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T13:58:06.418Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 914,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:03:05.809Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 915,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:08:06.023Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 916,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:13:06.775Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 917,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:18:06.098Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 918,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:23:06.473Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 919,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:28:06.255Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 920,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:33:06.808Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 921,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:38:06.686Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 922,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:43:05.797Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 923,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:48:05.870Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 924,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:53:05.792Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 925,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T14:58:06.505Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 926,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:03:06.071Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 927,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:08:05.909Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 928,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:13:06.731Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 929,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:18:06.554Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 930,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:23:06.219Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 931,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:28:06.210Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 932,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:33:06.129Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 933,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:38:06.124Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 934,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:43:06.108Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 935,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:48:06.443Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 936,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:53:06.230Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 937,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T15:58:06.591Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 938,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:03:06.214Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 939,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:08:06.525Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 940,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:13:06.043Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 941,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:18:06.352Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 942,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:23:06.990Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 943,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:28:06.839Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 944,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:33:06.836Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 945,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:38:06.723Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 946,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:43:06.581Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 947,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:48:06.534Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 948,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:53:06.923Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 949,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T16:58:06.739Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 950,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:03:06.701Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 951,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:08:06.815Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 952,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:13:07.185Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 953,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:18:07.004Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 954,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:23:07.226Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 955,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:28:06.750Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 956,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:33:07.808Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 957,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:38:07.431Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 958,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:43:08.401Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 959,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:48:07.613Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 960,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:53:08.572Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 961,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T17:58:08.016Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 962,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:03:08.648Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 963,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:08:08.288Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 964,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:13:09.026Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 965,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:18:08.519Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 966,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:23:09.186Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 967,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:28:09.422Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 968,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:33:08.540Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 969,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:38:07.993Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 970,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:43:09.318Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 971,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:48:08.968Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 972,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:53:08.208Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 973,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T18:58:08.150Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 974,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:03:07.644Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 975,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:08:08.211Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 976,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:13:07.986Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 977,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:18:08.369Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 978,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:23:08.608Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 979,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:28:07.471Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 980,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:33:09.179Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 981,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:38:09.089Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 982,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:43:09.082Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 983,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:48:09.711Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 984,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:53:08.578Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 985,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T19:58:09.112Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 986,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:03:09.811Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 987,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:08:09.177Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 988,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:13:08.877Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 989,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:18:09.815Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 990,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:23:09.578Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 991,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:28:08.554Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 992,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:33:08.838Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 993,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:38:08.722Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 994,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:43:09.772Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 995,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:48:09.953Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 996,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:53:09.880Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 997,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T20:58:09.617Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 998,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:03:09.540Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 999,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:08:08.585Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1000,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:13:08.749Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1001,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:18:08.001Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1002,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:23:08.072Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1003,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:28:07.620Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1004,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:33:07.685Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1005,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:38:07.592Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1006,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:43:07.967Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1007,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:48:08.419Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1008,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:53:08.131Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1009,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T21:58:08.004Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1010,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:03:08.443Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1011,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:08:07.796Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1012,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:13:08.531Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1013,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:18:08.387Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1014,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:23:08.483Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1015,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:28:08.697Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1016,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:33:07.980Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1017,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:38:08.585Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1018,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:43:08.845Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1019,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:48:08.595Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1020,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:53:08.777Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1021,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T22:58:08.955Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1022,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:03:08.743Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1023,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:08:08.781Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1024,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:13:09.468Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1025,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:18:08.384Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1026,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:23:09.321Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1027,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:28:09.465Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1028,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:33:09.329Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1029,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:38:09.345Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1030,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:43:10.642Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1031,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:48:10.620Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1032,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:53:09.621Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1033,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-26T23:58:09.444Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1034,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:03:09.533Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1035,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:08:09.553Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1036,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:13:09.548Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1037,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:18:09.833Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1038,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:23:10.451Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1039,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:28:09.573Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1040,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:33:10.598Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1041,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:38:09.828Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1042,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:43:10.374Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1043,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:48:10.904Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1044,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:53:09.827Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1045,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T00:58:10.294Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1046,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:03:10.296Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1047,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:08:09.645Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1048,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:13:09.666Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1049,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:18:09.910Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1050,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:23:11.756Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1051,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:28:11.020Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1052,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:33:05.426Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1053,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:38:12.093Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1054,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:43:04.935Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1055,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:48:06.163Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1056,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:53:05.497Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1057,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T01:58:09.655Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1058,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:03:09.667Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1059,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:08:09.564Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1060,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:13:05.529Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1061,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:18:06.126Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1062,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:23:06.966Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1063,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:28:07.717Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1064,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:33:06.448Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1065,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:38:05.799Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1066,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:43:05.943Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1067,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:48:06.579Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1068,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:53:05.280Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1069,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T02:58:05.331Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1070,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:03:05.503Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1071,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:08:05.658Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1072,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:13:05.981Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1073,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:18:06.176Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1074,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:23:05.477Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1075,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:28:05.507Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1076,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:33:05.510Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1077,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:38:05.627Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1078,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:43:05.551Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1079,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:48:05.529Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1080,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:53:05.786Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1081,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T03:58:05.669Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1082,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:03:05.701Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1083,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:08:05.642Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1084,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:13:09.176Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1085,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:18:05.901Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1086,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:23:06.380Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1087,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:28:05.996Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1088,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:33:05.883Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1089,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:38:08.308Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1090,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:43:09.295Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1091,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:48:11.363Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1092,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:53:12.318Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1093,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T04:58:10.829Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1094,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:03:20.707Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1095,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:08:18.965Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1096,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:13:07.517Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1097,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:18:09.662Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1098,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:23:06.623Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1099,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:28:06.695Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1100,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:33:06.757Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1101,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:38:07.259Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1102,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:43:07.892Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1103,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:48:06.643Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1104,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:53:06.819Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1105,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T05:58:06.814Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1106,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:00:12.127Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1107,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:05:14.059Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1108,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:10:11.164Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1109,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:15:21.148Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1110,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:20:08.916Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1111,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:25:08.106Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1112,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:30:08.449Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1113,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:35:09.031Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1114,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:40:07.996Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1115,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:45:08.947Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1116,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:50:08.980Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1117,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T06:55:08.546Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1118,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:00:09.163Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1119,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:05:08.635Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1120,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:10:11.485Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1121,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:15:10.454Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1122,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:20:08.852Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1123,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:25:07.893Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1124,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:30:07.788Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1125,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:35:07.849Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1126,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:40:07.545Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1127,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:45:07.612Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1128,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:50:07.687Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1129,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T07:55:07.682Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1130,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:00:07.708Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1131,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:05:07.771Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1132,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:10:07.804Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1133,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:15:07.814Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1134,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:20:09.102Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1135,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:25:08.559Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1136,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:30:08.332Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1137,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:34:02.719Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1138,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:39:00.252Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1139,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:44:00.074Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1140,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:49:00.869Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1141,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:54:01.678Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1142,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T08:59:07.479Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1143,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T09:04:01.580Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1144,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T09:09:04.130Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1145,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T09:14:01.651Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1146,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T09:19:02.418Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1147,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:38:08.915Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1148,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:43:07.068Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1149,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:48:09.305Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1150,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:53:25.478Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1151,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T11:58:21.095Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1152,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:03:10.177Z",
+          "rule_id": "R-01",
+          "severity": "high",
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "suggest": "保留一个为 role=root, 其他改为有 parent",
+          "nudge_count": 1153,
+          "send_message": false
         }
       ],
-      "nudge_count": 888,
+      "nudge_count": 1153,
       "audit_log": [
         {
           "ts": "2026-06-21T12:27:39.522Z",
@@ -15250,6 +17635,2126 @@
         },
         {
           "ts": "2026-06-26T11:48:10.158Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T11:53:09.768Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T11:58:02.357Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:03:10.542Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:08:06.231Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:13:10.410Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:18:08.678Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:23:09.713Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:28:09.915Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:33:09.651Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:38:11.883Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:43:11.855Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:48:11.983Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:53:16.678Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T12:58:13.654Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:03:12.758Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:08:14.231Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:13:13.890Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:18:14.081Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:23:13.657Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:28:13.083Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:33:06.985Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:38:06.675Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:43:06.280Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:48:06.247Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:53:06.642Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T13:58:06.418Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:03:05.809Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:08:06.023Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:13:06.776Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:18:06.098Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:23:06.473Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:28:06.255Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:33:06.808Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:38:06.686Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:43:05.797Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:48:05.870Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:53:05.792Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T14:58:06.505Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:03:06.071Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:08:05.909Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:13:06.731Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:18:06.554Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:23:06.219Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:28:06.210Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:33:06.129Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:38:06.124Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:43:06.108Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:48:06.443Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:53:06.230Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T15:58:06.591Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:03:06.214Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:08:06.525Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:13:06.043Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:18:06.352Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:23:06.990Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:28:06.839Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:33:06.836Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:38:06.723Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:43:06.581Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:48:06.534Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:53:06.923Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T16:58:06.739Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:03:06.701Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:08:06.815Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:13:07.185Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:18:07.004Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:23:07.226Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:28:06.750Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:33:07.808Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:38:07.431Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:43:08.401Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:48:07.613Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:53:08.572Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T17:58:08.016Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:03:08.648Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:08:08.288Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:13:09.026Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:18:08.519Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:23:09.186Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:28:09.422Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:33:08.540Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:38:07.993Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:43:09.318Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:48:08.968Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:53:08.208Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T18:58:08.150Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:03:07.644Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:08:08.211Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:13:07.986Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:18:08.369Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:23:08.608Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:28:07.471Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:33:09.179Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:38:09.089Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:43:09.082Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:48:09.711Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:53:08.578Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T19:58:09.112Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:03:09.811Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:08:09.177Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:13:08.878Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:18:09.815Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:23:09.578Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:28:08.554Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:33:08.838Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:38:08.722Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:43:09.772Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:48:09.953Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:53:09.880Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T20:58:09.617Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:03:09.540Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:08:08.585Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:13:08.749Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:18:08.001Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:23:08.072Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:28:07.620Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:33:07.685Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:38:07.592Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:43:07.967Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:48:08.419Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:53:08.131Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T21:58:08.004Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:03:08.443Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:08:07.796Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:13:08.531Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:18:08.387Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:23:08.483Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:28:08.697Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:33:07.980Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:38:08.585Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:43:08.845Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:48:08.595Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:53:08.777Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T22:58:08.955Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:03:08.743Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:08:08.781Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:13:09.468Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:18:08.384Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:23:09.321Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:28:09.465Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:33:09.329Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:38:09.345Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:43:10.642Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:48:10.620Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:53:09.621Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-26T23:58:09.444Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:03:09.533Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:08:09.553Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:13:09.548Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:18:09.833Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:23:10.451Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:28:09.573Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:33:10.598Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:38:09.828Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:43:10.374Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:48:10.904Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:53:09.827Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T00:58:10.294Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:03:10.296Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:08:09.645Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:13:09.666Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:18:09.910Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:23:11.756Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:28:11.020Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:33:05.427Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:38:12.093Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:43:04.935Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:48:06.163Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:53:05.497Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T01:58:09.655Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:03:09.667Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:08:09.564Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:13:05.529Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:18:06.126Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:23:06.966Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:28:07.717Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:33:06.448Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:38:05.799Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:43:05.943Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:48:06.579Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:53:05.280Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T02:58:05.331Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:03:05.503Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:08:05.658Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:13:05.981Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:18:06.176Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:23:05.477Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:28:05.507Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:33:05.510Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:38:05.627Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:43:05.551Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:48:05.529Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:53:05.786Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T03:58:05.669Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:03:05.701Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:08:05.642Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:13:09.176Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:18:05.901Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:23:06.380Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:28:05.996Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:33:05.883Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:38:08.308Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:43:09.295Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:48:11.363Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:53:12.318Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T04:58:10.829Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:03:20.707Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:08:18.965Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:13:07.517Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:18:09.662Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:23:06.623Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:28:06.695Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:33:06.757Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:38:07.259Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:43:07.892Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:48:06.643Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:53:06.819Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T05:58:06.814Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:00:12.127Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:05:14.059Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:10:11.164Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:15:21.148Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:20:08.916Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:25:08.106Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:30:08.449Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:35:09.031Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:40:07.996Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:45:08.947Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:50:08.980Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T06:55:08.546Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:00:09.163Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:05:08.635Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:10:11.485Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:15:10.454Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:20:08.852Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:25:07.893Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:30:07.788Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:35:07.849Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:40:07.545Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:45:07.612Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:50:07.687Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T07:55:07.682Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:00:07.708Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:05:07.771Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:10:07.804Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:15:07.814Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:20:09.102Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:25:08.559Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:30:08.332Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:34:02.719Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:39:00.252Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:44:00.074Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:49:00.869Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:54:01.678Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T08:59:07.479Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T09:04:01.580Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T09:09:04.130Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T09:14:01.651Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T09:19:02.418Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:38:08.915Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:43:07.068Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:48:09.305Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:53:25.478Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:58:21.095Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-01",
+          "pass": false,
+          "evidence": "tree 有 3 个 parent=null leaf (根唯一性违反): retest-A-draft, retest-B-review, retest-F-integrate",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:03:10.177Z",
           "auditor": "tao-watcher-script",
           "rule_id": "R-01",
           "pass": false,

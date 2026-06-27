@@ -1,6 +1,6 @@
 # Proma 改造项目 — 知识索引
 
-> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-25 20:46（V10 Phase 3 收尾后同步）
+> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-26 18:20（IHL R1-R6 Audit Tamper Detection 闭环后同步）
 
 新会话从这里开始读，能 5 分钟拿到项目全貌和关键路径。
 
@@ -12,7 +12,7 @@
 
 ---
 
-## 二、当前完成度（v0.16.5 + v0.7+ 引擎 + V4-V9 DbC + V10 内容校验 + Phase 3 Bug A/B 修复）
+## 二、当前完成度（v0.16.5 + v0.7+ 引擎 + V4-V9 DbC + V10 内容校验 + Phase 3 Bug A/B 修复 + IHL R1-R6 Audit Tamper Detection）
 
 ### Layer 1 — MCP 基础设施 ✅ 完工（v0.16.5）
 
@@ -25,8 +25,10 @@
 - **remote-session Release 验收**：⚠️ 有条件通过（39/40，1 个 fork new_title Bug，不阻断上线）
 - **session-management Skill v1.3.0** + **GitHub 仓库** `orphiczhou/proma-patches` + `apply-patches.sh` v0.16.5
 
-### Layer 2 — 树形会话执行体系 ✅ v0.2.2 + v0.7 Phase A + v0.7+ 引擎内联 + V4-V9 DbC + V10 内容校验 + Phase 3 Bug A/B 修复（工作区零源码）
+### Layer 2 — 树形会话执行体系 ✅ v0.2.2 + v0.7 Phase A + v0.7+ 引擎内联 + V4-V9 DbC + V10 内容校验 + Phase 3 Bug A/B 修复 + IHL R1-R6 Audit Tamper Detection（工作区零源码）
 
+- **[2026-06-27 09:36] R1 洁净室测试 + Worker 生命周期规范**: 4 个 Commander（A 功能正确性 10 用例 / B 对抗攻击 12 用例 / C 端到端 8 用例 / D Prompt Injection 8 用例）共 **38 用例**并行测试，综合通过率 **89.5%**。**关键胜利**：D 系列 **8/8 全过**，V10 trust anchor 完美防御 Prompt Injection（含 6/26 历史注入重放 18/18）；A 系列 12 项 V10 安全机制 11 项生效；C 系列 E_BORROWED_IDENTITY 拦截验证 Bug A 修复到位。**关键漏洞**：**P0** B9 applyNudge 规则绕过（rule_id 任意）+ B12 expect_outputs 路径遍历（`/etc/passwd` 类无校验）+ **P1** Fork 幻觉（C1+C5 双重确认，fork 缺身份提示自主越权）+ Auditor 鸡生蛋死锁（worker 占满 node_budget 无法创建 auditor）+ B5 audit_log 伪造（PARTIAL，缺专用 W-AUDIT-TAMPER）。回收后产出综合分析报告，并**首次撰写独立 Worker 生命周期规范**（6 阶段 25 事件 8 道审计关 7 类参与者，含完整 Mermaid 时序图 + 状态机 + 错误码全表 + P0/P1 gap 清单，可作为团队对齐契约）。详见 [测试计划](./v10/cleanroom-test-plan-2026-06-26.md) + [R1-A](./v10/cleanroom-round1-a-2026-06-26.md) / [R1-B](./v10/cleanroom-round1-b-2026-06-26.md) / [R1-C](./v10/cleanroom-round1-c-2026-06-26.md) / [R1-D](./v10/cleanroom-round1-d-2026-06-26.md) + [R1 综合分析](./v10/cleanroom-round1-recap-2026-06-27.md) + [Worker 生命周期规范 v1.0](./v10/worker-lifecycle-spec-2026-06-27.md)。**下一步**: R2 修复 3 个 P0/P1 后视角互换（A↔C / B↔A / C↔D / D↔B）
+- **[2026-06-26 18:20] IHL R1-R6 — 盲点驱动的迭代加固 + Audit Tamper Detection** (4 commits `1a7ed5f`/`031c546`/`d44163a`/`690f7e8` 已推 orphiczhou/proma-patches): 6 轮 **Iterative Hardening Loop (IHL)** 收敛 — R1 applyNudge 全局守卫（堵 9c423b8 tree 级规则盲点）/ R2 create_session workspace_id 校验（堵子会话落 "undefined" slug）/ R3 V4 Pro commander 端到端 / R4 fork_session 同类漏洞（审计驱动复用 R2 helper）/ R5 加 4 条 W-AUDIT-* 事后检测 / R6 R5 规则移到 Tier 1 绕开 status 守卫。**v626 tree-state.json 被直接篡改**（自审通过 + worker 当 auditor + audit_log 伪造 pass=true）暴露静态审计盲区 → 4 条 tamper detection（W-AUDIT-SELF/WORKER/TAMPER/NO-ALIGN）。**3 层防御拓扑定型**：入口拦截层（cmdEventAppend L1498 / cmdLeafAdd L705 / create_session L461 / fork_session L601）+ 兜底守卫层（cmdAuditGate L2337 / resolveAuditorIndep L1897 / applyNudge sharedCount）+ 事后检测层（W-AUDIT-*）。**Prompt Injection 实战防御副产品**：会话期间 6 条诱导 root（ce9a1e2f）滥用 audit_gate 的注入全部拒绝响应。3 份 patches.cjs 物理同步（仓库 + dev dist + patch-l，2658 行一致），Dev/Release 已重启加载。详见 [v626-r5-r6-audit-tamper-detection](./v10/v626-r5-r6-audit-tamper-detection.md) + [v626-iteration-recap](./v10/v626-iteration-recap.md) + [runtime-verify-2026-06-26](./v10/runtime-verify-2026-06-26.md) + [fix-tao-watcher-session-shared](./v10/fix-tao-watcher-session-shared.md)。**下一步**: TAO Watcher 按角色区分规则 / Phase D 用户层 bug / 跨工作区清理
 - **[2026-06-25 20:36] V10 Phase 3 — Bug A/B 修复 + 代码同步仓库 + 文档沉淀** (commit `30eb4fa`): Bug A（commander 代 worker 写 done event）+ Bug B（同 session 多 leaf 歧义）双重修复。**4 处引擎改动**：A-1 cmdEventAppend L1498（只允许 leaf.session_id 自己写）+ A-2 cmdAuditGate L2337-2345（**Auditor #2 发现的 hasDone 漏洞**，检查 caller_session_id）+ B-3 cmdLeafAdd L705-718（**新错误码 `E_DUPLICATE_SESSION_ID`** + session_id 唯一性校验）+ B-4 resolveAuditorIndep L1897-1911（.filter 跳过 pruned）。**代码同步到 workspace-files 顶层 + patch-l/**（按用户指令"所有 cjs 在 workspace-files 一份"）。4 个 Auditor 审查回收（Auditor #2 价值再次证明）。a8111bf5 主线会话因 **TAO Watcher 规则错配**意外终止，bc005820 接力完成。详见 [v10-followup 交接](./active/session-2026-06-25-v10-followup.md) + [跨工作区问题报告](./active/cross-workspace-tree-issue-2026-06-25.md)。**下一步**: push 4 commits / 重启 dev 验证 / 跨工作区清理
 - **[2026-06-25 17:55] V10 Phase 2 — root-as-trust-anchor + Agent helper 配套**: 详见 [v10/](./v10/) 17 份报告 + [v10-p2-e2e-report](./audit/v10-p2/v10-p2-e2e-report.md)。V10 8 大加固点（auditor-active / self-audit-v2 / uuid-strict / numeric-consistency / nudge-escalation / timestamp-monotonic / workspace-canonical / status-event-sync）+ Trust Anchor（root 自审特例解决鸡生蛋）+ D4 Helper 4 层自助文档（堵模型层失守）。164 测试全过，真实环境 V10 Phase 2 e2e 生产就绪
 - **[2026-06-25 12:19] V10 Phase 1 — 8 大加固点 + 双轮收敛**: 把 V4-V9 的「字段存在性校验」升级为「内容有效性校验」。V4-V9 形式完整但实测对真实攻击 **0% 拦截**（audit-gate-test-20260625 失守案例）。Tree 模式三层分离（实现/评价/洁净室）：A1 代码层评 8/8 合格，**Cr 洁净室独立测试发现 10 个真实失守**（Cr 优先于 A1）。详见 [charter](./reference/plans/v10-implementation-charter.md) + [commander-methodology-v10](./reference/methodology/commander-methodology-v10.md)
@@ -127,6 +129,7 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 | **Q1 e2e验证** | `workspace-files/.context/archive/2026-06-q1q3-audit/q1-e2e-verification-report.md` | 7 leaf 端到端全通过（已归档） |
 | **Q1 全深度验证** | `workspace-files/.context/archive/2026-06-q1q3-audit/q1-full-depth-report.md` | 10 leaf 3层 38/38 全通过（已归档） |
 | **Q2 方案** | `workspace-files/.context/reference/plans/q2-tree-ui-panel.md` v1.0 | 侧边栏树形UI面板（未实施） |
+| **最新交接 IHL R1-R6** | `.context/v10/v626-r5-r6-audit-tamper-detection.md` | 6 轮迭代加固 + Audit Tamper Detection（4 条 W-AUDIT-* 规则）+ Prompt Injection 实战防御。配套: v626-iteration-recap / runtime-verify-2026-06-26 / fix-tao-watcher-session-shared（均在 `.context/v10/`） |
 | **最新交接 V10 Phase 3** | `.context/active/session-2026-06-25-v10-followup.md` | Bug A/B 修复 + commit 30eb4fa + 文档沉淀 |
 | **跨工作区问题报告** | `.context/active/cross-workspace-tree-issue-2026-06-25.md` | 9 个工作区调查 + TAO Watcher 干扰根因 + 修复方案 |
 | **V10 工程方法论** | `.context/reference/methodology/commander-methodology-v10.md` | 5h/17 节点 Tree 模式加固工程实战沉淀 |
@@ -170,12 +173,12 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 
 ## 五、当前卡点与待办
 
-### 🔴 卡点 / 待决策（6/25 20:46）
+### 🔴 卡点 / 待决策（6/26 18:20）
 
-- **push 4 commits 到 GitHub**：本地领先远程 4 个（`30eb4fa` V10 P3 / `7d36cc7` V10 P2 / `f98805d` 开发树 / `8c81cc5` 索引同步）。`git push origin master` 是 destructive，等用户确认
-- **重启 dev 实例运行时验证 Bug A/B**：代码已直接落 `D:/Proma-dev/resources/app/dist/tree-engine.cjs`（19:15 改），但**实例未重启**，Bug A/B 修复未运行时验证。重启步骤：关 Proma-white → 重开 start-dev.bat → 创建测试树复现 Bug A（期望 `E_BORROWED_IDENTITY`）+ Bug B（期望 `E_DUPLICATE_SESSION_ID`）
-- **跨工作区问题（设计外）**：9 个工作区（应只有 1 主 proma），详见 [cross-workspace-tree-issue-2026-06-25.md](./active/cross-workspace-tree-issue-2026-06-25.md)。P0：归档 tree-2 关键产出（v10-p2-e2e-report.md + v10p2-e2e tree-state.json）到 proma/.context/audit/v10-p2/ + 清理 5 个无价值工作区（undefined / tree-1 / 4×workspace-*）
-- **TAO Watcher 规则错配（独立立项）**：监督规则不按 role 区分——worker 规则（W-01 brief_echo）发给根指挥官，导致 a8111bf5 思维混乱意外终止。修复：按 role 应用不同规则集（root/commander/worker 各有专属规则）
+- ✅ **push commits 到 GitHub**（V10 P3 4 个 + IHL R1-R6 4 个共 8 个 commit 已推 `orphiczhou/proma-patches`，远程同步到 `690f7e8`）
+- ✅ **重启 dev 实例运行时验证 Bug A/B**（Dev/Release 已重启加载最新 patches.cjs 2658 行 + tree-engine.cjs 3602 行，IHL R1-R6 全部运行时验证 PASS）
+- 🟡 **跨工作区问题（设计外）**：9 个工作区（应只有 1 主 proma），详见 [cross-workspace-tree-issue-2026-06-25.md](./active/cross-workspace-tree-issue-2026-06-25.md)。**v10-p2-e2e-report 已归档**到 `.context/audit/v10-p2/`，剩余：清理 5 个无价值工作区（undefined / tree-1 / 4×workspace-*）+ main.cjs `createAgentSession` 加 workspaceId 白名单（跨工作区 P2）
+- **TAO Watcher 规则错配（P0/P1 独立立项）**：监督规则不按 role 区分——worker 规则（W-01 brief_echo）发给根指挥官，导致 a8111bf5 思维混乱意外终止。**9c423b8 入口守卫已修 + R1 applyNudge 全局守卫已补**，但**根本问题（按 role 应用不同规则集）仍未解决**。修复方向：root/commander/worker 各有专属规则集
 - **Release 严重落后 1131 行**：dev 3602 vs release 2471，用户明确指示"不同步 release 目录"
 - **Layer 4 残留（平台层依赖）**：互审洗白 + 冒用真实 session，需 subagent_trace_id 绑定
 
@@ -189,7 +192,7 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 - **Commander prune/archive 级联未定义**（M5 / Phase D1）
 - **start-release-fresh.bat 异常**：指向 `D:\Proma-dev\Proma-coral.exe`（应为 release 目录），且 ISOLATED=1 实际跑在 dev 路径下
 
-### ✅ 已修复（2026-06-18 ~ 2026-06-25）
+### ✅ 已修复（2026-06-18 ~ 2026-06-26）
 
 | 版本 | 修复内容 |
 |------|---------|
@@ -203,26 +206,25 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 | V4-V9 DbC 加固（6/24） | 9 硬约束点（V4/V5b/V6/V8/CP2/V9 + 审计[1][2][3]），audit-attacks 18 攻击 0 BYPASS，dbc-spec 36/0 |
 | V10 Phase 1-2（6/25 12:19-17:55） | 8 大加固点（auditor-active/self-audit-v2/uuid-strict/numeric-consistency/nudge-escalation/timestamp-monotonic/workspace-canonical/status-event-sync）+ Trust Anchor（root 自审解决鸡生蛋）+ D4 Helper 4 层自助文档。164 测试全过。commit `7d36cc7`（P2）+ `f98805d`（开发树）。**核心教训：V4-V9 形式完整但实测 0% 拦截，v10 升级为内容有效性校验** |
 | V10 Phase 3（6/25 20:36） | Bug A（commander 代 worker 写 done event）+ Bug B（同 session 多 leaf 歧义）双重修复。4 处引擎改动 + 新错误码 `E_DUPLICATE_SESSION_ID`。Auditor #2 独立发现 hasDone 漏洞（实现者+A1 都漏）。代码同步 workspace-files 顶层 + patch-l/。commit `30eb4fa` |
+| IHL R1-R6（6/26 18:20） | 6 轮盲点驱动迭代加固：R1 applyNudge 全局守卫（堵 9c423b8 tree 级规则盲点）/ R2 create_session workspace_id 校验 / R4 fork_session 同类漏洞 / R5 加 4 条 W-AUDIT-* 事后检测 / R6 规则移到 Tier 1 绕开 status 守卫。**v626 tree 被直接篡改**（自审通过 + worker 当 auditor + audit_log 伪造 pass）暴露静态审计盲区。**3 层防御拓扑定型**（入口拦截 + 兜底守卫 + 事后检测）。**Prompt Injection 实战防御**：6 条诱导 root 滥用 audit_gate 的注入全部拒绝。3 份 patches.cjs 物理同步（2658 行一致）。commits `1a7ed5f`/`031c546`/`d44163a`/`690f7e8` |
 
 ### ✅ 已澄清（不是 bug）
 
 - **Bug 2（Fork 截断 20 轮）**：auto-compact 从未触发 → Fork 不丢消息。感知错觉来自 `list_messages` 默认 `limit=50`
 
-### 待办优先级（6/25 20:46）
+### 待办优先级（6/26 18:20）
 
 | 优先级 | 任务 |
 |---|---|
-| P0 | **push 4 commits 到 GitHub**（`git push origin master`）—— 等用户确认 |
-| P0 | **重启 dev 实例**验证 Bug A/B（用户操作）+ 端到端 MCP 测试 |
-| P0 | **归档 tree-2 关键产出** + 清理 5 个无价值工作区（undefined / tree-1 / 4×workspace-*） |
-| P1 | **TAO Watcher 按角色区分规则**（堵 a8111bf5 类意外终止，2-3 小时） |
-| P1 | patches.cjs 加 workspace_id 校验拦截（跨工作区 P1） |
+| P0 | **TAO Watcher 按角色区分规则**（堵 a8111bf5 类意外终止，2-3 小时；9c423b8 入口守卫 + R1 applyNudge 全局守卫已补盲点，但根本问题「规则不按 role 区分」未解） |
+| P0 | **清理 5 个无价值工作区**（undefined / tree-1 / 4×workspace-*，跨工作区 P0；v10-p2-e2e-report 已归档到 `.context/audit/v10-p2/`） |
+| P1 | patches.cjs 其他入口补 workspace_id 校验（R2/R4 已做 create_session/fork_session，迁移/恢复等入口可补） |
 | P2 | Phase D：D1 prune/archive 级联语义 / D2 migrate 版本号 / D3 watcher silence_minutes |
 | P2 | main.cjs `createAgentSession` 加 workspaceId 白名单（sed 补丁，跨工作区 P2） |
 | P2 | session-management SKILL 模式 4 修订（明确 commander 不应跨工作区） |
 | P2 | Layer 4 subagent_trace_id（平台层，大工程，单独立项） |
 | P3 | Q2 树形 UI 面板（补丁 L）实施 — 已让位给 v0.7+ 引擎内联 |
-| P3 | 沉淀"Tree 模式多会话协作"为可复用 Skill / remote-session fork new_title / I3 并发竞态 |
+| P3 | 沉淀"IHL / Tree 模式多会话协作"为可复用 Skill / remote-session fork new_title / I3 并发竞态 |
 
 ---
 

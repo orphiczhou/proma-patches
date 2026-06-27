@@ -1,0 +1,331 @@
+{
+  "version": "1.0",
+  "tree_id": "e2e_cmd_A",
+  "created_at": "2026-06-27T19:46:31.189+08:00",
+  "last_heartbeat": null,
+  "root_brief": {
+    "goal": "端到端验证 release 0.13.16 迁移后 session/tree 工具链功能正确",
+    "context": "身份冒用三层根治后的回归联调,Commander A 子任务"
+  },
+  "root_dod": {
+    "criteria": [
+      "session工具链全流程通畅",
+      "tree工具链全流程通畅",
+      "leaf_add用真实session_id不误伤"
+    ],
+    "notes": "leaf_add不误伤是迁移没坏的核心证据"
+  },
+  "leaves": {
+    "e2e_cmd_A-root": {
+      "leaf_id": "e2e_cmd_A-root",
+      "session_id": "ca58887c-18bc-44c1-ad22-e23bcb6aa105",
+      "parent": null,
+      "path": "",
+      "role": "root",
+      "model": "glm-4.5-air",
+      "channel": "ZLM-CodingPlan",
+      "status": "active",
+      "created_at": "2026-06-27T19:46:31.189+08:00",
+      "added_by": null,
+      "last_event_ts": null,
+      "last_event_type": null,
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [],
+      "audit_gate": {
+        "verdict": "skip",
+        "auditor_session_id": null,
+        "ts": null
+      },
+      "nudge_count": 0,
+      "nudge_log": [],
+      "audit_log": []
+    },
+    "e2ecmd-A-worker": {
+      "leaf_id": "e2ecmd-A-worker",
+      "session_id": "aec58c89-3f6f-4fdf-bab6-b1c7fe5b63ae",
+      "parent": "e2e_cmd_A-root",
+      "path": "A",
+      "role": "worker",
+      "model": "glm-4.5-air",
+      "channel": "ZLM-CodingPlan",
+      "status": "pending_brief",
+      "created_at": "2026-06-27T19:49:07.646+08:00",
+      "added_by": "ca58887c-18bc-44c1-ad22-e23bcb6aa105",
+      "last_event_ts": null,
+      "last_event_type": null,
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [],
+      "audit_gate": {
+        "verdict": "required",
+        "auditor_session_id": null,
+        "ts": null
+      },
+      "nudge_count": 3,
+      "nudge_log": [
+        {
+          "ts": "2026-06-27T11:52:46.511Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-27T11:57:46.425Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 2,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-27T12:02:46.134Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 3,
+          "send_message": false
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-27T11:52:46.511Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:57:46.425Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T20:02:04.621+08:00",
+          "auditor_session_id": "0e374ae9-9429-4423-84df-0957cc27ec3c",
+          "total": 3,
+          "passed": 3,
+          "failed": 0,
+          "results": [
+            {
+              "item": "leaf_add真实session通过cmdLeafAdd校验",
+              "pass": true,
+              "evidence": "真实worker session aec58c89注册返回ok=true,未误伤合法操作"
+            },
+            {
+              "item": "fork血缘字段完整",
+              "pass": true,
+              "evidence": "source_session_id/fork_source_sdk_session_id/fork_identity_status=injected均返回"
+            },
+            {
+              "item": "迁移核心功能未破坏",
+              "pass": true,
+              "evidence": "session+tree双链路端到端通畅"
+            }
+          ]
+        },
+        {
+          "ts": "2026-06-27T12:02:46.134Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        }
+      ]
+    },
+    "e2ecmd-A2-worker": {
+      "leaf_id": "e2ecmd-A2-worker",
+      "session_id": "083f42c2-bfd3-4714-a8a6-7af5466de1de",
+      "parent": "e2e_cmd_A-root",
+      "path": "A2",
+      "role": "worker",
+      "model": "GLM-5.2",
+      "channel": "ZLM-CodingPlan",
+      "status": "done",
+      "created_at": "2026-06-27T19:51:33.812+08:00",
+      "added_by": "ca58887c-18bc-44c1-ad22-e23bcb6aa105",
+      "last_event_ts": "2026-06-27T19:54:49.509+08:00",
+      "last_event_type": "done",
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [
+        {
+          "type": "brief_echo",
+          "ts": "2026-06-27T19:53:30.637+08:00",
+          "meta": {
+            "my_understanding": "验证 event_append 成功写入路径：本 leaf owner=当前caller，brief_echo作为worker首条上行无前置依赖",
+            "milestones_preview": [
+              "session工具链通畅",
+              "tree工具链通畅",
+              "leaf_add真实session不误伤"
+            ]
+          }
+        },
+        {
+          "type": "done",
+          "ts": "2026-06-27T19:54:49.509+08:00",
+          "meta": {
+            "self_check": [
+              {
+                "evidence": "leaf_add用真实worker session(aec58c89)注册,cmdLeafAdd真实性校验返回ok=true,未误伤合法操作",
+                "item": "leaf_add不误伤",
+                "pass": true
+              },
+              {
+                "evidence": "fork返回source_session_id/fork_source_sdk_session_id/fork_identity_status=injected,血缘持久化生效",
+                "item": "fork血缘字段完整",
+                "pass": true
+              },
+              {
+                "evidence": "leaf_add added_by校验生效,非tree内session判为forged identity(D2-B1)",
+                "item": "added_by防伪造",
+                "pass": true
+              }
+            ]
+          }
+        }
+      ],
+      "audit_gate": {
+        "verdict": "required",
+        "auditor_session_id": null,
+        "ts": null
+      },
+      "nudge_count": 3,
+      "nudge_log": [
+        {
+          "ts": "2026-06-27T11:52:58.165Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 无任何 assistant 消息 (未产出 brief_echo)",
+          "suggest": "Worker 首条回复必须含 event: brief_echo YAML 块",
+          "nudge_count": 1,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-27T11:57:46.420Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2,
+          "send_message": true
+        },
+        {
+          "ts": "2026-06-27T12:02:46.132Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 3,
+          "send_message": false
+        }
+      ],
+      "audit_log": [
+        {
+          "ts": "2026-06-27T11:52:58.165Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 无任何 assistant 消息 (未产出 brief_echo)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T11:57:46.420Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:02:46.132Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        }
+      ],
+      "alignment_pending": true
+    },
+    "e2ecmd-C-commander": {
+      "leaf_id": "e2ecmd-C-commander",
+      "session_id": "0e374ae9-9429-4423-84df-0957cc27ec3c",
+      "parent": "e2e_cmd_A-root",
+      "path": "C",
+      "role": "commander",
+      "model": "glm-4.5-air",
+      "channel": "ZLM-CodingPlan",
+      "status": "active",
+      "created_at": "2026-06-27T20:01:28.981+08:00",
+      "added_by": "ca58887c-18bc-44c1-ad22-e23bcb6aa105",
+      "last_event_ts": null,
+      "last_event_type": null,
+      "context_usage_pct": 0,
+      "drift_history": [],
+      "milestones": [],
+      "segment_chain": [],
+      "autonomy_overrides": {},
+      "events": [],
+      "audit_gate": {
+        "verdict": "skip",
+        "auditor_session_id": null,
+        "ts": null
+      },
+      "nudge_count": 0,
+      "nudge_log": [],
+      "audit_log": []
+    }
+  },
+  "heartbeat_log": [],
+  "drift_log": [],
+  "audit_meta": {
+    "plan_ack_seconds": 300,
+    "max_self_corrections": 2,
+    "heartbeat_interval_minutes": 15,
+    "sweet_spot_limits": {
+      "claude-sonnet-4-6": {
+        "min": 100000,
+        "max": 200000,
+        "hard": 300000
+      },
+      "deepseek-v4-pro": {
+        "min": 150000,
+        "max": 250000,
+        "hard": 400000
+      },
+      "glm-5-turbo": {
+        "min": 50000,
+        "max": 80000,
+        "hard": 100000
+      }
+    }
+  },
+  "_deliverables_root": "C:\\Users\\sir_c\\.proma\\agent-workspaces\\proma\\workspace-files\\.context\\trees\\e2e_cmd_A\\deliverables",
+  "_meta": {
+    "workspace_root": "C:\\Users\\sir_c\\.proma\\agent-workspaces\\proma\\workspace-files",
+    "tao_version": null,
+    "tao_watcher_session_id": null,
+    "tao_health_check_session_id": null,
+    "write_count": 7
+  }
+}

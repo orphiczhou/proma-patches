@@ -4,6 +4,189 @@
 
 新条目追加在顶部。
 
+## 2026-06-27 19:43 身份冒用三层根治 — 代码审计结论（review 子 Agent）
+
+> 纯读码审计（不跑运行时），对照设计文档 `layer1-hardening-design.md` + `layer2-tree-engine-design.md`。
+> 审计文件：`workspace-files/proma-dev-patches.cjs`、`workspace-files/tree-engine.cjs`。
+
+**总体结论**：层1/层2 根治目标（R1-R6 ownership、K1-K3 血缘、session 真实性校验、UUID 统一）**全部正确落地，无 P0 漏洞**。身份注入链可信（L1590 闭包注入 + L1370 外部 null），命名铁律（D6）保持，C-15 未受影响。**3 个残留攻击面（P1×2 / P2×2 / P3×2）+ 1 个风格问题**，集中在"防借身份（caller===auditor/owner）覆盖不全"和"D5 老会话兼容过宽"。
+
+### 层1 patches.cjs — 全部 ✅ 合格
+| 审计点 | 结论 | 行号 |
+|---|---|---|
+| R1自循环/R2下行/R3上行/R4多跳 | ✅ | L323-337 + isAncestorOrDescendant(L240)带环保护+depth上限 |
+| R5系统特权 | ✅ | isSystemPrivileged(L273)，**D2关键修正**：用 sourceAutomationId 识别 automation（不经 handler），只 send，同workspace |
+| R6外部降级 | ✅ | L291-298 D1-A：外部仅 send，fork/archive deny |
+| K1 create 写血缘 / K2 fork 写血缘 | ✅ | L657-669 / L764-771（内部才写 parentSessionId，外部不写防冒认） |
+| depth 防递归 / 命名铁律 D6 | ✅ | L642-652+L703-708 预检；C-15(L2823)未受影响 |
+| K7 notify 回调免疫 / 身份注入可信 | ✅ | L995-1002 onComplete不经handler；L1590闭包注入 |
+
+### 层2 tree-engine.cjs — 真实性校验 ✅，2 个 caller 绑定缺口 ⚠️
+| 审计点 | 结论 | 行号 |
+|---|---|---|
+| assertMcpEntrySessionId 三态(D1-a verifier优先) | ✅ | L190-215 |
+| checkSessionAlive 三态 / setSessionVerifier 注入 / patches.cjs verifier | ✅ | L3846-3852 / L3840 / patches L1472-1480 |
+| #5/#6 cmdLeafAdd / #7 占位跳过删除 | ✅ | L797/L808/L858 |
+| #9 cmdMilestoneSetResult / #10 resolveAuditorIndep | ✅ | L1561格式+L1585 resolveAuditorIndep(L2101 verifier + L2111 树内leaf交叉校验=纵深防御) |
+| #15 cmdAuditGate | ✅ | L2558格式 + **L2572 caller===audit（比verifier更强）** |
+| #11/#12 collectValidate / #13/#14 占位跳过删除 | ✅ | L2259/L2285/L2408 |
+| #16 cmdAuditAppend 真实性 | ✅ | L2684 verifier |
+| #17 cmdValidate 回填 | ⚠️ P3风格 | L3093 用 UUID_RE 而非 assertValidatePathSessionId（validate只读，语义等价） |
+
+### 新攻击面清单（按严重度）
+| # | 攻击面 | 严重度 | 根因 | 修复成本 |
+|---|---|---|---|---|
+| **1** | **D5 老会话兼容过宽** | **P1** | assertOwnership L343-348：两个无 parentSessionId 的老会话间**全 allow**（send/fork/archive）→ 迁移期身份冒用残留窗口 | 低（收紧为仅 send allow+audit，与 R6 对齐） |
+| **2** | **cmdLeafSetSession 缺 caller 校验** | **P1** | dispatch 不透传 callerSessionId 给 cmdLeafSetSession → X 可把任意 leaf.session_id 改成自己的真实 session_id → 夺取 leaf 所有权 → 绕过"只有 owner 能 mark done"（cmdEventAppend L1669）。ruleW08 仅事后检测 worker，不弥补 | 低（dispatch L3676 路由+cmd加 caller===added_by 校验） |
+| **3** | **cmdAuditAppend 缺 caller===auditor** | **P2** | dispatchAudit L2929 注释"仅 gate 需要 callerSessionId" → X 可用他人真实 session_id 作为 auditor 写 audit_log（审计真实性破坏）。MCP 层 tt helper L1534 已统一透传，engine 未消费 | 低（与 cmdAuditGate 对齐） |
+| 4 | verifier-error bypass | P2 | verifier 返回 null（__proma__未就绪/异常）→ bypass 只拒占位前缀 → 伪造随机 v4 UUID 可注册。生产环境 __proma__ 必就绪，条件苛刻 | 中（bypass 态加高危审计） |
+| 5 | ALLOW_AUDIT-src-missing | P2 | L315-320 srcMeta 缺失放行+审计，异常态可冒用任意 target | 中 |
+| 6 | R5 automation 滥用 | P3 | 需控制 automation 配置，引擎已收紧（只 send 同workspace） | — |
+| 7 | cmdValidate UUID 风格 | P3 | L3093 UUID_RE→assertValidatePathSessionId | 极低 |
+
+**已验证安全（不可行）**：血缘伪造 parentSessionId（agent 无 update_meta 工具+sourceSessionId 闭包注入）、depth 绕过（fallback 0 但 fork 累积正常）、setSessionVerifier 被覆盖（仅 patches 注入一次，agent 不可调）。
+
+**关键洞察**：本次根治核心是"session 真实性校验"（根因A）✅ 完成；但"防借身份"（caller===auditor/owner，V10-self-audit-forbidden 范畴）**只覆盖了 audit_gate + event_done**，audit_append 和 leaf_set_session 是**残留不一致**（MCP 层 callerSessionId 已就绪，engine dispatch 未路由，修复成本极低，建议本次顺手补）。
+
+## 2026-06-27 17:45 Release 0.13.16 迁移 + 身份冒用彻底根治（进行中）
+
+**起因**: 用户要求把 release 从 0.12.23 升级到官方新版 0.13.16（官方出了会话能力），趁这次迁移**彻底根治"每修必出 P0"的身份冒用问题**，并参考官方 session 管理设计改进我们自研机制。dev 不动。
+
+**三轮调研结论**:
+1. 官方 0.13.16 session 能力（createAgentSession/childSession/forkSession）**只给 UI 用（IPC），agent 调不到** → 我们 22 个自研工具必须整体保留迁移，"迁移"= 补丁重打到 0.13.16 main.cjs
+2. 补丁 A-K 字符串锚点在 0.13.16 **全部存活**，迁移难度低
+3. **官方 session 管理精髓**：`ctx` server-side 身份绑定 + `parentSessionId` 持久化血缘 + `delegationDepth`/`triggeredBy` 结构约束
+
+**身份冒用根因精准定位（两层，比上轮 R4 诊断更深）**:
+- patches.cjs 层：L207 `sourceSessionId` 仅闭包参数不验证 / L712 `send_message` 无 caller ownership 校验 / L693 `fork` 不持久化血缘
+- tree-engine 层：UUID 校验 3 套散落 16 处 + session 真实性从不验证
+
+**三层根治方案（参考官方 ctx 模式）**:
+- **层1 patches.cjs**：send_message/fork 加 caller ownership + parentSessionId 血缘 + delegationDepth 防递归 + triggeredBy 审计
+- **层2 tree-engine**：统一 UUID 校验 2 函数 + 关键入口调层1加固后 session 工具做真实性校验 + 金标准测试重构（死 session 用真实标记，不用占位 UUID）
+- **层3（长期）**：完整性签名
+
+**执行进度**: 批次0 ✅ / 批次1 ✅ / 批次2 ✅ / 批次3 ✅（UUID统一+session真实性verifier+金标准零退步+攻击重放6/7）/ **自动化部分全部完成** / 批次4 端到端验证 待用户启动release
+
+**层2实现关键决策（删掉后未来会犯错）**:
+- #9/#15 保留 isValidStrictUuidV4 不改 assertMcpEntrySessionId：dbc-spec V2_FORGED 用合法v4 UUID `55555555-...` 断言 E_AUDITOR_NOT_INDEPENDENT，前置会变 E_SESSION_NOT_ALIVE break；真实性由 resolveAuditorIndep（return风格）兜底
+- #17 保留 UUID_RE.test：migrate回填逻辑，改了误回填 added_by=PENDING_ROOT
+- 金标准测试必须 `PROMA_TREE_ENGINE` 指向 dist（`_findEngine` 默认 require patch-l旧版 3602行，跑它仅25/14）
+- D1-a 三态：verifier真实确认→放行跳过占位检查 / 明确拒绝→E_SESSION_NOT_ALIVE / bypass(CLI未注入)→退化为拒占位前缀
+- CRLF：项目固有CRLF行尾，Edit保持一致性无LF混合，非污染（区别于批次1的main.cjs LF→CRLF污染）
+- 设计文档 `workspace-files/.context/plan/layer2-tree-engine-design.md`，攻击重放脚本 `会话级 .context/l2-attack-replay.cjs`
+
+**D2 实测发现（重要架构事实，删掉后未来会犯错）**: 0.13.16 automation 建会话**直接调底层 `createAgentSession`（main.cjs 行522554），不经 patches 的 create_session handler**。因此 R5 心跳规则必须用官方 `meta.sourceAutomationId` 字段识别 automation 会话，**不能依赖** patches 写的 triggeredBy（automation 没经 handler 写不进去）。设计文档 `workspace-files/.context/plan/layer1-hardening-design.md`，回归测试脚本 `会话级 .context/test-layer1-ownership.cjs`（60项，可复用批次4）。
+
+**⚠️ 跨版本迁移 5 个关键坑（批次1实测，删掉后未来会犯错）**:
+1. **CRLF 污染**：Python 文本模式 `"w"` 在 Windows 把 `\n` 写成 `\r\n`，57 万行文件膨胀 57 万字节。**`node --check` 对 CRLF 不报错**（隐藏坑）。必须用二进制 `rb`/`wb` + 严格 UTF-8 解码。
+2. **C1 锚点 2 处、C2 锚点 4 处**（非唯一）：apply-patches.sh 的 sed 不带 `/g` 只改第一个 → **改错位置**。必须用带缩进上下文的精确字符串定位 sendMessage 内部正确那一处（C1: 8 空格缩进+后接 `if (!channel)`；C2: 12 空格+`try {` 前缀）。
+3. **补丁 F 必须跳过**：F 被 H 取代（wiki 明确"F 实际未注入，由 H 取代"），F+H 都打会重复注入损坏文件。
+4. **补丁 B 用 12 函数版**：apply-patches.sh 行76 是旧 10 函数版，但插件依赖 `listAgentWorkspaces`/`runAgentHeadless`，10 函数版会运行时 undefined。
+5. **补丁3 图标**：0.13.16 改名 `proma-white.png`→`iconTemplate.png`，但 `proma-logos/` 下彩色图标齐全，replacement 保留彩色 map，仅 pattern 锚点 + fallback 用 iconTemplate.png。
+
+**关键技术坑（asar extract）**: extract 不会带 `app.asar.unpacked/` 的 native 模块（`@anthropic-ai`/`@napi-rs`/`jszip` 252M），必须手动 `cp -rn app.asar.unpacked/node_modules/* app/node_modules/` 合并，否则启动崩溃。
+
+**关键文件**: 计划 `会话级 .context/plan/release-migrate-and-hardening-plan.md` | 备份 `app.bak-pre-01316-migrate` + `app.old-01223` + `main.cjs.bak-pre-migrate` | 迁移脚本 `会话级 .context/migrate-patches.py`（可重入幂等，二进制模式）
+
+---
+
+## 2026-06-27 17:15 R3 洁净室闭环 + 发现"占位 UUID 攻击链"新 P0
+
+**起因**: 用户接续 R3-handoff 文档，要求按零节清单执行 R3 修复（D2-B1 added_by 伪造 + D2-R3 worker 担任 auditor），重启 Dev 后派 4 个 R3 Commander 验证。
+
+**R3 修复（已落地）**:
+1. **D2-B1**（tree-engine.cjs cmdLeafAdd ~798-830）：withLock 块中加 added_by 事前校验（必须树内 leaf session_id，禁止 worker 担任 added_by，占位 UUID 跳过保护金标准）
+2. **D2-R3**（tree-engine.cjs cmdAuditAppend ~2714-2724）：withLock 块中拒绝 `auditorLeaf.role === 'worker'`，与 collectValidateIssues.audit_log_integrity 第 ② 项对齐升级为事前拦截
+3. 重构：`PLACEHOLDER_UUID_PATTERN_TOP` 提升到模块顶层（code-reviewer 建议采纳）
+4. code-reviewer PASS，3 处物理同步完成
+
+**R3 测试成果（4 Commander + 主会话验证）**:
+
+| Commander | 任务 | 结果 |
+|---|---|---|
+| A | D2-B1 复测 + 边界 | 90%（9/10 PASS，A8 全 0 UUID PARTIAL） |
+| B | D2-R3 复测 + audit_log_integrity 协同 | **100%（10/10）** |
+| C | R2 5 大修复回归 | 75%（6/8 PASS，2 PARTIAL 跨 workspace 环境限制） |
+| D | R3 新攻击面探索 | 发现 2 个新盲点 |
+| 主会话 | patches 生效 + D2-B1/D2-R3 主路径 | **8/8 PASS** |
+
+**🚨 新 P0：占位 UUID 攻击链（D 视角发现 + 主会话完整验证）**:
+
+根因：cmdLeafAdd 行 742 session_id 用宽松 `UUID_RE`（实现与"堵占位符"注释不一致），占位 UUID 可作 session_id 创建 leaf → 成为合法树成员 → 担任 auditor 绕过 D2-R3。
+
+实测（cr26r3verify tree）：
+1. 占位 UUID `00000000-...-000000000077` 作 session_id 创建 commander → ok
+2. 该占位 commander 给 worker 写 audit_log → ok（D2-R3 只查 role=worker）
+3. tree_validate → 未检出（占位 commander 在树中，audit_log_integrity ① 通过）
+
+**影响**：D2-B1 + D2-R3 + audit_log_integrity 三层防御被 10^12 种占位 UUID 绕过。
+
+**金标准兼容性关键论证**（R4 修复的基础）：
+- dbc-spec/zombie 等金标准走 `fs.writeFileSync` 直写路径，**不走 cmdLeafAdd / cmdAuditAppend MCP 入口**
+- 因此 MCP 入口统一拒占位 UUID **零破坏金标准**
+- collectValidateIssues（validate 路径）必须保留占位跳过（金标准会调 validate）
+
+**统一论证："兼容性绕过"模式**:
+
+每轮修复在兼容性边界引入新绕过：
+- R1→R2：B5 修复引入 D2-R3 视角盲点（入口与 validate 语义不一致）
+- R2→R3：D2-B1 修复引入占位 UUID 攻击链（UUID_RE 与 strict 选择不一致 + 占位 skip 过宽）
+- R3→R4：占位 UUID 攻击链（待修）
+
+**R4 修复优先级**（详见 R4-justification 文档）:
+- **R4-P0-A**（必修）：cmdLeafAdd session_id strict + 占位拒绝
+- **R4-P0-B**（防御纵深）：cmdAuditAppend auditor 占位拒绝
+- R4-P1：完整性哈希 / 移除 root.added_by 兜底
+- R4-P2：tree_id 命名统一 / health_check / MCP workspace
+
+**用户决策**: 记录下来统一论证（不立即修，等后续批次）
+
+**产出索引**:
+- `.context/v10/cleanroom-round3-final-recap-2026-06-27.md` — R3 综合分析（含 R4 优先级）
+- `.context/v10/R4-justification-2026-06-27.md` — **R4 统一论证**（威胁建模 + 金标准兼容矩阵 + 方案论证 + 兼容性绕过模式分析）
+- `.context/v10/bug-fix-r3-proposals-2026-06-27.md` — R3 修复方案
+- `.context/v10/cleanroom-round3-{test-plan,a,b,c,d}-2026-06-27.md` — 测试计划 + 4 Commander 报告
+- `D:/Proma-dev/resources/app/dist/tree-engine.cjs.bak-20260627-pre-r3-fix` — R3 备份
+
+**下一步**: 等用户决定 R4 修复时机（推荐 R4 批次 1：R4-P0-A/B + R4-P2-D MCP workspace，3h）
+
+---
+
+## 2026-06-27 12:35 R1 洁净室测试回收 + Worker 生命周期规范 v1.0 落档
+
+**起因**: 用户接续 6/26 IHL R1-R6 闭环后的 R1 洁净室测试，要求"派出子 Agent 回收结果并进行分析"，随后要求"详细讲解 worker 生命周期"并落独立文档便于团队对齐。
+
+**做的三件事**:
+
+1. **4 个 explorer SubAgent 并行回收** R1 报告（A/B/C/D 共 38 用例），主上下文零污染，综合通过率 89.5%
+2. **综合分析报告**：识别 5 大关键发现（按 P0/P1/P2 严重度分级），核心问题回答"V10 加固后拦截率从 0% 提升到 D=100%/B=75%"
+3. **Worker 生命周期规范 v1.0**：把 SKILL.md 的操作手册提升为独立设计契约，含 6 阶段 25 事件 8 道审计关 7 类参与者完整 Mermaid 时序图 + 状态机 + 错误码全表
+
+**R1 核心数据**:
+
+| Commander | 维度 | 通过率 | 关键结论 |
+|---|---|---|---|
+| A | 功能正确性 | 80% (6/10) | 12 项 V10 机制 11 项生效，A4/A5 受单会话约束阻塞 |
+| B | 对抗攻击 | 75% (9/12) | **2 个真实 FAIL**：B9 nudge 规则 / B12 路径遍历 |
+| C | 真实端到端 | 87.5% (7/8) | **Fork 幻觉**导致 C1 state 污染 |
+| D | Prompt Injection | **100%** (8/8) | V10 trust anchor 完美防御 |
+
+**P0/P1 待修 gap**（已写入规范 §13）:
+
+- **P0** B12 expect_outputs 路径遍历：`tree_event_append`/`tree_milestone_add` 接受 `/etc/passwd` 无校验
+- **P0** B9 applyNudge 规则绕过：rule_id 任意字符串无白名单
+- **P1** Fork 幻觉：fork 缺身份提示，自主越权（C1+C5 双重确认）
+- **P1** Auditor 鸡生蛋死锁：worker 占满 node_budget 后无法创建 auditor
+- **P1** B5 audit_log 伪造：缺专用 W-AUDIT-TAMPER 校验
+
+**产出索引**:
+- `.context/v10/cleanroom-round1-recap-2026-06-27.md` — 综合分析报告
+- `.context/v10/worker-lifecycle-spec-2026-06-27.md` — Worker 生命周期规范 v1.0（688 行）
+- PROJECT-INDEX.md 已同步刷新
+
+**下一步**: R2 修复 3 个 P0/P1 后视角互换（A↔C / B↔A / C↔D / D↔B）
+
 ## 2026-06-26 18:20 V10 Phase 3 Followup — IHL 6 轮迭代闭环 + R5/R6 Audit Tamper Detection
 
 **起因**: 用户要求"安排 TreeCommander 和 SubAgent 验证监督，并迭代改进"。在前序 V10 P3 收尾（commit `30eb4fa` Bug A/B 修复 + `9c423b8` TAO Watcher 入口守卫）基础上，开启 IHL（Iterative Hardening Loop）连续 6 轮迭代加固。

@@ -203,6 +203,161 @@ function validateWorkspaceId(workspaceId) {
   };
 }
 
+// ============================================================
+// 层1加固 (caller ownership) — patches.cjs 身份冒用根治
+// 设计文档: workspace-files/.context/plan/layer1-hardening-design.md
+// 目标: 堵 send_message / fork_session / archive_session 的身份冒用漏洞。
+//   sourceSessionId 是服务端注入的可信身份 (L1353 global.__proma_getMcpServers__
+//   按 sessionId 闭包注入, agent 无法篡改自己身份), 但三个写工具从未用它做权限判定
+//   → Agent A 可给任意 session B 注入消息 / fork 窃取上下文 / 归档破坏协作链。
+//   加固 = 给三个写工具加 caller ownership 校验 (R1-R6), 并让 create_session /
+//   fork_session 写 agentSession 级血缘字段。
+//
+// 新增血缘字段 (与官方 sdkSession 级 forkSourceSdkSessionId 严格区分, 运行时
+//   updateAgentSessionMeta 是 generic merge, .cjs 不经 TS 类型检查, 可写自定义字段):
+//   parentSessionId     — 谁创建/拥有我 (create_session + fork_session 都写, 用于 R2/R3/R4)
+//   forkedFromSessionId — 我从哪个 agentSession fork 上下文 (仅 fork_session 写, 语义血缘)
+//   delegationDepth     — 委派深度 (root/user 建=0, 子会话=parent.depth+1)
+//   triggeredBy         — 'user' | 'agent' | 'automation' (R5 系统特权判定 + 审计)
+//   ownerGrantedAt      — parentSessionId 写入时间戳 (审计/调试)
+//
+// 命名铁律 (D6): 绝不写 sourceSessionId / source_session_id / forked_from ——
+//   这三个是 C-15 ruleC15 (L2587) 判定 "worker 是否 fork 建" 的依据, 官方从不写,
+//   当前恒 undefined; 若 create_session 也写会破坏 C-15 语义 (误判 create 建的 worker
+//   为 fork 建)。必须用全新字段名 parentSessionId / forkedFromSessionId。
+// ============================================================
+
+// D3: MAX_DELEGATION_DEPTH=10. tree-engine commander 限 3 层 (root→child→grandchild),
+// session fork 链 (竹节交接/深度探索) 留余量到 10。R4 祖先链遍历也用此上限兜底。
+const MAX_DELEGATION_DEPTH = 10;
+
+// 判定结果结构: { allow: bool, rule: string, reason: string, audit: bool }
+//   allow=true 放行; audit=true 表示放行但记审计日志 (老会话兼容/系统特权/meta 丢失/外部 send)。
+
+// R4 祖先链查询: sidA 与 sidB 之一是另一的祖先 (沿 parentSessionId 向上, ≤maxDepth)。
+// 实现: 从 child 沿 parentSessionId 向上走能否到达 ancestor。O(depth) 次 getAgentSessionMeta,
+//   不依赖 listAgentSessions 返回自定义字段 (getAgentSessionMeta 运行时全量), 带环保护。
+function isAncestorOrDescendant(sidA, sidB, maxDepth) {
+  maxDepth = maxDepth || MAX_DELEGATION_DEPTH;
+  if (!sidA || !sidB || sidA === sidB) return false;
+  let a;
+  try { a = api(); } catch (_) { return false; }
+  // 从 startSid 沿 parentSessionId 向上走, 看能否到达 seekSid
+  function upChainReaches(startSid, seekSid, limit) {
+    let cur = startSid;
+    let hops = 0;
+    const seen = new Set();
+    while (cur && hops <= limit) {
+      if (cur === seekSid) return true;
+      if (seen.has(cur)) break;  // 环保护 (恶意/数据损坏形成环)
+      seen.add(cur);
+      let meta;
+      try { meta = a.getAgentSessionMeta(cur); } catch (_) { meta = null; }
+      if (!meta) break;
+      cur = meta.parentSessionId;
+      hops++;
+    }
+    return false;
+  }
+  // A 是 B 的祖先 ⇔ 从 B 向上能到 A;  B 是 A 的祖先 ⇔ 从 A 向上能到 B
+  return upChainReaches(sidB, sidA, maxDepth) || upChainReaches(sidA, sidB, maxDepth);
+}
+
+// R5 系统特权 (心跳 automation)。D2 关键修正:
+//   ⚠️ 0.13.16 automation 建会话直接调底层 createAgentSession (main.cjs L522554),
+//   不经 patches 的 create_session handler → patches 写的 triggeredBy='automation' 写不进
+//   automation 会话。因此 automation 识别必须用官方已有字段 meta.sourceAutomationId
+//   (AgentSessionMeta 标准字段), 绝不能只依赖 triggeredBy。
+//   triggeredBy 仍写 (给经 handler 的会话用), 但 R5 判定以 sourceAutomationId 为主。
+//   收紧: automation 只允许 send (action==='send'), 同 workspace 才放行。
+function isSystemPrivileged(srcMeta, tgtMeta, action) {
+  if (action !== 'send') return false;  // automation 不能 fork/archive 他人 session
+  if (!srcMeta) return false;
+  const isAutomation = !!srcMeta.sourceAutomationId || srcMeta.triggeredBy === 'automation';
+  if (!isAutomation) return false;
+  // 同 workspace 才放行 (跨 workspace automation 仍需血缘)
+  if (srcMeta.workspaceId && tgtMeta && tgtMeta.workspaceId &&
+      srcMeta.workspaceId !== tgtMeta.workspaceId) return false;
+  return true;
+}
+
+// caller ownership 核心校验 (R1-R6)。send_message / fork_session / archive_session 共用。
+// action ∈ {'send','fork','archive'}。
+// 返回 { allow, rule, reason, audit }。
+function assertOwnership(sourceSid, targetSid, action) {
+  // R6 外部/remote 降级 (sourceSessionId==null). D1 选项A: 外部仅允许 send, 禁 fork/archive。
+  //   外部 stdio MCP (Claude Code) 和 remote_* 进来时 sourceSessionId=null, 无法做血缘;
+  //   send 冒充危害 (注入消息) < fork 窃取上下文 / archive 破坏协作链, 故仅放行 send + 审计。
+  if (!sourceSid) {
+    if (action === 'send') {
+      return { allow: true, rule: 'R6-external-send', audit: true,
+        reason: 'external/remote caller: send allowed (D1-A), fork/archive denied' };
+    }
+    return { allow: false, rule: 'R6-external-deny', audit: true,
+      reason: `external/remote caller: ${action} denied (D1-A: only send_message allowed)` };
+  }
+
+  let a, srcMeta, tgtMeta;
+  try {
+    a = api();
+    srcMeta = a.getAgentSessionMeta(sourceSid);
+    tgtMeta = a.getAgentSessionMeta(targetSid);
+  } catch (e) {
+    // api 异常不阻断 (best-effort, 信任闭包身份, 与 list_sessions house style 一致)
+    return { allow: true, rule: 'ERR-api-bypass', audit: true,
+      reason: 'ownership check api error (bypass): ' + (e && e.message ? e.message : String(e)) };
+  }
+
+  if (!tgtMeta) {
+    return { allow: false, rule: 'E_TARGET_NOT_FOUND', audit: false,
+      reason: `target session not found: ${targetSid}` };
+  }
+  if (!srcMeta) {
+    // source meta 丢失不阻断: sourceSid 仍是可信的注入身份, meta 可能因 sessions.json
+    // 延迟/GC 暂缺。放行 + 审计 (不阻断合法内部协作)。
+    return { allow: true, rule: 'ALLOW_AUDIT-src-missing', audit: true,
+      reason: `source meta missing (trusting injected sourceSid): ${sourceSid}` };
+  }
+
+  // R1 自循环 (模式2/3 fork 自己, worker 给自己总结)
+  if (sourceSid === targetSid) {
+    return { allow: true, rule: 'R1-self', audit: false, reason: 'self-loop' };
+  }
+  // R2 下行认领: target 的 parent 是 source (commander→worker, worker→reviewer)
+  if (tgtMeta.parentSessionId === sourceSid) {
+    return { allow: true, rule: 'R2-downstream', audit: false, reason: 'target owned by caller (downstream)' };
+  }
+  // R3 上行回报: source 的 parent 是 target (worker→commander, 反向必须允许, K2)
+  if (srcMeta.parentSessionId === targetSid) {
+    return { allow: true, rule: 'R3-upstream', audit: false, reason: 'caller reports to target (upstream)' };
+  }
+  // R4 多跳血缘 (祖先链, 子commander↔孙worker, 竹节交接链)
+  if (isAncestorOrDescendant(sourceSid, targetSid, MAX_DELEGATION_DEPTH)) {
+    return { allow: true, rule: 'R4-ancestor-chain', audit: false, reason: 'ancestor/descendant relation (multi-hop)' };
+  }
+  // R5 系统特权 (心跳 automation, D2: sourceAutomationId 识别)
+  if (isSystemPrivileged(srcMeta, tgtMeta, action)) {
+    return { allow: true, rule: 'R5-automation', audit: true,
+      reason: 'automation heartbeat (sourceAutomationId), same-workspace send' };
+  }
+  // K9 / D5 老会话兼容: source 和 target 都无 parentSessionId (加固前建的) → 放行 + 审计。
+  //   避免一上线把所有历史协作链全断。纯老会话协作放行; 新→老 / 老→新 无血缘仍 DENY (堵冒用)。
+  if (!srcMeta.parentSessionId && !tgtMeta.parentSessionId) {
+    return { allow: true, rule: 'ALLOW_AUDIT-legacy', audit: true,
+      reason: 'both sessions pre-hardening (no lineage): allow + audit (D5 backward compat)' };
+  }
+  return { allow: false, rule: 'E_NO_OWNERSHIP', audit: true,
+    reason: `no ownership: ${action} from ${sourceSid.slice(0, 8)} to ${targetSid.slice(0, 8)}` };
+}
+
+// 把 ownership 判定记审计日志 (DENY 必记, audit=true 的放行也记)。
+function logOwnership(action, sourceSid, targetSid, decision) {
+  const tag = decision.allow ? (decision.audit ? 'AUDIT' : 'ALLOW') : 'DENY';
+  const src = sourceSid ? sourceSid.slice(0, 8) : '(external)';
+  const tgt = targetSid ? targetSid.slice(0, 8) : '?';
+  log(`[ownership:${tag}] action=${action} rule=${decision.rule} source=${src} target=${tgt} | ${decision.reason}`);
+}
+
 // ---- 7 个纯 handler（不依赖 sdk/zod，可在内部 MCP server 和 HTTP bridge 间共享）----
 function createToolHandlers(sourceSessionId) {
   return {
@@ -484,8 +639,34 @@ function createToolHandlers(sourceSessionId) {
       // 未指定 workspace_id 时不强制, createAgentSession 内部有 fallback, 加上
       // findTreesDirForWorkspace 的 slug "undefined" fallback 保护 (V10 已修).
 
+      // 层1加固 §6: delegationDepth 预检 (createAgentSession 之前, 超限直接拒绝避免孤儿 session)
+      let _newDepth = 0;
+      if (sourceSessionId) {
+        let _srcMeta = null;
+        try { _srcMeta = a.getAgentSessionMeta(sourceSessionId); } catch (_) {}
+        const _srcDepth = (_srcMeta && typeof _srcMeta.delegationDepth === 'number') ? _srcMeta.delegationDepth : 0;
+        _newDepth = _srcDepth + 1;
+        if (_newDepth > MAX_DELEGATION_DEPTH) {
+          return jsonResult({ ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `create denied: delegation depth ${_newDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${sourceSessionId.slice(0, 8)} already at depth ${_srcDepth}.` } });
+        }
+      }
       try {
         const meta = a.createAgentSession(args.title, args.channel_id, workspaceId, modelId);
+        // 层1加固 K1: 补写 agentSession 级血缘 (commander 建的 worker 必须能被 ownership R2 认领,
+        //   否则 tree 下发/开小弟全断). 命名铁律: 绝不写 source_session_id/forked_from (C-15 在用).
+        try {
+          if (sourceSessionId) {
+            a.updateAgentSessionMeta(meta.id, {
+              parentSessionId: sourceSessionId,
+              delegationDepth: _newDepth,
+              triggeredBy: 'agent',
+              ownerGrantedAt: Date.now(),
+            });
+          } else {
+            // 外部/automation: 不写 parentSessionId (避免外部冒认), depth=0
+            a.updateAgentSessionMeta(meta.id, { delegationDepth: 0, triggeredBy: 'user' });
+          }
+        } catch (e) { log(`[create_session] lineage write failed (non-fatal): ${e && e.message ? e.message : String(e)}`); }
         log(`Session created: ${meta.id.slice(0, 8)} "${meta.title}" channel=${args.channel_id} workspace=${workspaceId || '(default)'} model=${modelId}`);
         return jsonResult({
           session: {
@@ -509,6 +690,21 @@ function createToolHandlers(sourceSessionId) {
       const source = a.getAgentSessionMeta(args.source_session_id);
       if (!source) {
         return jsonResult({ error: `Source session not found: "${args.source_session_id}". Use list_sessions to find valid session IDs.` });
+      }
+
+      // 层1加固: caller 必须拥有 source 才能 fork (防任意 agent fork 他人 session 窃取完整上下文, 修 L693 区域漏洞)
+      const _forkOwn = assertOwnership(sourceSessionId, args.source_session_id, 'fork');
+      if (!_forkOwn.allow) {
+        logOwnership('fork', sourceSessionId, args.source_session_id, _forkOwn);
+        return jsonResult({ ok: false, error: { code: _forkOwn.rule, msg: `fork_session denied: ${_forkOwn.reason}` } });
+      }
+      if (_forkOwn.audit) logOwnership('fork', sourceSessionId, args.source_session_id, _forkOwn);
+
+      // 层1加固 §6: delegationDepth 预检 (forkAgentSession 之前, 超限拒绝避免孤儿)
+      const _forkSrcDepth = (typeof source.delegationDepth === 'number') ? source.delegationDepth : 0;
+      const _forkNewDepth = _forkSrcDepth + 1;
+      if (_forkNewDepth > MAX_DELEGATION_DEPTH) {
+        return jsonResult({ ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `fork denied: delegation depth ${_forkNewDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${args.source_session_id.slice(0, 8)} already at depth ${_forkSrcDepth}.` } });
       }
 
       if (!source.sdkSessionId) {
@@ -566,6 +762,13 @@ function createToolHandlers(sourceSessionId) {
         }
 
         const updates = {};
+        // 层1加固: 写 agentSession 级血缘 (caller 认领 fork 产物, 区别于 sdkSession 级 forkSourceSdkSessionId)。
+        //   命名铁律: 用 forkedFromSessionId (语义血缘), 不碰 source_session_id/forked_from (C-15 在用)。
+        updates.parentSessionId = sourceSessionId || args.source_session_id;  // caller 认领 (内部用 sourceSessionId, 外部降级用 args)
+        updates.forkedFromSessionId = args.source_session_id;                 // 语义血缘 (fork 才写)
+        updates.delegationDepth = _forkNewDepth;                               // 从 source 继承 depth+1
+        updates.triggeredBy = sourceSessionId ? 'agent' : 'user';
+        updates.ownerGrantedAt = Date.now();
         if (args.title) updates.title = args.title;
         const effectiveChannelId = args.new_channel_id || source.channelId;
         if (effectiveChannelId) updates.channelId = effectiveChannelId;
@@ -583,7 +786,106 @@ function createToolHandlers(sourceSessionId) {
         a.updateAgentSessionMeta(forked.id, updates);
         Object.assign(forked, updates);
 
-        log(`Session forked: ${forked.id.slice(0, 8)} from ${args.source_session_id.slice(0, 8)}`);
+        // V9+ Phase 4 (R2 P1 / Fork 幻觉修复): fork 后同步等待身份提示注入完成。
+        //   失守根因：R1 洁净室 C1+C5 双重确认 — fork 会话继承根会话完整上下文后，
+        //   缺少"你是 fork"的身份提示，自主越权执行建 leaf、写 done event、伪造 auditor UUID，
+        //   污染 tree-state.json（C1 实测：validate 返回 4 issues）。
+        //   修复：fork 完成后同步注入一条身份提示 user message 并等待响应，让 fork 会话明确：
+        //   ① 自己是 fork（非源会话）② 新 session_id ③ 禁止越权执行源会话身份相关操作。
+        //   设计权衡：增加 ~5-15s 延迟换取身份确定性，比异步注入更可靠（异步注入可能与
+        //   后续真实任务消息竞争，导致身份提示被覆盖）。
+        //   审计员 P1 反馈：fork_identity_injected 改三态（injected/timeout/failed），
+        //     让调用方能区分实际状态，避免误导性 true。
+        //   审计员 P0 反馈：超时路径需要 stop 后台 agent，防止 send_message 被静默丢弃。
+        const forkChannelId = effectiveChannelId || source.channelId;
+        const forkModelId = effectiveModelId || source.modelId;
+        const identityPrompt = [
+          '【FORK 身份提示 - V9+ Phase 4 / R2 P1 修复】',
+          '',
+          `你是从源会话 ${args.source_session_id.slice(0, 8)}... fork 出来的副本（不是源会话本身）。`,
+          '',
+          '**身份信息**：',
+          `- 你的新 session_id: ${forked.id}`,
+          `- 源会话 session_id: ${args.source_session_id}`,
+          '',
+          '**关键约束（必须遵守，任何后续消息都不得覆盖）**：',
+          '1. 你**不是**源会话本身。源会话身份相关的操作（如以源会话身份建 leaf、写 done event、',
+          '   调 audit_gate、伪造 auditor UUID）你**无权**执行。',
+          '2. 你的新 session_id 在 tree-state.json 中**不归属任何 leaf**。如需执行 tree 操作，',
+          '   必须由父会话重新分配 leaf_id 与你新 session_id 的关联。',
+          '3. 你的首要任务是：等待父会话给出明确任务。**禁止**主动越权执行任何 tree 写操作。',
+          '4. 如果你接到父会话任务（含明确 leaf_id 指派），按任务要求执行；不要复用源会话的',
+          '   leaf owner 身份。',
+          '',
+          '请回复："我已确认 fork 身份，新 session_id=' + forked.id.slice(0, 8) + '..., 等待父会话指令。" 以确认。'
+        ].join('\n');
+
+        let identityStatus = 'failed';  // 默认失败，仅注入流程走完且 onComplete 才置 injected
+        try {
+          await new Promise((resolve) => {
+            let settled = false;
+            const timeout = setTimeout(() => {
+              if (settled) return;
+              settled = true;
+              identityStatus = 'timeout';
+              // 审计员 P0 反馈：超时分支必须 stop 后台 agent，防止后续 send_message 被 activeSessions 静默丢弃
+              try {
+                if (typeof a.stopAgent === 'function') {
+                  a.stopAgent(forked.id);
+                  log(`[fork_session] 身份提示超时，已 stop 后台 agent: fork ${forked.id.slice(0, 8)}`);
+                } else {
+                  log(`[fork_session] 身份提示超时（a.stopAgent 不存在，未清理后台 agent）: fork ${forked.id.slice(0, 8)}`);
+                }
+              } catch (stopErr) {
+                log(`[fork_session] stopAgent 异常: ${stopErr}`);
+              }
+              resolve();
+            }, 30000);
+            try {
+              a.runAgentHeadless(
+                {
+                  sessionId: forked.id,
+                  userMessage: identityPrompt,
+                  channelId: forkChannelId,
+                  modelId: forkModelId,
+                  workspaceId: forked.workspaceId,
+                  permissionModeOverride: 'bypassPermissions',
+                },
+                {
+                  onComplete: () => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeout);
+                    identityStatus = 'injected';
+                    log(`[fork_session] 身份提示注入成功: fork ${forked.id.slice(0, 8)}`);
+                    resolve();
+                  },
+                  onError: (e) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeout);
+                    identityStatus = 'failed';
+                    log(`[fork_session] 身份提示注入失败（fork 仍返回成功）: ${e}`);
+                    resolve();
+                  },
+                  onTitleUpdated: () => {},
+                }
+              );
+            } catch (syncErr) {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timeout);
+              identityStatus = 'failed';
+              log(`[fork_session] 身份提示注入同步异常: ${syncErr}`);
+              resolve();
+            }
+          });
+        } catch (identityErr) {
+          identityStatus = 'failed';
+          log(`[fork_session] 身份提示流程异常（不影响 fork 结果）: ${identityErr}`);
+        }
+
+        log(`Session forked: ${forked.id.slice(0, 8)} from ${args.source_session_id.slice(0, 8)} (identity: ${identityStatus})`);
         return jsonResult({
           session: {
             id: forked.id,
@@ -594,8 +896,9 @@ function createToolHandlers(sourceSessionId) {
             source_session_id: args.source_session_id,
             fork_source_sdk_session_id: forked.forkSourceSdkSessionId,
             created_at: forked.createdAt,
+            fork_identity_status: identityStatus,  // injected / timeout / failed
           },
-          message: `Session forked: ${forked.title} (${forked.id.slice(0, 8)}) from "${source.title}". Open the Proma sidebar to see and switch to the forked session.`,
+          message: `Session forked: ${forked.title} (${forked.id.slice(0, 8)}) from "${source.title}". Fork 身份提示状态: ${identityStatus}（V9+ Phase 4 R2 P1）。Open the Proma sidebar to see and switch to the forked session.`,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -613,6 +916,17 @@ function createToolHandlers(sourceSessionId) {
       if (!meta) {
         return jsonResult({ error: `Target session not found: "${args.session_id}".` });
       }
+
+      // 层1加固: caller ownership 校验 (堵身份冒用核心漏洞 L712)。
+      //   caller(sourceSessionId) 必须对 target 拥有所有权 (血缘/自循环/系统特权),
+      //   否则任意 agent 可给 target 注入 user message 冒充指令/污染上下文。
+      //   notify 回调 (onComplete 内 runAgentHeadless sourceSessionId) 不经此 handler, 天然免疫。
+      const _sendOwn = assertOwnership(sourceSessionId, args.session_id, 'send');
+      if (!_sendOwn.allow) {
+        logOwnership('send', sourceSessionId, args.session_id, _sendOwn);
+        return jsonResult({ ok: false, error: { code: _sendOwn.rule, msg: `send_message denied: ${_sendOwn.reason}` } });
+      }
+      if (_sendOwn.audit) logOwnership('send', sourceSessionId, args.session_id, _sendOwn);
 
       const channelId = args.channel_id || meta.channelId;
       if (!channelId) {
@@ -765,6 +1079,14 @@ function createToolHandlers(sourceSessionId) {
       const a = api();
       const meta = a.getAgentSessionMeta(args.session_id);
       if (!meta) return jsonResult({ error: `Session not found: ${args.session_id}` });
+      // 层1加固: caller ownership 校验 (防任意 agent 归档他人 session → DoS / 破坏协作链)。
+      //   注意 R5 isSystemPrivileged 只允许 action='send', 故 automation 不能 archive (符合预期: 心跳不应归档他人)。
+      const _archOwn = assertOwnership(sourceSessionId, args.session_id, 'archive');
+      if (!_archOwn.allow) {
+        logOwnership('archive', sourceSessionId, args.session_id, _archOwn);
+        return jsonResult({ ok: false, error: { code: _archOwn.rule, msg: `archive_session denied: ${_archOwn.reason}` } });
+      }
+      if (_archOwn.audit) logOwnership('archive', sourceSessionId, args.session_id, _archOwn);
       const archived = args.archived !== false; // default true
       a.updateAgentSessionMeta(args.session_id, { archived });
       log(`Session ${archived ? "archived" : "unarchived"}: ${args.session_id.slice(0, 8)} "${meta.title}"`);
@@ -1141,6 +1463,21 @@ function createExternalHttpBridge() {
   // v0.7+: 引擎内联 —— 直接 require tree-engine.cjs（同目录），调 engine.run。
   // 不再 spawn node tree-state.js：工作区无需 tree-state.js 源码，agent 看不到引擎代码。
   const treeEngine = require("./tree-engine.cjs");
+
+  // L2-root-cause (层2 身份校验根治，方案A): 注入 session 真实性 verifier。
+  //   调 global.__proma__.getAgentSessionMeta 判断 session 是否真实存在（根因A根治：堵任意合规格式 UUID 注册）。
+  //   __proma__ 未就绪 → null（bypass，同 Patch M 哲学，best-effort 不阻断）；
+  //   session 真实存在 → true；不存在 → false（engine 据此 throw E_SESSION_NOT_ALIVE）。
+  //   verifier 是无状态函数，require 后注入一次即可（与 callerSessionId 透传互补；详见设计文档 §三方案A）。
+  treeEngine.setSessionVerifier((sid) => {
+    if (!sid) return false;
+    try {
+      const a = global.__proma__;
+      if (!a || typeof a.getAgentSessionMeta !== 'function') return null; // __proma__ 未就绪 → bypass
+      const meta = a.getAgentSessionMeta(sid);
+      return !!meta;                                    // session 真实存在 = true
+    } catch (_) { return null; }                        // 异常不阻断（bypass）
+  });
 
   // workspace → trees_dir 定位（复制 registerTreePanelIpc 内 discoverAllWorkspacesWithTrees 的核心；
   // 后者是 IIFE 局部函数，本模块级 createTreeMcpServer 无法访问，故独立实现一份）

@@ -20,6 +20,14 @@ const _findEngine = () => {
 };
 const engine = require(_findEngine());
 engine.setTreesRoot(SANDBOX);
+// L2-root-cause (层2 身份校验根治): 注入 mock session verifier（替代旧占位 UUID 跳过）。
+//   测试环境无真实 Proma session，占位前缀 UUID（00000000-...-XXX）视为真实 session（放行）；
+//   非占位 UUID（伪造合法 v4）→ false → assertMcpEntrySessionId 拒(E_SESSION_NOT_ALIVE) / resolveAuditorIndep 拒(E_AUDITOR_NOT_INDEPENDENT)。
+//   FAKE(全f) 在 FORBIDDEN_UUIDS 由格式校验拦截（不到 verifier）。详见设计文档 §五。
+engine.setSessionVerifier((sid) => {
+  if (typeof sid === 'string' && /^00000000-0000-0000-0000-[0-9]{12}$/.test(sid)) return true;
+  return false;
+});
 
 const UUID = {
   root:    '00000000-0000-0000-0000-000000000001',
