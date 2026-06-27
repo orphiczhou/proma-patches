@@ -340,11 +340,19 @@ function assertOwnership(sourceSid, targetSid, action) {
     return { allow: true, rule: 'R5-automation', audit: true,
       reason: 'automation heartbeat (sourceAutomationId), same-workspace send' };
   }
-  // K9 / D5 老会话兼容: source 和 target 都无 parentSessionId (加固前建的) → 放行 + 审计。
-  //   避免一上线把所有历史协作链全断。纯老会话协作放行; 新→老 / 老→新 无血缘仍 DENY (堵冒用)。
+  // K9 / D5 老会话兼容: source 和 target 都无 parentSessionId (加固前建的)。
+  //   P1 防借身份收紧：从"全 action allow+audit"改为"仅 send allow+audit，fork/archive deny"
+  //   （与 R6 外部降级语义对齐：fork 窃取上下文 / archive 破坏协作链危害 > send，收紧迁移期老会话间冒用窗口）。
+  //   send 放行保留 rule 'ALLOW_AUDIT-legacy'（test-layer1-ownership D5a/D5b 依赖此 rule 名断言）；
+  //   fork/archive 改 DENY（test-layer1-ownership 未覆盖 both-legacy 的 fork/archive，无回归）。
+  //   新→老 / 老→新（仅一方无 parentSessionId）不命中此块，仍走 E_NO_OWNERSHIP DENY（堵冒用，不变）。
   if (!srcMeta.parentSessionId && !tgtMeta.parentSessionId) {
-    return { allow: true, rule: 'ALLOW_AUDIT-legacy', audit: true,
-      reason: 'both sessions pre-hardening (no lineage): allow + audit (D5 backward compat)' };
+    if (action === 'send') {
+      return { allow: true, rule: 'ALLOW_AUDIT-legacy', audit: true,
+        reason: 'both sessions pre-hardening (no lineage): send allow + audit (D5 backward compat; P1 tightened: fork/archive now denied)' };
+    }
+    return { allow: false, rule: 'DENY-legacy-no-lineage', audit: true,
+      reason: `both sessions pre-hardening (no lineage): ${action} denied (D5 P1 tightened: only send_message allowed for legacy sessions without lineage; use create_session/fork_session with real parentSessionId to restore full delegation)` };
   }
   return { allow: false, rule: 'E_NO_OWNERSHIP', audit: true,
     reason: `no ownership: ${action} from ${sourceSid.slice(0, 8)} to ${targetSid.slice(0, 8)}` };

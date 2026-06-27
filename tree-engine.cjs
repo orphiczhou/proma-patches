@@ -1394,7 +1394,13 @@ async function cmdLeafSetLastEvent(args) {
 // 修正 PENDING_ROOT 或恢复时更新 session_id
 // ============================================================
 
-async function cmdLeafSetSession(args) {
+async function cmdLeafSetSession(args, callerSessionId) {
+  // P1 防借身份补强: 新增 callerSessionId 形参（dispatch → dispatchLeaf 透传，MCP wrapper tt helper 已注入）。
+  //   失守根因: leaf set-session 改 leaf.session_id 是"所有权转移"操作，引擎层原完全无感知 caller 身份,
+  //   X 把任意 leaf.session_id 改成自己的真实 session → 夺取所有权 → 绕过"只有 owner 能 mark done"。
+  //   修复: callerSessionId 必须 === leaf.added_by（仅创建该 leaf 的 commander/root 能改其 session_id）。
+  //   root leaf 的 added_by=null（cmdInit 自创建），允许 root 自己（caller===leaf.session_id）改（修正 PENDING_ROOT / 恢复），
+  //   与 cmdEventAppend L1798 callerIsRootSelf 同语义。CLI 调用（dbc-spec 等测试）不传 callerSessionId，跳过此校验（向后兼容）。
   const { positional } = parseArgs(args);
   const [tree_id, leaf_id, new_session_id] = positional;
   assertTreeExists(tree_id);
@@ -1409,6 +1415,24 @@ async function cmdLeafSetSession(args) {
     if (!state.leaves[leaf_id]) {
       throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
     }
+    const leaf = state.leaves[leaf_id];
+
+    // P1 防借身份: 只有创建该 leaf 的 commander/root（added_by）能改 leaf.session_id。
+    //   放在 session_id 唯一性校验之前（身份校验优先，fail-fast on attacker）。
+    //   - isCreator: caller === leaf.added_by（创建者）。workers 不能当 added_by（cmdLeafAdd L874 已禁），故 worker 无法借此夺权。
+    //   - isRootSelf: root leaf（added_by=null）允许 root 自己改（caller===leaf.session_id），覆盖 PENDING_ROOT 修正 / 恢复场景。
+    //   - CLI（无 callerSessionId）跳过，向后兼容全部金标准测试（均走 engine.run(cmd,args) 不传 caller）。
+    if (callerSessionId) {
+      const isCreator = leaf.added_by != null && callerSessionId === leaf.added_by;
+      const isRootSelf = leaf.role === 'root' && callerSessionId === leaf.session_id;
+      if (!isCreator && !isRootSelf) {
+        throw new TreeStateError(
+          E_BORROWED_IDENTITY,
+          `leaf set-session rejected: caller "${callerSessionId}" is not the creator (added_by=${leaf.added_by || 'null'}) of leaf "${leaf_id}" nor root-self. Only the commander/root that created this leaf can change its session_id (P1: prevent leaf ownership hijack — changing session_id would transfer done-event ownership).`
+        );
+      }
+    }
+
     // session_id 唯一性：不能与树中其他 leaf 冲突
     const conflict = Object.values(state.leaves).find(
       (l) => l.leaf_id !== leaf_id && l.session_id === new_session_id
@@ -1419,7 +1443,6 @@ async function cmdLeafSetSession(args) {
         `session_id "${new_session_id}" already used by leaf "${conflict.leaf_id}"`
       );
     }
-    const leaf = state.leaves[leaf_id];
     const from = leaf.session_id;
     leaf.session_id = new_session_id;
     writeState(tree_id, state);
@@ -2658,8 +2681,12 @@ async function cmdAuditGate(args, callerSessionId) {
 // 命令: audit append (v0.2.2 TAO) — 审计结果落盘
 // ============================================================
 
-async function cmdAuditAppend(args) {
+async function cmdAuditAppend(args, callerSessionId) {
   // audit append <tree_id> <leaf_id> --json '<audit_log_entry>'
+  // P2 防借身份补强: 新增 callerSessionId 形参（dispatchAudit 透传，MCP wrapper 已注入）。
+  //   失守根因: audit_append 写 audit_log 的 auditor_session_id 由调用方任意指定，引擎层无感知 caller 身份,
+  //   X 可用他人真实 session_id 当 auditor 写 audit_log（伪造审计背书）。
+  //   修复: callerSessionId 必须 === entry.auditor_session_id（与 cmdAuditGate L2572 对齐）。
   const { positional, opts } = parseArgs(args);
   const [tree_id, leaf_id] = positional;
   assertTreeExists(tree_id);
@@ -2682,6 +2709,16 @@ async function cmdAuditAppend(args) {
   // L2-root-cause: auditor_session_id 必须合法且真实存在（堵伪造 auditor 写 audit_log，根因A根治）。
   //   旧 isValidStrictUuidV4 只查格式，任意合规格式 UUID 都能写 audit_log；现加 verifier 真实性校验。
   assertMcpEntrySessionId(entry.auditor_session_id, 'auditor_session_id');
+
+  // P2 防借身份: 调用方 session_id 必须等于 entry.auditor_session_id（与 cmdAuditGate L2572 caller===audit_session_id 对齐）。
+  //   堵攻击：X 用他人真实 session_id（如 auditor 404c724f）当 auditor 写 audit_log，伪造审计背书。
+  //   CLI 调用（dbc-spec 等测试）不传 callerSessionId，跳过此校验（向后兼容）。
+  if (callerSessionId && callerSessionId !== entry.auditor_session_id) {
+    throw new TreeStateError(
+      E_BORROWED_IDENTITY,
+      `audit_append rejected: caller "${callerSessionId}" != auditor_session_id "${entry.auditor_session_id}" (borrowed identity forbidden; caller must be the auditor itself — align with audit_gate caller binding)`
+    );
+  }
 
   // M2: total/passed/failed 必须是整数（spec §18.3）
   for (const k of ['total', 'passed', 'failed']) {
@@ -2926,9 +2963,10 @@ async function dispatchAudit(args, callerSessionId) {
   }
   const [sub, ...rest] = args;
   switch (sub) {
-    // V10-self-audit-forbidden-v2: 仅 'gate' 需要 callerSessionId（堵借身份）
+    // V10-self-audit-forbidden-v2 + P1: 'gate' 和 'append' 都校验 caller 身份（堵借身份）。
+    //   append 路径原只透传给 gate，audit_append 收不到 caller → X 可用他人真实 session_id 当 auditor 写 audit_log。
     case 'gate': return await cmdAuditGate(rest, callerSessionId);
-    case 'append': return await cmdAuditAppend(rest);
+    case 'append': return await cmdAuditAppend(rest, callerSessionId);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown audit subcommand "${sub}"`);
   }
@@ -3688,8 +3726,9 @@ async function dispatch(cmd, args, callerSessionId) {
       return await cmdMigrate(args);
 
     // Add
+    // P1 防借身份: dispatchLeaf 透传 callerSessionId（cmdLeafSetSession 校验 caller===leaf.added_by，堵夺权）
     case 'leaf':
-      return await dispatchLeaf(args);
+      return await dispatchLeaf(args, callerSessionId);
     case 'milestone':
       return await dispatchMilestone(args);
 
@@ -3724,7 +3763,7 @@ async function dispatch(cmd, args, callerSessionId) {
   }
 }
 
-async function dispatchLeaf(args) {
+async function dispatchLeaf(args, callerSessionId) {
   if (args.length === 0) {
     throw new TreeStateError(E_SCHEMA_INVALID, 'leaf requires a subcommand: get | list-active | list-all | add | set-status | set-context | set-last-event | set-session | autonomy-override');
   }
@@ -3737,7 +3776,8 @@ async function dispatchLeaf(args) {
     case 'set-status': return await cmdLeafSetStatus(rest);
     case 'set-context': return await cmdLeafSetContext(rest);
     case 'set-last-event': return await cmdLeafSetLastEvent(rest);
-    case 'set-session': return await cmdLeafSetSession(rest);
+    // P1 防借身份: set-session 透传 callerSessionId（cmdLeafSetSession 校验 caller===leaf.added_by，堵夺权）
+    case 'set-session': return await cmdLeafSetSession(rest, callerSessionId);
     case 'autonomy-override': return await cmdLeafAutonomyOverride(rest);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown leaf subcommand "${sub}"`);

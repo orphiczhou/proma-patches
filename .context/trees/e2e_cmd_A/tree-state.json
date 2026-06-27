@@ -68,7 +68,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 3,
+      "nudge_count": 9,
       "nudge_log": [
         {
           "ts": "2026-06-27T11:52:46.511Z",
@@ -95,6 +95,60 @@
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 3,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.216Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 4,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.212Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 5,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.149Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 6,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.109Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 7,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.197Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 8,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.186Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 9,
           "send_message": false
         }
       ],
@@ -141,6 +195,54 @@
         },
         {
           "ts": "2026-06-27T12:02:46.134Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.216Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.212Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.149Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.109Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.197Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.186Z",
           "auditor": "tao-watcher-script",
           "rule_id": "W-01",
           "pass": false,
@@ -209,7 +311,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 3,
+      "nudge_count": 9,
       "nudge_log": [
         {
           "ts": "2026-06-27T11:52:58.165Z",
@@ -237,6 +339,60 @@
           "suggest": "fork 一个 verify/audit worker 独立检查",
           "nudge_count": 3,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.214Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 4,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.210Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 5,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.147Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 6,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.108Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 7,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.196Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 8,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.185Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 9,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -258,6 +414,54 @@
         },
         {
           "ts": "2026-06-27T12:02:46.132Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.214Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.210Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.147Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.108Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.196Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'e2ecmd-A2-worker' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.185Z",
           "auditor": "tao-watcher-script",
           "rule_id": "R-06",
           "pass": false,

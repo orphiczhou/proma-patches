@@ -156,7 +156,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 2308,
+      "nudge_count": 2320,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.279Z",
@@ -20929,6 +20929,114 @@
           "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
           "nudge_count": 2308,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:48.160Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2309,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:50.654Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2310,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:48.161Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2311,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:50.933Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2312,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:47.958Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2313,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:49.959Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2314,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:47.796Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2315,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:49.771Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2316,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:48.048Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2317,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:50.218Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2318,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:48.019Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2319,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:50.238Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2320,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -39395,6 +39503,102 @@
           "pass": false,
           "evidence": "milestone 'M1' has empty expect_outputs",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:48.160Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:50.654Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:48.161Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:50.933Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:47.958Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:49.959Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:47.796Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:49.771Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:48.048Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:50.218Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:48.019Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C1-consistency' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:50.238Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
         }
       ]
     },
@@ -39463,7 +39667,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 2308,
+      "nudge_count": 2320,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.284Z",
@@ -60236,6 +60440,114 @@
           "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
           "nudge_count": 2308,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:48.487Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2309,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:51.269Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2310,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:48.538Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2311,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:51.538Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2312,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:48.263Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2313,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:50.373Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2314,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:48.077Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2315,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:50.150Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2316,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:48.342Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2317,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:50.698Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2318,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:48.348Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2319,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:50.710Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2320,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -78702,6 +79014,102 @@
           "pass": false,
           "evidence": "milestone 'M1' has empty expect_outputs",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:48.487Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:51.269Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:48.538Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:51.538Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:48.263Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:50.373Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:48.077Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:50.150Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:48.342Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:50.698Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:48.348Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C2-completeness' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:50.710Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
         }
       ]
     },
@@ -78784,7 +79192,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 2308,
+      "nudge_count": 2320,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.289Z",
@@ -99557,6 +99965,114 @@
           "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
           "nudge_count": 2308,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:48.808Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2309,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:51.853Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2310,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:48.944Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2311,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:52.113Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2312,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:48.539Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2313,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:50.796Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2314,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:48.360Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2315,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:50.587Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2316,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:48.641Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2317,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:51.182Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2318,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:48.639Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2319,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:51.175Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2320,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -118023,6 +118539,102 @@
           "pass": false,
           "evidence": "milestone 'M1' has empty expect_outputs",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:48.808Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:51.853Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:48.944Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:52.113Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:48.539Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:50.796Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:48.360Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:50.587Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:48.641Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:51.182Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:48.639Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C3-standards' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:51.175Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
         }
       ]
     },
@@ -118106,7 +118718,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 2308,
+      "nudge_count": 2320,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.293Z",
@@ -138879,6 +139491,114 @@
           "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
           "nudge_count": 2308,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:49.138Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2309,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:52.498Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2310,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:49.316Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2311,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:52.696Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2312,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:48.823Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2313,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:51.235Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2314,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:48.639Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2315,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:51.014Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2316,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:48.948Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2317,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:51.670Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2318,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:48.945Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2319,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:51.658Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2320,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -157345,6 +158065,102 @@
           "pass": false,
           "evidence": "milestone 'M1' has empty expect_outputs",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:49.138Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:52.498Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:49.316Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:52.696Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:48.823Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:51.235Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:48.639Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:51.014Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:48.948Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:51.670Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:48.945Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-C4-evidence' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:51.658Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
         }
       ]
     },
@@ -157430,7 +158246,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 2308,
+      "nudge_count": 2320,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.299Z",
@@ -178203,6 +179019,114 @@
           "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
           "nudge_count": 2308,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:49.474Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2309,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:53.115Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2310,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:49.733Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2311,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:53.269Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2312,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:49.110Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2313,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:51.668Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2314,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:48.918Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2315,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:51.429Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2316,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:49.256Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2317,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:52.099Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2318,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:49.274Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2319,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:52.143Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2320,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -196669,6 +197593,102 @@
           "pass": false,
           "evidence": "milestone 'M1' has empty expect_outputs",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:49.474Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:53.115Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:49.733Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:53.269Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:49.110Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:51.668Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:48.918Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:51.429Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:49.256Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:52.099Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:49.274Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A1-reversemap' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:52.143Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
         }
       ]
     },
@@ -196751,7 +197771,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 2308,
+      "nudge_count": 2320,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.304Z",
@@ -217524,6 +218544,114 @@
           "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
           "nudge_count": 2308,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:49.852Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2309,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:53.735Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2310,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:50.141Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2311,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:53.867Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2312,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:49.386Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2313,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:52.110Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2314,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:49.210Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2315,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:51.829Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2316,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:49.547Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2317,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:52.567Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2318,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:49.591Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 2319,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:52.618Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2320,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -235990,6 +237118,102 @@
           "pass": false,
           "evidence": "milestone 'M1' has empty expect_outputs",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:49.852Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:53.735Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:50.141Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:53.867Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:49.386Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:52.110Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:49.210Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:51.829Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:49.547Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:52.567Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:49.591Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-A2-counterfactual' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:52.618Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
         }
       ]
     },
@@ -236072,7 +237296,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 3462,
+      "nudge_count": 3480,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.273Z",
@@ -267231,6 +268455,168 @@
           "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
           "nudge_count": 3462,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:47.658Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 3463,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:50.258Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 3464,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:54.387Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 3465,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:47.662Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 3466,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:50.537Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 3467,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:54.439Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 3468,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:47.518Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 3469,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:49.661Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 3470,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:52.533Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 3471,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:47.392Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 3472,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:49.490Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 3473,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:52.247Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 3474,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:47.612Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 3475,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:49.872Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 3476,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:53.016Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 3477,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:47.542Z",
+          "rule_id": "R-03",
+          "severity": "low",
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "suggest": "如有整合 leaf 应最后完成; 或命名加 integrate 后缀",
+          "nudge_count": 3478,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:49.915Z",
+          "rule_id": "R-06",
+          "severity": "low",
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "suggest": "fork 一个 verify/audit worker 独立检查",
+          "nudge_count": 3479,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:53.083Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 3480,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -294929,6 +296315,150 @@
           "pass": false,
           "evidence": "milestone 'M1' has empty expect_outputs",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:47.658Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:50.258Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:54.387Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:47.662Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:50.537Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:54.439Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:47.518Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:49.661Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:52.533Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:47.392Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:49.490Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:52.247Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:47.612Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:49.872Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:53.016Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:47.543Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-03",
+          "pass": false,
+          "evidence": "最晚 done 的 leaf 'l1fix_v2-W-walkthrough' 不像整合 leaf (无 integrate/整合 关键词)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:49.915Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "R-06",
+          "pass": false,
+          "evidence": "worker 'l1fix_v2-W-walkthrough' 已 done 但无独立验证 leaf",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:53.083Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'M1' has empty expect_outputs",
+          "degraded": false
         }
       ]
     },
@@ -294983,7 +296513,7 @@
         "auditor_session_id": "00000000-0000-4000-8000-000000000abc",
         "ts": "2026-06-21T18:23:06.278+08:00"
       },
-      "nudge_count": 1465,
+      "nudge_count": 1477,
       "nudge_log": [
         {
           "ts": "2026-06-22T13:27:44.534Z",
@@ -308169,6 +309699,114 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 1465,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:55.024Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1466,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:57.888Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1467,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:54.998Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1468,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:57.684Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1469,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:52.954Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1470,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:54.954Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1471,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:52.647Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1472,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:54.589Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1473,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:53.462Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1474,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:55.507Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1475,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:53.550Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1476,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:55.758Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1477,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -319943,6 +321581,102 @@
           "pass": false,
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:55.024Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:57.888Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:54.998Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:57.684Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:52.954Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:54.954Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:52.647Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:54.589Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:53.462Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:55.507Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:53.550Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:55.758Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
         }
       ]
     },
@@ -319983,7 +321717,7 @@
         "auditor_session_id": "00000000-0000-4000-8000-000000000abc",
         "ts": "2026-06-21T18:25:09.018+08:00"
       },
-      "nudge_count": 1464,
+      "nudge_count": 1476,
       "nudge_log": [
         {
           "ts": "2026-06-23T00:49:55.386Z",
@@ -333160,6 +334894,114 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 1464,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:55.420Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1465,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:58.321Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1466,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:55.387Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1467,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:58.089Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1468,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:53.233Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1469,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:55.236Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1470,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:52.911Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1471,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:54.862Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1472,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:53.771Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1473,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:55.787Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1474,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:53.866Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1475,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:56.080Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1476,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -344958,6 +346800,102 @@
           "pass": false,
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:55.420Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:58.321Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:55.387Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:58.089Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:53.233Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:55.236Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:52.911Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:54.862Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:53.771Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:55.787Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:53.866Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:56.080Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
         }
       ]
     },
@@ -344998,7 +346936,7 @@
         "auditor_session_id": "00000000-0000-4000-8000-000000000abc",
         "ts": "2026-06-21T18:25:55.024+08:00"
       },
-      "nudge_count": 1464,
+      "nudge_count": 1476,
       "nudge_log": [
         {
           "ts": "2026-06-23T00:50:09.925Z",
@@ -358175,6 +360113,114 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 1464,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:55.813Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1465,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:58.726Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1466,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:55.780Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1467,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:58.469Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1468,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:53.528Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1469,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:55.520Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1470,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:53.193Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1471,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:55.137Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1472,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:54.063Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1473,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:56.067Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1474,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:54.202Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1475,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:56.410Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1476,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -369968,6 +372014,102 @@
           "pass": false,
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:55.813Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:58.726Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:55.780Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:58.469Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:53.528Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:55.520Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:53.193Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:55.137Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:54.063Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:56.067Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:54.202Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:56.410Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
         }
       ]
     },
@@ -370009,7 +372151,7 @@
         "auditor_session_id": "00000000-0000-4000-8000-000000000abc",
         "ts": "2026-06-21T18:23:11.793+08:00"
       },
-      "nudge_count": 1464,
+      "nudge_count": 1476,
       "nudge_log": [
         {
           "ts": "2026-06-23T00:50:18.428Z",
@@ -383186,6 +385328,114 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 1464,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:56.212Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1465,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:59.130Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1466,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:56.162Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1467,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:58.859Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1468,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:53.803Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1469,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:55.789Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1470,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:53.481Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1471,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:55.421Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1472,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:54.347Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1473,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:56.351Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1474,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:54.513Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1475,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:56.755Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1476,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -394952,6 +397202,102 @@
           "pass": false,
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:56.212Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:59.130Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:56.162Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:58.859Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:53.803Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:55.789Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:53.481Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:55.421Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:54.347Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:56.351Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:54.513Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:56.755Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
         }
       ]
     },
@@ -395008,7 +397354,7 @@
         "auditor_session_id": "97355e66-8c24-4bdc-82f5-d13950081de0",
         "ts": "2026-06-21T18:09:19.968+08:00"
       },
-      "nudge_count": 2618,
+      "nudge_count": 2636,
       "nudge_log": [
         {
           "ts": "2026-06-21T12:27:39.340Z",
@@ -418571,6 +420917,168 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 2618,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:56.632Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2619,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:57.046Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 2620,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:59.554Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 2621,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:56.558Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2622,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:56.926Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 2623,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:59.239Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 2624,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:54.095Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2625,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:54.391Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 2626,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:56.066Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 2627,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:53.756Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2628,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:54.031Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 2629,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:55.704Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 2630,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:54.631Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2631,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:54.914Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 2632,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:56.640Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 2633,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:54.816Z",
+          "rule_id": "C-02",
+          "severity": "low",
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "suggest": "milestone set-result 需补 expect_outputs 或 milestone add 时填写",
+          "nudge_count": 2634,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:55.127Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 2635,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:57.113Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 2636,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -439594,6 +442102,150 @@
           "pass": false,
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:56.632Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:57.046Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:59.554Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:56.558Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:56.926Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:59.239Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:54.095Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:54.391Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:56.066Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:53.756Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:54.031Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:55.704Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:54.631Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:54.914Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:56.640Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:54.816Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-02",
+          "pass": false,
+          "evidence": "milestone 'm1-auto-done' has empty expect_outputs",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:55.127Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:57.113Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
         }
       ]
     },
@@ -439634,7 +442286,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 1150,
+      "nudge_count": 1156,
       "nudge_log": [
         {
           "ts": "2026-06-23T00:53:45.336Z",
@@ -449985,6 +452637,60 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 1150,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:08:00.000Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1151,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:59.644Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1152,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:56.355Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1153,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:56.002Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1154,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:56.929Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1155,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:57.478Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1156,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -459187,6 +461893,54 @@
           "pass": false,
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:08:00.000Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:59.644Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:56.355Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:56.002Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:56.929Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:57.478Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
         }
       ]
     },
@@ -459214,7 +461968,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 1150,
+      "nudge_count": 1156,
       "nudge_log": [
         {
           "ts": "2026-06-23T00:55:15.149Z",
@@ -469565,6 +472319,60 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 1150,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:08:00.434Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1151,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:13:00.031Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1152,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:56.630Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1153,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:56.286Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1154,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:57.217Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1155,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:57.857Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1156,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -478767,6 +481575,54 @@
           "pass": false,
           "evidence": "worker 首条 assistant 消息无 brief_echo",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:08:00.434Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:13:00.031Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:56.630Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:56.286Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:57.217Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:57.857Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
         }
       ]
     },
@@ -478794,7 +481650,7 @@
         "auditor_session_id": "00000000-0000-4000-8000-000000000abc",
         "ts": "2026-06-21T19:34:41.757+08:00"
       },
-      "nudge_count": 1464,
+      "nudge_count": 1476,
       "nudge_log": [
         {
           "ts": "2026-06-23T00:56:15.730Z",
@@ -491971,6 +494827,114 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 1464,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:57.457Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1465,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:08:00.865Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1466,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:57.293Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1467,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:13:00.442Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1468,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:54.675Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1469,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:56.903Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1470,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:54.310Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1471,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:56.570Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1472,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:55.210Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1473,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:57.500Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1474,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:55.432Z",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "severity": "high",
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "suggest": "检查 tree-state.json 是否被手工编辑; worker audit pass 前必须有 alignment brief_echo event",
+          "nudge_count": 1475,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:58.246Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 1476,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -503732,6 +506696,102 @@
         },
         {
           "ts": "2026-06-27T12:02:59.735Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:57.457Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:08:00.865Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:57.293Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:13:00.442Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:54.675Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:56.903Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:54.310Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:56.570Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:55.210Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:57.500Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:55.432Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-AUDIT-NO-ALIGN",
+          "pass": false,
+          "evidence": "worker audit_gate=pass 但 events 无 brief_echo with alignment (V5b 引擎校验应拦, 表明直接篡改)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:58.246Z",
           "auditor": "tao-watcher-script",
           "rule_id": "W-01",
           "pass": false,

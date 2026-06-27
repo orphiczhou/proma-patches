@@ -110,7 +110,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 801,
+      "nudge_count": 807,
       "nudge_log": [
         {
           "ts": "2026-06-24T12:55:10.421Z",
@@ -7320,6 +7320,60 @@
           "suggest": "fork 至少 4 个独立审查 worker",
           "nudge_count": 801,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.475Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 802,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.475Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 803,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.396Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 804,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.340Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 805,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.448Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 806,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.413Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 807,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -13730,6 +13784,54 @@
           "pass": false,
           "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.475Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.475Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.396Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.340Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.448Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.413Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
         }
       ]
     },
@@ -13782,7 +13884,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 800,
+      "nudge_count": 806,
       "nudge_log": [
         {
           "ts": "2026-06-24T13:00:22.668Z",
@@ -20983,6 +21085,60 @@
           "suggest": "fork 至少 4 个独立审查 worker",
           "nudge_count": 800,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.524Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 801,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.526Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 802,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.440Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 803,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.385Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 804,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.496Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 805,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.459Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 806,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -27385,6 +27541,54 @@
           "pass": false,
           "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.524Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.526Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.440Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.385Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.496Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.459Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
         }
       ]
     },
@@ -27437,7 +27641,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 799,
+      "nudge_count": 805,
       "nudge_log": [
         {
           "ts": "2026-06-24T13:05:19.570Z",
@@ -34629,6 +34833,60 @@
           "suggest": "fork 至少 4 个独立审查 worker",
           "nudge_count": 799,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.574Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 800,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.571Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 801,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.485Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 802,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.425Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 803,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.545Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 804,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.509Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 805,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -41023,6 +41281,54 @@
           "pass": false,
           "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.574Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.571Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.485Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.425Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.545Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.509Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
         }
       ]
     },
@@ -41075,7 +41381,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 799,
+      "nudge_count": 805,
       "nudge_log": [
         {
           "ts": "2026-06-24T13:05:19.571Z",
@@ -48267,6 +48573,60 @@
           "suggest": "fork 至少 4 个独立审查 worker",
           "nudge_count": 799,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.623Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 800,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.617Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 801,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.537Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 802,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.468Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 803,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.602Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 804,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.557Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 805,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -54661,6 +55021,54 @@
           "pass": false,
           "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.623Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.617Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.537Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.469Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.602Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.557Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
         }
       ]
     },
@@ -54713,7 +55121,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 797,
+      "nudge_count": 803,
       "nudge_log": [
         {
           "ts": "2026-06-24T13:15:10.479Z",
@@ -61887,6 +62295,60 @@
           "suggest": "fork 至少 4 个独立审查 worker",
           "nudge_count": 797,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.675Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 798,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.673Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 799,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.583Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 800,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.509Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 801,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.647Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 802,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.600Z",
+          "rule_id": "C-13",
+          "severity": "mid",
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "suggest": "fork 至少 4 个独立审查 worker",
+          "nudge_count": 803,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -68265,6 +68727,54 @@
           "pass": false,
           "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
           "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.675Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.673Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.583Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.509Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.647Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.600Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "C-13",
+          "pass": false,
+          "evidence": "审计场景下 commander 仅有 0 个 worker 子 leaf (需 ≥4 独立审查)",
+          "degraded": false
         }
       ]
     },
@@ -68317,7 +68827,7 @@
         "auditor_session_id": null,
         "ts": null
       },
-      "nudge_count": 654,
+      "nudge_count": 660,
       "nudge_log": [
         {
           "ts": "2026-06-25T01:07:22.446Z",
@@ -74204,6 +74714,60 @@
           "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
           "nudge_count": 654,
           "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.721Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 655,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.720Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 656,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.628Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 657,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.548Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 658,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.694Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 659,
+          "send_message": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.650Z",
+          "rule_id": "W-01",
+          "severity": "high",
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "suggest": "首条回复必须含 'event: brief_echo' YAML 块",
+          "nudge_count": 660,
+          "send_message": false
         }
       ],
       "audit_log": [
@@ -79433,6 +79997,54 @@
         },
         {
           "ts": "2026-06-27T12:02:46.607Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:07:46.721Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:12:46.720Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:17:46.628Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:22:46.548Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:27:46.694Z",
+          "auditor": "tao-watcher-script",
+          "rule_id": "W-01",
+          "pass": false,
+          "evidence": "worker 首条 assistant 消息无 brief_echo",
+          "degraded": false
+        },
+        {
+          "ts": "2026-06-27T12:32:46.650Z",
           "auditor": "tao-watcher-script",
           "rule_id": "W-01",
           "pass": false,
