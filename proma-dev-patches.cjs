@@ -1838,6 +1838,36 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
         return b.tree_count - a.tree_count;
       });
 
+      // 附加 session_title（人友好显示）：leaf.session_id → 会话名词
+      const _sessionTitles = {};
+      try {
+        const _sessions = api().listAgentSessions();
+        if (Array.isArray(_sessions)) {
+          for (const _s of _sessions) {
+            if (_s && _s.id && _s.title) _sessionTitles[_s.id] = _s.title;
+          }
+        }
+      } catch (_) {}
+      for (const _tree of allTrees) {
+        if (_tree && _tree.leaves) {
+          for (const _leaf of Object.values(_tree.leaves)) {
+            if (_leaf && _leaf.session_id) {
+              _leaf.session_title = _sessionTitles[_leaf.session_id] || null;
+            }
+          }
+        }
+        // tree.title: 会话名词优先（root leaf 的 session_title）, fallback root_brief.my_mission, 再 fallback tree_id
+        let _treeTitle = _tree && _tree.tree_id;
+        try {
+          if (_tree && _tree.root_brief && _tree.root_brief.my_mission) _treeTitle = _tree.root_brief.my_mission;
+          if (_tree && _tree.leaves) {
+            const _rootLeaf = Object.values(_tree.leaves).find(function (l) { return l && (l.parent === null || l.parent === undefined); });
+            if (_rootLeaf && _rootLeaf.session_title) _treeTitle = _rootLeaf.session_title;
+          }
+        } catch (_) {}
+        if (_tree) _tree.title = _treeTitle;
+      }
+
       return {
         ok: true,
         current_workspace_slug: currentSlug,
@@ -1874,18 +1904,21 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
     try {
       const bw = electron.BrowserWindow && electron.BrowserWindow.fromWebContents(event.sender);
       if (bw) {
-        // 验证 session 存在（避免切换到不存在的 session）
+        // 验证 session 存在 + 拿 title（避免切换到不存在的 session）
+        let _navMeta = null;
         try {
           const a = api();
-          const meta = a.getAgentSessionMeta(sessionId);
-          if (!meta) {
+          _navMeta = a.getAgentSessionMeta(sessionId);
+          if (!_navMeta) {
             log("[Patch L] navigate-to-session: session " + sessionId + " not found (可能是 Chat 会话或测试数据)");
             bw.webContents.send("proma:navigate-failed", { sessionId, reason: "not-found" });
             return;
           }
         } catch (_) {}
         // 真正切换: 复用 Proma 的 tray:open-agent-session 事件
-        bw.webContents.send("tray:open-agent-session", { sessionId });
+        // 传 { sessionId, title } 与 Proma 内置 openAgentSession(sessionId,title) 完全一致，
+        // 避免 renderer 端因缺 title 在同名会话场景切换失败/歧义
+        bw.webContents.send("tray:open-agent-session", { sessionId, title: _navMeta && _navMeta.title });
         log("[Patch L] navigate-to-session: " + sessionId);
       }
     } catch (e) {

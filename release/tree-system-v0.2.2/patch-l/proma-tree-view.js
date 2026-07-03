@@ -399,13 +399,16 @@
     }
   }
 
+  let _pollPaused = false;
   function startPolling() {
     stopPolling();
-    state.pollTimer = setInterval(fetchData, 3000);
+    state.pollTimer = setInterval(function () { if (!_pollPaused) fetchData(); }, 3000);
   }
   function stopPolling() {
     if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
   }
+  function pausePolling() { _pollPaused = true; }
+  function resumePolling() { _pollPaused = false; }
 
   // ============ 渲染 ============
 
@@ -416,51 +419,152 @@
     renderDetail();
   }
 
+  // combobox 复用缓存：render 时复用已存在的 combobox，避免 list 打开时被 render 重建打断
+  let _wsCombo = null;
+  let _treeCombo = null;
+
+  // 带搜索的联动下拉框（combobox）：input + 浮层列表。
+  // 稳健设计：list 打开时不被 render 重建打断；选中可靠触发（mousedown preventDefault）；点击外部才隐藏。
+  function makeComboBox(items, getLabel, getValue, currentValue, onSelect, placeholder) {
+    const wrapper = h('div', { style: 'position:relative;flex:1;min-width:0' });
+    const cur = items.find(function (it) { return getValue(it) === currentValue; });
+    const input = h('input', {
+      type: 'text',
+      style: 'width:100%;box-sizing:border-box;padding:5px 9px;font-size:13px;background:#1f2937;color:#e5e7eb;border:1px solid rgba(255,255,255,0.15);border-radius:6px;outline:none',
+      placeholder: placeholder || '搜索...',
+      value: cur ? getLabel(cur) : '',
+      autocomplete: 'off'
+    });
+    const list = h('div', { style: 'display:none;position:absolute;top:100%;left:0;right:0;max-height:280px;overflow-y:auto;background:#1f2937;border:1px solid rgba(255,255,255,0.15);border-radius:6px;margin-top:2px;z-index:1000;box-shadow:0 6px 16px rgba(0,0,0,0.45)' });
+
+    let isOpen = false;
+    let filterStr = '';
+
+    function buildItems() {
+      list.innerHTML = '';
+      const f = filterStr.toLowerCase().trim();
+      const matched = items.filter(function (it) {
+        if (!f) return true;
+        return String(getLabel(it)).toLowerCase().indexOf(f) >= 0 || String(getValue(it)).toLowerCase().indexOf(f) >= 0;
+      });
+      if (matched.length === 0) {
+        list.appendChild(h('div', { style: 'padding:6px 10px;color:#9ca3af;font-size:12px' }, '无匹配'));
+        return;
+      }
+      matched.forEach(function (it) {
+        const isActive = getValue(it) === currentValue;
+        const item = h('div', {
+          style: 'padding:5px 10px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis' + (isActive ? ';background:rgba(79,70,229,0.3);color:#fff' : ''),
+          // mousedown preventDefault 阻止 input 失焦，保证 click 必达 onSelect
+          onMousedown: function (e) { e.preventDefault(); },
+          onMouseenter: function (e) { if (!isActive) e.target.style.background = 'rgba(255,255,255,0.06)'; },
+          onMouseleave: function (e) { if (!isActive) e.target.style.background = 'transparent'; },
+          onClick: function (e) { e.preventDefault(); e.stopPropagation(); input.value = getLabel(it); close(); onSelect(getValue(it)); }
+        }, getLabel(it));
+        list.appendChild(item);
+      });
+    }
+
+    function open() {
+      if (isOpen) { filterStr = ''; buildItems(); try { input.select(); } catch (_) {} return; }
+      isOpen = true;
+      filterStr = '';
+      buildItems();
+      list.style.display = 'block';
+      try { input.select(); } catch (_) {}
+      if (typeof pausePolling === 'function') pausePolling();
+      setTimeout(function () { document.addEventListener('mousedown', onDocMousedown, true); }, 0);
+    }
+    function close() {
+      if (!isOpen) return;
+      isOpen = false;
+      list.style.display = 'none';
+      document.removeEventListener('mousedown', onDocMousedown, true);
+      if (typeof resumePolling === 'function') resumePolling();
+    }
+    function onDocMousedown(e) {
+      if (wrapper.contains(e.target)) return;
+      close();
+    }
+
+    input.addEventListener('focus', open);
+    input.addEventListener('input', function () { filterStr = input.value; if (isOpen) buildItems(); });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Escape') { close(); try { input.blur(); } catch (_) {} } });
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(list);
+
+    // render 复用：更新数据 + 当前值，不销毁 DOM（list 打开状态保留）
+    wrapper._updateCombo = function (newItems, newCurrentValue) {
+      items = newItems;
+      currentValue = newCurrentValue;
+      if (!isOpen) {
+        const c = items.find(function (it) { return getValue(it) === currentValue; });
+        input.value = c ? getLabel(c) : '';
+      }
+    };
+    wrapper._destroyCombo = function () { if (isOpen) close(); };
+    return wrapper;
+  }
+
   function renderTreeTabs() {
-    treeTabsEl.innerHTML = '';
+    // 外层 flex 容器：工作区 + 会话 两个下拉框左右并排
+    const row = h('div', { style: 'display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap' });
 
-    // 第一层: workspace 选择 (总是显示, 即使只有 1 个, 让用户看到完整 workspace 列表)
+    // 左：工作区下拉框（复用 _wsCombo，避免重建打断 list）
+    const wsCell = h('div', { style: 'display:flex;gap:6px;align-items:center;flex:1;min-width:180px' });
+    wsCell.appendChild(h('span', { style: 'font-size:12px;color:#9ca3af;flex-shrink:0;width:42px' }, '工作区'));
     if (state.workspaces.length > 0) {
-      const wsRow = h('div', { className: 'ptv-ws-tabs' });
-      for (const ws of state.workspaces) {
-        const isSelected = ws.workspace_slug === state.activeWorkspaceSlug;
-        const isEmpty = !ws.tree_count || ws.tree_count === 0;
-        const wsTab = h('div', {
-          className: 'ptv-ws-tab' + (isSelected ? ' ptv-ws-tab-active' : '') + (ws.is_current ? ' ptv-ws-tab-current' : '') + (isEmpty ? ' ptv-ws-tab-empty' : ''),
-          title: (ws.workspace_name || ws.workspace_slug) + (ws.is_current ? ' (当前)' : '') + ' — ' + ws.tree_count + ' tree(s)',
-          onClick: () => selectWorkspace(ws.workspace_slug)
-        });
-        // 优先用 workspace_name, 没有就退化 slug 简化
-        const displayName = ws.workspace_name || ws.workspace_slug.replace(/-[a-f0-9]{8}-[a-f0-9]{4}.*/i, '');
-        wsTab.appendChild(h('span', { className: 'ptv-ws-tab-name' }, displayName));
-        wsTab.appendChild(h('span', { className: 'ptv-ws-tab-count' }, ws.tree_count));
-        if (ws.is_current) wsTab.appendChild(h('span', { className: 'ptv-ws-tab-mark', title: '当前 workspace' }, '★'));
-        wsRow.appendChild(wsTab);
+      if (_wsCombo) {
+        _wsCombo._updateCombo(state.workspaces, state.activeWorkspaceSlug);
+      } else {
+        _wsCombo = makeComboBox(
+          state.workspaces,
+          function (ws) { return (ws.workspace_name || ws.workspace_slug) + (ws.is_current ? ' ★' : '') + '  (' + ws.tree_count + ')'; },
+          function (ws) { return ws.workspace_slug; },
+          state.activeWorkspaceSlug,
+          function (slug) { selectWorkspace(slug); },
+          '搜索工作区...'
+        );
       }
-      treeTabsEl.appendChild(wsRow);
-    }
-
-    // 第二层: 当前 workspace 下的 tree 选择
-    const wsTrees = state.trees.filter(t => t.workspace_slug === state.activeWorkspaceSlug);
-    const treeRow = h('div', { className: 'ptv-tree-tabs-row' });
-    if (wsTrees.length === 0) {
-      treeRow.appendChild(h('div', { className: 'ptv-empty' }, '此 workspace 暂无 tree'));
+      wsCell.appendChild(_wsCombo);
     } else {
-      for (const tree of wsTrees) {
-        const isSelected = tree.tree_id === state.activeTreeId;
-        const tab = h('div', {
-          className: 'ptv-tree-tab' + (isSelected ? ' ptv-tree-tab-active' : '') + (tree.has_active_leaf ? ' ptv-tree-tab-live' : ''),
-          title: tree.tree_id + (tree.has_active_leaf ? ' (活跃)' : ' (空闲)'),
-          onClick: () => { state.activeTreeId = tree.tree_id; state.selectedLeafId = null; render(); }
-        });
-        tab.appendChild(h('span', { className: 'ptv-tree-tab-id' }, tree.tree_id));
-        const leafCount = Object.keys(tree.leaves || {}).length;
-        const nudgeCount = Object.values(tree.leaves || {}).reduce((sum, l) => sum + (l.nudge_count || 0), 0);
-        tab.appendChild(h('span', { className: 'ptv-tree-tab-count' }, leafCount + ' leaves' + (nudgeCount ? ' ⚠' + nudgeCount : '')));
-        treeRow.appendChild(tab);
-      }
+      if (_wsCombo) { _wsCombo._destroyCombo(); _wsCombo = null; }
+      wsCell.appendChild(h('span', { style: 'font-size:12px;color:#9ca3af' }, '无 workspace'));
     }
-    treeTabsEl.appendChild(treeRow);
+    row.appendChild(wsCell);
+
+    // 右：会话下拉框（联动当前 workspace，复用 _treeCombo）
+    const wsTrees = state.trees.filter(function (t) { return t.workspace_slug === state.activeWorkspaceSlug; });
+    // 切 ws 后 activeTreeId 失效时自动选中第一个
+    if (wsTrees.length > 0 && !wsTrees.find(function (t) { return t.tree_id === state.activeTreeId; })) {
+      state.activeTreeId = wsTrees[0].tree_id;
+    }
+    // 切 ws 时强制销毁旧 tree combobox（items 完全变了）
+    if (_treeCombo && _treeCombo._lastWs !== state.activeWorkspaceSlug) {
+      _treeCombo._destroyCombo();
+      _treeCombo = null;
+    }
+    const treeCell = h('div', { style: 'display:flex;gap:6px;align-items:center;flex:1;min-width:180px' });
+    treeCell.appendChild(h('span', { style: 'font-size:12px;color:#9ca3af;flex-shrink:0;width:42px' }, '会话'));
+    if (_treeCombo) {
+      _treeCombo._updateCombo(wsTrees, state.activeTreeId);
+    } else {
+      _treeCombo = makeComboBox(
+        wsTrees,
+        function (t) { return (t.title || t.tree_id) + (t.has_active_leaf ? ' ●' : '') + '  (' + Object.keys(t.leaves || {}).length + ' leaves)'; },
+        function (t) { return t.tree_id; },
+        state.activeTreeId,
+        function (treeId) { state.activeTreeId = treeId; state.selectedLeafId = null; render(); },
+        wsTrees.length ? '搜索会话...' : '此工作区无 tree'
+      );
+      _treeCombo._lastWs = state.activeWorkspaceSlug;
+    }
+    treeCell.appendChild(_treeCombo);
+    row.appendChild(treeCell);
+
+    treeTabsEl.innerHTML = '';
+    treeTabsEl.appendChild(row);
   }
 
   function renderTree() {
@@ -498,7 +602,7 @@
       const node = h('div', {
         className: 'ptv-leaf-row' + (leaf.leaf_id === state.selectedLeafId ? ' ptv-leaf-selected' : '') + (leaf.status === 'pending_brief' ? ' ptv-leaf-pending' : ''),
         style: 'margin-left:' + (depth * 18) + 'px',
-        title: 'session: ' + leaf.session_id,
+        title: (leaf.session_title ? leaf.session_title + ' · ' : '') + 'leaf:' + leaf.leaf_id + ' · session:' + leaf.session_id.slice(0, 8),
         onClick: () => { state.selectedLeafId = leaf.leaf_id; render(); handleLeafClick(leaf); }
       });
       // 角色 icon
@@ -506,8 +610,12 @@
       // 状态圆点
       const statusColor = STATUS_COLOR[leaf.status] || '#9ca3af';
       node.appendChild(h('span', { className: 'ptv-dot', style: 'background:' + statusColor }));
-      // leaf_id
-      node.appendChild(h('span', { className: 'ptv-leaf-id' }, leaf.leaf_id));
+      // leaf 标签: session title 为主 (人友好), leaf_id 附加 (Agent 友好)
+      const _hasTitle = leaf.session_title && String(leaf.session_title).trim();
+      node.appendChild(h('span', { className: 'ptv-leaf-id' }, _hasTitle ? leaf.session_title : leaf.leaf_id));
+      if (_hasTitle) {
+        node.appendChild(h('span', { className: 'ptv-leaf-id', style: 'font-size:11px;color:#9ca3af;margin-left:6px;opacity:0.85' }, leaf.leaf_id));
+      }
       // 元数据 chips
       const meta = h('span', { className: 'ptv-leaf-chips' });
       meta.appendChild(h('span', { className: 'ptv-chip ptv-status-chip', style: 'color:' + statusColor }, STATUS_LABEL[leaf.status] || leaf.status));
@@ -819,18 +927,28 @@
       onClick: (e) => {
         e.preventDefault();
         e.stopPropagation();
-        // 调试: dump 该项目按钮的 React 信息 (定位 workspace_slug 字段名)
+        // 修 race condition: 注入按钮时 React fiber 可能未就绪 → 闭包 workspaceSlug=null
+        // 每次点击都重新从 DOM 拿 slug, 闭包值只作为兜底
+        let slug = workspaceSlug;
+        let group = null;
         try {
-          const group = e.currentTarget.closest ? e.currentTarget.closest('.group\\/project') : null;
-          if (group) {
+          group = e.currentTarget.closest ? e.currentTarget.closest('.group\\/project') : null;
+        } catch (_) {}
+        if (group) {
+          try {
+            const freshSlug = getWorkspaceSlugFromProjectGroup(group);
+            if (freshSlug) slug = freshSlug;
+          } catch (_) {}
+          // 调试: dump 该项目按钮的 React 信息 (定位 workspace_slug 字段名)
+          try {
             const pBtn = group.querySelector('button[class*="agent-project-item"]');
             if (pBtn) dumpProjectInfo(pBtn, 'entry-btn-click');
-          }
-        } catch (_) {}
+          } catch (_) {}
+        }
         if (state.floatingVisible) {
           hideOverlay();
         } else {
-          showOverlay(workspaceSlug);  // 传 workspace_slug 进去, 浮窗默认激活它
+          showOverlay(slug);  // 传 workspace_slug 进去, 浮窗默认激活它
         }
       },
       onMouseDown: (e) => {

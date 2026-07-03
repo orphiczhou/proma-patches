@@ -4,6 +4,27 @@
 
 新条目追加在顶部。
 
+## 2026-07-03 20:32 Tree 面板 UI 改进 — 会话名词化 + 联动下拉框 + combobox 根治
+
+**改动（release dist + 同步 dev/workspace-files/发布包，md5 一致）**:
+
+1. **leaf 节点 session_title 化**（人友好）：patches.cjs `get-tree-states` 用 listAgentSessions 建 session_id→title map 给每个 leaf 附加 session_title；proma-tree-view.js leaf 节点显示 `session_title` 为主 + `leaf_id` 小字附加（Agent 友好），tooltip 含完整 session_id。
+
+2. **tree 横条 title 化**：handler 给 tree 附加 `title`（优先级 root session_title > root_brief.my_mission > tree_id）；横条/下拉显示 title，tooltip 保留 tree_id。
+
+3. **两层联动下拉框**（替换横条 bar）：workspace + tree 两个 combobox 左右并排，带搜索匹配（getLabel/getValue includes），选 workspace 联动刷新会话列表。解决横条多时后面难选。
+
+4. **navigate-to-session 补 title**：patches.cjs 传 `{sessionId, title}`（与 Proma 内置 openAgentSession 一致）。**注：同名 title 会话切换仍未完全解决**（renderer 可能用 title 匹配 tab，待找纯 sessionId 切换 IPC）。
+
+5. **combobox 根治缩回/不切换**（子 Agent 审计 + 重写）：
+   - 根因：poll 每 3s fetchData→render→`treeTabsEl.innerHTML=''` 销毁 combobox DOM → list 缩回 + mousedown→click 间 list 没了导致 click 丢失（树选不切）
+   - 修复：renderTreeTabs 复用 `_wsCombo`/`_treeCombo`（不重建，`_updateCombo` 只更新数据）；项 `onMousedown preventDefault`（click 必达 onSelect）；document 级 mousedown 外部关闭（不用 blur 隐藏）；open 时 `pausePolling`（双保险）
+   - 诊断教训：handler 崩溃/combobox 异常无明显错时，appendFileSync 逐层诊断定位；子 Agent 独立审计避免主会话反复盲改
+
+**关键文件**: release dist `renderer/assets/proma-tree-view.js` + `proma-dev-patches.cjs`；备份 `*.bak-pre-treeview-fix-20260703` / `*.bak-pre-diag-20260703`。git 提交 workspace-files 副本 + 发布包 + note。
+
+---
+
 ## 2026-07-03 Layer A+C — 引擎统一 call_log + 聚合分析工具（消盲区 + 可分析）
 
 **起因**: Layer B 止血后，被拦调用（安全事件）仍**只在会话 JSONL、引擎层无记录（盲区）**，且日志散落/半结构化/按会话而非按 tree，分析成本高。Layer A 消盲区，Layer C 聚合分析。
