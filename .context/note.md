@@ -30,7 +30,20 @@
 
 **关键文件**: tree-engine.cjs（Layer A，release+workspace-files cmp 一致）| scripts/tree-analyze.cjs（Layer C）| 备份 `*.bak-20260703-pre-calllog` | call-log.jsonl 已 gitignore
 
-**剩余**: ① **重启 release**让 Layer A 运行时生效 ② Layer C P2（会话血缘视图）+ P3（收敛诊断）后续 ③ audit_log 刷爆清理 follow-up
+**闭环测试（19:0x，重启 release 后 + 真实子Agent）**:
+- 建 `e2eac` tree + 派 worker 子Agent（`46bb3380` glm-4.5-air）走派遣流程（create_session + send_message + wait）
+- **Layer A 运行时**：记录 8 条 call-log（成功+失败都记，含 milestone `E_SCHEMA_INVALID` 失败 = **消盲区实证**）
+- **Layer B 运行时对照**：nudge done leaf（`l1fix_v2-C1`）→ B1 拦 `E_STATUS_INVALID`；nudge pending_brief leaf（`e2eac-A-worker`）→ 放行（count=1）
+- **Layer C 闭环**：`tree-analyze` P0 正确聚合 B1 拦截 ×2（归因 `l1fix_v2-C1-consistency`）+ P1 时间线含失败调用（milestone 字段名错→修正）
+- **三层协同串联验证通过**：`B1 拦截 → call-log 记录 → tree-analyze 聚合` ✅
+
+**剩余 / follow-up**:
+- ✅ ① 重启 release（已完成，Layer A 运行时生效）
+- ② Layer C **P2**（会话血缘视图）+ **P3**（收敛诊断）后续
+- ③ `audit_log` 刷爆清理 follow-up（与 nudge 同步累积）
+- ④ **`caller_session_id` 记的是会话目录 ID（`1e67e61f`）非 agent session_id（`ee435ed8`）** — patches.cjs MCP wrapper 注入点问题，影响 Layer C P0 归因精度。修在 patches.cjs callerSessionId 来源（最值得修，P0 归因根基）
+- ⑤ **worker 子Agent `E_TREE_NOT_FOUND`** — worker 会话 tree 工具 trees_dir 与 commander 不同（workspace 解析，老问题，note 17:45/20:00）
+- ⑥ **`E_TREE_NOT_FOUND` 时 call-log 写不到** — Layer A 边界：appendCallLog 用 `treeDir(tree_id)`，tree 不存在则目录不存在→吞错。可加 orphan fallback log（`_orphan-call-log.jsonl`）
 
 ---
 
