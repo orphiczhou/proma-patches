@@ -110,6 +110,8 @@ R1 洁净室测试暴露一个问题：**4 个 Commander 各自从 SKILL.md 推�
 | done 时 self_check 缺项 | `E_SELFCHECK_INVALID` |
 | 命名乱起 | `E_NAME_INVALID` |
 
+> 💡 **实现机制深读**：本文把约束分为「SKILL 软引导 + 引擎硬约束」双层；完整的**三轨协同模型**（提示词轨 / 返回值轨 / 状态门禁）见 [`tree-system-overview-2026-07-03.md`](./tree-system-overview-2026-07-03.md) §5 ——它把「返回值引导」独立成第三轨，并解释拉模式 vs 推模式、三权分立设计哲学。
+
 ---
 
 ## §3 Worker 生命周期总览

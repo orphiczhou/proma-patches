@@ -115,6 +115,7 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 | **本索引** | `workspace-files/.context/PROJECT-INDEX.md` | 知识沉淀层入口 |
 | **目录导航** | `workspace-files/.context/README.md` | `.context/` 目录速查（新人 30 秒上手） |
 | **入门向导** | `workspace-files/.context/project-onboarding-guide-2026-06-25.md` | 图形化 30 分钟建立心智模型 |
+| **Tree 运行机制总览** | `workspace-files/.context/v10/tree-system-overview-2026-07-03.md` | 图形化整合「约束+驱动+实现」三视角（10 分钟建立 Tree 体系心智模型，新人必读） |
 | **长期笔记** | `workspace-files/.context/note.md` | 按日期追加的调研笔记（顶部最新） |
 | **技术 Wiki** | `workspace-files/.context/proma-dev-wiki.md` | 补丁命令 + 架构 + 测试记录 + 版本历史 |
 | **活跃文档** | `workspace-files/.context/active/` | 当前还在用的（8 份交接/进度/审计） |
