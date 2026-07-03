@@ -1794,7 +1794,7 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
               _meta: state._meta || {}
             });
           } catch (e) {
-            trees.push({ tree_id: name, workspace_slug, error: "parse failed: " + e.message });
+            trees.push({ tree_id: name, workspace_slug: workspaceSlug, error: "parse failed: " + e.message });
           }
         }
         return trees;

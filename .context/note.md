@@ -4,6 +4,23 @@
 
 新条目追加在顶部。
 
+## 2026-07-03 17:57 Tree 面板入口修复 — 三层根因（renderer / preload / catch 笔误）
+
+**现象**: release 0.13.16 tree 面板入口丢失，层层修复后恢复。
+
+**三层根因（按修复顺序）**:
+1. **renderer 注入漏**（迁移坑6）: release `renderer/assets/` 缺 `proma-tree-view.js`+`.css`（dev 有），`index.html` 缺补丁L `<link>`+`<script>` 标签（dev 行34/39有）。修复: 拷 dev js+css → release assets，index.html 注入标签（照 dev 补丁L 格式）。备份 `index.html.bak-pre-treeview-fix-20260703`。
+2. **preload 桥接漏**（迁移坑7）: release `preload.cjs` 缺补丁L `promaTreeIpc` 桥接段（dev 行1998-2037 `exposeInMainWorld("promaTreeIpc", promaBridge)`）。proma-tree-view.js 找不到 `window.promaTreeIpc` → "IPC不可用请检查preload"。修复: preload.cjs 末尾注入补丁L桥接段（dev 原样，dev/release preload 结尾结构一致都用 `import_electron`+`exposeInMainWorld("electronAPI")`）。备份 `preload.cjs.bak-pre-treeview-fix-20260703`。
+3. **readTreesFromDir catch `workspace_slug` 笔误**（源头bug，迁移后首次暴露）: `patches.cjs` catch 块 `trees.push({..., workspace_slug, ...})` — `workspace_slug` 是 ReferenceError（参数是 `workspaceSlug` 驼峰）。被损坏的 `tree-2/c26c2x/tree-state.json`（JSON position 1 异常，疑 BOM/双写）触发: 解析失败→catch→ReferenceError→从 catch 向外抛→handler 整体崩溃→ok:false→面板"找不到树结构"。**dev/release/workspace-files/发布包 4 处全修** `workspace_slug`→`workspace_slug: workspaceSlug`。
+
+**诊断方法论（复用价值高）**: handler 崩溃无明显错时，在 入口/discover/currentSlug后/循环后/外层catch 用 appendFileSync 写诊断文件，逐层定位执行到哪 + 抛错 stack。本次 4 轮（ENTRY→discover→[A][B]→外层catch记stack）定位到 `readTreesFromDir:1800 ReferenceError`。诊断完从 `bak-pre-diag` 恢复 patches.cjs 干净 + 只打 bug 修复。
+
+**未修（不阻塞）**: 损坏的 `tree-2/c26c2x/tree-state.json` + `undefined/c26c2x` 副本（handler 现标 error 不崩，该 tree 显示 parse failed）。
+
+**0.13.16 迁移坑累计 8 个**（17:45 记 1-5 + 本次 6-8）: 6 renderer tree-view 注入漏 / 7 preload promaTreeIpc 桥接漏 / 8 readTreesFromDir catch workspace_slug 笔误（源头 bug，迁移后因 tree-2 损坏 tree 首次暴露）。
+
+---
+
 ## 2026-07-03 Layer B 止血 — TAO nudge 失控修复 + 11.4万垃圾清理
 
 **起因**: 检查 TAO Watcher 日志发现严重不正常 — nudge 熔断失效（`l1fix_v2-C1-consistency` `nudge_count=2810`，7 个 done leaf 被刷爆），proma workspace 累积 **113,889 条垃圾 nudge_log**。TAO automation 当前 `active=false`（06-19 后停用）。
