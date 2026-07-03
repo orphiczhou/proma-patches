@@ -4,6 +4,36 @@
 
 新条目追加在顶部。
 
+## 2026-07-03 Layer A+C — 引擎统一 call_log + 聚合分析工具（消盲区 + 可分析）
+
+**起因**: Layer B 止血后，被拦调用（安全事件）仍**只在会话 JSONL、引擎层无记录（盲区）**，且日志散落/半结构化/按会话而非按 tree，分析成本高。Layer A 消盲区，Layer C 聚合分析。
+
+**Layer A（引擎统一 call_log）**:
+- `run()`（tree-engine.cjs:3931，统一 choke point，MCP/CLI 共用）注入：每次 `mcp__tree__*` 调用（**成功+失败都记**）写 call-log.jsonl per tree
+- 字段：`ts/cmd/sub/tree_id/leaf_id/caller_session_id/ok/error_code/elapsed_ms/args_digest/read_only`
+- 存储：独立 `call-log.jsonl`（append-only，不进 tree-state 避免全量写 10ms+ 性能炸弹）+ 轮转 10MB×3（40MB/树上限）
+- 范围：全记 + readOnly 标记（只读可过滤 = "只记写"的所有好处）
+- 金标准：`PROMA_CALL_LOG=0` 关闭测试环境（dbc-spec/audit-attacks 走 run 不传 caller）
+- 铁律：appendCallLog/extractIds 双层 try，**观测层绝不炸业务**
+- `args_digest`：ID/枚举完整记，`--json` 只记顶层 key（隐私+体积，不记任务内容）
+
+**Layer C（聚合分析 `scripts/tree-analyze.cjs`）**:
+- **P0 安全事件**：被拦调用按 error_code 聚合 + HIGH_RISK 白名单（E_BORROWED_IDENTITY/E_AUDITOR_NOT_INDEPENDENT/E_SESSION_NOT_ALIVE 等）+ 归因（top trees/leaves/callers）
+- **P1 时间线**：call_log + tree-state(events/audit_log) 按 ts 合并排序 → 统一事件流
+- 输出：stdout JSON + stderr Markdown，`--tree/--dimension/--since/--json` 过滤
+- 数据按 tree 聚合（非按会话），消除"散落/半结构化"痛点
+
+**验证**:
+- 金标准**零回归**（改前改后 25/14 一致，PROMA_CALL_LOG=0 时 SANDBOX 无 call-log 污染）
+- Layer A 动态 **3/3**：V1 只读调用记 `{ok:true,read_only:true,elapsed_ms:4}` / **V2 消盲区核心**（B1 拦的 E_STATUS_INVALID 被 call-log 记）/ V4 观测层吞错不炸业务
+- Layer C 跑通：P0 正确识别被拦（归因 tree/leaf/caller）+ P1 时间线聚合
+
+**关键文件**: tree-engine.cjs（Layer A，release+workspace-files cmp 一致）| scripts/tree-analyze.cjs（Layer C）| 备份 `*.bak-20260703-pre-calllog` | call-log.jsonl 已 gitignore
+
+**剩余**: ① **重启 release**让 Layer A 运行时生效 ② Layer C P2（会话血缘视图）+ P3（收敛诊断）后续 ③ audit_log 刷爆清理 follow-up
+
+---
+
 ## 2026-07-03 17:57 Tree 面板入口修复 — 三层根因（renderer / preload / catch 笔误）
 
 **现象**: release 0.13.16 tree 面板入口丢失，层层修复后恢复。

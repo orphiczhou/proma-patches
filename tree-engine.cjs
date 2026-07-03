@@ -3926,6 +3926,134 @@ function getTreesRoot() {
 //    若未来把临界区 async 化，per-call treesRoot 的 try/finally 仍能防污染，但建议彻底改为 dispatch(cmd,args,treesRoot) 参数化。
 // V10-self-audit-forbidden-v2: 新增 callerSessionId 参数，透传到 dispatch → dispatchAudit → cmdAuditGate。
 //   MCP wrapper 从 __proma_getMcpServers__(sessionId, ...) 提取并注入。
+// ─── Layer A: 引擎统一 call_log（2026-07-03）────────────────────────────
+//   目的: 消除被拦调用盲区 — 每次 mcp__tree__* 调用（成功+失败）都记 call-log.jsonl。
+//   注入点: run() 统一 choke point（MCP/CLI 共用，唯一入口）。
+//   存储: 独立 call-log.jsonl per tree（append-only，不进 tree-state 避免全量写性能炸弹）。
+//   金标准: PROMA_CALL_LOG=0 关闭测试环境（dbc-spec/audit-attacks 走 run 不传 caller）。
+//   铁律: 观测层绝不影响业务（extractIds/appendCallLog 双层 try 吞错）。
+const CALL_LOG_MAX_BYTES = 10 * 1024 * 1024;  // 10MB 触发轮转
+const CALL_LOG_KEEP = 3;                        // 保留 3 份历史（40MB/树上限）
+
+// 从 args 提取 tree_id/leaf_id/sub（观测用，永不抛）。用引擎 parseArgs 精确区分 positional/opts。
+function extractIds(cmd, args) {
+  const ids = { tree_id: null, leaf_id: null, sub: cmd };
+  try {
+    let p;
+    try { p = parseArgs(args).positional || []; }
+    catch (_) { p = (args || []).filter(a => typeof a === 'string' && a.length > 0 && !a.startsWith('-')); }
+    if (cmd === 'help') ids.sub = 'help';
+    else if (cmd === 'init' || cmd === 'backup' || cmd === 'restore' || cmd === 'migrate' || cmd === 'validate') {
+      ids.sub = cmd; ids.tree_id = p[0] || null;
+    } else if (cmd === 'leaf') {
+      ids.sub = p[0] || 'leaf';
+      if (p[0] === 'add') { ids.tree_id = p[1] || null; ids.leaf_id = '<in-json>'; }
+      else { ids.tree_id = p[1] || null; ids.leaf_id = p[2] || null; }
+    } else if (cmd === 'milestone') {
+      ids.sub = p[0] ? 'milestone-' + p[0] : 'milestone';
+      ids.tree_id = p[1] || null; ids.leaf_id = p[2] || null;
+    } else if (cmd === 'event' || cmd === 'drift' || cmd === 'heartbeat' || cmd === 'segment' || cmd === 'audit' || cmd === 'nudge') {
+      ids.sub = p[0] || cmd; ids.tree_id = p[1] || null; ids.leaf_id = p[2] || null;
+    } else if (cmd === 'tree') {
+      ids.sub = p[0] || 'tree'; ids.tree_id = p[1] || null;
+    } else { ids.sub = cmd; ids.tree_id = p[0] || null; }
+  } catch (_) { /* 观测层吞错 */ }
+  return ids;
+}
+
+// 只读命令判定（来自 patches.cjs tt(...,true) 标记）
+function isCallReadOnly(cmd, sub) {
+  if (cmd === 'help' || cmd === 'validate' || cmd === 'migrate') return true;
+  if (cmd === 'leaf' && ['get', 'list', 'list-active', 'list-all'].includes(sub)) return true;
+  if (cmd === 'tree' && ['dump', 'list'].includes(sub)) return true;
+  if (cmd === 'drift' && sub === 'list') return true;
+  if (cmd === 'heartbeat' && sub === 'tail') return true;
+  if (cmd === 'event' && sub === 'list') return true;
+  return false;
+}
+
+// --key value / --key=value 提取（内联，永不抛）
+function _findCallOpt(args, key) {
+  try {
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === key && i + 1 < args.length) return args[i + 1];
+      if (typeof args[i] === 'string' && args[i].indexOf(key + '=') === 0) return args[i].slice(key.length + 1);
+    }
+  } catch (_) {}
+  return null;
+}
+function _jsonTopKeys(s) {
+  try {
+    const o = JSON.parse(s);
+    if (Array.isArray(o)) return ['<array:' + o.length + '>'];
+    if (o && typeof o === 'object') return Object.keys(o);
+  } catch (_) {}
+  return null;
+}
+
+// 参数摘要：ID/枚举完整记，--json 只记顶层 key（隐私+体积，不记任务内容）
+function makeArgsDigest(cmd, args, ids) {
+  const d = {};
+  try {
+    if (cmd === 'audit') {
+      if (ids.sub === 'gate') {
+        const v = _findCallOpt(args, '--verdict'); if (v) d.verdict = v;
+        const a = _findCallOpt(args, '--audit-session-id'); if (a) d.audit_session_id = a;
+        const r = _findCallOpt(args, '--reason'); if (r) d.reason_len = r.length;
+      } else if (ids.sub === 'append') {
+        const k = _jsonTopKeys(_findCallOpt(args, '--json')); if (k) d.report_keys = k;
+      }
+    } else if (cmd === 'milestone') {
+      if (ids.sub === 'milestone-set-result') {
+        const ap = _findCallOpt(args, '--audit-pass'); if (ap) d.audit_pass = ap;
+        const asid = _findCallOpt(args, '--audit-session-id'); if (asid) d.audit_session_id = asid;
+      } else if (ids.sub === 'milestone-add') {
+        const k = _jsonTopKeys(_findCallOpt(args, '--json')); if (k) d.milestone_keys = k;
+      }
+    } else if (cmd === 'event') {
+      const t = _findCallOpt(args, '--type'); if (t) d.type = t;
+      const k = _jsonTopKeys(_findCallOpt(args, '--json')); if (k) d.meta_keys = k;
+    } else if (cmd === 'nudge') {
+      const r = _findCallOpt(args, '--rule-id'); if (r) d.rule_id = r;
+    } else if (cmd === 'leaf' && ids.sub === 'add') {
+      const k = _jsonTopKeys(_findCallOpt(args, '--json')); if (k) d.leaf_keys = k;
+    } else if (cmd === 'drift' || cmd === 'heartbeat' || cmd === 'segment') {
+      const k = _jsonTopKeys(_findCallOpt(args, '--json')); if (k) d.json_keys = k;
+    }
+  } catch (_) {}
+  return d;
+}
+
+// 轮转：logPath.(KEEP)→删, ...(1)→(2), 当前→.1（保留 KEEP 份）
+function rotateCallLog(logPath) {
+  try {
+    for (let i = CALL_LOG_KEEP; i >= 1; i--) {
+      const src = i === 1 ? logPath : (logPath + '.' + (i - 1));
+      const dst = logPath + '.' + i;
+      if (fs.existsSync(src)) {
+        if (i === CALL_LOG_KEEP && fs.existsSync(dst)) fs.unlinkSync(dst);
+        fs.renameSync(src, dst);
+      }
+    }
+  } catch (_) { /* 观测层吞错 */ }
+}
+
+// 写一条 call_log（整函数 try 包，永不抛，绝不影响业务）
+function appendCallLog(entry) {
+  try {
+    const tid = entry.tree_id;
+    if (!tid) return;  // 无 tree_id（help 等）不记，避免孤儿日志
+    const logPath = path.join(treeDir(tid), 'call-log.jsonl');
+    fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
+    if (Math.random() < 0.02) {  // 2% 概率 stat，省 IO
+      try {
+        const st = fs.statSync(logPath);
+        if (st.size > CALL_LOG_MAX_BYTES) rotateCallLog(logPath);
+      } catch (_) {}
+    }
+  } catch (_) { /* 静默：观测层不能影响业务 */ }
+}
+
 // V10-trust-anchor-fix (C5): callerSessionId 同时透传给 dispatch → dispatchEvent → cmdEventAppend,
 //   校验 caller 才能写 done event（堵 worker 给 root 写 done 触发 auto_upgrade）。
 async function run(cmd, args, treesRoot, callerSessionId) {
@@ -3933,12 +4061,24 @@ async function run(cmd, args, treesRoot, callerSessionId) {
   if (typeof treesRoot === 'string' && treesRoot.trim()) {
     TREES_ROOT = path.resolve(treesRoot);
   }
+  // Layer A: 入口计时 + ID 预提取 + 测试环境识别
+  const t0 = Date.now();
+  const ids = extractIds(cmd, args);
+  const callerSid = callerSessionId || null;
+  const isTestCtx = !callerSid && process.env.PROMA_CALL_LOG === '0';
+  const readOnly = isCallReadOnly(cmd, ids.sub);
   try {
     const result = await dispatch(cmd, args, callerSessionId);
+    if (!isTestCtx) {
+      appendCallLog({ ts: new Date().toISOString(), cmd, sub: ids.sub, tree_id: ids.tree_id, leaf_id: ids.leaf_id, caller_session_id: callerSid, ok: true, error_code: null, elapsed_ms: Date.now() - t0, args_digest: makeArgsDigest(cmd, args, ids), read_only: readOnly });
+    }
     return Object.assign({ ok: true }, result);
   } catch (e) {
     const code = e && e.code ? e.code : E_UNKNOWN;
     const msg = e && e.message ? e.message : String(e);
+    if (!isTestCtx) {
+      appendCallLog({ ts: new Date().toISOString(), cmd, sub: ids.sub, tree_id: ids.tree_id, leaf_id: ids.leaf_id, caller_session_id: callerSid, ok: false, error_code: code, elapsed_ms: Date.now() - t0, args_digest: makeArgsDigest(cmd, args, ids), read_only: readOnly, error_msg: msg.length > 200 ? msg.slice(0, 200) + '…' : msg });
+    }
     // V10-helper (D4 Layer 3): 错误返回附 help 引用。TreeStateError 构造时已挂 help_topic。
     //   自解释错误（E_TREE_NOT_FOUND 等）help_topic=null，不附引用。
     const helpTopic = (e && typeof e.help_topic !== 'undefined')

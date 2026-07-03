@@ -18,6 +18,9 @@ preload.cjs
 **/tree-state.json.bak-*-pre-nudge-cleanup
 tree-engine.cjs.bak-*-pre-*
 
+# Layer A 运行时调用日志（高频变化，不版本管理；分析用 scripts/tree-analyze.cjs）
+**/call-log.jsonl*
+
 # OS files
 .DS_Store
 Thumbs.db
