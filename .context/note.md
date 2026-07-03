@@ -17,7 +17,13 @@
    - release dist ✅ **已同步**（`D:/Proma-release/resources/app/dist/tree-engine.cjs` 与 workspace 副本 md5 一致 `8debc46...`，含 55 处 callerSessionId）
    - Git ❌ **仍未 push**（`orphiczhou/proma-patches`，分支 `release-0.13.16-hardening`，网络仍间歇 `Connection reset`）
 
-**剩余收尾**: ① git push（本次会话执行）② 确认 release 实例已重启让 P1 生效（6 个 `Proma.exe` 在跑，需用户在 UI 关闭重开 `D:/Proma-release/` 后用 `tree_leaf_set_session` 伪造 caller 重放确认返回拒绝）③ 非阻塞 follow-up（dbc-spec 口径核对 / `audit_append` undefined 脏条目 / `get_session_info` 不暴露血缘字段）。
+**剩余收尾进展（07-03 11:40 更新）**:
+- ① git push ✅ **已完成**：网络恢复后首次重试即成功，3 commit（`2b9a45b` / `4cee874` / `19cde23`）推上 `orphiczhou/proma-patches`，新建远端分支 `release-0.13.16-hardening`。
+- ② release 重启 + P1 运行时验证 ✅ **已完成（铁证）**：用户重启 release 实例后，建 `p1chk` tree 实测 `cmdAuditAppend` P1 补强（commit `4cee874` / engine L2716）：
+  - **控制组**：caller(`ee435ed8`) === auditor(`ee435ed8`) → `ok:true`，audit_log 正常写入
+  - **拦截组**：caller(`ee435ed8`) 借用 `1cba319d` 当 auditor → `E_BORROWED_IDENTITY` 拦截，msg 含 P1 特征串 `align with audit_gate caller binding`
+  - 证明 patches.cjs MCP wrapper `callerSessionId` 注入 + engine `dispatchAudit` 透传 + `cmdAuditAppend` caller!==auditor 拦截 **全链路在 release 运行实例生效**（不只 dist 同步，是运行时行为）。
+- ③ 非阻塞 follow-up（**未做**）：dbc-spec 口径核对（45/3 vs 25/14）/ `audit_append` undefined 脏条目 / `get_session_info` 不暴露血缘字段。
 
 ---
 
