@@ -4,6 +4,39 @@
 
 新条目追加在顶部。
 
+## 2026-07-03 工作状态恢复核实 — R4 已被三层根治超越，根治任务实质完成
+
+**会话恢复核实结论**（读 R4-justification + note.md + 实机核对 git/dist/进程）:
+
+1. **R4 修复无需执行**：R4-justification（06-27 17:10）论证的占位 UUID 攻击链修复（R4-P0-A/B：cmdLeafAdd session_id strict + cmdAuditAppend 占位拒绝），在当天 17:45 被 release 0.13.16 迁移的三层根治方案吸收并超越。层2 的 `assertMcpEntrySessionId` + `checkSessionAlive` 真实性 verifier 比 R4 的"MCP 入口占位拒绝"更彻底（占位/伪造 UUID 现返回 `E_SESSION_NOT_ALIVE`）。19:43 代码审计确认 cmdLeafAdd #5/#6/#7 占位跳过删除 + cmdAuditAppend #16 真实性 已落地，无 P0。**R4 文档现作历史论证留存，不再执行其原方案。**
+
+2. **补记 06-27 20:00 之后的端到端验证**（此前 note.md 漏记）: 20:49–22:05 又跑了 `e2ep1` / `e2ep1rt` / `e2etree` 三棵验证 tree —— 是 P1 补强（commit `4cee874`）后的大规模回归验证（e2etree 的 E-auditor 写 462 条 audit_log、E-worker-s1 写 456 条）。
+
+3. **今日 07-03 实机核实**:
+   - P1 补强代码 ✅ 在 `workspace-files/tree-engine.cjs`（`caller===added_by` L1426、`caller===auditor` L2716、dispatch 透传 L3729）
+   - release dist ✅ **已同步**（`D:/Proma-release/resources/app/dist/tree-engine.cjs` 与 workspace 副本 md5 一致 `8debc46...`，含 55 处 callerSessionId）
+   - Git ❌ **仍未 push**（`orphiczhou/proma-patches`，分支 `release-0.13.16-hardening`，网络仍间歇 `Connection reset`）
+
+**剩余收尾**: ① git push（本次会话执行）② 确认 release 实例已重启让 P1 生效（6 个 `Proma.exe` 在跑，需用户在 UI 关闭重开 `D:/Proma-release/` 后用 `tree_leaf_set_session` 伪造 caller 重放确认返回拒绝）③ 非阻塞 follow-up（dbc-spec 口径核对 / `audit_append` undefined 脏条目 / `get_session_info` 不暴露血缘字段）。
+
+---
+
+## 2026-06-27 20:00 端到端验证闭环 + P1 防借身份补强 → 整个任务完成
+
+**端到端验证（4 Commander 子Agent群，release 实例重启后）**:
+- A 功能联调：session 工具 8/8 + tree 全流程 + **leaf_add 真实 session 零误伤**（3个真实session全通过 cmdLeafAdd 真实性校验）
+- B 攻击重放：**6/6 全拦截**（伪造/占位UUID→E_SESSION_NOT_ALIVE、越权send→E_NO_OWNERSHIP、链式fork第11层→E_DELEGATION_TOO_DEEP、worker当auditor→E_AUDITOR_NOT_INDEPENDENT、占位/伪造UUID当auditor→E_SESSION_NOT_ALIVE）
+- C 金标准+血缘：audit-attacks/audit-extra 零绕过 + 血缘6字段（parentSessionId/forkedFromSessionId/delegationDepth/triggeredBy/sourceAutomationId/ownerGrantedAt）全部落盘 agent-sessions.json
+- D 代码审计：根治核心无P0，发现P1残留（详见下条目19:43）
+
+**P1 防借身份补强（commit `4cee874`）**: cmdLeafSetSession caller===added_by（堵夺leaf所有权）+ cmdAuditAppend caller===auditor（对齐cmdAuditGate L2572）+ D5老会话收紧（仅send allow）。**根因：MCP wrapper tt helper 已透传 callerSessionId，engine dispatch 此前只路由 event/audit-gate，cmdLeafSetSession/cmdAuditAppend 收不到——现已补齐**。攻击重放12/12 + revert对照（复制改后版本回退8处编辑得基线对比）证明 dbc-spec 零退步。
+
+**Git**: 分支 `release-0.13.16-hardening`，2提交（`19cde23` 迁移根治 + `4cee874` P1补强）本地，push 待网络（Connection reset）。
+
+**剩余事项**: ①重启 release 让 P1 生效（dist已改，运行中实例是旧的）②Git push 待网络恢复 ③follow-up 非阻塞：dbc-spec 口径核对（Commander C 报45/3 vs P1子会话报25/14，疑 dbc-spec.cjs 副本含/不含 mock verifier 差异，引擎零退步已证）、audit_append 失败残留 undefined 脏条目、get_session_info 不暴露血缘字段（增强建议）。
+
+---
+
 ## 2026-06-27 19:43 身份冒用三层根治 — 代码审计结论（review 子 Agent）
 
 > 纯读码审计（不跑运行时），对照设计文档 `layer1-hardening-design.md` + `layer2-tree-engine-design.md`。
