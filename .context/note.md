@@ -4,6 +4,34 @@
 
 新条目追加在顶部。
 
+## 2026-07-03 Layer B 止血 — TAO nudge 失控修复 + 11.4万垃圾清理
+
+**起因**: 检查 TAO Watcher 日志发现严重不正常 — nudge 熔断失效（`l1fix_v2-C1-consistency` `nudge_count=2810`，7 个 done leaf 被刷爆），proma workspace 累积 **113,889 条垃圾 nudge_log**。TAO automation 当前 `active=false`（06-19 后停用）。
+
+**根因 3 条**:
+1. `cmdNudgeAppend`（tree-engine.cjs:2828）入口**无 leaf.status 检查** — 7-strike 标 pruned 后入口未挡，done/pruned/archived 终态 leaf 仍被反复 nudge
+2. 入口**未调用 checkSessionAlive** — session 已死的僵尸 leaf 被 TAO 无限催办（永不响应）
+3. 历史 11.4 万条垃圾（B9 修复前 + 失效期累积）未清理
+
+**修复（B1+B2+B3，TAO 保持 `active=false` 只修代码不启用）**:
+- **B1**（cmdNudgeAppend 行2862 后）: 入口拒终态 leaf（done/pruned/archived → `E_STATUS_INVALID`），放行 active/segment_pending/pending_brief
+- **B2**（紧接 B1）: 入口 `checkSessionAlive` 三态（verifier 明确 false → `E_SESSION_NOT_ALIVE`；bypass 放行 CLI 兼容），堵僵尸 leaf
+- **B3**（`scripts/nudge-cleanup.cjs`）: 清理历史垃圾，threshold=7/keep=5，dry-run 默认 + 原子备份，只动 nudge_log/nudge_count
+
+**验证**:
+- 金标准 dbc-spec **改前改后完全一致**（25/14 baseline，零回归 — 14 个失败是已知口径差异，与 nudge 无关）
+- B1/B2 动态 harness **4/4**：done leaf 拦(E_STATUS_INVALID) / verifier=false 拦(E_SESSION_NOT_ALIVE) / verifier=throw 放行(bypass) / no-verifier 放行(bypass)
+- 清理 **113,532 条**（19/37 tree），l1fix_v2 23MB→10MB，`nudge_count=5/nudge_log=5` 保留最近 5 条，**其他字段完好**（events/audit_log/milestones 不动），幂等（再跑 total=0）
+
+**关键文件**: tree-engine.cjs（B1+B2，release + workspace-files md5 一致）| scripts/nudge-cleanup.cjs（B3）| 备份 `*.bak-20260703-pre-*` | 计划 `.context/plan/`(会话级)
+
+**剩余**:
+1. **重启 release 实例**让 B1/B2 运行时生效（dist 已改，运行中是旧代码 — 下次任何 nudge 调用走旧逻辑）
+2. `audit_log` 也被刷爆（l1fix_v2-C1 audit_log=2810，与 nudge 同步累积），**本次未清**（需区分有价值审计 vs 刷爆产物），留 follow-up
+3. Layer A（引擎统一 call_log 消除被拦盲区）+ Layer C（聚合分析工具）留后续
+
+---
+
 ## 2026-07-03 工作状态恢复核实 — R4 已被三层根治超越，根治任务实质完成
 
 **会话恢复核实结论**（读 R4-justification + note.md + 实机核对 git/dist/进程）:

@@ -2860,6 +2860,24 @@ async function cmdNudgeAppend(args) {
       throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
     }
     const leaf = state.leaves[leaf_id];
+    // B1 止血(2026-07-03): 终态 leaf 拒绝 nudge — 失守根因#1
+    //   7-strike 标 pruned 后入口未挡，done/pruned/archived 仍被反复 nudge（实测 l1fix_v2 有 7 个 done leaf 刷爆 2810+ 条）。
+    //   放行 active/segment_pending/pending_brief（活跃过渡态仍需 TAO 监督）。
+    if (leaf.status === 'done' || leaf.status === 'pruned' || leaf.status === 'archived') {
+      throw new TreeStateError(E_STATUS_INVALID,
+        `nudge_append rejected: leaf "${leaf_id}" has terminal status "${leaf.status}" (done/pruned/archived). ` +
+        `Terminal leaves cannot respond to nudges. Use 'drift append' with action=prune to re-dispatch, or 'leaf add' a new leaf. (B1: terminal-status guard)`);
+    }
+    // B2 止血(2026-07-03): session 已死拒绝 nudge — 失守根因#2
+    //   checkSessionAlive(行3886) 早存在但 cmdNudgeAppend 从未调用，僵尸 leaf(session 已死)被无限催办。
+    //   三态分支与 assertMcpEntrySessionId(行201) 对齐：
+    //   ① ok=true 无 bypass(真实)→放行 ② bypass(no-verifier/verifier-error)→放行(CLI/异常兼容) ③ ok=false 无 bypass(确认死)→拒绝
+    const aliveB2 = checkSessionAlive(leaf.session_id);
+    if (aliveB2.ok === false && !aliveB2.bypass) {
+      throw new TreeStateError(E_SESSION_NOT_ALIVE,
+        `nudge_append rejected: leaf "${leaf_id}" session "${leaf.session_id}" is not alive (session does not exist). ` +
+        `A dead session cannot respond to nudges — repeated nudges are noise. Use 'drift append' action=prune to re-dispatch. (B2: zombie-session guard)`);
+    }
     // V9+ Phase 4 (R2 P0 / B9): role→rule 适用性校验（rule 必须匹配 leaf.role）。
     if (!allowedRoles.includes(leaf.role)) {
       throw new TreeStateError(

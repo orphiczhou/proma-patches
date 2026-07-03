@@ -14,6 +14,10 @@ session-cleaner.zip
 main.cjs
 preload.cjs
 
+# 运维脚本备份（nudge-cleanup B3 / 引擎修复，2026-07-03）
+**/tree-state.json.bak-*-pre-nudge-cleanup
+tree-engine.cjs.bak-*-pre-*
+
 # OS files
 .DS_Store
 Thumbs.db
