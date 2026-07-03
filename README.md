@@ -303,6 +303,7 @@ V10 升级把"字段存在性校验"升级为"内容有效性校验"。在 V10 P
 |---|---|---|
 | **Project Index** | [`.context/PROJECT-INDEX.md`](.context/PROJECT-INDEX.md) | 项目索引（5 分钟拿全貌 + 关键路径） |
 | **图形化向导** | [`.context/project-onboarding-guide-2026-06-25.md`](.context/project-onboarding-guide-2026-06-25.md) | 30 分钟建立完整心智模型（图形化 + 类比 + 通俗） |
+| **Tree 运行机制总览** | [`.context/v10/tree-system-overview-2026-07-03.md`](.context/v10/tree-system-overview-2026-07-03.md) | 图形化整合「约束+驱动+实现」三视角（10 分钟吃透 Tree 体系，新人必读） |
 | **进度笔记** | [`.context/note.md`](.context/note.md) | 长期调研笔记（按日期追加在顶部） |
 | **完整技术 Wiki** | [`.context/proma-dev-wiki.md`](.context/proma-dev-wiki.md) | 补丁命令、架构、测试记录、版本历史（73KB） |
 | **最新进度报告** | [`.context/active/progress-report-2026-06-25.md`](.context/active/progress-report-2026-06-25.md) | 6/20→6/25 五天阶段性总结 |
@@ -464,6 +465,7 @@ bash uninstall.sh
 - **完整变更日志**：[CHANGELOG.md](CHANGELOG.md)
 - **完整许可证**：[LICENSE](LICENSE)
 - **图形化入门向导**：[`.context/project-onboarding-guide-2026-06-25.md`](.context/project-onboarding-guide-2026-06-25.md)
+- **Tree 运行机制总览**：[`.context/v10/tree-system-overview-2026-07-03.md`](.context/v10/tree-system-overview-2026-07-03.md)（10 分钟吃透 Tree 体系）
 - **项目索引**：[`.context/PROJECT-INDEX.md`](.context/PROJECT-INDEX.md)
 
 ---
