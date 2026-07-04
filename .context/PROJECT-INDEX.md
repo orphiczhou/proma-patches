@@ -1,6 +1,6 @@
 # Proma 改造项目 — 知识索引
 
-> 入口文档 | 维护: 周星星 | 最后更新: 2026-07-04（ISS-001/002/003阶段一/004 修复轮次后同步）
+> 入口文档 | 维护: 周星星 | 最后更新: 2026-07-04（ISS-001/002/003阶段一/004 修复轮次后同步；新增 Tree harness 中期评价）
 
 新会话从这里开始读，能 5 分钟拿到项目全貌和关键路径。
 
@@ -116,6 +116,7 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 | **目录导航** | `workspace-files/.context/README.md` | `.context/` 目录速查（新人 30 秒上手） |
 | **入门向导** | `workspace-files/.context/project-onboarding-guide-2026-06-25.md` | 图形化 30 分钟建立心智模型 |
 | **Tree 运行机制总览** | `workspace-files/.context/v10/tree-system-overview-2026-07-03.md` | 图形化整合「约束+驱动+实现」三视角（10 分钟建立 Tree 体系心智模型，新人必读） |
+| **Tree harness 中期评价** | `workspace-files/.context/tree-harness-midterm-review.md` | nanju 活案例 4-Agent 洁净室交叉印证：3 个 P0 设计漏洞（done event 架空 8 道门禁 / audit_gate 三重死锁 / 状态机零流转）+ 纸面门禁清单 + 过度/欠设计分析 + 优先修复表（2026-07-04） |
 | **长期笔记** | `workspace-files/.context/note.md` | 按日期追加的调研笔记（顶部最新） |
 | **待解决问题清单** | `workspace-files/.context/待解决问题清单.md` | 开放问题/接口陷阱/已知坑追踪（🔴 待解决 / 🟡 已规避 / 🟢 已解决，解决后改状态不删除） |
 | **技术 Wiki** | `workspace-files/.context/proma-dev-wiki.md` | 补丁命令 + 架构 + 测试记录 + 版本历史 |
