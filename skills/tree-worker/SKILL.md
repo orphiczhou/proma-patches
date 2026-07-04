@@ -272,6 +272,59 @@ dod:
 
 ---
 
+## §4.6 done 前 G1-G5 多子Agent 内容审查（ISS-003，review_required=true 时强制）
+
+> 对应引擎硬约束：`cmdLeafSetStatus` done 门禁校验 events[] 须含 ≥1 条 `review_round` 事件（schema + 末轮 red_count===0 + 总轮数≤3）。
+> 2026-07-04 新增（ISS-003 阶段一）。与 §4.2 互补：§4.2 是每个 Mi 后的快速单 Agent 对齐自检；§4.6 是全部 Mi 完成后、done 前的多视角内容审查收敛。
+
+**触发条件**：`brief.audit_meta.review_required === true`（commander 下发 brief 时标记），或 worker 自检交付物为设计文档/架构级/跨文件（≥1000 字）时主动开启。
+
+**与 §4.2 的关系**：§4.2 不废弃（仍用于 milestone 级快速自检），但 review_required=true 时 done 前必须**额外**跑 §4.6。审计角色（§10，commander 派 leaf 模式）是另一条独立链，不冲突。
+
+**执行步骤**（最多 3 轮，红色归零收敛）：
+
+1. **分档决定 reviewer 数量**（按交付物总字数/文件数，避免小任务过重）：
+   - < 1000 字或单文件小改 → 2 reviewer（G1 完整性 + G3 可执行性）
+   - 1000–5000 字或跨 2-3 文件 → 3 reviewer（G1 + G2 一致性 + G3）
+   - \> 5000 字或跨多文件/架构级 → 5 reviewer（G1-G5 全视角）
+
+2. **并行 Fork N 个子 Agent**，每个分配一个视角：
+   - **G1 完整性**：交付物是否覆盖 brief.my_mission / dod.deliverables 全部要求
+   - **G2 一致性**：交付物内部 / 跨文件是否自洽（命名、接口、术语）
+   - **G3 可执行性**（红色必改）：能否跑/编译/通过测试；命令、依赖、路径是否正确
+   - **G4 可读性**：结构、表达、受众适配
+   - **G5 格式合规**（红色必改）：对照 dod.quality_gates 逐项
+
+   每个子 Agent prompt 给出 brief / dod / milestone / 产出路径，要求**只提 findings，不重写**，每条 finding 标 `severity: red|yellow|green` + `evidence`（≥10 字，引用具体位置）。
+
+3. **收集 N 份 findings → 写 review_round event**（`mcp__tree__tree_event_append`）：
+   ```yaml
+   event: review_round
+   meta:
+     round_no: 1
+     reviewers:
+       - perspective: G1
+         reviewer_session_id: <子Agent session_id；SDK SubAgent 无 Proma session_id 时填一个合法 UUID，≠ 自己 session_id，≠ added_by>
+         findings:
+           - { severity: red, item: "评测流程图缺异常分支", evidence: "flow.mmd 第3段未画 timeout 分支，与 error-handling.md 不一致" }
+           - { severity: green, item: "API 列表完整", evidence: "api.yaml 覆盖 brief 要求的 8 个端点" }
+     red_count: 1
+     converged: false
+   ```
+   ⚠️ `reviewer_session_id` 不得 = 自己 session_id（自审，引擎 `E_REVIEW_FORGERY` 拦截）、不得 = added_by（commander 不能自审下属）。
+
+4. **若末轮 red_count > 0** → 按 findings 自改 → 再 Fork N 个子 Agent（至少 60% 新 session，避免视角重复）→ 写 round 2 → …
+5. **最多 3 轮**：red_count=0 即收敛（converged: true）→ 可 done；3 轮仍红 → 不再循环，上行 `blocked` 请求 commander 介入（引擎拦截 total_rounds>3 的 done）。
+
+**已知局限（阶段一，诚实标注）**：引擎 review 门禁【仅防格式伪造 + 自审】，**不防内容伪造**——worker 自写一条格式合法但全 green 的 review_round 可蒙混通过。**真实防线是 commander 验收时抽查 reviewer findings 与产出文件的相关性**（见 tree-commander SKILL §4 Step4）。阶段二（Layer2 findings-产出文件相关性校验）将补引擎层内容真实性。这与 self_check 同安全级别（self_check 也是 worker 自写、引擎只防格式）。
+
+**禁止**：
+- `reviewer_session_id` = 自己 session / added_by（`E_REVIEW_FORGERY`）
+- findings 为空或 evidence < 10 字（`E_REVIEW_FORGERY`）
+- 跳过审查直接 done（`E_REVIEW_NOT_CONVERGED`）
+
+---
+
 ## §5 决策笔记模板（.note.md）
 
 > 对应设计文档: §6.3 决策日志
@@ -450,6 +503,7 @@ drift_declaration: false
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-07-04 | v2.3 | ISS-003：新增 §4.6 done 前 G1-G5 多子Agent 内容审查（review_required=true 时强制，含分档/红色归零/最多3轮/已知局限诚实标注）。与 §4.2 milestone 级自检互补不冲突 |
 | 2026-06-19 | v2.2 | 审计驱动修订：load_on 从 fork_session 修正为 create_session（原则 11：叶子 = create_session）；target 描述明确子 Commander 由 fork_session 创建 |
 | 2026-06-19 | v2.1 | 新增 §10 审计角色（触发判定、最小 Fork 结构、审计 done 格式、审计禁止行为）；§0 引用 tree-audit-methodology.md |
 | 2026-06-18 | v2.0 | 首次创建。合并 v0.1 9 条铁律 + v0.2 内部自审必须化（铁律 3 从可选升级为必须）；新增 §4 完整自审流程（含 Prompt 模板 + drift_history 写入规范）；done 模板新增 drift_declaration 字段 |

@@ -4,6 +4,108 @@
 
 新条目追加在顶部。
 
+## 2026-07-04 ISS-001/002/003/004 修复轮次（Tree 模式多会话协作）
+
+**任务**：用户指令"看待解决问题文档→派子Agent调研设计→多轮审计迭代→修复→审计收敛"。4 个 ISS 全做，方案+改代码+部署验证，SDK SubAgent 协作。
+
+**方法论闭环**（Tree 模式多会话协作，6 阶段）：
+1. 调研 4 SubAgent 并行（各 ISS 设计方案初稿）
+2. 对抗审计 4 SubAgent（找漏洞）+ ISS-003 二轮再审（确认致命伤 + 分阶段）
+3. 迭代定稿 v2（综合审计反馈）
+4. 实施（ISS-001/002/004 patches.cjs + ISS-003 tree-engine.cjs + 两份 SKILL）
+5. 测试 SubAgent 写 ISS-003 验证（13/13）+ 代码审计 SubAgent 复核（无阻断）
+6. 部署 dev/release dist 三份同步
+
+**4 个关键反转/澄清**（审计价值证明）：
+- ISS-002：title 假设证伪（renderer 纯 sessionId 匹配 `A.find(R=>R.id===sessionId)`，无 title 歧义）→ 改备选 A + toast
+- ISS-003：worker 自调 G1-G5 是新造机制（现有 §14 是 commander 派 leaf）+ **events 自写性让纯结构校验失效**（worker 可自写合法 review_round 蒙混）→ 阶段一诚实标注 + 分阶段
+- ISS-004：方案 B（process.on uncaughtException）**不消 Electron 弹窗**（Node 多 listener 并存，Electron 内置 handler 不被覆盖）→ 消弹窗靠 A + res.end try/catch
+- ISS-003：checkSessionAlive 强校验会误杀 SDK SubAgent（无 Proma session_id）→ 取消，改为格式 + 非自审校验
+
+**交付**：
+- `proma-dev-patches.cjs`：ISS-001 validateWorkspaceId slug→id 兼容 + remote_create_session default 兜底 / ISS-002 navigate handler 预热+诊断+失效 toast / ISS-004 bridge socket on-error + res.end try/catch + uncaughtException 限定 EPIPE/ECONNRESET
+- `tree-engine.cjs`（+150 行）：3 新错误码 + DEFAULT_AUDIT_META.review_required=false（opt-in）+ EVENT_TYPE_ENUM 加 review_round + isReviewRequired(leaf,state) + validateReviewRoundSchema（含 finding.item + red_count 交叉校验）+ done 门禁 review 校验 + cmdLeafAdd 父链 flagged 扫描 + cmdMigrate 规则 11
+- tree-worker SKILL §4.6 + tree-commander §4 Step4（已同步顶层 skills/）
+- 测试 `.context/plan/iss003-review-gate-test.cjs`（13/13，含 events 自写绕过 = 阶段一已知局限）
+- 部署：workspace-files + dev dist + release dist 三份一致（patches 3109 / tree-engine 4315）
+
+**ISS-003 阶段二 follow-up**（已写入待解决清单）：review_evidence 不可直接写字段 + cmdReviewRound 唯一写入路径 + Layer2 findings-产出文件相关性校验 + R-08 巡逻。阶段一是格式基线（和 self_check 同安全级），真正硬约束在阶段二。
+
+**运行时验证清单**（重启 dev/release 实例后）：
+- ISS-001：dev 调 `remote_create_session({instance:'release', channel_id:X})` 不传 workspace_id → 命中 release default 工作区，不再 E_WORKSPACE_NOT_FOUND
+- ISS-002：造两个同名 title 不同 session_id 会话，tree 面板点击切换生效；会话失效时有红色 toast 提示
+- ISS-003：建 review_required=true 的 tree（tree_init 传 `audit_meta.review_required:true`），worker 不跑 G1-G5 直接 done → E_REVIEW_NOT_CONVERGED；跑完收敛 → 放行
+- ISS-004：密集 send_message wait=true + 中途 kill MCP client → 无主进程 EPIPE 弹窗
+
+**关键教训**：
+- **events 自写性是 Tree 体系的根本限制**——任何 events 级校验都只能防格式不防内容（和 self_check 同级）。真正硬约束需"worker 不可直接写的字段"（worker 走专门命令提交，引擎写字段）。这是阶段二的核心。
+- 对抗审计多次反转初稿假设（title 假设、方案 B 消弹窗、checkSessionAlive 误杀、isReviewRequired 读 leaf.audit_meta 死代码）—— 多轮审计 + 测试是必要的，初稿方案不可信。
+- migrate flagged 的 one-way ratchet 风险：未 opt-in 的树不应被强制（flagged 只在 review_required=true 时标，grandfathered 始终标）。
+
+## 2026-07-04 session-cleaner 洁净室测试 3 轮迭代 — 收敛
+
+**背景**：v1 脚本昨天落地后，派 4 个独立子 Agent 做洁净室测试（不透露实现者先验结论，各自独立验证）。3 轮收敛。
+
+**收敛曲线**：
+
+| 轮 | 视角 | 发现 / 修复 | 格式 B 保真度 |
+|----|------|------------|---------------|
+| R1 | 4 Agent 并行（黑盒/白盒/对抗/金标准） | 抓到 1 个 P0 + 5 个 P1。最致命：`_merge_b_assistant` 里 `all_texts` 是死变量，**42% 回合丢文本（12474 个），累计丢 135 万字符** | 37% → 90% |
+| R2 | 独立复核 | R1 六项全 PASS；又抓 2 个：① best_text 取"最长"在 Z.ai 工具交错回合丢叙述（**我修复时引入**）② ×N 折叠误并不同 input（**我 R1 误判为 P3，实证 462 处**） | 90% → ↑ |
+| R3 | 最终复核 | R2 两项全修复（12474 回合全恢复、误折叠 462→0）；新函数白盒无 bug；无新问题 | 收敛 |
+
+**最终修复清单（clean_session.py）**：
+1. [P0] `_merge_b_assistant` text 补全：从"取最长"改为"最后一行 text 优先；无则前缀去重并集兜底"
+2. [P1] `_summarize_tool_input` 加 `isinstance(inp, dict)` 守卫（防 list/str/int 崩 `.items()`）
+3. [P1] 文件打开 `utf-8` → `utf-8-sig`（自动 strip BOM，原静默判空）
+4. [P1] `--out` 的 `mkdir` 包 try（PermissionError/FileExistsError/NotADirectoryError）
+5. [P1] `content = msg.get("content") or []`（None 防御）
+6. [P2] `detect_format` 跳过首部无法识别行重试（原整文件判废）
+7. [P1] 新增 `_dedup_texts`：前缀去重保留独立多段（修 Z.ai 交错回合）
+8. [P1] 新增 `_fold_key` + `collapse` 基于 input md5 哈希折叠（修 ×N 误并）
+
+**关键教训 — 确认偏误**：我昨天测 `00b0d864` 只看了开头几十行的分段结构就判定"解析有效"，漏掉了 P0。4 个独立 Agent 从白盒（读代码）和金标准（对比语义）两个完全不同的角度交叉命中同一个 bug。多轮迭代的价值：R2 又抓到我修复时引入的新问题（best_text）和我之前的误判（×N 折叠），R3 验证收敛。
+
+**当前状态**：v1 脚本生产可用。保真度 格式 A ≈ 93%、格式 B ≈ 90-95%。`--all` 586 文件 ≈17.6s、0 失败。R3 留有独立验证脚本在 /tmp/r3/（已清理或会话后失效）。
+
+## 2026-07-03 23:53 session-cleaner.zip 能否在当前项目使用 — 分析结论
+
+**背景**：`workspace-files/session-cleaner.zip`（v1.0.0, MIT, 9504B, 6/25）是会话清洗 skill 的原始打包。`skills/session-cleaner/` 下已装有**更新的 v2.0.0**（AGPL-3.0, 7/3）。需判断"能否在当前目录项目使用"。
+
+**两版本质差异**：
+
+| 维度 | zip v1.0.0 | 已装 v2.0.0 |
+|------|-----------|------------|
+| 形态 | 纯 Python 脚本 `clean_session.py`(392行) + 格式spec | `proma` CLI 的**薄封装**（SKILL.md + cli-usage.md，**无脚本**） |
+| 依赖 | 仅 Python 标准库，零第三方 | 依赖 `proma session` 命令（来自 `@proma/session-core` + `apps/cli`） |
+| 用法 | `python clean_session.py <id> --out dir` | `proma session info/outline/search/export` |
+| 维护性 | 独立重抄会话格式，会随内部格式漂移 | 格式知识只存一处（core 包），健壮 |
+
+**当前项目环境事实（决定性）**：
+- workspace-files **不是** Proma 源码 monorepo —— 无 `apps/cli/`、无 `packages/session-core/`、无 `default-skills/`
+- `which proma` → **不在 PATH**
+- ⇒ **v2.0.0 在当前环境跑不通**（它的 SKILL.md 会诱导调 `proma session`，必然 `command not found`）
+- 但 Python 3.14.3 可用，`~/.proma/agent-sessions/` 有 586 个 jsonl / 913MB
+
+**实测 v1（用真实会话 00b0d864, 400KB）**：
+- ✅ 解析逻辑对当前格式**完全有效**：400KB 原始 → 20.8KB 干净 Markdown（压缩 ~95%），`## 用户`/`## 助手` 分段正确，工具调用折叠、thinking/tool_result 丢弃均生效
+- ✅ `--out` 写文件模式正常（脚本用 `write_text(md, encoding="utf-8")`）
+- ❌ `--stdout` 在**中文 Windows 控制台会崩**：`UnicodeEncodeError: 'gbk' codec can't encode '⚠'`。根因：`sys.stdout.write(md)` 未指定编码，stdout 走 GBK。**解法**：优先用 `--out`，或 `PYTHONIOENCODING=utf-8 python ... --stdout`
+
+**结论**：
+1. **能用的是 zip 里的 v1**（自包含、当前环境可直接跑），**不是 skills/ 里已装的 v2**（缺 proma CLI 跑不通）。
+2. v1 唯一问题是 Windows stdout 编码 bug（一行 `sys.stdout.reconfigure(encoding="utf-8")` 即可根治），不影响 `--out` 文件输出。
+3. **隐患**：skills/ 下装的 v2 SKILL.md 会误导 Agent 调不存在的 `proma` 命令，建议在当前环境用 v1 覆盖，或显式标注 v2 依赖未满足。
+
+**测试产物**：已在 /tmp 解压与验证，未污染工作区。
+
+**落地（2026-07-04，按"v1+v2 共存+fallback"方案）**：
+- `skills/session-cleaner/` 补入 v1 的 `scripts/clean_session.py` + `references/session-format-spec.md`，v2 的 SKILL.md / cli-usage.md 原样保留 → 4 文件共存
+- 修掉 v1 的 Windows stdout GBK 崩溃（`sys.stdout/stderr.reconfigure(encoding="utf-8")`，带 AttributeError 兜底）。回归实测：原崩溃的 `--stdout` 现退出码 0、中文正常；`--out` 仍 20811 bytes 正常
+- SKILL.md 在"历史"注释后植入 `> ⚠️ Fallback` 段落：`which proma` 不存在时改走 v1 脚本，附完整命令
+- 当前环境用法：`python skills/session-cleaner/scripts/clean_session.py <id> --out cleaned/`
+
+
 ## 2026-07-03 20:32 Tree 面板 UI 改进 — 会话名词化 + 联动下拉框 + combobox 根治
 
 **改动（release dist + 同步 dev/workspace-files/发布包，md5 一致）**:

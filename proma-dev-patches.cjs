@@ -6,6 +6,21 @@ const { randomUUID } = require("node:crypto");
 const path = require("path");
 const fs = require("fs");
 
+// ISS-004 纵深防御: 全局 uncaughtException 兜底.
+//   注: Node EventEmitter 多 listener 并存, 加此 listener 不会移除 Electron 内置弹窗 handler ——
+//   此 handler 的作用是 (a) EPIPE/ECONNRESET 降级为日志 (配合 bridge socket on-error 双保险, 防漏网);
+//   (b) 其他未捕获异常结构化记录. 严格限定只吞 EPIPE/ECONNRESET, 其余 rethrow 触发 Electron 默认弹窗
+//   (不掩盖真 bug). log 此时未定义, 用 console.error.
+process.on("uncaughtException", (err) => {
+  const code = err && err.code;
+  if (code === "EPIPE" || code === "ECONNRESET") {
+    try { console.error(`[proma-dev-patches] [swallowed] ${code}: ${err && err.message ? err.message : ''}`); } catch (_) {}
+    return;  // 不退出, 不 rethrow
+  }
+  console.error(`[proma-dev-patches] [uncaughtException] ${(err && err.stack) || err}`);
+  throw err;  // 其他异常 rethrow → Electron 默认弹窗 (不掩盖真 bug)
+});
+
 // ---- 远端实例 HTTP 调用 ----
 const http = require("node:http");
 const PORT_START = 19876;
@@ -182,14 +197,22 @@ function validateWorkspaceId(workspaceId) {
   const trimmed = (typeof workspaceId === 'string') ? workspaceId.trim() : workspaceId;
   if (!trimmed) return { ok: true };
   let validIds = null;
+  let workspaces = null;
   try {
-    const workspaces = api().listAgentWorkspaces() || [];
+    workspaces = api().listAgentWorkspaces() || [];
     validIds = new Set(workspaces.map(w => w.id));
   } catch (e) {
     log("validateWorkspaceId: listAgentWorkspaces failed, skip validation: " + (e && e.message));
     return { ok: true };
   }
   if (validIds.has(trimmed)) return { ok: true, normalized: trimmed };
+  // ISS-001 compat: 入参可能是 slug 而非 id (旧调用方/历史脚本/remote_create_session 旧逻辑残留).
+  //   二次用 slug 匹配, 命中则 normalized 成 id (与下游 createAgentSession 期望的 workspaceId 单位对齐,
+  //   也消除"validateWorkspaceId 用 id 索引、但调用方传 slug"的单位不匹配).
+  if (workspaces && Array.isArray(workspaces)) {
+    const bySlug = workspaces.find(w => w && w.slug === trimmed);
+    if (bySlug && bySlug.id) return { ok: true, normalized: bySlug.id };
+  }
   const validList = [...validIds].slice(0, 5).join(', ');
   const total = validIds.size;
   return {
@@ -1148,23 +1171,28 @@ function createRemoteToolHandlers() {
       //   仍无法确定则明确报错（不再静默放行 "undefined" 字符串）。
       let payload = Object.assign({}, args);
       if (!payload.workspace_id || payload.workspace_id === 'undefined' || payload.workspace_id === 'null') {
-        // 尝试 fallback：当前实例激活 workspace slug
-        let fallback = null;
+        // ISS-001 fix (cross-instance workspace_id resolution):
+        //   旧实现 fallback 到【调用方本实例】的 slug (e.g. "proma"), 透传到目标实例必失败 ——
+        //   目标实例索引里没有 "proma", 且 fallback 传 slug 而目标端 validateWorkspaceId 用 id 校验, 单位不匹配.
+        //   新实现: 询问【目标实例】list_workspaces, 仅当存在 slug==="default" 的工作区时用其 id 兜底;
+        //   否则明确报错 (宁可报错也不猜 —— 猜错会把会话静默建到错误工作区, 比报错更危险).
+        //   禁止任何 fallback 回调用方 slug (会复活原 bug).
+        let resolved = null;
         try {
-          // findCurrentWorkspaceSlug 在 registerTreePanelIpc IIFE 里，这里独立实现一份轻量版
-          const a = api();
-          const sessions = a.listAgentSessions();
-          if (Array.isArray(sessions) && sessions.length > 0) {
-            const sorted = sessions.filter(s => s.workspaceId).sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0));
-            if (sorted[0] && sorted[0].workspaceId) {
-              try { fallback = a.getAgentWorkspace(sorted[0].workspaceId) && a.getAgentWorkspace(sorted[0].workspaceId).slug; } catch (_) {}
-            }
+          const lw = await remoteHttpPost(port, "list_workspaces", {}, host);
+          const ws = Array.isArray(lw) ? lw : (Array.isArray(lw && lw.workspaces) ? lw.workspaces : []);
+          const def = ws.find(w => w && w.slug === 'default');
+          if (def && def.id) {
+            resolved = def.id;
+            log("[remote_create_session] workspace_id auto-resolved to target instance default workspace: " + def.id);
           }
-        } catch (_) {}
-        if (fallback) {
-          payload.workspace_id = fallback;
+        } catch (e) {
+          log("[remote_create_session] list_workspaces on target instance failed: " + (e && e.message ? e.message : String(e)));
+        }
+        if (resolved) {
+          payload.workspace_id = resolved;
         } else {
-          return jsonResult({ ok: false, error: { code: 'E_WORKSPACE_REQUIRED', msg: 'remote_create_session: workspace_id is required (V10-workspace-canonical). Pass workspace_id explicitly, or set a current active workspace on this instance to use as fallback.' } });
+          return jsonResult({ ok: false, error: { code: 'E_WORKSPACE_REQUIRED', msg: 'remote_create_session: workspace_id could not be auto-resolved on target instance (no "default" workspace found, or list_workspaces failed). Pass workspace_id explicitly.', help_hint: 'Call mcp__remote-session__remote_list_workspaces with the same instance to list valid workspace ids.' } });
         }
       }
       return jsonResult(await remoteHttpPost(port, "create_session", payload, host));
@@ -1425,11 +1453,17 @@ function createExternalHttpBridge() {
             let args = {};
             try { args = JSON.parse(body || "{}"); } catch (_) { /* keep {} */ }
             const result = await handler(args);
-            res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify(result));
+            // ISS-004: 客户端可能在 handler await 期间断开, writeHead/end 对已关 socket 写 → 同步抛 EPIPE
+            //   (socket.on('error') 拦不住同步 throw, 是 uncaughtException 残留路径). 包 try/catch 兜底.
+            try {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify(result));
+            } catch (_) {}
           } catch (e) {
-            res.writeHead(500, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+            try {
+              res.writeHead(500, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }));
+            } catch (_) {}
           }
         });
       });
@@ -1437,6 +1471,17 @@ function createExternalHttpBridge() {
       server.on("error", (e) => {
         if (e.code === "EADDRINUSE") return reject(e);
         log(`HTTP bridge error: ${e.message}`);
+      });
+
+      // ISS-004 fix: 连接级 socket error handler.
+      //   当 MCP 客户端 (proma-mcp-server.cjs req.destroy()) 在 server 端 async handler 仍在 await
+      //   (send_message 最长 600s) 时提前断开, server 写响应触发 EPIPE/ECONNRESET. 无 socket 级 handler
+      //   时冒到 process uncaughtException → Electron 主进程弹窗. 这里吞连接级错误 (仅记日志不抛),
+      //   server 级 error 仍走上面的 server.on("error"). socket 由 Node 自动 destroy/close, 无 fd 泄漏.
+      server.on("connection", (socket) => {
+        socket.on("error", (err) => {
+          try { log(`[bridge-socket] ${err && err.code ? err.code : ''} ${err && err.message ? err.message : ''}`); } catch (_) {}
+        });
       });
 
       const bindHost = process.env.PROMA_BRIDGE_HOST || "127.0.0.1";
@@ -1900,27 +1945,55 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
   // 补丁 M+ v0.2: 不再用 proma:navigate-to-session 广播（renderer 没监听）
   // 改为复用 Proma 内置的 tray:open-agent-session 事件链
   // renderer 已监听这个事件并自动 setActiveTabId + updateSettings
-  ipcMain.on("proma:navigate-to-session", (event, sessionId) => {
+  // ISS-002 fix (同名会话切换失效):
+  //   审计反转: renderer 全程纯 sessionId 匹配, 无 title 歧义 (补 title 无效是预期的).
+  //   真因大概率是 renderer listAgentSessions 与目标 session 不一致 (atom 未 flush/命中 miss) 或
+  //   session 已失效. 旧"executeJavaScript click 兜底"无可靠选择器 (sidebar item 无 data-session-id),
+  //   增量价值=0 且 DOM 耦合风险高, 已弃用.
+  //   新方案 (备选A + 诊断): ①预热 renderer listAgentSessions 刷新 atom ②发主 IPC ③结构化诊断日志
+  //   ④navigate-failed 让 tree 面板消费 (会话失效时 UI 提示, 见 proma-tree-view 注入段).
+  ipcMain.on("proma:navigate-to-session", async (event, sessionId) => {
     try {
       const bw = electron.BrowserWindow && electron.BrowserWindow.fromWebContents(event.sender);
-      if (bw) {
-        // 验证 session 存在 + 拿 title（避免切换到不存在的 session）
-        let _navMeta = null;
+      if (!bw) return;
+      // ① 预热: 让 renderer 的 listAgentSessions 先跑一次, 刷新 atom 与磁盘一致 (治 list miss 真因).
+      //    失败不阻断 (旧版 preload 可能未暴露 listAgentSessions).
+      try {
+        await bw.webContents.executeJavaScript(
+          "(window.electronAPI && window.electronAPI.listAgentSessions) ? window.electronAPI.listAgentSessions().then(function(s){window.__promaNavList=(s&&s.length)||0;}).catch(function(){}) : Promise.resolve()",
+          true
+        );
+      } catch (_) {}
+      // ② 验证 session 存在 + 拿 title
+      let _navMeta = null;
+      let _metaHit = false;
+      try {
+        const a = api();
+        _navMeta = a.getAgentSessionMeta(sessionId);
+        _metaHit = !!_navMeta;
+      } catch (_) {}
+      // 诊断: 记录命中情况, 便于定位真因 (V4 未运行时确认)
+      log("[Patch L][nav-diag] sid=" + sessionId + " metaHit=" + _metaHit +
+         " ws=" + (_navMeta && _navMeta.workspaceId ? _navMeta.workspaceId : 'null'));
+      if (!_navMeta) {
+        // ③ session 失效: 发 navigate-failed + 轻量 toast 提示 (V3, 不依赖 proma-tree-view.js 改动).
+        //   proma:navigate-failed 供 tree 面板消费 (若已监听); toast 兜底让用户看到反馈, 非静默不动.
+        bw.webContents.send("proma:navigate-failed", { sessionId, reason: "not-found" });
         try {
-          const a = api();
-          _navMeta = a.getAgentSessionMeta(sessionId);
-          if (!_navMeta) {
-            log("[Patch L] navigate-to-session: session " + sessionId + " not found (可能是 Chat 会话或测试数据)");
-            bw.webContents.send("proma:navigate-failed", { sessionId, reason: "not-found" });
-            return;
-          }
+          const _shortSid = String(sessionId).slice(0, 8);
+          bw.webContents.executeJavaScript(
+            "(function(){try{var d=document.createElement('div');d.textContent='\\u4f1a\\u8bdd " + _shortSid + " \\u5df2\\u5931\\u6548\\u6216\\u4e0d\\u5b58\\u5728 (navigate-failed)';" +
+            "d.setAttribute('style','position:fixed;top:16px;right:16px;z-index:99999;background:#c0392b;color:#fff;padding:10px 14px;border-radius:6px;font-size:13px;font-family:sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)');" +
+            "document.body.appendChild(d);setTimeout(function(){try{d.remove();}catch(_){}},3500);}catch(e){}})()",
+            true
+          ).catch(function(){});
         } catch (_) {}
-        // 真正切换: 复用 Proma 的 tray:open-agent-session 事件
-        // 传 { sessionId, title } 与 Proma 内置 openAgentSession(sessionId,title) 完全一致，
-        // 避免 renderer 端因缺 title 在同名会话场景切换失败/歧义
-        bw.webContents.send("tray:open-agent-session", { sessionId, title: _navMeta && _navMeta.title });
-        log("[Patch L] navigate-to-session: " + sessionId);
+        log("[Patch L][nav-diag] session not found, sent navigate-failed + toast sid=" + sessionId);
+        return;
       }
+      // ④ 真正切换: 复用 Proma tray:open-agent-session 事件链 (纯 sessionId, renderer R.id===sessionId)
+      bw.webContents.send("tray:open-agent-session", { sessionId, title: _navMeta.title });
+      log("[Patch L][nav-diag] sent tray:open-agent-session sid=" + sessionId);
     } catch (e) {
       log("[Patch L] navigate-to-session error: " + (e && e.message));
     }

@@ -200,8 +200,15 @@ self_audit:
 ```text
 子会话 done 上报后:
   1. 检查 self_check 是否全部 pass（缺任一项 → 直接退回，不进入验收）
-  2. 派验收 Agent（见 §9 模板）→ 拿到 verdict
-  3. verdict.pass → mcp__tree__tree_leaf_set_status(tree_id=<tree_id>, leaf_id=<leaf_id>, status=done)
+  2. [ISS-003] 若 brief.audit_meta.review_required=true (worker 应跑 G1-G5 多子Agent 自审):
+     a. tree_event_list 查 worker events, 确认含 ≥1 条 review_round 事件 (末轮 red_count=0)
+        - 无 review_round → 退回, 要 worker 补跑 tree-worker §4.6 (引擎也会 E_REVIEW_NOT_CONVERGED 拦 set-status done)
+     b. 抽查 findings 真实性 (引擎只防格式, commander 抽查是内容真实性的真实防线):
+        - 随机抽 1-2 个 reviewer_session_id, 用 mcp__session__list_messages 看是否真有审查对话 (防 worker 自写全 green 蒙混)
+        - 抽 1 条历史 red finding 看是否真在后续 round 修复
+        - 抽查通过 → 继续; 发现伪造 (reviewer session 无实质内容/全 green 废话) → 退回 + tree_drift_append(severity=high)
+  3. 派验收 Agent（见 §9 模板）→ 拿到 verdict
+  4. verdict.pass → mcp__tree__tree_leaf_set_status(tree_id=<tree_id>, leaf_id=<leaf_id>, status=done)
      verdict 不通过 → 按 §7 三档纠偏决策树执行
 ```
 
@@ -773,6 +780,7 @@ declare done 前逐项确认：
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-07-04 | v2.3 | ISS-003：§4 Step4 加 review_required=true 验收核查（核 review_round event + 抽查 findings 真实性，引擎只防格式，commander 抽查是内容真实性的真实防线） |
 | 2026-06-19 | v2.2 | 审计驱动修订：requires 中 commander-methodology.md 版本引用从 v1.0 更新为 v1.2 |
 | 2026-06-19 | v2.1 | 新增 §14 审计工作流（铁律 5、最小 7 leaf 结构、审计 5 件套模板、迭代收敛流程、完成检查表）；§0 引用 tree-audit-methodology.md；铁律从 4 条扩展到 5 条 |
 | 2026-06-18 | v2.0 | 首次创建。合并 v0.1 契约/事件/剪枝 + v0.2 心跳/内审/三档纠偏/哨兵 Agent/验收 Agent。所有 tree-state.js 子命令引用来自附录 A 实现。 |

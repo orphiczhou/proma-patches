@@ -66,7 +66,7 @@ const LEAF_NAME_RE = /^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\d*(?:[a-z]\d*)*)?-)?(\w+)
 // 枚举 (附录 A.8)
 // v0.2.2: 新增 pending_brief — Worker 初始状态，brief_echo 之前不可声明 done
 const STATUS_ENUM = ['active', 'done', 'pruned', 'archived', 'segment_pending', 'pending_brief'];
-const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check'];
+const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round'];
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
@@ -154,6 +154,10 @@ const E_STATUS_EVENT_MISMATCH = 'E_STATUS_EVENT_MISMATCH'; // V10-status-event-s
 //   堵根因A — 旧校验只查 UUID 格式从不校验 session 是否真实存在，任意合规格式 UUID 都能注册成树成员/auditor。
 //   详见 workspace-files/.context/plan/layer2-tree-engine-design.md §三方案A + §四UUID映射表。
 const E_SESSION_NOT_ALIVE = 'E_SESSION_NOT_ALIVE';
+// ISS-003 (done 门禁耦合审查收敛, 2026-07-04): worker done 前须跑 G1-G5 多子Agent 自审并留痕.
+const E_REVIEW_NOT_CONVERGED = 'E_REVIEW_NOT_CONVERGED';  // worker done 但 review 未收敛/未跑
+const E_REVIEW_FORGERY = 'E_REVIEW_FORGERY';              // review_round schema 伪造/自审
+const E_REVIEW_FLAGGED_BLOCK = 'E_REVIEW_FLAGGED_BLOCK';  // 父链有 flagged leaf, 需先补审
 
 // v0.2.2: 真实 MCP session_id 格式校验（UUID v1-v5 不区分版本）
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -231,6 +235,7 @@ const DEFAULT_AUDIT_META = {
   plan_ack_seconds: 300,
   max_self_corrections: 2,
   heartbeat_interval_minutes: 15,
+  review_required: false,  // ISS-003: 默认 opt-in (false), 防 dbc-spec/v10-cleanroom 金标准回归; nanju 类树显式 true
   sweet_spot_limits: {
     'claude-sonnet-4-6': { min: 100000, max: 200000, hard: 300000 },
     'deepseek-v4-pro': { min: 150000, max: 250000, hard: 400000 },
@@ -301,6 +306,10 @@ const ERROR_TO_HELP = {
   E_LEAF_AUTO_PRUNED:         'nudge_escalation',         // V10-nudge-escalation
   E_STATUS_EVENT_MISMATCH:    'v10_constraints',          // V10-status-event-sync
   E_SESSION_NOT_ALIVE:        'session_liveness',         // L2-root-cause: session 不真实存在
+  // ---- ISS-003 done 门禁耦合审查收敛 ----
+  E_REVIEW_NOT_CONVERGED:     'alignment_workflow',       // worker done 但 review 未收敛
+  E_REVIEW_FORGERY:           'alignment_workflow',       // review_round schema 伪造/自审
+  E_REVIEW_FLAGGED_BLOCK:     'alignment_workflow',       // 父链 flagged, 需先补审
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -929,6 +938,28 @@ async function cmdLeafAdd(args) {
       }
     }
 
+    // 3.8. ISS-003 (2026-07-04): 父链 flagged 扫描 —— 若祖先 leaf 有 review_evidence.flagged=true
+    //   且未补审 (events 无 review_round), 拒绝创建子 leaf.
+    //   堵"在未审查的设计文档上启动实现"类 ISS-003 场景 (nanju A 层 v0.1 草稿).
+    //   补审路径: 给 flagged leaf 补 review_round event (G1-G5 收敛) → 自动满足放行 (无需专门清除命令).
+    if (parent !== null) {
+      let ancestor = state.leaves[parent];
+      let _guard = 0;  // 防 state.json 被手工编辑成环 (新代码加兜底, 优于 calcCommanderDepth 现状)
+      while (ancestor && _guard++ < 100) {
+        if (ancestor.review_evidence && ancestor.review_evidence.flagged === true) {
+          const ancEvs = Array.isArray(ancestor.events) ? ancestor.events : [];
+          const hasReview = ancEvs.some((e) => e && (e.type === 'review_round' || e.event_type === 'review_round'));
+          if (!hasReview) {
+            throw new TreeStateError(
+              E_REVIEW_FLAGGED_BLOCK,
+              `cannot add leaf under "${ancestor.leaf_id}": ancestor has review_evidence.flagged=true (pre-ISS-003 done without review). Run G1-G5 review on the flagged ancestor first (append a review_round event), then retry.`
+            );
+          }
+        }
+        ancestor = ancestor.parent ? state.leaves[ancestor.parent] : null;
+      }
+    }
+
     // v0.7 Phase A 批次3 (A4) + 批次5 (V8): 节点预算硬约束 — active leaf 数不得超过 root_dod.node_budget
     // root leaf 算 active；待创建的新 leaf 未计入。超出时拒绝，逼操作者先归档或调高预算。
     // V8: budget=0 必须被尊重（原 `|| 10` 短路把 0 当 10）。typeof + isFinite 严格挡 null/undefined/字符串/NaN。
@@ -1133,6 +1164,88 @@ async function cmdEventList(args) {
 // 命令: leaf set-status
 // ============================================================
 
+// ISS-003 (done 门禁耦合审查收敛) 辅助函数 —— 2026-07-04
+//   诚实标注: events 是 worker 可写的, review_round 结构校验【仅防格式伪造】(空/缺/结构错/自审),
+//   【不防内容伪造】(worker 可自写格式合法的 review_round 蒙混, 如全 green 废话).
+//   内容真实性由 commander 验收抽样 (tree-commander SKILL §4 Step4, 非引擎强制) +
+//   阶段二 Layer2 (findings-产出文件相关性校验) 兜底. 与 self_check 同安全级别.
+//   真正不可绕过的硬约束 (review_evidence 不可直接写字段 + cmdReviewRound) 在阶段二.
+function isReviewRequired(leaf, state) {
+  if (process.env.PROMA_REVIEW_DISABLE === '1') return false;
+  const re = leaf.review_evidence;
+  if (re && re.grandfathered === true) return false;  // 存量豁免 (migrate rule 11 标记)
+  // 叶级覆盖优先 (commander 显式设 leaf.audit_meta.review_required), fallback 树级
+  // (cmdInit 的 audit_meta_override 设 state.audit_meta.review_required, nanju 类树整树开启).
+  const leafAm = leaf.audit_meta || {};
+  if (leafAm.review_required !== undefined) return leafAm.review_required === true;
+  const treeAm = (state && state.audit_meta) || {};
+  return treeAm.review_required === true;  // 默认 false (opt-in, 防金标准回归)
+}
+
+function validateReviewRoundSchema(meta, leaf, leafId) {
+  if (!meta || typeof meta !== 'object') {
+    throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" has invalid meta (must be object)`);
+  }
+  const reviewers = Array.isArray(meta.reviewers) ? meta.reviewers : null;
+  if (!reviewers || reviewers.length === 0) {
+    throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" has empty reviewers (G1-G5 ≥1 required)`);
+  }
+  for (const r of reviewers) {
+    if (!r || typeof r !== 'object') {
+      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" has invalid reviewer entry`);
+    }
+    if (typeof r.perspective !== 'string' || r.perspective.length === 0) {
+      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer missing perspective (G1-G5)`);
+    }
+    // reviewer_session_id: UUID 格式 + ≠ leaf.session_id + ≠ added_by (防自审/防借 caller 身份).
+    //   注: 不调 checkSessionAlive —— SDK SubAgent 无 Proma session_id, 强校验误杀合规 worker.
+    //   内容真实性靠 commander 抽样 + 阶段二 Layer2.
+    if (typeof r.reviewer_session_id !== 'string' || !UUID_RE.test(r.reviewer_session_id)) {
+      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" has invalid reviewer_session_id (UUID required)`);
+    }
+    if (r.reviewer_session_id === leaf.session_id) {
+      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" = leaf owner session (self-review forbidden)`);
+    }
+    if (leaf.added_by && r.reviewer_session_id === leaf.added_by) {
+      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" = added_by (commander cannot self-review own worker)`);
+    }
+    const findings = Array.isArray(r.findings) ? r.findings : null;
+    if (!findings || findings.length === 0) {
+      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" has no findings`);
+    }
+    for (const f of findings) {
+      if (!f || typeof f !== 'object') {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" has invalid finding`);
+      }
+      if (typeof f.item !== 'string' || f.item.length === 0) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" finding missing item`);
+      }
+      if (!['red', 'yellow', 'green'].includes(f.severity)) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" finding has invalid severity (red/yellow/green)`);
+      }
+      if (typeof f.evidence !== 'string' || f.evidence.length < 10) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" finding evidence too thin (≥10 chars required)`);
+      }
+    }
+  }
+  if (typeof meta.red_count !== 'number' || meta.red_count < 0 || !Number.isInteger(meta.red_count)) {
+    throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" has invalid red_count (non-negative integer required)`);
+  }
+  if (typeof meta.converged !== 'boolean') {
+    throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" has invalid converged (boolean required)`);
+  }
+  // red_count 与实际 red findings 计数交叉校验 (防 worker 报 red_count=0 但塞 red finding 蒙混)
+  let _actualRed = 0;
+  for (const r of reviewers) {
+    for (const f of r.findings) {
+      if (f.severity === 'red') _actualRed++;
+    }
+  }
+  if (meta.red_count !== _actualRed) {
+    throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" red_count=${meta.red_count} mismatches actual red findings=${_actualRed}`);
+  }
+}
+
 async function cmdLeafSetStatus(args) {
   const { positional } = parseArgs(args);
   const [tree_id, leaf_id, new_status] = positional;
@@ -1243,6 +1356,39 @@ async function cmdLeafSetStatus(args) {
           throw new TreeStateError(
             E_SCHEMA_INVALID,
             `worker "${leaf_id}" events must include brief_echo and done before set-status done`
+          );
+        }
+      }
+
+      // ISS-003 (done 门禁耦合审查收敛, 2026-07-04): worker + review_required 时,
+      //   events 须含 ≥1 条 review_round 事件 (worker 自调多子Agent G1-G5 审查留痕).
+      //   schema: {round_no, reviewers:[{perspective, reviewer_session_id, findings:[{severity,item,evidence}]}],
+      //            red_count, converged}. 末轮 red_count===0 + 总轮数≤3.
+      //   ⚠️ 见 isReviewRequired/validateReviewRoundSchema 诚实标注: 仅防格式伪造, 不防内容伪造.
+      if (leaf.role === 'worker' && isReviewRequired(leaf, state)) {
+        const evs = Array.isArray(leaf.events) ? leaf.events : [];
+        const reviewRounds = evs.filter((e) => e && (e.type === 'review_round' || e.event_type === 'review_round'));
+        if (reviewRounds.length === 0) {
+          throw new TreeStateError(
+            E_REVIEW_NOT_CONVERGED,
+            `cannot set status=done: worker "${leaf_id}" has no review_round event (review_required=true). Worker must run G1-G5 multi-subagent review (≥1 round) before done. Set audit_meta.review_required=false to opt out, or PROMA_REVIEW_DISABLE=1 for tests.`
+          );
+        }
+        for (const rr of reviewRounds) {
+          validateReviewRoundSchema(rr.meta || rr, leaf, leaf_id);
+        }
+        const last = reviewRounds[reviewRounds.length - 1];
+        const lastMeta = last.meta || last;
+        if (lastMeta.red_count > 0) {
+          throw new TreeStateError(
+            E_REVIEW_NOT_CONVERGED,
+            `cannot set status=done: last review_round has ${lastMeta.red_count} red finding(s) on "${leaf_id}". Run more review rounds or escalate.`
+          );
+        }
+        if (reviewRounds.length > 3) {
+          throw new TreeStateError(
+            E_REVIEW_NOT_CONVERGED,
+            `cannot set status=done: review exceeded 3 rounds without convergence on "${leaf_id}" (${reviewRounds.length} rounds). Escalate to commander instead of looping.`
           );
         }
       }
@@ -3184,6 +3330,31 @@ async function cmdMigrate(args) {
       });
     }
 
+    // 规则 11 (ISS-003, 2026-07-04): 存量 done worker leaf 标记 review_evidence.
+    //   背景: ISS-003 诉求 —— nanju A 层 v0.1 草稿未跑 G1-G5 审查就走完 done.
+    //   策略: grandfathered 始终标 (isReviewRequired 豁免, 不阻断 leaf 自身);
+    //   flagged 只在 tree audit_meta.review_required=true 时标 (避免对未 opt-in 的树强制下游拦截 ——
+    //   migrate 是 one-way ratchet, 未 opt-in 的树不应被永久改变行为).
+    //   清除路径: 给 flagged leaf 补 review_round event → 父链扫描自动放行 (无需专门清除命令).
+    const _treeReviewReq11 = state.audit_meta && state.audit_meta.review_required === true;
+    for (const id of Object.keys(leaves)) {
+      const leaf = leaves[id];
+      if (leaf.role !== 'worker' || leaf.status !== 'done') continue;
+      if (leaf.review_evidence) continue;  // 已有 (新机制下产生的) 不动
+      const _markFlagged = _treeReviewReq11;
+      changes.push({ leaf_id: id, field: 'review_evidence', from: null, to: _markFlagged ? 'grandfathered+flagged' : 'grandfathered', reason: 'ISS-003: pre-review-gate done leaf' + (_markFlagged ? ' (flagged: downstream blocked until review backfilled)' : ' (grandfathered only, tree not opt-in)') });
+      if (!dryRun) {
+        leaf.review_evidence = {
+          grandfathered: true,
+          flagged: _markFlagged,
+          rounds: [],
+          final_converged: true,  // grandfathered 自身不阻断 (isReviewRequired 返回 false)
+          total_rounds: 0,
+          note: 'pre-ISS-003 leaf: done before review_gate.' + (_markFlagged ? ' Downstream leaf creation blocked until a review_round event is appended.' : '')
+        };
+      }
+    }
+
     if (!dryRun) {
       writeState(tree_id, state);
     }
@@ -4121,6 +4292,10 @@ module.exports = {
     E_SESSION_NOT_ALIVE,
   },
   setSessionVerifier,
+  // ISS-003 (2026-07-04) 辅助函数导出 —— 仅供测试 (iss003-review-gate-test.cjs) 纯函数降级测试用。
+  //   不改变任何引擎逻辑；生产路径仍由 cmdLeafSetStatus 内部调用。
+  isReviewRequired,
+  validateReviewRoundSchema,
 };
 
 // CLI shim: node tree-engine.cjs <cmd> [args] —— stdout 输出与原 tree-state.js 完全一致。

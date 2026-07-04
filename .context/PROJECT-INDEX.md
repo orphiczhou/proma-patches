@@ -1,6 +1,6 @@
 # Proma 改造项目 — 知识索引
 
-> 入口文档 | 维护: 周星星 | 最后更新: 2026-06-26 18:20（IHL R1-R6 Audit Tamper Detection 闭环后同步）
+> 入口文档 | 维护: 周星星 | 最后更新: 2026-07-04（ISS-001/002/003阶段一/004 修复轮次后同步）
 
 新会话从这里开始读，能 5 分钟拿到项目全貌和关键路径。
 
@@ -210,6 +210,8 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 | V10 Phase 3（6/25 20:36） | Bug A（commander 代 worker 写 done event）+ Bug B（同 session 多 leaf 歧义）双重修复。4 处引擎改动 + 新错误码 `E_DUPLICATE_SESSION_ID`。Auditor #2 独立发现 hasDone 漏洞（实现者+A1 都漏）。代码同步 workspace-files 顶层 + patch-l/。commit `30eb4fa` |
 | IHL R1-R6（6/26 18:20） | 6 轮盲点驱动迭代加固：R1 applyNudge 全局守卫（堵 9c423b8 tree 级规则盲点）/ R2 create_session workspace_id 校验 / R4 fork_session 同类漏洞 / R5 加 4 条 W-AUDIT-* 事后检测 / R6 规则移到 Tier 1 绕开 status 守卫。**v626 tree 被直接篡改**（自审通过 + worker 当 auditor + audit_log 伪造 pass）暴露静态审计盲区。**3 层防御拓扑定型**（入口拦截 + 兜底守卫 + 事后检测）。**Prompt Injection 实战防御**：6 条诱导 root 滥用 audit_gate 的注入全部拒绝。3 份 patches.cjs 物理同步（2658 行一致）。commits `1a7ed5f`/`031c546`/`d44163a`/`690f7e8` |
 
+| ISS-001/002/003/004（7/4） | **Tree 模式多会话协作修复轮次**（调研4→审计4→再审→实施→测试13/13→代码审计→部署）：ISS-001 remote_create_session 跨实例 workspace_id 兜底（问目标实例 default）+ validateWorkspaceId slug→id 兼容；ISS-002 同名会话切换（**title 假设证伪**，renderer 纯 sessionId 匹配，改预热 listAgentSessions + 失效 toast）；ISS-003 done 门禁耦合审查收敛（**阶段一**：引擎 review_round 校验 + cmdLeafAdd 父链 flagged + migrate 规则11 + SKILL §4.6/§4Step4，13/13 测试，**诚实标注仅防格式不防内容**，阶段二 follow-up）；ISS-004 EPIPE（**方案B 不消弹窗**，bridge socket on-error + res.end try/catch + uncaughtException 限定）。3 份 cjs 同步（patches 3109 / tree-engine 4315）。详见 [iss-fix-plan-v2](./.context/plan/iss-fix-plan-v2.md) + [ISS-003 测试](./.context/plan/iss003-review-gate-test.cjs) |
+
 ### ✅ 已澄清（不是 bug）
 
 - **Bug 2（Fork 截断 20 轮）**：auto-compact 从未触发 → Fork 不丢消息。感知错觉来自 `list_messages` 默认 `limit=50`
@@ -221,6 +223,7 @@ PROMA_INSTANCE_ISOLATED=0  →  @proma/electron/         +  ~/.proma/         (�
 | P0 | **TAO Watcher 按角色区分规则**（堵 a8111bf5 类意外终止，2-3 小时；9c423b8 入口守卫 + R1 applyNudge 全局守卫已补盲点，但根本问题「规则不按 role 区分」未解） |
 | P0 | **清理 5 个无价值工作区**（undefined / tree-1 / 4×workspace-*，跨工作区 P0；v10-p2-e2e-report 已归档到 `.context/audit/v10-p2/`） |
 | P1 | patches.cjs 其他入口补 workspace_id 校验（R2/R4 已做 create_session/fork_session，迁移/恢复等入口可补） |
+| P1 | **ISS-003 阶段二**（review_evidence 不可直接写字段 + cmdReviewRound 唯一写入路径 + Layer2 findings-产出文件相关性校验 + R-08 巡逻；阶段一已 done 见已修复表。阶段一是格式基线，真正硬约束在阶段二） |
 | P2 | Phase D：D1 prune/archive 级联语义 / D2 migrate 版本号 / D3 watcher silence_minutes |
 | P2 | main.cjs `createAgentSession` 加 workspaceId 白名单（sed 补丁，跨工作区 P2） |
 | P2 | session-management SKILL 模式 4 修订（明确 commander 不应跨工作区） |
