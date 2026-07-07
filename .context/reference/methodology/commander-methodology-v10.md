@@ -228,6 +228,30 @@ async function cmdEventAppend(args, callerSessionId) {
 2. 特例放行条件**永远不要用 `||` 给多个值**，每个特例只接受**唯一一个具体值**（root.session_id）
 3. 特例相关的所有写操作（auto_upgrade）必须配套 caller 校验，且 caller 校验要在 dispatch 链路全程透传
 
+### 2.3.1 信任锚的第二层：root 当任意 worker 的 auditor（2026-07-07 repro 补充）
+
+§2.3 只讲了信任锚的**第一层**（root 自审 root，解决 root 自己的 audit_gate）。但 nanju-iter2 暴露的冷启动死锁揭示：**worker 的 audit_gate 在冷启动期由谁背书**才是真正卡点。repro 实证（`deadlock-repro.cjs` 场景 B，10/10 全通过）确认信任锚还有**第二层**能力：
+
+`resolveAuditorIndep` 闸门2（tree-engine.cjs L2241-2255）允许 root 当**任意非 root leaf** 的 auditor：
+
+```js
+if (leaf.role !== 'root' && auditorSessionId) {
+  const rootLeaf = Object.values(state.leaves).find(
+    l => l.parent === null && l.role === 'root' && l.session_id === auditorSessionId
+  );
+  if (rootLeaf && rootLeaf.leaf_id !== leaf.leaf_id) {
+    // root status 非 archived/pruned + events 非空 → 放行（信任锚第二层）
+    return null;
+  }
+}
+```
+
+含义：冷启动期（树内无 `status=done + events 非空 + audit_gate=pass` 的独立 auditor leaf），commander（root 身份）可直接当所有 worker 的 alignment + milestone + audit_gate auditor，全程走闸门2，**无需 fork 独立 auditor leaf**。具体操作流程见 tree-commander SKILL §13。
+
+**为什么 nanju-iter2 还是死锁了**：commander 不知道信任锚的第二层能力，误按"派独立 auditor leaf 走 V10-auditor-active（闸门3）"操作，而闸门3 对冷启动 leaf 是无穷递归（自己 done 需 audit_pass → 需独立 auditor → 自己）。**根因是协议/文档没教对，不是引擎缺口——引擎闸门2 一直完备。**
+
+**通用模式补充**：信任锚的设计意图（root 独立于所有 worker/commander，是不可质疑的信任源）天然支持"root 审任意 worker"。第一层（root 自审 root）和第二层（root 审 worker）都是信任锚的合法能力，边界同样严格（auditor 必须显式 `=== root.session_id`，且 caller 必须 `=== audit_session_id`，堵借身份）。冷启动期走第二层，正常期（已有 done+pass 的独立 auditor leaf）才转闸门3。
+
 ---
 
 ## 三、完整实施时间线

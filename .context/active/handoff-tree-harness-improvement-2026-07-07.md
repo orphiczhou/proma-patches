@@ -131,3 +131,48 @@ root（commander 自己，caller=root.session_id）按严格顺序给 worker 配
 ---
 
 *方案定稿。实施从备份 + L0 开始。*
+
+---
+
+## 七、实施完成与验证（2026-07-07 收敛定稿）
+
+### 7.1 实施结果
+
+| 层 | 改动 | 状态 | 验证 |
+|---|---|---|---|
+| **L0** | SKILL §13 冷启动信任锚流程（caller 机制/§13.0 术语/§13.3 步骤0-7/§13.3a auto_upgrade）+ §6/§4/§5 对齐 + methodology §2.3.1 + worker §3.4 | ✅ 两轮审计收敛 | 洁净室复测：新 commander 能走通 worker done 闭环 |
+| **L1-a** | P0-3 状态机流转白名单（STATUS_TRANSITIONS + E_STATUS_TRANSITION_INVALID）| ✅ | p0-3 新测试 19/19 |
+| **L1-b** | milestone caller-binding（堵场景 D 攻击面：dispatchMilestone 透传 caller + cmdMilestoneSetResult caller 校验）| ✅ | repro 场景 D 已堵（D1/D2 → E_BORROWED_IDENTITY）|
+| **L1-c** | help 同步（error_code_index 40 个 / alignment_workflow 补 review_round / EVENT_TYPE 9 种 / role_semantics 补白名单 / session_liveness topic）| ✅ | help 一致性自检通过 |
+| **L2** | 待解决清单更新（ISSUE-005/008/009 已解，006/007/010 遗留）+ design.md 术语注 | ✅ | — |
+
+### 7.2 关键修正（推翻 0707 报告结论）
+
+0707 报告原结论"alignment/audit_gate **设计层死锁，commander 无解**"经 repro 实证**被推翻**：
+- `resolveAuditorIndep` **闸门2**（L2241-2255）一直允许 root 当任意 worker 的 auditor，repro 场景 B 10/10 全通过
+- 死锁根因是 **SKILL §6 L320 教错**（"路线图 Agent 必须是独立 leaf"→ commander fork 独立 auditor 走闸门3 → 无穷递归）
+- **引擎不需要改即可解死锁**；本次引擎改动（P0-3 + milestone caller-binding）是顺带加固，非解死锁
+
+### 7.3 验证统计
+
+| 测试 | 结果 |
+|---|---|
+| iss003-review-gate-test | 13/13 ✅（零回归）|
+| p0-1-sync-fix-test | 4/4 ✅（零回归）|
+| p0-3-status-transition-test（新）| 19/19 ✅ |
+| deadlock-repro 场景 A-F | 全语义自洽 ✅（B 10/10 root 通道；D 攻击面已堵；F auto_upgrade 实证）|
+| 洁净室盲测（2 轮）| 第2轮通过（blocker 全解）|
+
+### 7.4 遗留（本次未做，记录为后续课题）
+
+- **ISSUE-006** 竹节交接 ownership 不迁移（patches.cjs 层，需引擎↔patches 回调）
+- **ISSUE-007** commander context 自动竹节 + session 通信可靠性（notify/wait）
+- **ISSUE-010** audit_log_integrity 316 处历史脏数据清理（需 migrate 规则/清理工具）
+- dbc-spec.cjs 测试脚本 API 过时（setSessionVerifier），非本次引入，待单独修
+
+### 7.5 部署状态
+
+按用户决策：**改源 + git commit，暂不部署 dist**。
+- SKILL/方法论改动（proma/skills/）：Proma 重载即生效，不需发 dist
+- 引擎改动（workspace-files/tree-engine.cjs）：已 git commit，**未复制到 dev/release dist**（用户验证后再发）
+- 备份：`.bak-pre-improvement-20260707`（tree-engine.cjs + SKILL + patches + 4 份方法论）

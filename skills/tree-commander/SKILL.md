@@ -181,7 +181,19 @@ self_audit:
   1. fork_session(from=<parent_session>, new_channel_id=..., new_model_id=...)
      或 create_session(channel_id=..., model_id=..., title=<命名规范的标题>)
   2. 首条消息 = §3 的 5 件套完整 YAML（直接复制粘贴模板）
-  3. 调 mcp__tree__tree_leaf_add(tree_id=<tree_id>, leaf=<leaf 初始数据对象>)
+  3. 调 mcp__tree__tree_leaf_add(tree_id=<tree_id>, leaf=<leaf 对象>)
+     leaf 对象必填字段（缺任一 → E_SCHEMA_INVALID）：
+     ```yaml
+     leaf:
+       leaf_id: "<prefix>-<A1>-worker"        # 命名见 §12；prefix = tree init 时 root_brief.prefix，与 tree_id 解耦
+       session_id: "<worker 的 Proma session_id，fork_session/create_session 后获得>"
+       parent: "<root 或父 commander 的 leaf_id>"
+       path: "<prefix>-root → ... → <本 leaf_id>"   # 由 leaf_id 按引擎 parsePathFromLeafId 规则派生，须与 leaf_id 命名一致（引擎校验，不符 → E_SCHEMA_INVALID）
+       role: "worker"                          # 枚举 root|commander|worker（leaf_add 拒绝 role=root，root 只由 init 创建）
+       model: "GLM-5.2"
+       channel: "<渠道 id>"
+       added_by: "<commander/root 的 session_id>"   # 非 root 必填（操作者追溯链）
+     ```
      （命名强制校验在工具内置，失败返回 error.code 如 E_NAME_INVALID）
   4. 对 self_audit 的每个 milestone 调:
      mcp__tree__tree_milestone_add(tree_id=<tree_id>, leaf_id=<leaf_id>, milestone=<milestone 对象>)
@@ -261,7 +273,7 @@ self_audit:
 | `mcp__tree__tree_leaf_set_context(tree_id, leaf_id, context_pct)` | context_pct 0-100，心跳后更新上下文使用率 |
 | `mcp__tree__tree_leaf_set_last_event(tree_id, leaf_id, event_type, ts?)` | 更新最后事件类型和时间 |
 | `mcp__tree__tree_leaf_autonomy_override(tree_id, leaf_id, overrides=<obj>)` | 中档纠偏时限权（overrides 对象含 added_must_ask / removed_can_decide / reason） |
-| `mcp__tree__tree_milestone_set_result(tree_id, leaf_id, milestone_id, audit_pass, note_path?)` | 记录里程碑审计结果（audit_pass 布尔） |
+| `mcp__tree__tree_milestone_set_result(tree_id, leaf_id, milestone_id, audit_pass, audit_session_id, note_path?)` | 记录里程碑审计结果（`audit_pass=true` 时 `audit_session_id` 必填且须独立；冷启动填 `root.session_id` 走闸门2，见 §13.3 步骤2） |
 
 ### Append（数组追加）
 
@@ -276,7 +288,7 @@ self_audit:
 
 | 工具 | 说明 |
 |------|------|
-| `mcp__tree__tree_audit_gate(tree_id, leaf_id, verdict, audit_session_id?, reason?)` | 审计门禁裁决 |
+| `mcp__tree__tree_audit_gate(tree_id, leaf_id, verdict, audit_session_id, reason?)` | 审计门禁裁决（`audit_session_id` 必填且须 = caller session_id，否则 `E_BORROWED_IDENTITY`；冷启动填 `root.session_id` 走闸门2，见 §13.3 步骤6） |
 | `mcp__tree__tree_audit_append(tree_id, leaf_id, report=<obj>)` | 追加审计报告。report 必填字段：`auditor_session_id`(UUID)、`total`(int)、`passed`(int)、`failed`(int)、`results[]`(每项含 `{item, pass, evidence}`)。缺字段抛 `E_SCHEMA_INVALID` |
 | `mcp__tree__tree_nudge_append(tree_id, leaf_id, nudge=<obj>)` | 追加 nudge 记录 |
 
@@ -301,7 +313,7 @@ self_audit:
 | **done** | 子会话完成上报 | ① 登记事件 ② 派验收 Agent（§9）③ 按 verdict 执行：pass → set-status done；不通过 → 走 §7 纠偏 | `tree_event_append(type=done)` → `tree_leaf_set_status(status=done)` 或 `tree_drift_append` |
 | **blocked** | 子会话卡点上报 | ① 登记事件 ② 审查选项 A/B ③ send_message 给决策 ④ 超 10 分钟无响应 → archive + 重 Fork | `tree_event_append(type=blocked)` → 超时后 `tree_leaf_set_status(status=archived)` + `tree_leaf_add` 新叶 |
 | **plan** | 子会话拆解计划上报 | ① 登记事件 + 登记 plan_id + ts ② 派路线图 Agent（researcher）评估 ③ 5 分钟内收到 verdict → 按 verdict 行事 ④ 5 分钟未收到 → **默认放行**（plan_ack_seconds 到期）⑤ 若 verdict=nack 在放行后才到 → 走中档纠偏 | `tree_event_append(type=plan)` → nack 时 `tree_drift_append(action=limit)` |
-| **brief_echo** | 子会话首条上行（复述理解） | ① 登记事件 ② 派路线图 Agent 比对对齐度 ③ ≥85% → 放行 ④ <85% → 直接发回简报，重新 brief_echo（最便宜纠偏） | `tree_event_append(type=brief_echo)` → <85% 时 `tree_drift_append(severity=low, action=nudge)` |
+| **brief_echo** | 子会话首条上行（复述理解） | ① 登记事件 ② 评估对齐度（路线图 Agent 仅做评估，auditor 选择见 §13）③ **回填 alignment event（V5b 必须，见 §6 回填机制 / §13.3 步骤4）** ④ ≥85% → 放行 ⑤ <85% → 发回重 brief_echo | `tree_event_append(type=brief_echo)` → 回填 alignment event → <85% 时 `tree_drift_append(severity=low, action=nudge)` |
 | **heartbeat_reply** | 子会话回应 status_check | ① 登记事件 ② 解析回应内容 ③ 正常 → 仅记录 ④ 异常 → 喂给 §7 纠偏 | `tree_event_append(type=heartbeat_reply)` → `tree_leaf_set_context` |
 
 ### plan 默认放行机制（详细）
@@ -327,10 +339,10 @@ self_audit:
      评估本身的"智力活"可用 SDK SubAgent（researcher）做，但 auditor_session_id 不能填 SDK session。
   3. 评估完成 → 根会话【必须】回填一条 brief_echo event 到 worker leaf:
      mcp__tree__tree_event_append(
-       tree_id, leaf_id=<worker>,
-       type='brief_echo',
-       json='{"alignment":"<评估结论或百分比>","auditor_session_id":"<auditor_session_id>"}'
+       tree_id, leaf_id=<worker>, type='brief_echo',
+       meta={"alignment":"<评估结论或百分比>","auditor_session_id":"<auditor_session_id>"}
      )
+     # 注：event-append 传 meta 对象（底层 CLI 为 --json 字符串，MCP 层为 meta 对象）
      这条回填 event 是 worker 后续 audit_gate pass 的硬前置（V5b 查 events 留痕，不查可篡改标志）。
 
   🔴 auditor 选择决策（冷启动死锁的正解，repro 实证 2026-07-07，详见 §13）:
@@ -639,9 +651,16 @@ prompt: |
 
 ## §13 冷启动信任锚流程（2026-07-07 repro 实证新增）
 
-> 解决 nanju-iter2 暴露的 alignment/audit_gate **冷启动死锁**。
-> 根因：commander 误 fork "独立 auditor leaf" 走 V10-auditor-active（`resolveAuditorIndep` 闸门3），冷启动期无穷递归。
+> 解决 nanju-iter2 暴露的 alignment/audit_gate **冷启动死锁**（nanju-iter2 = 2026-07-07 一次冷启动死锁实战复盘，详见上游报告 `tree-system-execution-report-2026-07-07.md`）。
+> 根因：commander 误 fork "独立 auditor leaf" 走 V10-auditor-active（`resolveAuditorIndep` 闸门3），冷启动期陷入"自己 done 需 audit_pass → 需独立 auditor → 自己"的**循环依赖（无法自启动）**。
 > 正解：引擎 `resolveAuditorIndep` **闸门2**（tree-engine.cjs L2241-2255）允许 root 当任意 worker 的 auditor（信任锚），repro 场景 B 实证 10/10 全通过。**引擎不需要改，是协议必须教对。**
+
+### §13.0 前置术语（必读，否则 §13.3 看不懂）
+
+- **caller**：mcp__tree__* 工具调用方的 Proma session_id，引擎从 MCP context 自动提取（**工具签名里没有 caller 参数，它是隐式的**）。commander 调 → caller=root.session_id；worker 调 → caller=worker.session_id。
+- **root.session_id 怎么拿**：`mcp__session__get_my_session_id()` 的返回值就是 root.session_id（commander 自己的 session_id）。
+- **caller=worker 的步骤怎么执行**：commander 用 `send_message` 给 worker 发指令（如"请调 mcp__tree__tree_event_append(type=done, meta={...})"），worker 收到后按 tree-worker SKILL 自己调（caller=worker 自动满足）。⚠️ commander 绝不能代调 caller=worker 的工具（→ `E_BORROWED_IDENTITY`）。
+- **V10-auditor-active**：引擎判定一个 leaf 可当独立 auditor 的三条件——`status=done` + `events` 非空 + `audit_gate.verdict=pass`。冷启动期没有任何 leaf 满足它（所以才需要 root 信任锚）。
 
 ### §13.1 冷启动期判定
 
@@ -651,28 +670,46 @@ prompt: |
 
 冷启动期所有 worker 的 milestone audit_pass + alignment 回填 + audit_gate pass，`auditor_session_id` 一律填 `root.session_id`，由 commander 自己调用（`caller=root.session_id === audit_session_id`）。
 
-🔴 **冷启动期绝不要 fork "独立 auditor leaf" 并让它自审**——闸门3 V10-auditor-active 三连对冷启动 leaf 是无穷递归（自己 done 需 audit_pass → 需独立 auditor → 自己），这是 nanju-iter2 死锁根因。
+🔴 **冷启动期绝不要 fork "独立 auditor leaf" 并让它自审**——闸门3 V10-auditor-active 三连对冷启动 leaf 是循环依赖（自己 done 需 audit_pass → 需独立 auditor → 自己，无法自启动），这是 nanju-iter2 死锁根因。冷启动期定义见 §13.1；何时转正常期（可派独立 auditor leaf）见 §13.4。
 
 ### §13.3 root 给 worker 配齐 done 前置（严格顺序，repro 场景 B 实证 10/10）
 
+> **步骤映射主流程**：步骤 0-2 属 §4 Step2 下发期；步骤 3-4 属 §4 Step3 事件路由（worker brief_echo → commander 回填 alignment）；步骤 5-7 属 §4 Step4 质量门。
+> ⚠️ 若树的 `audit_meta.review_required=true`（ISS-003 opt-in），步骤 5 前还需 worker 产 ≥1 条 review_round event（末轮 red_count=0，见 §4 Step4 / tree-worker §4.6），否则步骤 7 被 `E_REVIEW_NOT_CONVERGED` 拦。
+
 ```text
+[caller=root]  0. tree_event_append(tree_id, leaf_id=<root>, type=plan|status_check)  # root.events 非空（闸门2 前置；events 只增不减，一旦非空永久满足，无需每个 worker 都重做此步）
 [caller=root]  1. tree_milestone_add(tree_id, leaf_id=<worker>, milestone=<含 expect_outputs>)
+                  # expect_outputs = deliverables/ 下相对路径数组；禁绝对路径 / 禁 ../ 遍历 / 禁 symlink
 [caller=root]  2. tree_milestone_set_result(tree_id, leaf_id=<worker>, milestone_id,
                   audit_pass=true, audit_session_id=<root.session_id>)        # 闸门2 放行
 [caller=worker]3. tree_event_append(tree_id, leaf_id=<worker>, type=brief_echo,
                   meta={my_understanding, milestones_preview})                # 无 alignment
 [caller=root]  4. tree_event_append(tree_id, leaf_id=<worker>, type=brief_echo,
-                  meta={alignment, auditor_session_id=<root.session_id>})     # 闸门2，V5b 前置
-[caller=worker]5. tree_event_append(tree_id, leaf_id=<worker>, type=done, meta={self_check})
-[caller=root]  6. tree_audit_gate(tree_id, leaf_id=<worker>, verdict=pass,
-                  audit_session_id=<root.session_id>)                         # caller===audit_session_id，闸门2
-[caller=worker]7. tree_leaf_set_status(tree_id, leaf_id=<worker>, status=done)  # 全 8 道门禁通过
+                  meta={alignment, auditor_session_id=<root.session_id>})     # 闸门2，V5b 前置；alignment 填评估如 "0.92 (aligned)"
+                  ── worker 干活，把产出写入 deliverables/<expect_outputs 声明的相对路径> ──
+[caller=worker]5. tree_event_append(tree_id, leaf_id=<worker>, type=done,
+                  meta={self_check})                                          # self_check = 非空 [{item,pass,evidence}] 数组（schema 见 §3.5）
+[caller=root]  6. 派验收 Agent（§9）→ verdict.pass → tree_audit_gate(tree_id, leaf_id=<worker>,
+                  verdict=pass, audit_session_id=<root.session_id>)           # caller===audit_session_id，闸门2 放行
+[caller=worker]7. tree_leaf_set_status(tree_id, leaf_id=<worker>, status=done)  # 全 8 道门禁通过；deliverables 须已落盘
 ```
 
 ⚠️ 关键约束（引擎硬校验，违反即拦）：
-- 步骤 6 的 `audit_session_id` 必须 = 调用者（root）的 session_id，否则 `E_BORROWED_IDENTITY`
-- worker 不能自己调步骤 6（caller=worker ≠ audit_session_id=root）
-- 步骤 4 的 alignment event 是步骤 6 的硬前置（V5b），缺则 `E_ALIGNMENT_NOT_VERIFIED`
+- **步骤 0**：root.events 必须非空才能命中闸门2（root init 后 events 默认空，须先写一条 plan/status_check）
+- **步骤 1**：expect_outputs 声明的每个文件必须在步骤 7 前真实落盘到 `<treeDir>/deliverables/<outPath>`，否则步骤 7 `E_DELIVERABLE_MISSING`
+- **步骤 5**：done event 必须 worker 自己写（caller=worker），commander 代写被 `E_BORROWED_IDENTITY` 拦
+- **步骤 6**：audit_session_id 必须 = 调用者（root）的 session_id，否则 `E_BORROWED_IDENTITY`；worker 不能自己调步骤 6；步骤 4 的 alignment event 是步骤 6 的硬前置（V5b），缺则 `E_ALIGNMENT_NOT_VERIFIED`
+
+### §13.3a root 自身 done（auto_upgrade 简化路径，不走 §13.3 七步）
+
+root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 七步。引擎 auto_upgrade 机制（tree-engine.cjs L1961-1972）：root 写自己的 done event（caller=root，带 self_check）→ audit_gate 自动从 skip 升为 pass（auto_upgrade=true）。即 root 只需：
+
+```text
+[caller=root]  tree_event_append(tree_id, leaf_id=<root>, type=done, meta={self_check})  →  tree_leaf_set_status(tree_id, leaf_id=<root>, status=done)
+```
+
+这也解释了 root 两种 event 的不同作用：① 写 plan/status_check → root.events 非空（满足闸门2 对 rootLeaf 的 events 要求，即 §13.3 步骤0 的前置）；② 写 done → 触发 auto_upgrade，root 自身 audit_gate 升 pass（满足 root 自己 set-status done 的门禁 L1399）。注意：闸门2 对 rootLeaf（L2247-2252）只校验 status + events，**不校验 root 自己的 audit_gate**——所以步骤0 只需写 plan 让 events 非空即可，不必先 done。
 
 ### §13.4 转正常期
 

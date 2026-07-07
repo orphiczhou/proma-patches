@@ -66,6 +66,17 @@ const LEAF_NAME_RE = /^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\d*(?:[a-z]\d*)*)?-)?(\w+)
 // 枚举 (附录 A.8)
 // v0.2.2: 新增 pending_brief — Worker 初始状态，brief_echo 之前不可声明 done
 const STATUS_ENUM = ['active', 'done', 'pruned', 'archived', 'segment_pending', 'pending_brief'];
+// P0-3 (2026-07-07): 状态机流转白名单。堵 done→active 回退 / archived 终态复活 / pruned→active|done 复活。
+//   原实现只 assertEnum(new_status)，任意 from→to 合法（含 done→active、archived→active），状态机形同虚设。
+//   幂等 (X→X) 允许（兼容重复 set-status）；pending_brief↔active 灵活（brief 阶段）；segment_pending 仅可回 active。
+const STATUS_TRANSITIONS = {
+  pending_brief:    ['active', 'done', 'pruned', 'archived', 'pending_brief'],
+  active:           ['done', 'pruned', 'archived', 'segment_pending', 'pending_brief', 'active'],
+  done:             ['pruned', 'archived', 'done'],
+  pruned:           ['archived', 'pruned'],
+  archived:         ['archived'],
+  segment_pending:  ['active', 'segment_pending'],
+};
 const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round'];
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
@@ -113,6 +124,8 @@ const E_TREE_NOT_FOUND = 'E_TREE_NOT_FOUND';
 const E_LEAF_NOT_FOUND = 'E_LEAF_NOT_FOUND';
 const E_SCHEMA_INVALID = 'E_SCHEMA_INVALID';
 const E_STATUS_INVALID = 'E_STATUS_INVALID';
+// P0-3 (2026-07-07): 状态机流转白名单——done/archived/pruned 不可非法回退/复活
+const E_STATUS_TRANSITION_INVALID = 'E_STATUS_TRANSITION_INVALID';
 const E_NAME_INVALID = 'E_NAME_INVALID';
 const E_PARENT_MISSING = 'E_PARENT_MISSING';
 const E_DUPLICATE_LEAF = 'E_DUPLICATE_LEAF';
@@ -277,6 +290,7 @@ const ERROR_TO_HELP = {
   E_NAME_INVALID:             'naming_convention',
   E_PARENT_MISSING:           'how_to_init',
   E_DUPLICATE_LEAF:           'naming_convention',
+  E_DUPLICATE_SESSION_ID:     'naming_convention',       // Bug B: session_id 在树中重复
   E_CHILDREN_NOT_DONE:        'role_semantics',
   E_DEPTH_EXCEEDED:           'role_semantics',
   E_BACKUP_CORRUPT:           null,
@@ -305,6 +319,7 @@ const ERROR_TO_HELP = {
   E_TS_NOT_MONOTONIC:         'v10_constraints',          // V10-timestamp-monotonic
   E_LEAF_AUTO_PRUNED:         'nudge_escalation',         // V10-nudge-escalation
   E_STATUS_EVENT_MISMATCH:    'v10_constraints',          // V10-status-event-sync
+  E_STATUS_TRANSITION_INVALID:'role_semantics',           // P0-3 状态机流转白名单
   E_SESSION_NOT_ALIVE:        'session_liveness',         // L2-root-cause: session 不真实存在
   // ---- ISS-003 done 门禁耦合审查收敛 ----
   E_REVIEW_NOT_CONVERGED:     'alignment_workflow',       // worker done 但 review 未收敛
@@ -1264,6 +1279,16 @@ async function cmdLeafSetStatus(args) {
     const leaf = state.leaves[leaf_id];
     const from = leaf.status;
 
+    // P0-3 (2026-07-07): 状态机流转白名单——堵 done→active 回退 / archived 终态复活 / pruned→active|done 复活。
+    //   幂等 (X→X) 允许；非法流转抛 E_STATUS_TRANSITION_INVALID。
+    const allowed = STATUS_TRANSITIONS[from] || [];
+    if (!allowed.includes(new_status)) {
+      throw new TreeStateError(
+        E_STATUS_TRANSITION_INVALID,
+        `cannot set status="${new_status}": invalid transition from "${from}" (allowed: [${allowed.join(', ')}]). done cannot revert to active/pending_brief; archived is terminal; pruned cannot revive to active/done without re-fork.`
+      );
+    }
+
     // 切到 done 时校验：milestones 必须非空 + 所有 milestones 都 audit_pass=true
     // 严格路径：契约精神要求每个宣告完成的工作都有结构骨架（§3.5 milestones 是必填项）
     if (new_status === 'done') {
@@ -1707,7 +1732,7 @@ async function cmdMilestoneAdd(args) {
   return result;
 }
 
-async function cmdMilestoneSetResult(args) {
+async function cmdMilestoneSetResult(args, callerSessionId) {
   const { positional, opts } = parseArgs(args);
   const [tree_id, leaf_id, milestone_id] = positional;
   assertTreeExists(tree_id);
@@ -1752,6 +1777,16 @@ async function cmdMilestoneSetResult(args) {
     // v0.7 批次5 (V4): audit_pass=true 必须由独立 auditor 背书（self-approving forbidden）。
     //   audit_pass=false 免校验（失败声明无需独立背书，且 failed milestone 也无法满足 done 前置）。
     if (audit_pass === true) {
+      // P0-3+ (2026-07-07, 场景D 攻击面堵): audit_pass=true 必须由 auditor 自己调（caller===audit_session_id），
+      //   与 cmdAuditGate L2732 一致。原 cmdMilestoneSetResult 不接收 callerSessionId（dispatchMilestone 未透传），
+      //   导致 worker 借 root session_id 可伪造 milestone audit_pass（虽 audit_gate 兜底无法 done，但污染数据完整性）。
+      //   CLI 不传 caller（callerSessionId=undefined）跳过校验，向后兼容测试。
+      if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId) {
+        throw new TreeStateError(
+          E_BORROWED_IDENTITY,
+          `milestone set-result rejected: caller "${callerSessionId}" != audit_session_id "${audit_session_id}" (borrowed identity forbidden; auditor must call set-result itself). CLI omits caller for backward compat.`
+        );
+      }
       const indepProblem = resolveAuditorIndep(state, leaf, audit_session_id);
       if (indepProblem) {
         throw new TreeStateError(
@@ -3458,7 +3493,7 @@ auditor leaf 必须：
 - audit_session_id 指向"另一个独立 leaf"的 session_id（不能指向自己）
 - V10-self-audit-forbidden: callerSessionId（MCP wrapper 注入）必须 === audit_session_id
 
-## status 转换图
+## status 转换图（白名单约束 STATUS_TRANSITIONS）
 \`\`\`
 pending_brief → active → done     （正常完成）
 active → pruned                  （剪枝）
@@ -3467,8 +3502,26 @@ active → segment_pending         （竹节交接中）
 \`\`\`
 切 done 时引擎硬校验：milestones 非空 + 全部 audit_pass=true + alignment 已回填。
 
+## P0-3 状态机流转白名单（2026-07-07）
+状态流转受 STATUS_TRANSITIONS 白名单约束，非法流转抛 **E_STATUS_TRANSITION_INVALID**。
+完整白名单（在 cmdLeafSetStatus 校验）：
+\`\`\`
+pending_brief   → [active, done, pruned, archived, pending_brief]
+active          → [done, pruned, archived, segment_pending, pending_brief, active]
+done            → [pruned, archived, done]
+pruned          → [archived, pruned]
+archived        → [archived]                // 终态，不可复活
+segment_pending → [active, segment_pending]
+\`\`\`
+关键约束：
+- **done 不可回退** active / pending_brief（防"假完成回头改"绕过 done 校验）
+- **archived 是终态**，唯一流转是 archived→archived（幂等）
+- **pruned 不可直接复活**到 active / done（要恢复须重新 fork 新 leaf）
+- **幂等允许**：X→X 不抛错（重试安全）
+
 ## 关联
-- mcp__tree__tree_help('how_to_register_auditor') — auditor 注册细节`,
+- mcp__tree__tree_help('how_to_register_auditor') — auditor 注册细节
+- mcp__tree__tree_help('error_code_index') — E_STATUS_TRANSITION_INVALID`,
   },
 
   v10_constraints: {
@@ -3703,8 +3756,43 @@ worker 永远拿不到 audit pass：
 - worker 卡死无法 done，会上行 blocked 抱怨"audit pass 被拦"
 - **这不是 bug，是 V5b 硬约束**（堵 A3-omit-alignment 绕过）
 
+## ISS-003 done 门禁：review_round 收敛协议
+当 audit_meta.review_required=true 时，worker 切 done **前置**：events 须含 ≥1 条 \`review_round\` event。
+
+review_round meta schema：
+\`\`\`
+{
+  round_no:        number (≥1),
+  reviewers: [
+    {
+      perspective:        'G1'|'G2'|'G3'|'G4'|'G5',  // 多视角
+      reviewer_session_id: <UUID v4>,
+      findings: [
+        { severity: 'red'|'yellow'|'green', item: <string>, evidence: <≥10 chars> }
+      ]
+    }
+  ],
+  red_count: number (非负整数，须 = 实际 red findings 数),
+  converged: boolean
+}
+\`\`\`
+收敛条件：**末轮 red_count=0**；总轮数 ≤3（超过强制升级）。
+
+违反错误码：
+- **E_REVIEW_NOT_CONVERGED** — events 无 review_round / 末轮 red_count>0 / 总轮数>3
+- **E_REVIEW_FORGERY** — reviewer 是 worker 自己（session_id 相同）/ 是 added_by（commander）/ perspective 漏填 / reviewer_session_id 非 UUID v4 / findings 空 / evidence<10 字符 / red_count 与实际不符
+- **E_REVIEW_FLAGGED_BLOCK** — 父链祖先有 review_evidence.flagged=true（pre-ISS-003 done 未补审），须先给 flagged 祖先补 review_round event 再创建下游 leaf
+
+绕过开关（仅测试用）：\`audit_meta.review_required=false\` 或环境变量 \`PROMA_REVIEW_DISABLE=1\`。
+
+## 已知局限（必须诚实标注）
+review_round 结构校验**仅防格式伪造**（空/缺字段/自审/UUID 非法），**不防内容伪造**——
+worker 可自写一份格式合法的 review_round（全 green 废话）蒙混 done 门禁。
+阶段一靠 commander 抽查 + 阶段二 Layer2（caller 真实性校验）补强。
+
 ## 关联
-- mcp__tree__tree_help('how_to_register_auditor')`,
+- mcp__tree__tree_help('how_to_register_auditor')
+- mcp__tree__tree_help('error_code_index') — E_REVIEW_*`,
   },
 
   nudge_escalation: {
@@ -3780,24 +3868,31 @@ Round 2:
   },
 
   error_code_index: {
-    title: '全部错误码索引（33 个）',
+    title: '全部错误码索引（40 个）',
     related: [],
-    content: `# error_code_index — 33 个错误码索引
+    content: `# error_code_index — 40 个错误码索引
 
-## 旧错误码（17 个）
+> 共 40 个 E_* 错误码定义于 tree-engine.cjs（grep \`const E_\` 校验）。
+> 注：E_NO_OWNERSHIP 属于 session 层 patches.cjs，非 tree 错误码，此处不收录。
+
+## 基础错误码（自解释，help=null）
 - E_TREE_NOT_FOUND — 树目录/状态文件不存在
 - E_LEAF_NOT_FOUND — leaf_id 不存在
-- E_SCHEMA_INVALID — JSON/字段结构错误 [help: how_to_init]
-- E_STATUS_INVALID — status 不在枚举 [help: role_semantics]
-- E_NAME_INVALID — leaf_id 不符合命名正则 [help: naming_convention]
-- E_PARENT_MISSING — parent 引用不存在的 leaf [help: how_to_init]
-- E_DUPLICATE_LEAF — leaf/tree 已存在 [help: naming_convention]
-- E_CHILDREN_NOT_DONE — 子 leaf 未全部 done [help: role_semantics]
-- E_DEPTH_EXCEEDED — commander 嵌套超过 3 层 [help: role_semantics]
 - E_BACKUP_CORRUPT — 备份文件损坏
 - E_IO — 文件读写错误
 - E_UNKNOWN — 未知命令/子命令
 - E_LOCK_TIMEOUT — 文件锁等待超时
+
+## 结构/角色错误码（22 个，映射 help）
+- E_SCHEMA_INVALID — JSON/字段结构错误 [help: how_to_init]
+- E_STATUS_INVALID — status 不在枚举 [help: role_semantics]
+- E_STATUS_TRANSITION_INVALID — P0-3 状态机流转白名单违例（done 不可回退 / archived 终态 / pruned 不可复活）[help: role_semantics]
+- E_NAME_INVALID — leaf_id 不符合命名正则 [help: naming_convention]
+- E_PARENT_MISSING — parent 引用不存在的 leaf [help: how_to_init]
+- E_DUPLICATE_LEAF — leaf/tree 已存在 [help: naming_convention]
+- E_DUPLICATE_SESSION_ID — session_id 在树中重复（Bug B 修复）[help: naming_convention]
+- E_CHILDREN_NOT_DONE — 子 leaf 未全部 done [help: role_semantics]
+- E_DEPTH_EXCEEDED — commander 嵌套超过 3 层 [help: role_semantics]
 - E_DELIVERABLE_MISSING — done 时缺少交付物 [help: alignment_workflow]
 - E_AUDITOR_NOT_INDEPENDENT — auditor 与被审 leaf 不独立 [help: how_to_register_auditor]
 - E_AUDIT_PREMATURE — 时序错（pass 早于前置）[help: alignment_workflow]
@@ -3806,12 +3901,13 @@ Round 2:
 - E_TREE_NODE_BUDGET_EXCEEDED — 超节点预算 [help: how_to_init]
 - E_TREE_NOT_VALIDATED — validate 失败 [help: audit_tree_structure]
 - E_GATEKEEPER_REQUIRED — 需要 gatekeeper [help: role_semantics]
+- E_SESSION_NOT_ALIVE — L2-root-cause: caller session 被 verifier 明确判定不真实存在 [help: session_liveness]
 
-## V10 新增错误码（16 个）
+## V10 加固错误码（13 个）
 - E_AUDITOR_NOT_DONE — auditor.status≠done [help: how_to_register_auditor]
 - E_AUDITOR_NO_EVENTS — auditor.events 空 [help: how_to_register_auditor]
 - E_AUDITOR_NOT_VERIFIED — auditor 自己 audit_gate.verdict≠pass [help: how_to_register_auditor]
-- E_BORROWED_IDENTITY — caller≠audit_session_id [help: self_audit_forbidden]
+- E_BORROWED_IDENTITY — caller≠audit_session_id（cmdAuditGate/cmdMilestoneSetResult/cmdEventAppend 共用）[help: self_audit_forbidden]
 - E_INVALID_UUID_STRICT — UUID 全 0/全 f/非合法格式 [help: v10_constraints]
 - E_NEGATIVE_COUNT — total/passed/failed<0 [help: v10_constraints]
 - E_COUNT_MISMATCH — passed+failed≠total [help: v10_constraints]
@@ -3820,7 +3916,54 @@ Round 2:
 - E_TS_IN_FUTURE — event ts 晚于 now+60s [help: v10_constraints]
 - E_TS_NOT_MONOTONIC — event ts 早于上一条 [help: v10_constraints]
 - E_LEAF_AUTO_PRUNED — nudge_count≥7 强制 pruned [help: nudge_escalation]
-- E_STATUS_EVENT_MISMATCH — status/event 不同步 [help: v10_constraints]`,
+- E_STATUS_EVENT_MISMATCH — status/event 不同步 [help: v10_constraints]
+
+## ISS-003 done 门禁 review 收敛错误码（3 个）
+- E_REVIEW_NOT_CONVERGED — events 无 review_round / 末轮 red_count>0 / 总轮数>3 [help: alignment_workflow]
+- E_REVIEW_FORGERY — reviewer=自己/added_by、perspective 漏填、reviewer_session_id 非 UUID v4、findings 空、evidence<10 字符、red_count 不符 [help: alignment_workflow]
+- E_REVIEW_FLAGGED_BLOCK — 父链祖先 review_evidence.flagged=true（pre-ISS-003 done 未补审），须先补 review_round event [help: alignment_workflow]`,
+  },
+
+  session_liveness: {
+    title: 'session 真实性校验（auditor / caller 必须是 live session）',
+    related: ['how_to_register_auditor', 'self_audit_forbidden', 'error_code_index'],
+    content: `# session_liveness — caller session 必须是 live 的 Proma session
+
+## 核心规则
+任何 mcp__tree__* 写入入口（leaf_add / event_append / audit_gate / milestone_set_result 等）的
+\`callerSessionId\`（即 Agent 自身 session_id）必须经过 \`checkSessionAlive\` 真实性校验。
+
+"live session" 定义：通过 Proma create_session / fork_session 真实创建的 Agent 会话，
+Proma session 层（patches.cjs）能查到记录并确认存活。CLI 调用注入的占位 session、
+未注入 verifier 的 CLI 占位 UUID、手编的 UUID 都不算 live。
+
+## verifier 三态分支（assertMcpEntrySessionId）
+1. ok=true 且无 bypass：verifier 真实确认存在 → 放行（金标准占位 UUID 靠测试 mock 放行）。
+2. ok=false 且无 bypass：verifier 明确说不存在 → **throw E_SESSION_NOT_ALIVE**。
+3. bypass（CLI 未注入 verifier / verifier-error 降级 best-effort）：
+   退化为严格格式校验，拒占位前缀 UUID（堵 CLI 占位伪造）。
+   bypass 分支 **不** 阻断写入——verifier 拒绝或未注入时不抛 E_SESSION_NOT_ALIVE。
+
+## 关联错误码
+- **E_SESSION_NOT_ALIVE**：caller session 被 verifier 明确判定为不存在（分支 ②）。
+  修复：改用真实 create_session/fork_session 产出的 session_id。
+- **E_AUDITOR_NOT_INDEPENDENT**：auditor 与被审 leaf 不独立（同一 session / 无独立 leaf）。
+  当 auditor 不是 live 的独立 session 时，也会先在 leaf 注册环节被 session_liveness 拦下。
+
+## 为什么 auditor 必须是 live session
+V10 加固要求 auditor 在自己 session 内调 audit_gate（堵 E_BORROWED_IDENTITY 借身份攻击）。
+若允许 CLI 占位 / 手编 UUID 当 auditor session，则 auditor 身份可伪造，整个 V10 独立审计
+体系失效。因此 session_liveness 是 V10 独立性的前置闸。
+
+## CLI / 未注入 verifier 的退化策略
+- bypass 分支退化为严格 UUID 格式 + 拒占位前缀（不是完全不校验）。
+- 这保证 CLI 误调用能被格式层拦下，但无法防住"伪造合法格式 UUID"的攻击面——
+  该攻击面靠 commander 抽查 + 阶段二 Layer2（patches.cjs session 层强校验）根治。
+
+## 防御
+- 调任何写入工具前确认 callerSessionId 来自真实 fork/create
+- 错误返回附 help_topic=session_liveness 时，对照本 topic 分支表排查
+- 不要在 CLI / 脚本里直接拼 UUID 调写入工具`,
   },
 
   full_guide: {
@@ -3836,7 +3979,7 @@ Round 2:
 - §3 5 件套契约模板（brief/dod/report/autonomy/self_audit）
 - §4 工作流程 5 步法
 - §5 mcp__tree__* 工具速查（28 个工具）
-- §6 事件路由表（done/blocked/plan/brief_echo/heartbeat_reply）
+- §6 事件路由表（EVENT_TYPE_ENUM 共 9 种：done / blocked / plan / brief_echo / heartbeat_reply / nudge / limit / status_check / review_round）
 - §7 三档纠偏决策树（low/mid/high）
 - §8 心跳通道
 - §9 验收 Agent prompt 模板
@@ -3852,10 +3995,11 @@ Round 2:
 1. 直接读文件：\`Read("skills/tree-commander/SKILL.md")\`
 2. 或问具体 topic：\`mcp__tree__tree_help('<topic>')\`
 
-## topic 列表
+## topic 列表（共 14 个）
 how_to_init | how_to_register_auditor | role_semantics | v10_constraints |
 self_audit_forbidden | borrowed_identity | naming_convention | common_mistakes |
-alignment_workflow | nudge_escalation | audit_tree_structure | error_code_index | full_guide`,
+alignment_workflow | nudge_escalation | audit_tree_structure | error_code_index |
+session_liveness | full_guide`,
   },
 };
 
@@ -3910,7 +4054,7 @@ async function dispatch(cmd, args, callerSessionId) {
     case 'leaf':
       return await dispatchLeaf(args, callerSessionId);
     case 'milestone':
-      return await dispatchMilestone(args);
+      return await dispatchMilestone(args, callerSessionId);
 
     // Append
     // V10-trust-anchor-fix (C5): dispatchEvent 也透传 callerSessionId（cmdEventAppend 校验 caller 写 done event）
@@ -3964,14 +4108,14 @@ async function dispatchLeaf(args, callerSessionId) {
   }
 }
 
-async function dispatchMilestone(args) {
+async function dispatchMilestone(args, callerSessionId) {
   if (args.length === 0) {
     throw new TreeStateError(E_SCHEMA_INVALID, 'milestone requires a subcommand: add | set-result');
   }
   const [sub, ...rest] = args;
   switch (sub) {
     case 'add': return await cmdMilestoneAdd(rest);
-    case 'set-result': return await cmdMilestoneSetResult(rest);
+    case 'set-result': return await cmdMilestoneSetResult(rest, callerSessionId);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown milestone subcommand "${sub}"`);
   }
