@@ -18,6 +18,12 @@ preload.cjs
 **/tree-state.json.bak-*-pre-nudge-cleanup
 tree-engine.cjs.bak-*-pre-*
 
+# 手工操作前快照备份（restore / audit-gate edit 等，运行时产物，不版本管理）
+**/tree-state.backup.*.before-*.json
+
+# 补丁/引擎修复前整文件备份（ISS 修复 / improvement 等各轮次）
+*.bak-pre-*
+
 # Layer A 运行时调用日志（高频变化，不版本管理；分析用 scripts/tree-analyze.cjs）
 **/call-log.jsonl*
 

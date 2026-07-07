@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "tree_id": "tdb24",
-  "created_at": "2026-06-27T19:04:15.138+08:00",
+  "created_at": "2026-07-03T18:26:15.016+08:00",
   "last_heartbeat": null,
   "root_brief": {
     "parent_intent": "dbc unit test"
@@ -21,7 +21,7 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "active",
-      "created_at": "2026-06-27T19:04:15.138+08:00",
+      "created_at": "2026-07-03T18:26:15.016+08:00",
       "added_by": null,
       "last_event_ts": null,
       "last_event_type": null,
@@ -49,7 +49,7 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "active",
-      "created_at": "2026-06-27T19:04:15.142+08:00",
+      "created_at": "2026-07-03T18:26:15.023+08:00",
       "added_by": "00000000-0000-0000-0000-000000000001",
       "last_event_ts": null,
       "last_event_type": null,
@@ -77,9 +77,9 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "done",
-      "created_at": "2026-06-27T19:04:15.144+08:00",
+      "created_at": "2026-07-03T18:26:15.027+08:00",
       "added_by": "00000000-0000-0000-0000-000000000001",
-      "last_event_ts": "2026-06-27T19:04:15.149+08:00",
+      "last_event_ts": "2026-07-03T18:26:15.036+08:00",
       "last_event_type": "done",
       "context_usage_pct": 0,
       "drift_history": [],
@@ -89,14 +89,14 @@
       "events": [
         {
           "type": "brief_echo",
-          "ts": "2026-06-27T19:04:15.146+08:00",
+          "ts": "2026-07-03T18:26:15.031+08:00",
           "meta": {
             "ack": "ok"
           }
         },
         {
           "type": "done",
-          "ts": "2026-06-27T19:04:15.149+08:00",
+          "ts": "2026-07-03T18:26:15.036+08:00",
           "meta": {
             "self_check": [
               {
