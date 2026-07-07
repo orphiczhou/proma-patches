@@ -4,6 +4,46 @@
 
 新条目追加在顶部。
 
+## 2026-07-07 洁净室测试 — 错误 24→15，3 修复生效，SKILL 部署缺口（会话 57f5aec1）
+
+**测试**：pro commander（DeepSeek-pro，4abf02e6）+ observer（9a37323c）跑 macp-cleanroom（评估 06 test-plan），对比 macp-stab 基线（旧 SKILL+任务指令）。
+**结果**：try-and-fix 错误 **24→15（-37.5%）**。worker done，tree_validate **0 issues**。
+**3 修复完美生效**：① self_check schema 6→0（新 evidence 模板）② tao-watcher "undefined" 假阳性 0 issues（bug 修复）③ root alignment_pending=false（修复）。
+**完全避开**：E_DUPLICATE_SESSION_ID 3→0 / E_AUDIT_PREMATURE 3→0 / E_SELFCHECK_INVALID 6→0（新 help topics 生效，commander 靠 how_to_worker_lifecycle 等）。
+**部署缺口（已修复）**：pro 用 `.proma-dev` userData（非 `~/.proma`），新 SKILL 最初同步错路径（到 ~/.proma/default/skills），commander 读到 .proma-dev 旧 SKILL（无 §13）。已同步到 `.proma-dev/agent-workspaces/default/skills`（pro 真实路径，含 §13）。
+**新发现（下一轮材料）**：① E_SCHEMA_INVALID path 字符串vs数组（6次，新雷区，需 help how_to_path_format + leaf_add schema 标注 path:string）② E_AUDITOR_NOT_INDEPENDENT milestone_set_result 缺 audit_session_id（3次，§13.3 前置表已覆盖但 SKILL 当时未生效）③ tree_id 命名不一致（tree_init 允许连字符但 leaf_add 禁，系统级）④ tao-watcher 小任务敏感（C-13 ≥4审查者/R-06 独立验证，对小任务过严）。
+**预估**：完整 §13 + help 后错误 ~8（observer 预估，待重测验证）。
+**报告**：[active/observation-cleanroom-2026-07-07.md](./active/observation-cleanroom-2026-07-07.md)（207 行）。
+
+## 2026-07-07 pro 真实任务稳定性测试 — §13 解死锁实证（会话 57f5aec1）
+
+**测试**：pro 实例 commander（DeepSeek-pro，64922c5f）+ 3 fork worker（macp-A1/A2/A3，DeepSeek-pro）跑真实文档评估（06 test-plan / 04 api-spec / 05 sprint-plan），用 §13 冷启动流程。观察员（4f84afd9，pro 近距）全程观察。
+**结果**：**3/3 worker done**（alignment 90-95，audit_gate pass）。**§13 成功解开 alignment 死锁** — 对比 nanju-iter2 旧引擎 0/9 done + 11×E_ALIGNMENT_NOT_VERIFIED + 4×E_REVIEW_FORGERY → 现在 0 E_REVIEW_FORGERY / 0 E_AUDITOR_NOT_INDEPENDENT。
+**引擎加固表现**：caller-binding 拦 commander 伪造 worker done ×3 ✓ / self_check schema 严格（6×E_SELFCHECK_INVALID，worker 摩擦大）/ audit_gate 时序保护 ×3 ✓ / milestone caller-binding 全通过 / 写操作 2-11ms 稳定无崩溃。
+**pro 稳定性**：commander 9.2min 完成，291% context（95.6% cache 命中），26 次写无损坏，无超时/数据竞争。
+**关键发现**：commander 用 fork 创建真实 worker（非兼演）；commander 协调消息在 worker 会话（自身 list_messages total=1，观察 commander 需聚合 worker 会话）。
+**改进材料**：[active/observation-macp-stab-2026-07-07.md](./active/observation-macp-stab-2026-07-07.md)（观察员 252 行报告）。5 个问题：① self_check schema 摩擦大（SKILL/help 加 JSON 示例）② E_DELIVERABLE_MISSING 错误附路径 ③ tao-watcher audit_log auditor_session_id="undefined" bug ④ E_DUPLICATE_SESSION_ID help 强调独立 session ⑤ root alignment_pending 未清理。SKILL §13：流程清晰 ★★★★☆ 但操作顺序/错误码指引 ★★★☆☆（commander try-and-fix 24 次错误，15 次可靠更好文档避免）。
+**下一轮 harness+loop 改进方向**：help 加 how_to_worker_lifecycle topic（fork→leaf_add→brief_echo→alignment→done(worker)→audit_gate(commander)→set_status）/ SKILL §13 加错误码速查表 + worker self_check 模板 / 修 tao-watcher bug / §13 顺序文档显式化 / trust anchor 模式作 loop 体系 worker alignment 标准解法。
+
+## 2026-07-07 pro 引擎部署 + 端到端验证通过（会话 57f5aec1）
+
+- **pro dist 部署**：cp workspace-files/tree-engine.cjs → D:/Proma-dev/resources/app/dist/（备份 `.bak-pre-p03-deploy-20260707`）+ 用户重启 pro。dist 有独立 tree-engine.cjs，**cp 即部署无需构建**（proma-mcp-server.cjs require 它）。
+- **DeepSeek 端到端验证**（pro 会话 f388041a，因 GLM 卡换 DeepSeek-pro）：① **P0-3 状态机**拦截 done→active = `E_STATUS_TRANSITION_INVALID` ✓ ② **§13 死锁打破回归** W1 done，闸门2 放行 root（先 E_AUDIT_PREMATURE→补 done event 后过，符合 done 门禁顺序）✓ ③ milestone caller-binding + help 同步生效 ✓ ④ tree_validate **4 非阻断 issues**（1 name_invalid + 3 audit_log_integrity 历史模式）。
+- **§13 死锁打破首验**（pro 会话 e91d1916, GLM-5.2）：root 当 worker auditor 全程走通，W1 pending_brief→done，闸门2 放行。**不依赖引擎改动**（用既有 resolveAuditorIndep 闸门2）。
+- **release 暂缓**：用户选「先观察 pro 稳定性」再上 release。release dist 保持现状（只 SKILL 生效）。
+- **⚠️ 观察点 — GLM channel**：pro 的 GLM-5.2 启动慢/间歇（验证会话 de873801 长时间零响应后恢复，DeepSeek-v4-pro 秒回正常）。疑 pro 重启后 GLM key/配置异常，**独立于引擎改动**。实际 tree 任务若全链 GLM 需注意；建议观察期用 DeepSeek 跑或先排查 GLM channel。
+- **测试树**（留 pro 作证据）：test-deadlock-verify-20260707（§13 验证）+ test-p03-verify-20260707（P0-3 验证）。
+
+## 2026-07-07 Tree Harness 完整改进 — L0/L1/L2 全层落地 + 收敛（commit b594a32，会话 57f5aec1）
+
+在 568bebe（P0-2 SKILL 解法）基础上完成全层改进，3 路子 Agent 审计 + 洁净室盲测 2 轮收敛：
+
+- **L0 死锁打破（SKILL/方法论，不改引擎）**：commander SKILL 新增 §13 冷启动信任锚流程（§13.0 caller 机制/术语、§13.3 步骤0-7 严格顺序、§13.3a auto_upgrade）+ §6/§4/§5 对齐 + methodology §2.3.1 信任锚第二层 + worker §3.4。
+- **L1 引擎加固**：P0-3 状态机流转白名单（STATUS_TRANSITIONS + E_STATUS_TRANSITION_INVALID，堵 done→active/archived 复活）+ milestone caller-binding（堵场景D 攻击面：dispatchMilestone 透传 caller + cmdMilestoneSetResult caller 校验）+ help 同步（error_code_index 40 个/alignment_workflow 补 review_round/EVENT_TYPE 9 种/role_semantics 补白名单/session_liveness topic）。
+- **L2**：待解决清单更新（ISS-005/008/009 已解，006/007/010 遗留）+ design.md 术语注。
+- **验证**：iss003 13/13 + p0-1 4/4 + p0-3 19/19 + repro 场景A-F 语义自洽 + 洁净室盲测收敛。
+- **交付**：[active/handoff-tree-harness-improvement-2026-07-07.md](./active/handoff-tree-harness-improvement-2026-07-07.md) §7。**未部署 dist**（待用户验证后再发）。
+
 ## 2026-07-07 P0-2 结论修正 — 引擎通道完备，死锁真因是 SKILL 协议误用（57f5aec1 会话）
 
 **来源**：[active/handoff-tree-harness-improvement-2026-07-07.md](./active/handoff-tree-harness-improvement-2026-07-07.md)（并行会话 57f5aec1，3 路子 Agent 深挖 + repro 实证）

@@ -75,6 +75,29 @@ load_on: create_session  # 原则 11：叶子 = create_session；子 Commander �
 
 ---
 
+## §2.5 worker lifecycle 全景（谁调什么）
+
+> 对应设计文档: §4.2 事件通道 + §6.1 brief_echo；commander 侧流程见 tree-commander SKILL §13.3。
+> 一图看懂 worker 一生要经历 9 个阶段，哪些是 worker 主动调、哪些是 commander 调、哪些是 worker 收件。
+
+| 阶段 | 调用者 | 工具 / 动作 | worker 做什么 |
+|------|--------|------------|--------------|
+| 1. fork | commander | `mcp__session__fork_session` / `create_session` | （被动）被创建，拿到自己的 session_id |
+| 2. leaf_add | commander | `mcp__tree__tree_leaf_add` | （被动）被登记为 tree 里的 leaf，拿到 leaf_id |
+| 3. 收 5 件套 | commander → worker | `send_message`（首条=5 件套 YAML） | 解析 brief/dod/report/autonomy/self_audit，理解任务边界 |
+| 4. brief_echo（首条） | **worker 主动** | `mcp__tree__tree_event_append(type=brief_echo, meta={my_understanding, milestones_preview})` | 用自己的话复述 brief + 列 milestones（无 alignment 字段） |
+| 5. alignment 回填 | commander（root 身份） | `tree_event_append(type=brief_echo, meta={alignment, auditor_session_id=root.session_id})` | （被动）等待 commander 回填对齐评估；撞 `E_ALIGNMENT_NOT_VERIFIED` 说明这步没做，上行 `blocked` 提示母会话 |
+| 6. 干活 | **worker 主动** | 产出文件落盘 `deliverables/` + 每个 Mi 自审（§4）+ review_round（若 review_required，§4.6） | 执行 milestones，每个 Mi 完成跑 §4.2 自审、产出 `.note.md` |
+| 7. done event | **worker 主动** | `tree_event_append(type=done, meta={self_check, deliverables, milestones, context_usage, drift_declaration})` | 全部 Mi 完成、self_check 全过后上报；self_check schema = `[{item,pass,evidence}]`（§3.1） |
+| 8. audit_gate pass | commander（caller===audit_session_id=root.session_id） | `tree_audit_gate(verdict=pass, audit_session_id=root.session_id)` | （被动）等待门禁背书；步骤 5 没做则这步被 `E_ALIGNMENT_NOT_VERIFIED` 拦，worker 永远到不了步骤 9 |
+| 9. set-status done | **worker 主动** | `tree_leaf_set_status(status=done)` | 步骤 8 通过后自己调；deliverables 必须已落盘，否则 `E_DELIVERABLE_MISSING` |
+
+> **worker 主动调的步骤**：4（brief_echo）、7（done event）、9（set-status done）——这三步 commander 不能代调（代调 → `E_BORROWED_IDENTITY`）。
+> **步骤 9 前必须步骤 8 完成**：worker 调 set-status done 时引擎查 `audit_gate.verdict=pass`，没过 → `E_GATEKEEPER_REQUIRED`。若卡在这，先确认 commander 是否已调步骤 8（上行 `blocked` 催一下）。
+> **撞 `E_ALIGNMENT_NOT_VERIFIED`**：说明步骤 5 没做（commander 没回填 alignment event），worker 这边上行 `blocked` 提示母会话补 alignment 评估，**不要自己伪造 alignment**（auditor 必须独立，伪造会被拦）。
+
+---
+
 ## §3 上行消息模板
 
 > 对应设计文档: §4.2 事件通道, §6.1 brief_echo
@@ -85,16 +108,21 @@ load_on: create_session  # 原则 11：叶子 = create_session；子 Commander �
 
 **必填字段**: `event`, `deliverables`, `self_check`, `milestones`, `context_usage`, `drift_declaration`
 
+> **self_check schema（v2.4 强化，引擎硬校验）**：必须是 `[{item, pass, evidence}]` 数组。`item` = 检查项描述；`pass` = true/false；`evidence` = ≥10 字的客观证据（引用产出文件的具体位置/行/段落，禁止空泛"已检查"）。缺 `evidence` 或 <10 字 → done event 被 `E_SELFCHECK_INVALID` 拦，必须重写。
+
 ```yaml
 event: done
 deliverables: ["docs/prd/module-x.md", "docs/prd/module-x/flow.mmd"]  # 必填
-self_check:                     # 必填，逐条比对 deliverable + quality_gate
+self_check:                     # 必填，逐条比对 deliverable + quality_gate；schema = [{item,pass,evidence}]
   - item: "Mermaid 流程图可渲染"
     pass: true
+    evidence: "flow.mmd 经 mmdc CLI 渲染输出 flow.svg 无报错，含 7 个节点 6 条边"
   - item: "API 列表覆盖全部端点"
     pass: true
+    evidence: "api.yaml 第 12-89 行列出 8 个端点，逐条对照 brief.in_scope 第 2 条 8 项全部命中"
   - item: "异常处理 section 存在"
     pass: false                  # ❌ 则标注原因，在 milestones 中说明
+    evidence: "module-x.md 当前无 '异常处理' 二级标题，仅在第 4 段提及 1 句，缺 timeout/重试/降级三档"
 milestones:                     # 必填，逐个标注
   - id: M1
     audit_pass: true
@@ -476,13 +504,16 @@ REST
 event: done
 deliverables:
   - "<审查/攻击报告路径>"
-self_check:
+self_check:                      # schema = [{item,pass,evidence}]，evidence ≥10 字，缺则 E_SELFCHECK_INVALID
   - item: "已 Fork 子 Agent 执行审查（非自己直接判断）"
     pass: true
+    evidence: "Fork 了子 Agent session <id>，list_messages 可见其审查对话，问题列表来自该子 Agent 返回"
   - item: "问题列表含 ID/定位/严重程度/描述/修正建议 5 字段"
     pass: true
+    evidence: "审查报告第 2-47 行每条问题均含 ID（P1-P23）/定位（文件:行）/severity/desc/fix 五列"
   - item: "标注了每个严重程度的判断理由"
     pass: true
+    evidence: "报告 severity 列每项后括注理由，如 'high（阻断：API 缺 auth 校验，见 §3.2）'"
 milestones:
   - { id: M1, audit_pass: true, note_path: "<note路径>" }
   - { id: M2, audit_pass: true, note_path: "<note路径>" }

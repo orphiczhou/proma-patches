@@ -269,7 +269,7 @@ self_audit:
 
 | 工具 | 说明 |
 |------|------|
-| `mcp__tree__tree_leaf_set_status(tree_id, leaf_id, status)` | status ∈ `active\|done\|pruned\|archived\|segment_pending`。切 done 时校验 milestones 非空且全部 audit_pass=true（失败返回 `E_MILESTONE_INCOMPLETE`） |
+| `mcp__tree__tree_leaf_set_status(tree_id, leaf_id, status)` | status ∈ `active\|done\|pruned\|archived\|segment_pending`。切 done 时校验 milestones 非空且全部 audit_pass=true（失败返回 `E_SCHEMA_INVALID`） |
 | `mcp__tree__tree_leaf_set_context(tree_id, leaf_id, context_pct)` | context_pct 0-100，心跳后更新上下文使用率 |
 | `mcp__tree__tree_leaf_set_last_event(tree_id, leaf_id, event_type, ts?)` | 更新最后事件类型和时间 |
 | `mcp__tree__tree_leaf_autonomy_override(tree_id, leaf_id, overrides=<obj>)` | 中档纠偏时限权（overrides 对象含 added_must_ask / removed_can_decide / reason） |
@@ -677,6 +677,22 @@ prompt: |
 > **步骤映射主流程**：步骤 0-2 属 §4 Step2 下发期；步骤 3-4 属 §4 Step3 事件路由（worker brief_echo → commander 回填 alignment）；步骤 5-7 属 §4 Step4 质量门。
 > ⚠️ 若树的 `audit_meta.review_required=true`（ISS-003 opt-in），步骤 5 前还需 worker 产 ≥1 条 review_round event（末轮 red_count=0，见 §4 Step4 / tree-worker §4.6），否则步骤 7 被 `E_REVIEW_NOT_CONVERGED` 拦。
 
+**§13.3 步骤前置条件表**（撞错即翻；列=步骤｜调用者｜前置条件｜产物｜漏做触发的错误码）：
+
+| 步骤 | 调用者 | 前置条件 | 产物 | 漏做触发 |
+|------|--------|---------|------|---------|
+| 0. root 写 plan/status_check event | root | tree_init 已完成 | root.events 非空（闸门2 前置，只增不减，做一次永久满足） | 闸门2 不放行 → 后续 audit 全卡 |
+| 1. milestone_add（含 expect_outputs） | root | 步骤 0 + leaf_add 完成 | worker 的 milestones 列表 | 步骤 2 无 milestone 可 set |
+| 2. milestone_set_result（audit_pass=true） | root（audit_session_id=root.session_id） | 步骤 1 | worker milestone audit_pass 留痕 | 步骤 7 `E_SCHEMA_INVALID（milestone 未 audit_pass）` |
+| 3. brief_echo 首条（worker 自发） | worker | 收到 5 件套 | worker.events 首条 brief_echo（无 alignment） | 步骤 4 无对象可回填 |
+| 4. brief_echo alignment 回填 | root（auditor_session_id=root.session_id） | 步骤 3 | worker.events 多一条带 alignment 的 brief_echo（V5b 硬前置） | 步骤 6 `E_ALIGNMENT_NOT_VERIFIED` |
+| 5. done event（带 self_check） | worker | 步骤 4 + 干活完成 + deliverables 落盘 | worker.events done 留痕 | — （worker 漏做则永远到不了步骤 6） |
+| 6. audit_gate pass | root（caller===audit_session_id） | 步骤 4 + 验收 Agent verdict.pass | worker.audit_gate.verdict=pass | 步骤 7 `E_GATEKEEPER_REQUIRED` |
+| 7. set-status done | worker | 步骤 0-6 全过 + deliverables 落盘 | worker.status=done | `E_DELIVERABLE_MISSING` / `E_GATEKEEPER_REQUIRED` / `E_SCHEMA_INVALID（milestone未pass）` / `E_REVIEW_NOT_CONVERGED（review_required=true时）` |
+
+> **caller 标注说明**：`root` = commander 自己调（caller=root.session_id）；`worker` = commander 用 `send_message` 让 worker 自己调（caller=worker.session_id）。commander 绝不能代调 caller=worker 的步骤（→ `E_BORROWED_IDENTITY`）。
+> **review_required 提示**：若 `audit_meta.review_required=true`，步骤 5 的 done event 之前 worker 必须先产 ≥1 条 `review_round` event（末轮 `red_count=0`，总轮数 ≤3），否则步骤 7 被 `E_REVIEW_NOT_CONVERGED` 拦（见 §4 Step4 / tree-worker §4.6）。
+
 ```text
 [caller=root]  0. tree_event_append(tree_id, leaf_id=<root>, type=plan|status_check)  # root.events 非空（闸门2 前置；events 只增不减，一旦非空永久满足，无需每个 worker 都重做此步）
 [caller=root]  1. tree_milestone_add(tree_id, leaf_id=<worker>, milestone=<含 expect_outputs>)
@@ -689,7 +705,7 @@ prompt: |
                   meta={alignment, auditor_session_id=<root.session_id>})     # 闸门2，V5b 前置；alignment 填评估如 "0.92 (aligned)"
                   ── worker 干活，把产出写入 deliverables/<expect_outputs 声明的相对路径> ──
 [caller=worker]5. tree_event_append(tree_id, leaf_id=<worker>, type=done,
-                  meta={self_check})                                          # self_check = 非空 [{item,pass,evidence}] 数组（schema 见 §3.5）
+                  meta={self_check})                                          # self_check = 非空 [{item,pass,evidence}] 数组（schema 见 tree-worker SKILL §3.1）
 [caller=root]  6. 派验收 Agent（§9）→ verdict.pass → tree_audit_gate(tree_id, leaf_id=<worker>,
                   verdict=pass, audit_session_id=<root.session_id>)           # caller===audit_session_id，闸门2 放行
 [caller=worker]7. tree_leaf_set_status(tree_id, leaf_id=<worker>, status=done)  # 全 8 道门禁通过；deliverables 须已落盘
@@ -701,9 +717,9 @@ prompt: |
 - **步骤 5**：done event 必须 worker 自己写（caller=worker），commander 代写被 `E_BORROWED_IDENTITY` 拦
 - **步骤 6**：audit_session_id 必须 = 调用者（root）的 session_id，否则 `E_BORROWED_IDENTITY`；worker 不能自己调步骤 6；步骤 4 的 alignment event 是步骤 6 的硬前置（V5b），缺则 `E_ALIGNMENT_NOT_VERIFIED`
 
-### §13.3a root 自身 done（auto_upgrade 简化路径，不走 §13.3 七步）
+### §13.3a root 自身 done（auto_upgrade 简化路径，不走 §13.3 八步）
 
-root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 七步。引擎 auto_upgrade 机制（tree-engine.cjs L1961-1972）：root 写自己的 done event（caller=root，带 self_check）→ audit_gate 自动从 skip 升为 pass（auto_upgrade=true）。即 root 只需：
+root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 八步。引擎 auto_upgrade 机制（tree-engine.cjs L1961-1972）：root 写自己的 done event（caller=root，带 self_check）→ audit_gate 自动从 skip 升为 pass（auto_upgrade=true）。即 root 只需：
 
 ```text
 [caller=root]  tree_event_append(tree_id, leaf_id=<root>, type=done, meta={self_check})  →  tree_leaf_set_status(tree_id, leaf_id=<root>, status=done)
@@ -727,6 +743,22 @@ root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 七步
 若上述流程因引擎 bug 或协议冲突彻底走不通（参考 nanju-iter2 降级 A）:
 - 应急形态 = `create_session` 新建 b-worker（commander 作 owner）+ 产出直落 `deliverables/` + 跳过 tree leaf done 门禁
 - 这是"形式死锁但内容必须交付"的最后兜底，**非首选**；优先排查 §13.1-§13.4 是否执行到位
+
+### §13.7 错误码速查表（撞错即翻）
+
+> 撞到任一错误码先翻此表；表没覆盖的，看工具返回里的 `help_topic` 字段。所有 `mcp__tree__*` 工具失败统一返回 `{ok:false, error:{code, message, help_topic?}}`。
+
+| 错误码 | 哪步触发 | 含义 | 修复方法 |
+|--------|---------|------|---------|
+| `E_DUPLICATE_SESSION_ID` | `leaf_add` | 该 `session_id` 已被别的 leaf 注册（一 session 不能挂多 leaf） | worker 重新 `fork_session` 拿一个新 `session_id`，再用新 id 重新 `leaf_add` |
+| `E_BORROWED_IDENTITY` | `leaf_add` / `leaf set-session` / `milestone set-result` / `done` event / `audit_gate` / `audit_append`（多处 caller≠audit_session_id 校验） | caller（调工具的 session）≠ `audit_session_id`（冒名背书） | commander 把"该 worker 调的工具"通过 `send_message` 让 worker 自己调；冷启动期 `audit_session_id` 永远填 `root.session_id`（详见 §13.2/§13.0） |
+| `E_AUDIT_PREMATURE` | `audit_gate pass` | 步骤6 audit_gate pass 时，被审 leaf 的 events 里还没有 done event（步骤5 done event 漏做，或步骤顺序反了：6 跑在 5 之前） | 先让 worker 写 done event（步骤5），再调 `tree_audit_gate(verdict=pass)`（步骤6） |
+| `E_SELFCHECK_INVALID` | `done` event | `self_check` 不是 `[{item,pass,evidence}]` 数组（缺字段/格式错） | 改 schema 见 tree-worker SKILL §3.1（每项必须有 `evidence` ≥10 字证据；至少 1 项 `pass=true`（全 false 与 done 矛盾，V6 拦截）） |
+| `E_DELIVERABLE_MISSING` | `set-status done` | `expect_outputs` 声明的文件未落盘到 `deliverables/` | 让 worker 把产出写到 `<treeDir>/deliverables/<outPath>`（相对路径，禁绝对路径/symlink）后重试 |
+| `E_ALIGNMENT_NOT_VERIFIED` | `audit_gate pass` | worker 的 events 缺 alignment 回填（§13.3 步骤4 漏做） | commander 回填一条 `brief_echo` event（`meta={alignment, auditor_session_id=root.session_id}`），见 §6 回填机制 / §13.3 步骤4 |
+| `E_GATEKEEPER_REQUIRED` | `set-status done` | 没先 `audit_gate pass` 就直接 set done（缺门禁背书） | 先调 `tree_audit_gate(verdict=pass, audit_session_id=root.session_id)`（§13.3 步骤6）通过后再 set-status done |
+
+> **通用排查注**：所有 `mcp__tree__*` 工具失败时返回 `{ok:false, error:{code, message, help_topic}}`。若返回里带 `help_topic` 字段，**立即** `mcp__tree__tree_help(topic=<help_topic>)` 拿该主题详细用法——多数错误根因是参数 schema 或调用顺序错，help_topic 给的就是正解。
 
 ---
 

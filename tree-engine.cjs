@@ -748,7 +748,10 @@ async function cmdInit(args) {
     audit_gate: { verdict: 'skip', auditor_session_id: null, ts: null },
     nudge_count: 0,
     nudge_log: [],
-    audit_log: []
+    audit_log: [],
+    // root 是信任锚，不参与 alignment 回填流程（不写 brief_echo alignment），初始化即 false。
+    // worker/commander 才走 alignment_pending 流程（首条 brief_echo 无 alignment 时置 true）。
+    alignment_pending: false
   };
 
   await withLock(tree_id, () => {
@@ -1862,7 +1865,9 @@ async function cmdEventAppend(args, callerSessionId) {
           );
         }
         leaf.alignment_pending = false;
-      } else if (leaf.alignment_pending === undefined) {
+      } else if (leaf.alignment_pending === undefined && leaf.role !== 'root') {
+        // root 是信任锚不写 alignment（不参与 alignment 回填流程），不应被置 true；
+        // worker/commander 首条 brief_echo 无 alignment 时标记 alignment_pending=true。
         leaf.alignment_pending = true;
       }
     }
@@ -2614,6 +2619,9 @@ function collectValidateIssues(state) {
     for (let i = 0; i < auditLog.length; i++) {
       const entry = auditLog[i];
       if (!entry || typeof entry !== 'object') continue;
+      // 跳过 tao-watcher 机械巡检条目：tao-watcher 不是 auditor leaf，其 audit_log 条目
+      // 用 auditor 字段（值 'tao-watcher-script'）而非 auditor_session_id，不应套用交叉校验。
+      if (entry.auditor === 'tao-watcher-script') continue;
       const auditorSession = entry.auditor_session_id;
       // L2-root-cause: 占位跳过已移除 —— 统一走树内 leaf 存在性交叉校验（①）。
       // ① auditor_session_id 必须在 leaves 中存在
@@ -3398,8 +3406,8 @@ async function cmdMigrate(args) {
 // ============================================================
 // 命令: help (V10-helper D4 Layer 1)
 // mcp__tree__tree_help(topic) — Agent 主动问"工具怎么用"。
-// 13 个 topic 覆盖：建树 / auditor 注册 / 角色 / V10 加固 / 借身份攻击 / 命名 /
-//                  常见错误 / alignment / nudge / 审计树结构 / 错误码索引 / 全文指南。
+// 15 个 topic 覆盖：建树 / auditor 注册 / 角色 / worker 生命周期 / V10 加固 / 借身份攻击 / 命名 /
+//                  常见错误 / alignment / nudge / 审计树结构 / 错误码索引 / session 活性 / 全文指南。
 // 设计原则：渐进披露（默认简洁）+ 错误即教育（错误返回附 help_topic）。
 // ============================================================
 
@@ -3426,6 +3434,14 @@ deliverables[{path,min_length?,must_contain?}] / quality_gates[] / self_check[] 
 - 自动创建 <tree_id>-root，role=root，status=active
 - session_id 优先级：--session-id → PROMA_SESSION_ID → PENDING_ROOT（过渡标记，后续 leaf set-session 修正）
 - 建议直接传 --session-id 用根会话真实 session_id（mcp__session__get_my_session_id 拿）
+
+## 每个 leaf 必须绑定独立 session
+每个 leaf（root / commander / worker / auditor）的 session_id 必须是一个**真实且独立**的 Proma Agent session：
+- 用 mcp__session__fork_session 或 mcp__session__create_session 产出 session 后，再用 leaf_add 注册；
+- 一一对应：**一个 leaf 一个 session**。多 leaf 共用同一 session_id → E_DUPLICATE_SESSION_ID（详见 v10_constraints）；
+- 禁止占位 UUID（如 00000000-0000-0000-0000-000000000000 / 全 f / CLI 启动期的占位串）→ E_INVALID_UUID_STRICT（v10_constraints V10-uuid-format-strict）；
+- "CLI 占位"不算 live session：占位 session_id 即使格式合法，session_liveness 校验也会判 not alive → E_SESSION_NOT_ALIVE。
+- 详见：role_semantics（角色/fork 关系）、self_audit_forbidden（callerSessionId === audit_session_id 硬约束）、session_liveness（live 判据）。
 
 ## 常见 init 失败
 - E_DUPLICATE_LEAF: tree 已存在 → 用 validate 校验现有
@@ -3522,6 +3538,77 @@ segment_pending → [active, segment_pending]
 ## 关联
 - mcp__tree__tree_help('how_to_register_auditor') — auditor 注册细节
 - mcp__tree__tree_help('error_code_index') — E_STATUS_TRANSITION_INVALID`,
+  },
+
+  how_to_worker_lifecycle: {
+    title: 'worker 完整生命周期（fork→done 全阶段）',
+    related: ['role_semantics', 'alignment_workflow', 'self_audit_forbidden', 'common_mistakes'],
+    content: `# how_to_worker_lifecycle — worker 完整生命周期
+
+worker 从被 fork 到 status=done 的 8 个阶段，每阶段标注**调用者归属**（commander 调 vs worker 自己调）。
+
+## 阶段流（caller 归属）
+
+\`\`\`
+[fork]              [leaf_add]          [brief_echo #1]         [brief_echo #2 回填]     [干活]                 [done event]              [audit_gate pass]         [set-status=done]
+   │                    │                     │                          │                       │                        │                           │                            │
+ commander          commander              worker                     commander                worker                  worker                   auditor(独立)              worker(自己)
+ fork_session       leaf_add(worker)      event_append              event_append            (执行任务/              event_append               audit_gate                 cmdLeafSetStatus
+ → worker           → status=             (type=brief_echo,         (type=brief_echo,        里程碑/milestones)     (type=done,               (verdict=pass,              (engine 硬校验)
+   session            pending_brief         meta={my_understanding,   meta={alignment,                                 meta={self_check,          audit_session_id=
+                                           milestones_preview})      auditor_session_id})                              deliverables, ...})        <auditor 自己>})
+\`\`\`
+
+阶段详表（caller 列说明谁应该发起这次 mcp 调用）：
+
+| 阶段 | 引擎 API | caller |
+|------|----------|--------|
+| 1. fork | mcp__session__fork_session | commander |
+| 2. leaf_add | tree_leaf_add（role=worker, session_id=worker 真实 session） | commander |
+| 3. brief_echo #1（首条上行） | tree_event_append（type=brief_echo, meta={my_understanding, milestones_preview}） | **worker 自己** |
+| 4. brief_echo #2（alignment 回填） | tree_event_append（type=brief_echo, meta={alignment, auditor_session_id}，需独立 auditor） | commander（或 auditor） |
+| 5. 干活 | （任意：milestone_add / event plan / drift …） | **worker 自己** |
+| 6. done event | tree_event_append（type=done, meta={self_check, deliverables, expect_outputs_map?}） | **worker 自己** |
+| 7. audit_gate pass | tree_audit_gate（verdict=pass, audit_session_id=<auditor 自己>） | **auditor（独立 leaf/session）** |
+| 8. set-status=done | tree_leaf_set_status（status=done，引擎硬校验 milestones+audit_pass+alignment） | **worker 自己** |
+
+## self_check JSON 模板（done event 必填字段）
+
+最小合法示例：**非空数组**，每项含 \`item\` / \`pass\` / \`evidence\`，且**至少 1 项 pass=true**：
+
+\`\`\`json
+[
+  {
+    "item": "feature X 已实现并通过 unit test",
+    "pass": true,
+    "evidence": "test/feature_x.test.js 全绿 (12/12); src/feature_x.js L23-58"
+  },
+  {
+    "item": "无 lint warning",
+    "pass": true,
+    "evidence": "npm run lint 零 warning"
+  }
+]
+\`\`\`
+
+字段要求：
+- \`item\` (string): 检查项描述，非空
+- \`pass\` (boolean): 该项是否通过
+- \`evidence\` (string): 客观证据（文件路径/行号/test 输出/命令结果），非空
+- 数组长度 ≥ 1，且至少 1 项 \`pass=true\`
+
+## 常见错误码
+
+- **E_BORROWED_IDENTITY**: commander 代 worker 写 done event 或代调 audit_gate（callerSessionId ≠ 当前调用者的 session）→ 自审被禁（self_audit_forbidden）
+- **E_AUDIT_PREMATURE**: 跳过前置阶段（brief_echo 未发 / milestones 未全 pass / alignment 未回填就 pass）
+- **E_SELFCHECK_INVALID**: done event 的 self_check 不符合上述 schema（非数组 / 空数组 / 缺字段 / 无 pass=true 项）
+- **E_ALIGNMENT_NOT_VERIFIED**: worker audit pass 前 alignment_pending 未清零（缺 brief_echo #2 回填）
+
+## 关联
+- mcp__tree__tree_help('alignment_workflow') — brief_echo + alignment 回填流程
+- mcp__tree__tree_help('self_audit_forbidden') — 禁自审硬约束
+- mcp__tree__tree_help('role_semantics') — 角色/fork 关系
+- mcp__tree__tree_help('common_mistakes') — 65996e8b 教训`,
   },
 
   v10_constraints: {
@@ -3750,6 +3837,32 @@ worker 首条 brief_echo 只含 my_understanding + milestones_preview。
 评估完成后，结果以第二条 brief_echo event 回填到 worker leaf——
 这同时满足 V5b 的"events 留痕"和 A3 的"独立 auditor 背书"。
 
+## done event 的 self_check JSON schema
+worker 走到 done event 阶段时，meta.self_check 必须是**非空数组**，每项含 \`item\` / \`pass\` / \`evidence\`，且**至少 1 项 pass=true**：
+
+\`\`\`json
+[
+  {
+    "item": "feature X 已实现并通过 unit test",
+    "pass": true,
+    "evidence": "test/feature_x.test.js 全绿 (12/12); src/feature_x.js L23-58"
+  },
+  {
+    "item": "无 lint warning",
+    "pass": true,
+    "evidence": "npm run lint 零 warning"
+  }
+]
+\`\`\`
+
+字段要求：
+- \`item\` (string): 检查项描述，非空
+- \`pass\` (boolean): 该项是否通过
+- \`evidence\` (string): 客观证据（文件路径/行号/test 输出/命令结果），非空
+- 数组长度 ≥ 1，且至少 1 项 \`pass=true\`（否则 E_SELFCHECK_INVALID）
+
+完整 worker 生命周期见 mcp__tree__tree_help('how_to_worker_lifecycle')。
+
 ## 跳过此步的后果
 worker 永远拿不到 audit pass：
 - cmdAuditGate 拦 E_ALIGNMENT_NOT_VERIFIED
@@ -3897,7 +4010,7 @@ Round 2:
 - E_AUDITOR_NOT_INDEPENDENT — auditor 与被审 leaf 不独立 [help: how_to_register_auditor]
 - E_AUDIT_PREMATURE — 时序错（pass 早于前置）[help: alignment_workflow]
 - E_ALIGNMENT_NOT_VERIFIED — worker 缺 alignment 回填 [help: alignment_workflow]
-- E_SELFCHECK_INVALID — self_check schema 错 [help: alignment_workflow]
+- E_SELFCHECK_INVALID — self_check schema 错。修复：必须是**非空数组** [{item:string, pass:boolean, evidence:string}]，至少 1 项 pass:true；详见 how_to_worker_lifecycle / alignment_workflow 的 self_check JSON schema 示例 [help: alignment_workflow]
 - E_TREE_NODE_BUDGET_EXCEEDED — 超节点预算 [help: how_to_init]
 - E_TREE_NOT_VALIDATED — validate 失败 [help: audit_tree_structure]
 - E_GATEKEEPER_REQUIRED — 需要 gatekeeper [help: role_semantics]
@@ -3995,8 +4108,8 @@ V10 加固要求 auditor 在自己 session 内调 audit_gate（堵 E_BORROWED_ID
 1. 直接读文件：\`Read("skills/tree-commander/SKILL.md")\`
 2. 或问具体 topic：\`mcp__tree__tree_help('<topic>')\`
 
-## topic 列表（共 14 个）
-how_to_init | how_to_register_auditor | role_semantics | v10_constraints |
+## topic 列表（共 15 个）
+how_to_init | how_to_register_auditor | role_semantics | how_to_worker_lifecycle | v10_constraints |
 self_audit_forbidden | borrowed_identity | naming_convention | common_mistakes |
 alignment_workflow | nudge_escalation | audit_tree_structure | error_code_index |
 session_liveness | full_guide`,
