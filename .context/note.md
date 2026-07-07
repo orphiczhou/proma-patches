@@ -4,6 +4,14 @@
 
 新条目追加在顶部。
 
+## 🔖 新会话必读 — 交接文档（2026-07-07 会话 57f5aec1 → 新会话）
+
+**继续 tree harness 修复迭代，先读**：[active/handoff-iteration-continue-2026-07-07.md](./active/handoff-iteration-continue-2026-07-07.md)
+- 当前状态：4 轮迭代收敛，错误 24→1（96%），pro 完整部署，release 待
+- 下一轮入口：A 部署 release / B 稳定性（DeepSeek 波动）/ C 进阶（多worker·review）/ D 体系遗留（ISS-006/007/010）
+- 完整技术：[active/tree-harness-iteration-summary-2026-07-07.md](./active/tree-harness-iteration-summary-2026-07-07.md)
+- **坑**：pro 用 `.proma-dev`（非 ~/.proma），SKILL 同步要 3 处；DeepSeek 执行波动需多 run 取中位数；会话冷启动慢；文档错误码必须 grep 引擎实际行为
+
 ## 2026-07-07 path 修复验证 — path 错误归零 ✓，但 DeepSeek 执行波动（会话 57f5aec1）
 
 **测试**：pro commander（d833d78b，DeepSeek-pro）验证 §4 path 注释修复。测试树 vpro2。
