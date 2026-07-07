@@ -4,6 +4,16 @@
 
 新条目追加在顶部。
 
+## 2026-07-07 完整 §13 验证 — 错误 24→15→**1**（93% 降幅，会话 57f5aec1）
+
+**测试**：pro commander（b5ff5c0c，DeepSeek-pro）+ observer（7945c327），完整新 SKILL §13（已部署 .proma-dev/default/skills）+ 新 help topics + bug 修复。测试树 vpro1。
+**结果**：try-and-fix 错误 **1**（vs cleanroom 15 / macp-stab 24，**93% 降幅**）。worker done，tree_validate **0 issues**。
+**三方对比**：macp-stab 24（旧SKILL+任务指令）→ cleanroom 15（旧SKILL+新help）→ 完整§13 **1**（新SKILL §13+新help）。
+**§13 增量价值**：**§13.3 步骤前置条件表最大贡献**（caller+前置+漏做触发列，消除 E_BORROWED_IDENTITY/E_ALIGNMENT_NOT_VERIFIED/E_GATEKEEPER_REQUIRED/E_AUDIT_PREMATURE/E_SELFCHECK_INVALID/E_DELIVERABLE_MISSING/E_DUPLICATE_SESSION_ID/E_AUDITOR_NOT_INDEPENDENT/E_NAME_INVALID 等 14 错误）；§13.2 冷启动 auditor=root 消除死锁；§13.7 速查表"撞错即翻"。
+**唯一残留**：E_SCHEMA_INVALID path 格式（§4 Step2 文档歧义：path 误填完整 leaf_id 而非路径段"A1"）。下一轮修 §4 path 说明可消。
+**§13 被读取确认**：commander index 14 明确"已读取 SKILL §13 完整流程"，.proma-dev SKILL 含 §13.0-§13.7。
+**报告**：[active/observation-cleanroom2-2026-07-07.md](./active/observation-cleanroom2-2026-07-07.md)（128 行）。本轮迭代收敛：24→15→1。
+
 ## 2026-07-07 洁净室测试 — 错误 24→15，3 修复生效，SKILL 部署缺口（会话 57f5aec1）
 
 **测试**：pro commander（DeepSeek-pro，4abf02e6）+ observer（9a37323c）跑 macp-cleanroom（评估 06 test-plan），对比 macp-stab 基线（旧 SKILL+任务指令）。
