@@ -4,6 +4,15 @@
 
 新条目追加在顶部。
 
+## 2026-07-07 path 修复验证 — path 错误归零 ✓，但 DeepSeek 执行波动（会话 57f5aec1）
+
+**测试**：pro commander（d833d78b，DeepSeek-pro）验证 §4 path 注释修复。测试树 vpro2。
+**path 修复目标达成**：path 相关 E_SCHEMA_INVALID = **0** ✓（cleanroom2 的 1 个 path 错误消除，注释消歧生效，commit 9b11e16）。worker done，tree_validate **0 issues**。
+**总错误 7**（非 0）：E_DUPLICATE_LEAF×1 + E_SCHEMA_INVALID×2(缺model/缺milestones，**非path**) + E_ALIGNMENT_NOT_VERIFIED×1 + E_AUDITOR_NOT_INDEPENDENT×2 + E_DELIVERABLE_MISSING×1。
+**⚠️ 关键发现：DeepSeek 执行 SKILL 有波动**（cleanroom2=1 错误，本次=7，同 SKILL §13）。§13.3 前置表/§13.7 速查表帮助避开大部分错误，但非 100%（取决于 commander 读 SKILL 仔细程度 + 模型随机性）。
+**下一轮方向**：① 更强 SKILL 引导（leaf_add 前置 checklist / 必填字段提醒）② 引擎层默认值（leaf_add 自动补 model/channel，减少必填字段摩擦）③ 多次 run 取错误中位数（而非单次）衡量稳定性。
+**本轮迭代总结**：macp-stab 24 → cleanroom 15（3修复）→ 完整§13 cleanroom2 1（§13.3 最大贡献）→ path 修复 path错误0（总7波动）。4 commits（b594a32/c82bf3b/0600c37/9b11e16）。
+
 ## 2026-07-07 完整 §13 验证 — 错误 24→15→**1**（93% 降幅，会话 57f5aec1）
 
 **测试**：pro commander（b5ff5c0c，DeepSeek-pro）+ observer（7945c327），完整新 SKILL §13（已部署 .proma-dev/default/skills）+ 新 help topics + bug 修复。测试树 vpro1。
