@@ -8,7 +8,7 @@
 > - 改动：删 `cmdEventAppend` done event 自动同步 status（原 line 1945-1953）+ **连带**删 `collectValidateIssues` 误报前半段（原 line 2547-2557，否则合规中间态被误报）+ 注释。`tree-engine.cjs` 15 增 24 删，4306 行。
 > - 测试：P0-1 专项（`.context/plan/p0-1-sync-fix-test.cjs`）4/4 + ISS-003 baseline 13/13 + stash baseline 对比**零回归**（v10 18/6、dbc-spec 45/3 改前改后完全一致；失败是 workspace engine 相对 dist 的既存差异，与 P0-1 无关）。
 > - **⚠️ P0-1 不是"删 1 行"**：`cmdLeafSetStatus`（line 1406-1419）要求 set-status done 前先有 done event，合规路径必然有"done event 已写、status 仍 active"中间态，`collectValidateIssues` 必须连带改。详见 `note.md` 顶部条目。
-> - **下一步（阶段 A 继续）**：P0-2（先复核 C3 是否真闭环——读 `resolveAuditorIndep` 行 ~2245；再 SKILL 加死锁期降级）→ P0-3（状态机流转白名单 + `E_STATUS_TRANSITION_INVALID`）→ 一起部署 dev/release dist。
+> - **下一步（阶段 A 继续）**：~~P0-2~~（✅ 已由 57f5aec1 会话解决，commit `568bebe`：repro 实证推翻"三重死锁"判断，引擎 `resolveAuditorIndep` 闸门2 本就可用，真因是 SKILL §6 教 commander fork 独立 auditor leaf；解法=改 SKILL 固化 root 信任锚冷启动流程，见 `handoff-tree-harness-improvement-2026-07-07.md`）→ **P0-3**（状态机流转白名单 + `E_STATUS_TRANSITION_INVALID`）→ 一起部署 dev/release dist。
 
 ---
 

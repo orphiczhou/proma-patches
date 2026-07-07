@@ -4,6 +4,23 @@
 
 新条目追加在顶部。
 
+## 2026-07-07 P0-2 结论修正 — 引擎通道完备，死锁真因是 SKILL 协议误用（57f5aec1 会话）
+
+**来源**：[active/handoff-tree-harness-improvement-2026-07-07.md](./active/handoff-tree-harness-improvement-2026-07-07.md)（并行会话 57f5aec1，3 路子 Agent 深挖 + repro 实证）
+
+**核心修正**：07-04 中期评审 §二 P0-2「audit_gate 三重死锁（V5b+V10+信任锚）」结论**被实证推翻**：
+- repro 实跑 10/10（`.context/plan/deadlock-repro.cjs`）：root 一人当 auditor、全程走 `resolveAuditorIndep` **闸门2**（tree-engine.cjs L2241-2255，root 当任意非 root leaf 的 auditor），worker 顺利 done，validate 整树通过
+- **引擎通道完备，不需要改**。闸门2 冷启动可用（仅要求 rootLeaf status≠archived/pruned + events 非空）
+- 死锁真因：**SKILL §6 协议误用** —— 教 commander「路线图 Agent 必须是独立 leaf」当 auditor，把 commander 推向 fork 独立 auditor leaf 走闸门3（V10-auditor-active 三连：自身 done 需 audit_pass → 需独立 auditor → 自己），无穷递归
+
+**已落地解法**（SKILL，不改引擎，commit `568bebe`）：
+- tree-commander §4：audit_gate pass 作为 set-status done 前置；auditor 选择决策（冷启动期 auditor=root.session_id 由 commander 自调走闸门2；正常期才派独立 leaf 走闸门3）
+- 明确警告：冷启动期绝不要 fork 独立 auditor leaf
+
+**对 07-04 P0-2 描述的修正**：本笔记下方 07-04 条目里「P0-2 三重死锁」是中期评审的**理论判断，已被 07-07 repro 实证推翻**。引擎 V-04「root 后门」实为闸门2 的正确设计（root 信任锚），非降级。C-b 决议的"形式待审"可由 root 信任锚流程合规满足。
+
+**⚠️ 未亲自验证项**：repro 10/10 来自 57f5aec1 会话，本会话（0fbed5a1）未独立复跑。结论采信并行会话实证 + 闸门2 代码逻辑（L2241-2255 确实只校验 rootLeaf status/events，无递归要求）。
+
 ## 2026-07-04 P0-1 修复完成 — 恢复 done 门禁刚性（阶段 A 第一步）
 
 **上游**：[tree-harness-midterm-review.md](./tree-harness-midterm-review.md) §二 P0-1（4 Agent 洁净室，4 源全中）| **交接**：[active/handoff-tree-harness-fix-2026-07-04.md](./active/handoff-tree-harness-fix-2026-07-04.md)
