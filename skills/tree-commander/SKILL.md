@@ -188,7 +188,7 @@ self_audit:
        leaf_id: "<prefix>-<A1>-worker"        # 命名见 §12；prefix = tree init 时 root_brief.prefix，与 tree_id 解耦
        session_id: "<worker 的 Proma session_id，fork_session/create_session 后获得>"
        parent: "<root 或父 commander 的 leaf_id>"
-       path: "<prefix>-root → ... → <本 leaf_id>"   # 由 leaf_id 按引擎 parsePathFromLeafId 规则派生，须与 leaf_id 命名一致（引擎校验，不符 → E_SCHEMA_INVALID）
+       path: "A1"   # 仅本层路径段（worker 在 root 下 = "A1"；嵌套在 commander 下 = "A1/B1"）。⚠️ 不是完整 leaf_id（"vpro1-A1-worker" ✗），不是 "root → leaf" 路径链。由 leaf_id 按引擎 parsePathFromLeafId 派生 = leaf_id 去 prefix 和 role 后缀的段（不符 → E_SCHEMA_INVALID）
        role: "worker"                          # 枚举 root|commander|worker（leaf_add 拒绝 role=root，root 只由 init 创建）
        model: "GLM-5.2"
        channel: "<渠道 id>"
