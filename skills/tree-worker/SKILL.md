@@ -193,6 +193,8 @@ milestones_preview:             # 必填，至少 1 项
 **可选字段**: `my_understanding.why_this_exists`（可选，说明此任务存在的理由）
 
 > **⚠️ v0.7 批次5 (V5b) done 前置 — alignment 回填**：worker 的 brief_echo 本身不带 alignment（alignment 是 commander/独立 auditor 的对齐评估产物）。但 worker 要 `set-status done`，引擎要求 events 中**必须存在一条带 `alignment + auditor_session_id` 的 brief_echo event**（由母会话/独立 auditor 收到你的首条 brief_echo、评估对齐后回填）。若卡在"audit pass 被拦 E_ALIGNMENT_NOT_VERIFIED"，说明 commander 还没回填 alignment——请上行 `blocked` 提示母会话补 alignment 评估，**不要自己伪造 alignment**（auditor 必须独立，伪造会被拦）。
+>
+> **冷启动期（2026-07-07 补）**：母会话在冷启动期会用 `root.session_id` 直接当 alignment+audit_gate auditor（引擎信任锚，详见 tree-commander SKILL §13）。这正常，worker 不必担心 auditor 是"母会话自己"——root 作信任锚是引擎允许的例外。worker 仍只需：发首条 brief_echo（无 alignment）→ 干活 → done 上报，alignment 回填和 audit_gate pass 由母会话（root 身份）完成。
 
 ---
 

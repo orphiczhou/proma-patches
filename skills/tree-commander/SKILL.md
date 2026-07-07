@@ -208,7 +208,14 @@ self_audit:
         - 抽 1 条历史 red finding 看是否真在后续 round 修复
         - 抽查通过 → 继续; 发现伪造 (reviewer session 无实质内容/全 green 废话) → 退回 + tree_drift_append(severity=high)
   3. 派验收 Agent（见 §9 模板）→ 拿到 verdict
-  4. verdict.pass → mcp__tree__tree_leaf_set_status(tree_id=<tree_id>, leaf_id=<leaf_id>, status=done)
+  4. verdict.pass → 先调 audit_gate 给 worker 背书 pass（V5b 硬前置，详见 §13 冷启动信任锚流程）:
+     mcp__tree__tree_audit_gate(tree_id, leaf_id=<worker>, verdict='pass',
+       audit_session_id=<auditor_session_id>)
+     - 冷启动期: audit_session_id = root.session_id，commander 自己调（caller===audit_session_id）
+     - 正常期: audit_session_id = 已 done+pass 的独立 auditor leaf session，该 auditor 自己调
+     - ⚠️ worker 不能自己调 audit_gate 给自己 pass（caller≠audit_session_id → E_BORROWED_IDENTITY）
+     - ⚠️ 不调 audit_gate 直接 set-status done → 引擎 E_GATEKEEPER_REQUIRED 拦
+  5. audit_gate pass 后 → mcp__tree__tree_leaf_set_status(tree_id=<tree_id>, leaf_id=<leaf_id>, status=done)
      verdict 不通过 → 按 §7 三档纠偏决策树执行
 ```
 
@@ -316,15 +323,23 @@ self_audit:
 ```text
 子会话 worker 发出 brief_echo（首条，复述理解）后:
   1. 根会话调 event append 登记（worker 的 brief_echo event，含 my_understanding/milestones_preview）
-  2. 根会话派路线图 Agent 评估对齐度（比对 brief/dod）
-     - 路线图 Agent 必须是独立 leaf（其 session_id 将作为 alignment auditor）
+  2. 评估对齐度（比对 brief/dod）。auditor_session_id 填谁见下方"auditor 选择决策"。
+     评估本身的"智力活"可用 SDK SubAgent（researcher）做，但 auditor_session_id 不能填 SDK session。
   3. 评估完成 → 根会话【必须】回填一条 brief_echo event 到 worker leaf:
      mcp__tree__tree_event_append(
        tree_id, leaf_id=<worker>,
        type='brief_echo',
-       json='{"alignment":"<评估结论或百分比>","auditor_session_id":"<路线图Agent的session_id>"}'
+       json='{"alignment":"<评估结论或百分比>","auditor_session_id":"<auditor_session_id>"}'
      )
      这条回填 event 是 worker 后续 audit_gate pass 的硬前置（V5b 查 events 留痕，不查可篡改标志）。
+
+  🔴 auditor 选择决策（冷启动死锁的正解，repro 实证 2026-07-07，详见 §13）:
+  - 冷启动期（树内尚无 status=done + events 非空 + audit_gate=pass 的 leaf）:
+    auditor_session_id = root.session_id（commander 自己）。引擎 resolveAuditorIndep 闸门2
+    允许 root 当任意 worker 的 auditor（信任锚）。由 commander 自己写这条回填 event。
+    ⚠️ 绝不要在冷启动期 fork "独立 auditor leaf" 当 auditor——它会卡在 V10-auditor-active
+    三连（自己 done 需 audit_pass → 需独立 auditor → 自己），无穷递归，是 nanju-iter2 死锁根因。
+  - 正常期（已有 ≥1 个 done+pass 的 auditor leaf）: 可派独立 leaf 当 auditor（走闸门3）。
   4. 对齐度 ≥85% → 放行 worker 继续干活
      对齐度 <85% → tree_drift_append(severity=low, action=nudge) 发回重 brief_echo
   5. ⚠️ 若跳过步骤 3（未回填 alignment event），worker 永远拿不到 audit pass:
@@ -619,6 +634,62 @@ prompt: |
 2. Fork 时强制继承 prefix（leaf add 校验）
 3. `role` 必须在 `[root, commander, worker]` 枚举内，越界抛 `E_SCHEMA_INVALID`（引擎 `cmdLeafAdd` → `assertEnum` 硬约束，Q1 v1.1 起生效）
 4. 重档剪枝时旧会话 archive 不删，新会话加 `i2/i3` 后缀
+
+---
+
+## §13 冷启动信任锚流程（2026-07-07 repro 实证新增）
+
+> 解决 nanju-iter2 暴露的 alignment/audit_gate **冷启动死锁**。
+> 根因：commander 误 fork "独立 auditor leaf" 走 V10-auditor-active（`resolveAuditorIndep` 闸门3），冷启动期无穷递归。
+> 正解：引擎 `resolveAuditorIndep` **闸门2**（tree-engine.cjs L2241-2255）允许 root 当任意 worker 的 auditor（信任锚），repro 场景 B 实证 10/10 全通过。**引擎不需要改，是协议必须教对。**
+
+### §13.1 冷启动期判定
+
+冷启动期 = 树内尚无任何满足 V10-auditor-active 的 leaf（`status=done` + `events` 非空 + `audit_gate.verdict=pass`）。首个 worker 完成 done 之前都是冷启动期。
+
+### §13.2 冷启动期 auditor = root.session_id（commander 自己）
+
+冷启动期所有 worker 的 milestone audit_pass + alignment 回填 + audit_gate pass，`auditor_session_id` 一律填 `root.session_id`，由 commander 自己调用（`caller=root.session_id === audit_session_id`）。
+
+🔴 **冷启动期绝不要 fork "独立 auditor leaf" 并让它自审**——闸门3 V10-auditor-active 三连对冷启动 leaf 是无穷递归（自己 done 需 audit_pass → 需独立 auditor → 自己），这是 nanju-iter2 死锁根因。
+
+### §13.3 root 给 worker 配齐 done 前置（严格顺序，repro 场景 B 实证 10/10）
+
+```text
+[caller=root]  1. tree_milestone_add(tree_id, leaf_id=<worker>, milestone=<含 expect_outputs>)
+[caller=root]  2. tree_milestone_set_result(tree_id, leaf_id=<worker>, milestone_id,
+                  audit_pass=true, audit_session_id=<root.session_id>)        # 闸门2 放行
+[caller=worker]3. tree_event_append(tree_id, leaf_id=<worker>, type=brief_echo,
+                  meta={my_understanding, milestones_preview})                # 无 alignment
+[caller=root]  4. tree_event_append(tree_id, leaf_id=<worker>, type=brief_echo,
+                  meta={alignment, auditor_session_id=<root.session_id>})     # 闸门2，V5b 前置
+[caller=worker]5. tree_event_append(tree_id, leaf_id=<worker>, type=done, meta={self_check})
+[caller=root]  6. tree_audit_gate(tree_id, leaf_id=<worker>, verdict=pass,
+                  audit_session_id=<root.session_id>)                         # caller===audit_session_id，闸门2
+[caller=worker]7. tree_leaf_set_status(tree_id, leaf_id=<worker>, status=done)  # 全 8 道门禁通过
+```
+
+⚠️ 关键约束（引擎硬校验，违反即拦）：
+- 步骤 6 的 `audit_session_id` 必须 = 调用者（root）的 session_id，否则 `E_BORROWED_IDENTITY`
+- worker 不能自己调步骤 6（caller=worker ≠ audit_session_id=root）
+- 步骤 4 的 alignment event 是步骤 6 的硬前置（V5b），缺则 `E_ALIGNMENT_NOT_VERIFIED`
+
+### §13.4 转正常期
+
+首个 worker done 后，若需长期独立 auditor（复杂树多 worker 并行审查）:
+- commander 用 §13.3 流程把一个 auditor leaf 喂到 V10-auditor-active（repro 场景 A 实证：root 先给 auditor leaf 配齐，auditor leaf 自己 done 后即合格）
+- 之后该 auditor 走闸门3 审后续 worker（auditor 自己调 audit_gate，`caller=auditor.session_id`）
+- 即：**root 只在冷启动期当 auditor，正常期交给独立 auditor leaf**
+
+### §13.5 SDK SubAgent 的位置
+
+对齐度评估、验收等"智力活"可用 SDK SubAgent（researcher / code-reviewer），但 SDK SubAgent 无 Proma session_id，**不能当引擎 auditor**。`auditor_session_id` 永远填 `root.session_id`（冷启动）或独立 auditor leaf session（正常期）。
+
+### §13.6 极端应急（引擎/协议彻底失效时）
+
+若上述流程因引擎 bug 或协议冲突彻底走不通（参考 nanju-iter2 降级 A）:
+- 应急形态 = `create_session` 新建 b-worker（commander 作 owner）+ 产出直落 `deliverables/` + 跳过 tree leaf done 门禁
+- 这是"形式死锁但内容必须交付"的最后兜底，**非首选**；优先排查 §13.1-§13.4 是否执行到位
 
 ---
 
