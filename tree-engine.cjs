@@ -1406,7 +1406,8 @@ async function cmdLeafSetStatus(args) {
       // V10-status-event-sync: 设置 done 前必须先有 done event（events 数组里至少 1 条 type=done）。
       //   spec §三 V10-status-event-sync：堵"先 set-status done 再补 done event"的反序操作。
       //   worker 已被 v0.2.2-修复#5 强制 brief_echo+done 双事件覆盖；commander/root 走这里。
-      //   注意：cmdEventAppend 'done' 会单向同步 status=done，所以正常路径"先 event done → 再 set-status done"也满足此校验。
+      //   注意：P0-1 修复 (2026-07-04) 后 cmdEventAppend 'done' 不再同步 status, 合规路径是
+      //   "先 event done → 再 set-status done"; 此校验要求前者先发生 (worker 写 done event 时 status 仍为 active, 合法中间态)。
       {
         const evs = Array.isArray(leaf.events) ? leaf.events : [];
         const hasDone = evs.some((e) => e && (e.type === 'done' || e.event_type === 'done'));
@@ -1939,18 +1940,13 @@ async function cmdEventAppend(args, callerSessionId) {
     leaf.events.push(ev);
     leaf.last_event_type = opts.type;
     leaf.last_event_ts = ts;
-    // V10-status-event-sync: done event 写入时强制同步 status=done。
-    //   spec §三 V10-status-event-sync：堵 status=active 但 last_event=done 不同步。
-    //   原代码只更新 last_event_type/ts，status 与 event 可能脱节（攻击者只写 done event 不调 set-status done）。
-    if (opts.type === 'done' && leaf.status !== 'done') {
-      // 注意：leaf.set-status done 还要校验 milestones/deliverables/audit_gate 等前置条件；
-      // 这里只做"event→status 单向同步"，不绕过 cmdLeafSetStatus 的硬约束（status=done 是结果，不是入口）。
-      // 风险：worker 通过 done event 直接拿到 status=done 绕过 set-status done 校验。
-      // 决策（V10 spec）：done event 自身已有 self_check schema 硬约束（A5），且 cmdAuditGate A7 要求 pass 前先有 done event；
-      // 这里同步 status=done 是为了让 collectValidateIssues 能正确检测"status/event 不同步"。
-      // 真正的"done 准入"仍由 cmdLeafSetStatus 的 milestones/deliverables 校验把关（worker done 必经此路径）。
-      leaf.status = 'done';
-    }
+    // P0-1 修复 (2026-07-04, tree-harness-midterm-review §二):
+    //   删除原 V10-status-event-sync 的"done event 自动同步 status=done"逻辑（原 line 1945-1953）。
+    //   原逻辑 leaf.status='done' 架空 cmdLeafSetStatus 的 8 道 done 门禁——worker 写 done event 即拿 done,
+    //   无需过 milestones/audit_pass/expect_outputs/deliverables/brief_echo+done/review_round/audit_gate/children。
+    //   修复后: status=done 由 cmdLeafSetStatus 唯一入口写入。done event 只是"宣告意图"(带 self_check schema),
+    //   合规路径为 done event → audit_gate pass → set-status done, 中间态"有 done event 但 status≠done"合法。
+    //   连带: collectValidateIssues 的 status_event_mismatch 前半段校验已同步去掉(见 collectValidateIssues)。
     // V10-trust-anchor: root 写 done event 时自动升级 audit_gate='pass'（root 自审）。
     //   原因：root 是信任锚,没有上游 auditor；如果要求 root 先调 audit_gate pass 才能 set-status done,
     //   会陷入"鸡生蛋"——root 永远无法满足"独立 auditor"。方案 §三 子方案 C：root 写 done event 时
@@ -2540,21 +2536,16 @@ function collectValidateIssues(state) {
     }
   }
 
-  // V10-status-event-sync: status/event 双向一致性校验（reconcileStatus 内联）。
-  //   - last_event=done 但 status≠done → issue（cmdEventAppend 应已同步，老数据可能漏）
-  //   - status=done 但 events 无 done → issue（cmdLeafSetStatus 应已拦，老数据可能漏）
-  //   spec §三 V10-status-event-sync：堵"status=active 但 last_event=done"或反向不一致。
+  // V10-status-event-sync: status/event 一致性校验（P0-1 修复后单向）。
+  //   - status=done 但 events 无 done → issue（cmdLeafSetStatus 应已拦，老数据可能漏）—— 保留
+  //   - 有 done event 但 status≠done → 【不再报】P0-1 修复后这是合规中间态
+  //     (合规路径 done event → audit_gate pass → set-status done 中, status 暂为 active 是正常的)。
+  //   P0-1 修复 (2026-07-04): 删 cmdEventAppend 自动同步后, 原"双向一致性"前半段会误报合规中间态, 故去掉。
+  //   保留反向校验: status=done 必有 done event (cmdLeafSetStatus V10 gate 的兜底)。
   for (const id of leafIds) {
     const leaf = leaves[id];
     const evs = Array.isArray(leaf.events) ? leaf.events : [];
     const hasDoneEvent = evs.some((e) => e && (e.type === 'done' || e.event_type === 'done'));
-    if (hasDoneEvent && leaf.status !== 'done') {
-      issues.push({
-        type: 'status_event_mismatch',
-        leaf_id: id,
-        detail: `events[] contains a 'done' event but status="${leaf.status}" (must be done). cmdEventAppend should have synced status; legacy data needs migrate.`
-      });
-    }
     if (leaf.status === 'done' && !hasDoneEvent) {
       issues.push({
         type: 'status_event_mismatch',

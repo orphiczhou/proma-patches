@@ -1,6 +1,6 @@
 # `.context/` 目录导航
 
-> 维护：周星星 | 最后整理：2026-06-26
+> 维护：周星星 | 最后整理：2026-07-04（新增 Tree harness 中期评价）
 >
 > 本文件由文档归档方案自动生成。`.context/` 是 Proma 改造项目的知识中心——所有非代码产物（设计、计划、交接、审计、测试报告、运行时数据）都沉淀在这里。
 
@@ -21,6 +21,7 @@
 ├── PROJECT-INDEX.md          ← 入口索引（必读）
 ├── README.md                  ← 本文件
 ├── note.md                    ← 长期累积笔记（运行时持续追加）
+├── tree-harness-midterm-review.md   ← Tree harness 中期评价（nanju 活案例 4-Agent 交叉印证，2026-07-04）
 ├── project-onboarding-guide-2026-06-25.md   ← 30 分钟入门向导
 ├── proma-dev-wiki.md          ← 完整技术 Wiki（补丁/架构/版本史）
 ├── proma-dev-patches.cjs      ← 主插件源码（22 工具 + HTTP bridge）
@@ -69,6 +70,7 @@
 
 ### 我要查「设计原理 / 方法论」
 
+- **Tree harness 中期评价**：[`tree-harness-midterm-review.md`](./tree-harness-midterm-review.md) —— nanju 活案例 4-Agent 洁净室交叉印证 3 个 P0 设计漏洞（done event 架空门禁 / audit_gate 三重死锁 / 状态机零流转）+ 优先修复表（2026-07-04）
 - 设计文档：[`reference/design/`](./reference/design/) —— 8 份（tree-commander-design / technical-report / proma-innovation-plan / proposal-remote-session-mcp / 等）
 - 方法论：[`reference/methodology/`](./reference/methodology/) —— 3 份（commander-methodology v1.2 + v10 + tree-audit-methodology）
 - 架构方案：[`reference/architecture/`](./reference/architecture/) —— 3 个自包含整体（architecture-plan-2026-06-23 + expert-review v1/v2）

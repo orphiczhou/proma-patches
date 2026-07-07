@@ -4,6 +4,12 @@
 > **交接者**：Proma Agent（会话 d66e3600，2026-07-04 16:55）| **维护**：周星星
 > **上游报告**（必读全文）：`workspace-files/.context/tree-harness-midterm-review.md`（4 Agent 洁净室，nanju 活案例，18 leaf）
 
+> **✅ 进度（2026-07-04 17:30，会话 0fbed5a1）**：**P0-1 已修复验证，暂不部署**（用户确认仅 commit + 文档）。
+> - 改动：删 `cmdEventAppend` done event 自动同步 status（原 line 1945-1953）+ **连带**删 `collectValidateIssues` 误报前半段（原 line 2547-2557，否则合规中间态被误报）+ 注释。`tree-engine.cjs` 15 增 24 删，4306 行。
+> - 测试：P0-1 专项（`.context/plan/p0-1-sync-fix-test.cjs`）4/4 + ISS-003 baseline 13/13 + stash baseline 对比**零回归**（v10 18/6、dbc-spec 45/3 改前改后完全一致；失败是 workspace engine 相对 dist 的既存差异，与 P0-1 无关）。
+> - **⚠️ P0-1 不是"删 1 行"**：`cmdLeafSetStatus`（line 1406-1419）要求 set-status done 前先有 done event，合规路径必然有"done event 已写、status 仍 active"中间态，`collectValidateIssues` 必须连带改。详见 `note.md` 顶部条目。
+> - **下一步（阶段 A 继续）**：P0-2（先复核 C3 是否真闭环——读 `resolveAuditorIndep` 行 ~2245；再 SKILL 加死锁期降级）→ P0-3（状态机流转白名单 + `E_STATUS_TRANSITION_INVALID`）→ 一起部署 dev/release dist。
+
 ---
 
 ## 一、一句话任务

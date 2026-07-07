@@ -4,6 +4,53 @@
 
 新条目追加在顶部。
 
+## 2026-07-04 P0-1 修复完成 — 恢复 done 门禁刚性（阶段 A 第一步）
+
+**上游**：[tree-harness-midterm-review.md](./tree-harness-midterm-review.md) §二 P0-1（4 Agent 洁净室，4 源全中）| **交接**：[active/handoff-tree-harness-fix-2026-07-04.md](./active/handoff-tree-harness-fix-2026-07-04.md)
+
+**改动**（`tree-engine.cjs`，15 增 24 删，净 −9 行）：
+1. 删 `cmdEventAppend` 的 done event 自动同步 `status='done'`（原 line 1945-1953）—— P0-1 主体
+2. **连带**删 `collectValidateIssues` 的 `status_event_mismatch` 前半段校验（原 line 2547-2557）—— 否则合规中间态被误报
+3. 注释更新（3 处）
+
+**⚠️ 关键发现：P0-1 不是报告说的"删 1 行"** —— 实测发现 `cmdLeafSetStatus`（line 1406-1419）要求 set-status done 前必须先有 done event，所以合规路径必然经历"done event 已写、status 仍 active"的中间态。只删 line 1952 会让 `collectValidateIssues` 把这个**合规中间态误报为 issue**（且阻断 archive）。必须连带调整校验。这正是交接文档陷阱#7（"修复时优先验证是否真生效，别只看代码存在"）。
+
+**测试证据**（`PROMA_TREE_ENGINE=workspace-files/tree-engine.cjs`）：
+- **P0-1 专项**（`.context/plan/p0-1-sync-fix-test.cjs`）：4/4 ✓
+  - A：空 leaf 调 event append done，status 保持 `pending_brief`（漏洞已堵；修复前直接变 `done` 绕过 8 道门禁）
+  - B：空 leaf set-status done 被门禁拦（E_SCHEMA_INVALID: milestones non-empty）
+  - C：合规中间态 validate 无 `status_event_mismatch` 误报（连带修复生效）
+  - D：端到端合规路径（配齐门禁 → done event → set-status done）成功
+- **ISS-003 baseline**（`.context/plan/iss003-review-gate-test.cjs`）：13/13 ✓ —— P0-1 解锁 ISS-003 阶段一 review 门禁（从空转变为生效）
+- **零回归证明**（stash baseline 对比）：v10-trust-anchor（18/6）和 dbc-spec（45/3）改前改后**完全一致**。失败用例是 workspace engine 相对 dist 的既有差异（v10 缺 `setSessionVerifier` 被 `E_INVALID_UUID_STRICT` 拦；dbc-spec 的 V4-b/V9-a/V9-b fixture 问题），与 P0-1 无关
+
+**方法论**：写验证脚本实证漏洞 + stash baseline 对比证明零回归，对抗"删一行"的乐观假设。
+
+**状态**：用户确认**暂不部署**（仅 commit + 文档），阶段 A 后续 P0-2/P0-3 完成后一起部署。dist 未动（备份 `.bak-pre-iss-deploy-20260704` 仍在）。
+
+**后续（阶段 A 待办）**：
+- **P0-2** 短期：SKILL 加 audit_gate 死锁期降级（C-b 合规化）；长期：信任锚 C3 全链路。⚠️ 复核点：上一轮认知"C3 已落地"，但报告说仍死锁 —— 需读 `resolveAuditorIndep`（行 ~2245）确认 commander 派独立 auditor leaf 是否仍死锁
+- **P0-3**：状态机流转白名单 + `E_STATUS_TRANSITION_INVALID`；tao-watcher MCP 化（调 `tree_nudge_append` 而非直改 json）
+
+## 2026-07-04 树形任务 harness 中期评价 — nanju 活案例
+
+**完整报告**：[tree-harness-midterm-review.md](./tree-harness-midterm-review.md)
+
+**方法**：4 个独立子 Agent（执行流 / 代码白盒 / 会话语义 / 设计对照）并行洁净室分析，互不通信，交叉印证。案例：南大 nanju 树（18 leaf，12 archived，1 done）。
+
+**4 Agent 汇聚的 3 个 P0 设计漏洞**：
+1. **done event 自动同步 status=done**（`cmdEventAppend` line 1945-1953）→ 架空 cmdLeafSetStatus 全部 8 道 done 门禁。B6 就是这样"done"的（milestones=[]/audit_gate=required/无 alignment）。**删 1 行即可恢复刚性**。四源全中。
+2. **audit_gate 结构性不可达**：V5b+V10+信任锚三重死锁 → 13/13 worker alignment 缺失，靠 commander 发明 C-b 决议（设计外）绕过。代码层 root 后门（V-04）把独立审计降级为 root 单点信任。
+3. **状态机零流转校验**：pending_brief→pruned 合法，三档纠偏在代码层零落地；tao-watcher 直改 json，escalation 是 dead code（B1 nudge_count=42 仍 active）。
+
+**关键方法论洞察**：
+- 「**门禁堆栈 vs 协议编队能力**」：门禁本身有效（23/48 error 正常拦截），崩溃在协议层 — commander 三波建 12 worker 都无法完成 alignment 回填+派独立 auditor 这两个"人对人"动作。A 系列 12 灭非任务难度，是同一形式门反复卡。
+- 「**worker 优秀 / harness 拖后腿**」：worker（GLM-5.2）4/5 正确回 brief_echo、真跑 multi-sub-agent 自审、red 真归零；harness 9 个设计漏洞中 6 个高严重度。
+- 「**纸面门禁**」：V5b/§14 审计树/milestone_add/三档纠偏/ctx 竹节交接 — 在 nanju 实战中**从未真正执行过一次**。
+
+**中期评价结论**：骨架优秀（5 件套契约/心跳/命名/C-b 务实），但门禁刚性被一行代码（V-01）架空，存在多个"死的硬约束"+ 结构性死锁（validation+archive+budget）。逃生通道逼违规（commander 发明 C-b、root 直改 tree-state.json 违反铁律#1）。**需中期补丁而非渐进优化**。
+
+
 ## 2026-07-04 ISS-001/002/003/004 修复轮次（Tree 模式多会话协作）
 
 **任务**：用户指令"看待解决问题文档→派子Agent调研设计→多轮审计迭代→修复→审计收敛"。4 个 ISS 全做，方案+改代码+部署验证，SDK SubAgent 协作。
