@@ -81,7 +81,11 @@ const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_rep
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
-const ROLE_ENUM = ['root', 'commander', 'worker'];
+// P0a (2026-07-08): 引入 'auditor' role —— 独立审计 leaf 专属角色。
+//   根因：macp4-A4 用 commander 假装 auditor → C-13/R-03/R-06 假阳性 24-38 条；macp4-W3 §3.5 "需要独立 auditor role，
+//   而非复用 worker 靠 W-AUDIT-WORKER 打补丁"。auditor leaf 走简化协议（brief_echo+done+audit_gate，无 milestone/review_round），
+//   其 audit_gate=pass 由 root 信任锚背书（resolveAuditorIndep 行 2432-2446 天然放行）或上级 auditor 背书（通用路径 2467-2490）。
+const ROLE_ENUM = ['root', 'commander', 'worker', 'auditor'];
 
 // V9+ Phase 4 (R2 P0 / B9 修复): nudge rule_id 白名单 + role→rule 适用性表。
 //   背景：R1 洁净室 B9 暴露 — tree_nudge_append 接受任意 rule_id 字符串（含 "INVALID-RULE-99"），
@@ -92,18 +96,16 @@ const ROLE_ENUM = ['root', 'commander', 'worker'];
 //   2148+（W-AUDIT-*）。
 const NUDGE_RULE_WHITELIST = {
   // Tier 1 — 全局规则（root/commander/worker 通用）
+  // P0b (2026-07-08): 删 R-03/R-06（高噪音语义规则，macp4-A4 假阳性；auditor role 后独立验证由 audit_gate 替代）
   'R-01': ['root', 'commander', 'worker'],
-  'R-03': ['root', 'commander', 'worker'],
   'R-04': ['root', 'commander', 'worker'],
   'R-05': ['root', 'commander', 'worker'],
-  'R-06': ['root', 'commander', 'worker'],
   // Tier 2 — Commander 角色规则
+  // P0b: 删 C-13/C-15（C-13 commander 需 4+ 子 worker 误套 auditor leaf；C-15 高噪音，macp2 红线已由 startup_notice+§13.5 覆盖）
   'C-02': ['commander'],
   'C-03': ['commander'],
   'C-06': ['commander'],
   'C-11': ['commander'],
-  'C-13': ['commander'],
-  'C-15': ['commander'],
   // Tier 3 — Worker 角色规则
   'W-01': ['worker'],
   'W-08': ['worker'],
@@ -725,8 +727,7 @@ async function cmdInit(args) {
   const workspace_root = path.resolve(TREES_ROOT, '..', '..');
 
   const state = {
-    version: '1.0',
-    tree_id,
+    version: '1.1',  // P0a (2026-07-08): 1.0→1.1，引入 auditor role（migrate 自动升级旧树版本号）
     created_at: nowIso(),
     last_heartbeat: null,
     root_brief,
@@ -924,10 +925,10 @@ async function cmdLeafAdd(args) {
             `leaf_add rejected: added_by "${added_by}" not found as any leaf session in tree (possible forged identity). added_by must be the session_id of an existing leaf (typically commander or root). [D2-B1]`
           );
         }
-      } else if (addedByLeaf.role === 'worker') {
+      } else if (addedByLeaf.role === 'worker' || addedByLeaf.role === 'auditor') {  // P0a: auditor 同 worker 是叶子节点，不能当 added_by（operator）
         throw new TreeStateError(
           E_BORROWED_IDENTITY,
-          `leaf_add rejected: added_by "${added_by}" maps to leaf "${addedByLeaf.leaf_id}" with role=worker (workers cannot add child leaves — only root/commander can). [D2-B1]`
+          `leaf_add rejected: added_by "${added_by}" maps to leaf "${addedByLeaf.leaf_id}" with role=${addedByLeaf.role} (${addedByLeaf.role}s cannot add child leaves — only root/commander can). [D2-B1]`
         );
       }
     }
@@ -971,13 +972,14 @@ async function cmdLeafAdd(args) {
       }
     }
 
-    // 3.7. Worker 不能有子节点：parent leaf 如果存在且 role=worker，拒绝
+    // 3.7. Worker/auditor 不能有子节点：parent leaf 如果存在且 role∈{worker,auditor}，拒绝
+    //   P0a: auditor 同 worker 是叶子节点（不能 fork），不能当 parent
     if (parent !== null) {
       const parentLeaf = state.leaves[parent];
-      if (parentLeaf && parentLeaf.role === 'worker') {
+      if (parentLeaf && (parentLeaf.role === 'worker' || parentLeaf.role === 'auditor')) {
         throw new TreeStateError(
           E_SCHEMA_INVALID,
-          `cannot add leaf under parent "${parent}": parent is a worker (atomic leaf). Only commanders can have children.`
+          `cannot add leaf under parent "${parent}": parent is a ${parentLeaf.role} (atomic leaf). Only commanders can have children.`
         );
       }
     }
@@ -1038,7 +1040,9 @@ async function cmdLeafAdd(args) {
       autonomy_overrides: {},
       events: [],
       // v0.2.2 (TAO): 审计门 + 鞭策记录
-      audit_gate: { verdict: role === 'worker' ? 'required' : 'skip', auditor_session_id: null, ts: null },
+      // P0a: auditor leaf audit_gate 初始 verdict='required'（与 worker 同）—— auditor 不能自审（行 2478 拦），
+      //   需由 root 信任锚背书（行 2432-2446 放行）或上级 auditor 背书（通用路径 2467-2490）。commander/root 仍 'skip'。
+      audit_gate: { verdict: (role === 'worker' || role === 'auditor') ? 'required' : 'skip', auditor_session_id: null, ts: null },
       nudge_count: 0,
       nudge_log: [],
       audit_log: []
@@ -1356,6 +1360,13 @@ function validateReviewRoundSchema(meta, leaf, leafId) {
       if (typeof f.evidence !== 'string' || f.evidence.length < 10) {
         throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" finding evidence too thin (≥10 chars required)`);
       }
+      // P1b (2026-07-08): finding_id 可选（向后兼容）。若存在，必须是非空字符串。
+      //   用于 done event meta.red_findings_resolved 跨事件关联（治 macp4-W3 假收敛：数值收敛≠内容收敛）。
+      if (f.finding_id !== undefined) {
+        if (typeof f.finding_id !== 'string' || f.finding_id.length === 0) {
+          throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" finding has invalid finding_id (must be non-empty string if present)`);
+        }
+      }
     }
   }
   if (typeof meta.red_count !== 'number' || meta.red_count < 0 || !Number.isInteger(meta.red_count)) {
@@ -1412,6 +1423,12 @@ async function cmdLeafSetStatus(args) {
     // 切到 done 时校验：milestones 必须非空 + 所有 milestones 都 audit_pass=true
     // 严格路径：契约精神要求每个宣告完成的工作都有结构骨架（§3.5 milestones 是必填项）
     if (new_status === 'done') {
+      // P0a (auditor role): auditor leaf 走简化协议——不产出交付物（其"产物"是 audit_gate verdict + audit_log），
+      //   跳过 milestone/expect_outputs/deliverables 三道门禁。保留通用安全门：brief_echo+done 双事件 + audit_gate pass + done event。
+      //   macp4-A4 用 commander 假装 auditor 时被迫走完整 milestone 协议（无交付物 → 卡死），auditor role 后此矛盾消除。
+      //   注：if(!isAuditor) 闭合在 deliverables 段末（"v0.2.2-修复#5 Worker done 前置 events" 注释前）。
+      const isAuditor = leaf.role === 'auditor';
+      if (!isAuditor) {
       const ms = Array.isArray(leaf.milestones) ? leaf.milestones : [];
       if (ms.length === 0) {
         throw new TreeStateError(
@@ -1492,10 +1509,11 @@ async function cmdLeafSetStatus(args) {
           }
         }
       }
+      }  // P0a: 闭合 if(!isAuditor) — auditor 跳过 milestone/expect_outputs/deliverables 门禁
 
-      // v0.2.2-修复#5: Worker done 前置 events 检查
+      // v0.2.2-修复#5: Worker done 前置 events 检查（P0a: auditor 同样要求 brief_echo+done 双事件）
       // 必须含 ≥2 events 且包含 brief_echo + done（堵住 Events 空洞）
-      if (leaf.role === 'worker') {
+      if (leaf.role === 'worker' || isAuditor) {
         const evs = Array.isArray(leaf.events) ? leaf.events : [];
         if (evs.length < 2) {
           throw new TreeStateError(
@@ -2024,6 +2042,16 @@ async function cmdEventAppend(args, callerSessionId) {
       validateSubagentSpawnSchema(meta || {}, leaf, leaf_id, treeDir(tree_id));
     }
 
+    // 2026-07-08 macp3 Phase2 复盘：review_round 也在 append 时校验（同 subagent_spawn）。
+    //   事故：原 schema 校验只在 done 门禁（cmdLeafSetStatus），worker 写入 malformed review_round
+    //   （假 session_id / 无 reviewer_kind / 空 reviewers）后 append 不拦 → events 污染 → done 门禁
+    //   校验所有 review_round 时撞到早期坏事件 → E_REVIEW_FORGERY → status 永远卡 active（append-only 删不掉）。
+    //   改：append 时即调 validateReviewRoundSchema，malformed 当场拒 E_REVIEW_FORGERY，events 保持干净，
+    //   worker 立即反馈可修正。done 门禁仍保留（防御纵深，外加 ≥1轮/末轮red=0/≤3轮 数量校验）。
+    if (opts.type === 'review_round') {
+      validateReviewRoundSchema(meta || {}, leaf, leaf_id);
+    }
+
     // v0.7 Phase A 批次2 (A5): done event 的 self_check schema 硬约束（strict: 必须存在且合法）。
     // 每个 done event 必须附带结构化 self_check（非空 [{item,pass,evidence}] 数组），
     // 拒绝字符串（"all_pass"）、空数组、缺字段或类型错误，杜绝 worker 走捷径伪造 done。CP5 硬修复。
@@ -2077,6 +2105,58 @@ async function cmdEventAppend(args, callerSessionId) {
           E_SELFCHECK_INVALID,
           `done event rejected: self_check has no item with pass=true (all ${sc.length} item(s) failed). done declares completion but self_check reports zero passing — contradiction. Fix the work or use event 'blocked' instead.`
         );
+      }
+      // P1b (2026-07-08): red_findings_resolved 跨事件关联校验（治 macp4-W3 假收敛：red 降 yellow 但文档没改）。
+      //   若 leaf 历史 review_round 有 red findings（带 finding_id），done event 必须在 meta.red_findings_resolved
+      //   声明每条 red 怎么处理：edit_file=改了文档（fix_evidence 是 diff）/downgrade=降级（fix_evidence 是理由）/other。
+      //   fix_evidence ≥20 字。向后兼容：无 review_round 或 red findings 无 finding_id → red_findings_resolved 可省略。
+      const _rrEvs = Array.isArray(leaf.events) ? leaf.events : [];
+      const _redIds = new Set();
+      for (const _e of _rrEvs) {
+        if (!_e || (_e.type !== 'review_round' && _e.event_type !== 'review_round')) continue;
+        const _rm = _e.meta || _e;
+        const _rvs = Array.isArray(_rm.reviewers) ? _rm.reviewers : [];
+        for (const _rv of _rvs) {
+          const _fs = Array.isArray(_rv.findings) ? _rv.findings : [];
+          for (const _f of _fs) {
+            if (_f && _f.severity === 'red' && typeof _f.finding_id === 'string' && _f.finding_id.length > 0) {
+              _redIds.add(_f.finding_id);
+            }
+          }
+        }
+      }
+      if (_redIds.size > 0) {
+        const rfr = meta.red_findings_resolved;
+        if (!Array.isArray(rfr)) {
+          throw new TreeStateError(
+            E_SELFCHECK_INVALID,
+            `done event rejected: leaf "${leaf_id}" has ${_redIds.size} red finding(s) with finding_id in history review_round, but meta.red_findings_resolved is missing or not an array. Must declare how each red finding was resolved (P1b: fix content convergence, not just numeric). red finding_ids: ${Array.from(_redIds).join(', ')}`
+          );
+        }
+        const _resolvedIds = new Set();
+        for (let _i = 0; _i < rfr.length; _i++) {
+          const _it = rfr[_i];
+          if (!_it || typeof _it !== 'object') {
+            throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: red_findings_resolved[${_i}] is not an object on "${leaf_id}"`);
+          }
+          if (typeof _it.finding_id !== 'string' || _it.finding_id.length === 0) {
+            throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: red_findings_resolved[${_i}].finding_id is missing or not a string on "${leaf_id}"`);
+          }
+          if (!['edit_file', 'downgrade', 'other'].includes(_it.fix_method)) {
+            throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: red_findings_resolved[${_i}] (finding_id=${_it.finding_id}) has invalid fix_method (must be edit_file|downgrade|other) on "${leaf_id}"`);
+          }
+          if (typeof _it.fix_evidence !== 'string' || _it.fix_evidence.length < 20) {
+            throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: red_findings_resolved[${_i}] (finding_id=${_it.finding_id}) fix_evidence too thin (≥20 chars required) on "${leaf_id}"`);
+          }
+          _resolvedIds.add(_it.finding_id);
+        }
+        const _unresolved = Array.from(_redIds).filter((id) => !_resolvedIds.has(id));
+        if (_unresolved.length > 0) {
+          throw new TreeStateError(
+            E_SELFCHECK_INVALID,
+            `done event rejected: ${_unresolved.length} red finding(s) not resolved in red_findings_resolved on "${leaf_id}": ${_unresolved.join(', ')}. Each red finding must be declared (fix_method=edit_file with diff, or downgrade with reason).`
+          );
+        }
       }
     }
 
@@ -2644,11 +2724,11 @@ function collectValidateIssues(state) {
         leaf_id: id,
         detail: `added_by "${addedBy}" does not match any leaf.session_id in tree (operator must be a tree member)`
       });
-    } else if (operatorLeaf.role === 'worker') {
+    } else if (operatorLeaf.role === 'worker' || operatorLeaf.role === 'auditor') {  // P0a: auditor 同 worker，不能当 added_by
       issues.push({
         type: 'added_by_role_invalid',
         leaf_id: id,
-        detail: `added_by "${addedBy}" points to a worker leaf "${operatorLeaf.leaf_id}". Only root/commander can add leaves.`
+        detail: `added_by "${addedBy}" points to a ${operatorLeaf.role} leaf "${operatorLeaf.leaf_id}". Only root/commander can add leaves.`
       });
     }
   }
@@ -2699,7 +2779,8 @@ function collectValidateIssues(state) {
   // HARDEN6 (加固点#6 预留): commander/root context_usage_pct>100 视为卡死/塌缩
   for (const id of leafIds) {
     const leaf = leaves[id];
-    if ((leaf.role === 'commander' || leaf.role === 'root') && typeof leaf.context_usage_pct === 'number' && leaf.context_usage_pct > 100) {
+    // P0a: auditor leaf 也纳入 context overflow 检查（auditor 长审计同样可能卡死/塌缩）
+    if ((leaf.role === 'commander' || leaf.role === 'root' || leaf.role === 'auditor') && typeof leaf.context_usage_pct === 'number' && leaf.context_usage_pct > 100) {
       issues.push({ type: 'context_overflow', leaf_id: id, detail: `context_usage_pct=${leaf.context_usage_pct} > 100 (presumed stuck/collapsed)` });
     }
   }
@@ -3431,7 +3512,7 @@ async function cmdMigrate(args) {
     for (const id of Object.keys(leaves)) {
       const leaf = leaves[id];
       if (!leaf.audit_gate) {
-        const verdict = leaf.role === 'worker' ? 'required' : 'skip';
+        const verdict = (leaf.role === 'worker' || leaf.role === 'auditor') ? 'required' : 'skip';  // P0a: auditor 同 worker，audit_gate verdict='required'
         changes.push({ leaf_id: id, field: 'audit_gate', from: null, to: { verdict, auditor_session_id: null, ts: null } });
         if (!dryRun) leaf.audit_gate = { verdict, auditor_session_id: null, ts: null };
       }
@@ -3530,6 +3611,15 @@ async function cmdMigrate(args) {
       }
     }
 
+    // 规则 12 (P0a, 2026-07-08): state.version 1.0 → 1.1（引入 auditor role）。
+    //   auditor role 是新增 enum，旧树无 auditor leaf，无需数据迁移；
+    //   历史"假装 auditor"的 leaf（macp4-A4 用 commander 假装）保持原 role，不自动改 auditor
+    //   （会误伤真 commander，且已 done 不影响新机制）。仅升级版本号。
+    if (state.version !== '1.1') {
+      changes.push({ field: 'version', from: state.version, to: '1.1', reason: 'P0a: auditor role introduced' });
+      if (!dryRun) state.version = '1.1';
+    }
+
     if (!dryRun) {
       writeState(tree_id, state);
     }
@@ -3595,37 +3685,47 @@ deliverables[{path,min_length?,must_contain?}] / quality_gates[] / self_check[] 
   },
 
   how_to_register_auditor: {
-    title: 'auditor 注册流程（解决鸡生蛋）',
-    related: ['self_audit_forbidden', 'borrowed_identity', 'v10_constraints'],
-    content: `# how_to_register_auditor — auditor 注册流程
+    title: 'auditor 注册流程（P0a auditor role）',
+    related: ['self_audit_forbidden', 'borrowed_identity', 'v10_constraints', 'role_semantics'],
+    content: `# how_to_register_auditor — auditor 注册流程（P0a, 2026-07-08）
 
-## 问题（V4-V9 鸡生蛋）
-auditor 必须先 audit_gate pass 才能给 worker 背书 → 但 auditor 自己也要被更高级 auditor 审过才能 pass → 无穷递归。
+## P0a 新机制：auditor 是独立 role
+2026-07-08 前，auditor 用 commander/worker role 假装（macp4-A4 用 commander → C-13/R-03 假阳性 24-38 条；macp4-A3 用 worker → W-AUDIT-WORKER 违规）。
+P0a 引入 role='auditor'：独立审计 leaf，走简化协议，规则按 role 适配（不再误套 worker/commander 规则）。
 
-## 解决方案 A（V10-trust-anchor，C3 实施中）
-root 是信任锚点（trust anchor），允许自审：
-1. tree_init 后 root 自审 → root.audit_gate.verdict = 'pass'（root 特权）
-2. commander fork 真实 session 当 auditor
-3. auditor 在自己 session 内调 audit_gate(leaf_id=root, verdict=pass, audit_session_id=<auditor 自己>)
-4. auditor 给 worker 背书：audit_gate(leaf_id=worker, verdict=pass, audit_session_id=<auditor 自己>)
+## 鸡生蛋问题与解决（V10-trust-anchor）
+auditor 必须先 audit_gate pass 才能给 worker 背书 → 但 auditor 自己也要被背书才能 pass → 无穷递归。
+解决：root 是信任锚（trust anchor），可担任任意非 root leaf 的 auditor（resolveAuditorIndep 行 2432-2446 放行）。
+- 冷启动期：root 给 auditor leaf 背书 audit_gate=pass
+- 正常期：上级已 done 的 auditor 给下级 auditor 背书（通用路径行 2467-2490）
 
-## 解决方案 B（V10 当前版本，root 不能自审）
-通过【根会话外的独立 session】注册 auditor：
-1. commander 在自己 session 内用 mcp__session__fork_session 派一个 auditor session
-2. commander send_message(auditor_session, "审计 leaf X")
-3. auditor 在自己 session 内调 audit_gate(leaf_id=X, verdict=pass, audit_session_id=<auditor 自己 session>)
-4. 引擎校验 callerSessionId（MCP wrapper 自动注入）=== audit_session_id → 通过
+## auditor leaf 注册流程（leaf_add role=auditor）
+1. commander fork 真实独立 session 当 auditor（mcp__session__fork_session；🚫禁 create_session/delegate_agent 当 SubAgent — macp2 事故红线）
+2. commander leaf_add(role='auditor', session_id=auditor 真实 session, parent=commander, added_by=commander.session_id)
+   - auditor leaf 初始 status='active'，audit_gate.verdict='required'（不能自审）
+3. auditor 在自己 session 内 append brief_echo + done event（简化协议，无 milestone/review_round/deliverables）
+4. root 给 auditor 背书：audit_gate(leaf_id=auditor, verdict=pass, audit_session_id=root.session_id)
+   - callerSessionId（MCP wrapper 注入）=== root.session_id === audit_session_id → 通过
+5. auditor 给 worker 背书：audit_gate(leaf_id=worker, verdict=pass, audit_session_id=auditor 自己 session)
+6. auditor set-status=done（简化门禁：仅 brief_echo+done 双事件 + audit_gate pass + done event 存在）
 
-## auditor 三重校验（V10-auditor-active）
-auditor leaf 必须：
+## auditor 三重校验（V10-auditor-active，担任他人 auditor 时）
+auditor leaf 担任其他 leaf 的 auditor 时，引擎校验 auditor leaf：
 - status === 'done'
 - events 非空（至少发过一条上行事件）
-- audit_gate.verdict === 'pass'（被更高权威背书过，或 root 特权）
+- audit_gate.verdict === 'pass'（被 root 或上级 auditor 背书过）
 缺任一 → E_AUDITOR_NOT_DONE / E_AUDITOR_NO_EVENTS / E_AUDITOR_NOT_VERIFIED
+
+## auditor 简化协议（P0a，区别于 worker/commander）
+auditor leaf 不产出交付物（其"产物"是 audit_gate verdict + audit_log），故 done 门禁跳过：
+- 跳过：milestones 非空 / expect_outputs / deliverables 文件存在 / ISS-003 review_round / commander children done
+- 保留：brief_echo+done 双事件 / audit_gate verdict=pass / done event 存在
+- 保留：状态机流转白名单（STATUS_TRANSITIONS）
 
 ## 关键约束
 - callerSessionId 必须 === audit_session_id（堵借身份，详见 self_audit_forbidden）
-- audit_session_id 必须是合法 UUID（V10-uuid-format-strict）
+- audit_session_id 必须是合法 UUID v4（V10-uuid-format-strict）
+- auditor 不能自审（audit_session_id=auditor 自己 → E_AUDITOR_NOT_INDEPENDENT "auditor is the leaf itself"）
 - 不要用占位 UUID（00000000-... 等），用真实 fork_session 拿到的 session_id`,
   },
 
@@ -3638,11 +3738,12 @@ auditor leaf 必须：
 - **root**: 树根，唯一，无 parent。tree_init 自动创建。root 是 trust anchor（V10-trust-anchor 提案）。
 - **commander**: 中间指挥官，可有子节点。深度上限 3 层。
 - **worker**: 原子执行者，**不能有子节点**（引擎硬约束）。
-- **auditor**: 不是一个独立 role 字段！auditor 是某个 leaf 的"职责"，由 audit_gate 的 audit_session_id 指向另一个 leaf 的 session_id 实现。
+- **auditor** (P0a, 2026-07-08): 独立审计 leaf，专门承担 audit_gate 背书职责。走简化协议（brief_echo+done+audit_gate，无 milestone/review_round/deliverables）。audit_gate=pass 由 root 信任锚背书（冷启动期）或上级已 done auditor 背书（正常期）。auditor 不能自审（resolveAuditorIndep 行 2478 拦）。
 
 ## 谁能 fork 谁
 - root fork commander
-- commander fork worker 或子 commander
+- commander fork worker / 子 commander / auditor
+- auditor 不能 fork（叶子节点，同 worker）
 - worker 不能 fork（叶子节点）
 
 ## 谁能审谁
@@ -3657,7 +3758,7 @@ active → pruned                  （剪枝）
 active → archived                （归档，可恢复）
 active → segment_pending         （竹节交接中）
 \`\`\`
-切 done 时引擎硬校验：milestones 非空 + 全部 audit_pass=true + alignment 已回填。
+切 done 时引擎硬校验：milestones 非空 + 全部 audit_pass=true + alignment 已回填（**auditor role 走简化协议跳过 milestones**，见 how_to_register_auditor）。
 
 ## P0-3 状态机流转白名单（2026-07-07）
 状态流转受 STATUS_TRANSITIONS 白名单约束，非法流转抛 **E_STATUS_TRANSITION_INVALID**。
@@ -3738,11 +3839,22 @@ worker 从被 fork 到 status=done 的 8 个阶段，每阶段标注**调用者�
 - \`evidence\` (string): 客观证据（文件路径/行号/test 输出/命令结果），非空
 - 数组长度 ≥ 1，且至少 1 项 \`pass=true\`
 
+## P1b: red_findings_resolved（跨事件关联，治假收敛）
+若 leaf 历史 review_round 有 red findings（带 finding_id），done event 的 meta.red_findings_resolved 必须声明每条 red 怎么处理（治 macp4-W3 假收敛：red 降 yellow 但文档没改）：
+
+示例：red_findings_resolved: [{finding_id:"F01", fix_method:"edit_file", fix_evidence:"将 SUPPLEMENT 列表从 4 件改为 5 件，新增 S6 条目（≥20 字）"}]
+
+- finding_id: 对应 review_round findings 的 finding_id（worker 自分配，如 F01/F02；finding_id 在 review_round findings 中可选）
+- fix_method: edit_file（改了文档，fix_evidence 是 diff/修改前后对比）/ downgrade（降级，fix_evidence 是理由）/ other
+- fix_evidence: ≥20 字
+- 向后兼容：无 review_round 或 red findings 无 finding_id → red_findings_resolved 可省略
+- 错误码：违例抛 E_SELFCHECK_INVALID
+
 ## 常见错误码
 
 - **E_BORROWED_IDENTITY**: commander 代 worker 写 done event 或代调 audit_gate（callerSessionId ≠ 当前调用者的 session）→ 自审被禁（self_audit_forbidden）
 - **E_AUDIT_PREMATURE**: 跳过前置阶段（brief_echo 未发 / milestones 未全 pass / alignment 未回填就 pass）
-- **E_SELFCHECK_INVALID**: done event 的 self_check 不符合上述 schema（非数组 / 空数组 / 缺字段 / 无 pass=true 项）
+- **E_SELFCHECK_INVALID**: done event 的 self_check 不符合上述 schema（非数组 / 空数组 / 缺字段 / 无 pass=true 项）；或 P1b red_findings_resolved 缺失/未覆盖所有 red finding_id/fix_evidence<20字
 - **E_ALIGNMENT_NOT_VERIFIED**: worker audit pass 前 alignment_pending 未清零（缺 brief_echo #2 回填）
 
 ## 关联
@@ -3877,12 +3989,12 @@ V4-V9 引擎只查"A 是否是不同 leaf"，不查"调用者是否真是 A"—�
 |----|------|------|
 | prefix | 项目代号（永不变更） | \`[a-z][a-z0-9_]{3,7}\`（小写开头，4-8 字符，无连字符）|
 | path | 树定位（根省略） | \`[A-Z]\\d*(?:[a-z]\\d*)*\` |
-| role | root/commander/worker | 枚举 |
+| role | root/commander/worker/auditor | 枚举 |
 | suffix | 竹节 sNN / 尝试 iNN（可选） | \`s\\d+\\|i\\d+\` |
 
 ## 完整正则
 \`\`\`
-^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\\d*(?:[a-z]\\d*)*)?-)?(root|commander|worker)(?:-(s\\d+|i\\d+))?$
+^([a-z][a-z0-9_]{3,7})-(?:([A-Z]\\d*(?:[a-z]\\d*)*)?-)?(root|commander|worker|auditor)(?:-(s\\d+|i\\d+))?$
 \`\`\`
 
 ## 正例

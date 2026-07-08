@@ -692,7 +692,7 @@ prompt: |
 
 冷启动期所有 worker 的 milestone audit_pass + alignment 回填 + audit_gate pass，`auditor_session_id` 一律填 `root.session_id`，由 commander 自己调用（`caller=root.session_id === audit_session_id`）。
 
-🔴 **冷启动期绝不要 fork "独立 auditor leaf" 并让它自审**——闸门3 V10-auditor-active 三连对冷启动 leaf 是循环依赖（自己 done 需 audit_pass → 需独立 auditor → 自己，无法自启动），这是 nanju-iter2 死锁根因。冷启动期定义见 §13.1；何时转正常期（可派独立 auditor leaf）见 §13.4。
+🔴 **冷启动期绝不要让 auditor leaf 自审**（auditor 自己给自己 audit_gate pass）——闸门3 V10-auditor-active 三连对冷启动 leaf 是循环依赖（自己 done 需 audit_pass → 需独立 auditor → 自己，无法自启动），这是 nanju-iter2 死锁根因。**P0a 解法**：auditor leaf 的 audit_gate=pass 由 root 信任锚背书（§13.4.1 步骤5，root 当 auditor 调 audit_gate），不是 auditor 自审。冷启动期定义见 §13.1；何时转正常期见 §13.4。
 
 ### §13.3 root 给 worker 配齐 done 前置（严格顺序，repro 场景 B 实证 10/10）
 
@@ -749,12 +749,50 @@ root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 八步
 
 这也解释了 root 两种 event 的不同作用：① 写 plan/status_check → root.events 非空（满足闸门2 对 rootLeaf 的 events 要求，即 §13.3 步骤0 的前置）；② 写 done → 触发 auto_upgrade，root 自身 audit_gate 升 pass（满足 root 自己 set-status done 的门禁 L1399）。注意：闸门2 对 rootLeaf（L2247-2252）只校验 status + events，**不校验 root 自己的 audit_gate**——所以步骤0 只需写 plan 让 events 非空即可，不必先 done。
 
-### §13.4 转正常期
+### §13.4 转正常期 + auditor role（P0a, 2026-07-08）
 
-首个 worker done 后，若需长期独立 auditor（复杂树多 worker 并行审查）:
-- commander 用 §13.3 流程把一个 auditor leaf 喂到 V10-auditor-active（repro 场景 A 实证：root 先给 auditor leaf 配齐，auditor leaf 自己 done 后即合格）
-- 之后该 auditor 走闸门3 审后续 worker（auditor 自己调 audit_gate，`caller=auditor.session_id`）
-- 即：**root 只在冷启动期当 auditor，正常期交给独立 auditor leaf**
+首个 worker done 后，若需长期独立 auditor（复杂树多 worker 并行审查），**用 role='auditor' 创建独立审计 leaf**。
+
+> **P0a 背景**：2026-07-08 前，auditor 用 commander/worker role 假装（macp4-A4 用 commander → C-13/R-03 假阳性 24-38 条；macp4-A3 用 worker → W-AUDIT-WORKER 违规；macp4-W3 §3.5 "需要独立 auditor role 而非复用 worker 靠打补丁"）。P0a 引入 role='auditor'：独立审计 leaf，走简化协议，规则按 role 适配，不再误套 worker/commander 规则。
+
+#### §13.4.1 auditor leaf 创建流程（leaf_add role=auditor）
+
+```text
+[caller=root]   1. mcp__session__fork_session → 拿到 auditor 独立 session
+                   # 🚫禁 create_session/delegate_agent 当 SubAgent（macp2 红线，§13.5）
+[caller=root]   2. tree_leaf_add(role='auditor', session_id=<auditor session>, parent=<commander leaf>,
+                   added_by=<root.session_id>, path=<大写字母开头段>)
+                   # auditor leaf 初始 status='active', audit_gate.verdict='required'（不能自审）
+[caller=auditor]3. tree_event_append(type=brief_echo, meta={my_understanding, milestones_preview:[]})  # 简化协议，无 milestone
+[caller=auditor]4. tree_event_append(type=done, meta={self_check})              # 简化协议，无 deliverables/review_round
+[caller=root]   5. tree_audit_gate(leaf_id=<auditor>, verdict=pass, audit_session_id=<root.session_id>)
+                   # root 信任锚背书（resolveAuditorIndep 行 2432-2446 放行）；caller===audit_session_id
+[caller=auditor]6. tree_leaf_set_status(leaf_id=<auditor>, status=done)         # 简化门禁通过
+```
+
+auditor leaf done 后即满足 V10-auditor-active（status=done + events 非空 + audit_gate=pass），可担任后续 worker 的 auditor。
+
+#### §13.4.2 auditor 简化协议（区别于 worker §13.3 八步）
+
+auditor leaf 不产出交付物（其"产物"是 audit_gate verdict + audit_log），故 done 门禁跳过 milestone/expect_outputs/deliverables/review_round，仅保留：
+- ✅ 保留：brief_echo + done 双事件 / audit_gate verdict=pass / done event 存在 / 状态机流转白名单
+- ⏭ 跳过：milestones 非空 / expect_outputs / deliverables 文件存在 / ISS-003 review_round / commander children done
+
+> auditor 的 self_check 仍需符合 schema（非空 `[{item,pass,evidence}]` 数组，至少 1 项 pass=true，evidence ≥10 字）——这是 done event 通用校验，不因简化协议免除。
+
+#### §13.4.3 auditor 担任他人 auditor
+
+auditor leaf done 后，可给 worker / 下级 auditor 背书：
+```text
+[caller=auditor] tree_audit_gate(leaf_id=<worker>, verdict=pass, audit_session_id=<auditor.session_id>)
+```
+- caller=auditor.session_id === audit_session_id → caller 校验通过（cmdAuditGate 行 2926）
+- resolveAuditorIndep 通用路径（行 2467-2490）校验 auditor leaf：status=done + events 非空 + 自己 audit_gate=pass → 放行
+- 🔴 auditor 不能自审：audit_session_id=auditor 自己 → `E_AUDITOR_NOT_INDEPENDENT`（"auditor is the leaf itself"，行 2478）
+
+#### §13.4.4 root 信任锚保留作冷启动兜底
+
+auditor role 引入后，root 信任锚（§13.2）**仍保留**：冷启动期（无任何 auditor leaf done 时）root 当所有 leaf 的 auditor。转正常期后逐步交给 auditor leaf 链式背书（上级 auditor 背书下级 auditor，§13.4.3）。root 永远是最后兜底的信任锚——auditor leaf 的 audit_gate=pass 在冷启动期由 root 背书（§13.4.1 步骤5）。
 
 ### §13.5 SDK SubAgent 的位置（2026-07-07 重写：SubAgent 入树）
 
@@ -882,6 +920,7 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 - C1-C4 和 A1-A2 必须并行启动（相互独立）
 - 修正员（fix）在所有审查员返回后启动
 - 禁止指挥官亲自充当审查员（"自己画靶自己打分"）
+- 🔴 **审查 leaf 用 role=auditor**（P0a，见 §13.4）：C1-C4/A1-A2 用 `leaf_add(role='auditor')` 创建，走简化协议（brief_echo+done+audit_gate，无 milestone）。**禁止用 role=worker/commander 假装 auditor**（macp4-A4 用 commander → C-13/R-03 假阳性 24-38 条；macp4-A3 用 worker → W-AUDIT-WORKER 违规）
 
 **SubAgent 放大审查产能（2026-07-07 新增）**：commander 的审计维度 leaf（C1-C4 / A1-A2）可派 SDK SubAgent 做深度审查（如某维度需要逐行核对大量证据 / 多视角交叉验证）。每个 SubAgent 在**它所属的审计 leaf** 上 append 一条 `subagent_spawn` 事件（`subagent_id` 父段 = 该审计 leaf_id），产出落 `deliverables/subagent-outputs/`。SubAgent 永不当该审计 leaf 的 caller / auditor-of-record（caller-binding 不变，见 §13.5）。
 

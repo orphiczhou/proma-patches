@@ -195,6 +195,8 @@ load_on: create_session  # 原则 11：叶子 = create_session；子 Commander �
 
 > **self_check schema（v2.4 强化，引擎硬校验）**：必须是 `[{item, pass, evidence}]` 数组。`item` = 检查项描述；`pass` = true/false；`evidence` = ≥10 字的客观证据（引用产出文件的具体位置/行/段落，禁止空泛"已检查"）。缺 `evidence` 或 <10 字 → done event 被 `E_SELFCHECK_INVALID` 拦，必须重写。
 
+> **P1b red_findings_resolved（2026-07-08，治假收敛）**：若你的 review_round 有 red findings（带 `finding_id`），done event 的 `meta.red_findings_resolved` 必须声明每条 red 怎么处理（治 macp4-W3 假收敛：red 降 yellow 但文档没改）。每项 `{finding_id, fix_method, fix_evidence}`：`fix_method` = `edit_file`（改了文档，fix_evidence 是 diff）/ `downgrade`（降级，fix_evidence 是理由）/ `other`；`fix_evidence` ≥20 字。无 red 或 red 无 finding_id 时可省略（向后兼容）。违例 → `E_SELFCHECK_INVALID`。详见 tree_help('how_to_worker_lifecycle')。
+
 > **SubAgent 诚实性提醒（2026-07-07 补）**：若 worker 用了 SubAgent 辅助（§2.5.1）或 §4.6 多视角审查，self_check **不得**对 SubAgent 身份/产出撒谎——例如不得写 "reviewer_session_id 合法" 实则填了占位 UUID（旧 BUG-1，已被引擎 E_REVIEW_FORGERY 拦截），不得写 "SubAgent 产出完整" 实则文件 0 字节（BUG-3，已被 E_DELIVERABLE_EMPTY 拦截）。新机制下 worker 用真 `subagent_spawn` 事件 + 真 `output_ref` 落盘，self_check 如实核验：① 本 leaf events 中 subagent_spawn 数量 = 实际 spawn 的 SubAgent 数；② 每个 output_ref 文件存在且非空；③ review_round 的 reviewer_ref 都能溯源到 subagent_spawn。撒谎会被审计（commander 他审 + 独立 auditor）追溯查出。
 
 ```yaml
@@ -438,6 +440,9 @@ dod:
      - `output_ref` = 相对 **deliverables 根**的路径（如 `subagent-outputs/sub-rvreq1-A1-worker-01.md`）。引擎解析为 `<treeDir>/deliverables/<output_ref>` 校验存在 + size>0。
      - `status` = `done`（产出落盘成功）或 `failed`（SubAgent 失败，可省 output_ref）
 
+   > ⚠️ **append 即校验**（2026-07-08 macp3 复盘改）：`subagent_spawn` 和 `review_round` 在 `event_append` 时**当场校验 schema**——格式错立即 `E_REVIEW_FORGERY`/`E_SCHEMA_INVALID`，**不会静默写入后卡 done 门禁**（events append-only 删不掉；macp3 早期坏 review_round 曾导致 status 永久卡 active）。严格按下方格式 + 禁止清单写，一次过。
+   > alignment 对齐评估走 **`brief_echo` event**（`type=brief_echo, meta={alignment, auditor_session_id}`），**没有** `alignment` 事件类型（写了 → `E_SCHEMA_INVALID`）。
+
 5. **收集 N 份 findings → 写 review_round event**（`mcp__tree__tree_event_append`，仍 append 到本 worker leaf）：
    ```yaml
    event: review_round
@@ -677,9 +682,11 @@ REST
 
 ---
 
-## §10 审计角色（v2.1 新增）
+## §10 审计角色（v2.1；P0a 2026-07-08 更新为 role=auditor）
 
 > 依据：tree-audit-methodology.md v1.0。当你的 role 或 brief.my_mission 涉及审查/审计/验证/终局时，**必须**按本节执行。
+>
+> **P0a 更新**：审计角色现在用独立的 `role='auditor'` leaf（不再用 worker 假装，macp4-A4/A3 实证假阳性 + W-AUDIT-WORKER 违规）。创建流程见 tree-commander SKILL §13.4。auditor leaf 走**简化协议**（brief_echo+done+audit_gate，无 milestone/review_round/deliverables），其 audit_gate=pass 由 root 信任锚背书（冷启动期）或上级 auditor 背书（正常期）。如果你被 fork 为 auditor role，本节是你的操作手册。
 
 ### §10.1 触发判定
 
@@ -688,53 +695,54 @@ REST
 - `leaf_id` 的 role 段为 `C1/C2/C3/C4/A1/A2/verify/review/audit`
 - brief.in_scope 第一条含 "按方法论阶段"
 
-### §10.2 审计角色的核心区别
+### §10.2 auditor role 的核心区别（vs 常规 worker）
 
-| 常规 worker | 审计 worker |
+| 常规 worker（role=worker） | 审计角色（role=auditor） |
 |------------|------------|
-| 自己产出文档/代码 | **不产出内容，只产出问题列表** |
-| 1 个 self_check 即够 | **必须 Fork 子 Agent 做多维并行审查** |
+| 自己产出文档/代码 | **不产出交付物，只产出问题列表 + audit_gate verdict** |
+| done 走完整门禁（milestone+deliverables+review_round） | **done 走简化协议（brief_echo+done+audit_gate，无 milestone/deliverables）** |
+| audit_gate 由独立 auditor 背书 | **audit_gate 由 root 信任锚或上级 auditor 背书**（不能自审，行 2478 拦） |
+| 1 个 self_check 即够 | **鼓励 Fork SubAgent 做多维并行审查**（SubAgent 用内置 Agent 工具，§13.5 红线） |
 | done 后指挥官验收 | **done 后由指挥官汇总多审计员结果** |
 | 不做反事实攻击 | **攻击角色必须构造破坏性场景** |
 
-### §10.3 审计 worker 的最小 Fork 结构
+### §10.3 auditor 的最小审查结构（Fork SubAgent 做多维审查）
 
-**如果你是审查员（C1-C4）**：你必须 Fork 1 个子 Agent 执行具体审查。
+> auditor role 的审查劳动通过 `subagent_spawn` 事件归因（§13.5）。SubAgent **必须用内置 Agent 工具**（进程内，🚫禁 create_session/delegate_agent，macp2 红线）。
+
+**如果你是审查员（C1-C4）**：你 Fork 1 个 SubAgent 执行具体审查。
 
 ```
-审查员 worker（你）
-  └── Fork 1 个子 Agent：按你的维度执行具体审查
+审查员 auditor（你）
+  └── Fork 1 个 SubAgent：按你的维度执行具体审查
         产出：结构化问题列表，每个问题含 ID/定位/严重程度/描述/修正建议
 ```
 
 **如果你是攻击员（A1-A2）**：你必须 Fork 2 个子 Agent 并行攻击。
 
 ```
-攻击员 worker（你）
-  ├── Fork Agent 1：角色视角攻击（每个角色 3 个"如果...怎么办"）
-  ├── Fork Agent 2：契约边界攻击（每条验收标准 1-2 个边界外输入）
+攻击员 auditor（你）
+  ├── Fork SubAgent 1：角色视角攻击（每个角色 3 个"如果...怎么办"）
+  ├── Fork SubAgent 2：契约边界攻击（每条验收标准 1-2 个边界外输入）
   └── 汇总产出攻击报告
 ```
 
-### §10.4 审计 done 上报格式
+### §10.4 auditor done 上报格式（简化协议，无 milestone/deliverables）
 
 ```yaml
 event: done
-deliverables:
-  - "<审查/攻击报告路径>"
 self_check:                      # schema = [{item,pass,evidence}]，evidence ≥10 字，缺则 E_SELFCHECK_INVALID
-  - item: "已 Fork 子 Agent 执行审查（非自己直接判断）"
+  - item: "已 Fork SubAgent 执行审查（非自己直接判断）"
     pass: true
-    evidence: "Fork 了子 Agent session <id>，list_messages 可见其审查对话，问题列表来自该子 Agent 返回"
+    evidence: "Agent(G1 完整性审查) 返回问题列表，subagent_spawn 事件已 append 留痕"
   - item: "问题列表含 ID/定位/严重程度/描述/修正建议 5 字段"
     pass: true
     evidence: "审查报告第 2-47 行每条问题均含 ID（P1-P23）/定位（文件:行）/severity/desc/fix 五列"
   - item: "标注了每个严重程度的判断理由"
     pass: true
     evidence: "报告 severity 列每项后括注理由，如 'high（阻断：API 缺 auth 校验，见 §3.2）'"
-milestones:
-  - { id: M1, audit_pass: true, note_path: "<note路径>" }
-  - { id: M2, audit_pass: true, note_path: "<note路径>" }
+# auditor 简化协议：无 milestones / 无 deliverables / 无 review_round
+# audit_gate 由 root 或上级 auditor 背书（不是自己 set）
 context_usage: <数字>
 drift_declaration: false
 ```

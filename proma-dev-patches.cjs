@@ -2597,10 +2597,8 @@ async function checkAllRules(tree, workspace, cfg) {
 
   // Tier 1
   maybe("R-01", ruleR01, tree);
-  maybe("R-03", ruleR03, tree);
   maybe("R-04", ruleR04, tree);
   maybe("R-05", ruleR05, tree);
-  maybe("R-06", ruleR06, tree);
   for (const leaf of Object.values(tree.state.leaves)) {
     if (isSharedSessionLeaf(leaf)) {
       log("[Patch M] tree=" + tree.tree_id + " leaf=" + leaf.leaf_id +
@@ -2610,7 +2608,6 @@ async function checkAllRules(tree, workspace, cfg) {
     maybe("C-02", ruleC02, leaf, tree);
     maybe("C-03", ruleC03, leaf, tree);
     maybe("C-06", ruleC06, leaf, tree);
-    maybe("C-13", ruleC13, leaf, tree);
     // V10 Phase 3 followup R5 (移到 Tier 1, 不依赖 status): tamper detection 必须对
     // done leaf 跑, 因为篡改痕迹 (audit_gate=pass / audit_log pass=true) 都是 done
     // 之后才看的. 之前放在 Tier 2 (有 status 守卫) 导致 v626 全 done tree 永远检测不到.
@@ -2634,7 +2631,6 @@ async function checkAllRules(tree, workspace, cfg) {
     maybe("W-11", ruleW11, leaf, tree);
     maybe("W-12", ruleW12, leaf, tree);
     maybe("C-11", ruleC11, leaf, tree);
-    maybe("C-15", ruleC15, leaf, tree);
   }
 
   return all;
@@ -2694,16 +2690,9 @@ async function applyNudge(tree, violation, cfg) {
     };
     leaf.nudge_log.push(nudgeEntry);
 
-    // 写 audit_log (区别于 nudge_log: audit_log 是审计结果, nudge_log 是鞭策)
-    if (!Array.isArray(leaf.audit_log)) leaf.audit_log = [];
-    leaf.audit_log.push({
-      ts: new Date().toISOString(),
-      auditor: "tao-watcher-script",
-      rule_id: violation.rule_id,
-      pass: false,
-      evidence: violation.evidence,
-      degraded: false  // 脚本检查不算 degraded
-    });
+    // P0b (2026-07-08): 废止 tao-watcher 写 audit_log（macp4-A4 实证 29-43 条噪音掩盖真审计结果）。
+    //   tao-watcher 只保留 nudge_log + send_message（鞭策），不再污染 audit_log（审计结果专由独立 auditor leaf 写）。
+    //   engine collectValidateIssues 仍跳过历史 tao-watcher-script 条目（防御性兼容旧数据）。
 
     // 保存
     fs.writeFileSync(tree.state_path, JSON.stringify(freshState, null, 2));

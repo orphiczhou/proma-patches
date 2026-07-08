@@ -716,6 +716,127 @@ async function case13_subagent_budget_guardrail() {
   }
 }
 
+// Case 14: review_round 在 event_append 时即校验 (2026-07-08 macp3 复盘新行为)
+//   背景: cmdEventAppend 现在对 type=review_round 当场调 validateReviewRoundSchema
+//         (以前只在 done 门禁时才校验). 这样 malformed review_round 在 append 时就拒
+//         E_REVIEW_FORGERY / E_SCHEMA_INVALID, 不会静默写入后卡 done.
+//   关键: 全部走 event append 路径 (不是 tamperLeaf 注入, 也不直接调纯函数),
+//         以验证"append 即校验"真的接到了 cmdEventAppend 这一层.
+//   断言:
+//     14a: append 合法 review_round → ok (合法的能过 append 校验)
+//     14b: append malformed (reviewer_kind:subagent + 同时带 reviewer_session_id) → E_REVIEW_FORGERY
+//     14c: append malformed (无 reviewer_kind + reviewer_session_id 非 UUID 乱串) → E_REVIEW_FORGERY 或 E_SCHEMA_INVALID (宽松匹配)
+//     14d: append review_round reviewer_kind:subagent + reviewer_ref 无对应 subagent_spawn (没先 spawn) → E_REVIEW_FORGERY
+async function case14_review_round_append_validation() {
+  console.log('\n[14] review_round 在 event_append 时即校验 (macp3)');
+
+  // 14a: 合法 review_round → ok
+  //   前置: 先 append 合法 subagent_spawn (并落 output 文件), 让 reviewer_ref 溯源有据.
+  {
+    const tid = freshTreeId();
+    await initTree(tid);
+    const leafId = await addWorker(tid, 'C14a');
+    const sm = spawnMeta(leafId, 1);
+    createDeliverable(tid, sm.output_ref, 'c14a subagent review report\n');
+    await expectOk('14a-pre append 合法 subagent_spawn → ok',
+      ['event', 'append', tid, leafId, '--type', 'subagent_spawn', '--json', JSON.stringify(sm)]);
+    // 合法 review_round: reviewer_kind:subagent + reviewer_ref=对应 subagent_id +
+    //   findings(severity green, evidence ≥10 chars) + red_count:0 + converged:true +
+    //   independence:self_delegated
+    const rrMeta = {
+      round_no: 1,
+      reviewers: [{
+        perspective: 'G1-correctness',
+        reviewer_kind: 'subagent',
+        reviewer_ref: sm.subagent_id,  // sub:<leafId>:1, 与 spawn 匹配
+        findings: [{ severity: 'green', item: 'logic', evidence: 'c14a subagent review verified' }],
+      }],
+      red_count: 0,
+      converged: true,
+      independence: 'self_delegated',
+    };
+    await expectOk('14a append 合法 review_round → ok (证明合法的能过 append 校验)',
+      ['event', 'append', tid, leafId, '--type', 'review_round', '--json', JSON.stringify(rrMeta)]);
+  }
+
+  // 14b: malformed (reviewer_kind:subagent + 同时带 reviewer_session_id 互斥违例) → E_REVIEW_FORGERY
+  {
+    const tid = freshTreeId();
+    await initTree(tid);
+    const leafId = await addWorker(tid, 'C14b');
+    const sm = spawnMeta(leafId, 1);
+    createDeliverable(tid, sm.output_ref, 'c14b subagent spawn\n');
+    await run(['event', 'append', tid, leafId, '--type', 'subagent_spawn', '--json', JSON.stringify(sm)]);
+    const rrMeta = {
+      round_no: 1,
+      reviewers: [{
+        perspective: 'G1-correctness',
+        reviewer_kind: 'subagent',
+        reviewer_ref: sm.subagent_id,
+        reviewer_session_id: UUID.rev1,  // 互斥: reviewer_kind:subagent 禁带 reviewer_session_id
+        findings: [{ severity: 'green', item: 'logic', evidence: 'c14b mutex violation here' }],
+      }],
+      red_count: 0,
+      converged: true,
+      independence: 'self_delegated',
+    };
+    await expectFail('14b append malformed (subagent + reviewer_session_id 互斥) → E_REVIEW_FORGERY (append 即拒)',
+      ['event', 'append', tid, leafId, '--type', 'review_round', '--json', JSON.stringify(rrMeta)],
+      'E_REVIEW_FORGERY');
+  }
+
+  // 14c: malformed (无 reviewer_kind + reviewer_session_id 非 UUID 乱串) → E_REVIEW_FORGERY 或 E_SCHEMA_INVALID
+  //   宽松匹配: expectFail 只接单 code, 这里改用直接断言 !ok 且 error.code 含 REVIEW 或 SCHEMA.
+  {
+    const tid = freshTreeId();
+    await initTree(tid);
+    const leafId = await addWorker(tid, 'C14c');
+    const rrMeta = {
+      round_no: 1,
+      reviewers: [{
+        perspective: 'G1-correctness',
+        // 无 reviewer_kind → 缺省 session → 走 session 分支需合法 UUID
+        reviewer_session_id: 'abc-not-uuid',  // 非 UUID 乱串
+        findings: [{ severity: 'green', item: 'logic', evidence: 'c14c non-uuid junk session' }],
+      }],
+      red_count: 0,
+      converged: true,
+    };
+    const r = await run(['event', 'append', tid, leafId, '--type', 'review_round', '--json', JSON.stringify(rrMeta)]);
+    if (r.ok) {
+      fail('14c append malformed (非 UUID 乱串) → 拒', '命令成功了 (append 即校验未生效)');
+    } else if (r.error && (r.error.code === 'E_REVIEW_FORGERY' || r.error.code === 'E_SCHEMA_INVALID')) {
+      pass('14c append malformed (非 UUID 乱串) → 拒 (REVIEW 或 SCHEMA)', r.error.code);
+    } else {
+      fail('14c append malformed (非 UUID 乱串) → 拒',
+        `实际 ${r.error ? r.error.code : '?'}: ${(r.error && r.error.msg || '').slice(0, 160)}`);
+    }
+  }
+
+  // 14d: reviewer_kind:subagent + reviewer_ref 无对应 subagent_spawn (没先 spawn) → E_REVIEW_FORGERY
+  {
+    const tid = freshTreeId();
+    await initTree(tid);
+    const leafId = await addWorker(tid, 'C14d');
+    // 不 append subagent_spawn, 直接 append review_round
+    const rrMeta = {
+      round_no: 1,
+      reviewers: [{
+        perspective: 'G1-correctness',
+        reviewer_kind: 'subagent',
+        reviewer_ref: `sub:${leafId}:1`,  // 格式合法但本 leaf 无对应 spawn
+        findings: [{ severity: 'green', item: 'logic', evidence: 'c14d no spawn forged reviewer' }],
+      }],
+      red_count: 0,
+      converged: true,
+      independence: 'self_delegated',
+    };
+    await expectFail('14d append reviewer_kind:subagent 无对应 subagent_spawn → E_REVIEW_FORGERY (append 即拒, 溯源失败)',
+      ['event', 'append', tid, leafId, '--type', 'review_round', '--json', JSON.stringify(rrMeta)],
+      'E_REVIEW_FORGERY');
+  }
+}
+
 // ============================================================
 // 内部 helper: 配齐 done 前置 (除 deliverable size 校验外)
 //   milestone(audit_pass) + brief_echo + done event + audit_gate pass
@@ -822,6 +943,7 @@ async function main() {
     { n: 11, fn: case11_session_fake_uuid_accepted },
     { n: 12, fn: case12_startup_notice },
     { n: 13, fn: case13_subagent_budget_guardrail },
+    { n: 14, fn: case14_review_round_append_validation },
   ];
 
   const filter = process.argv.slice(2).filter((a) => !/^--/.test(a));
