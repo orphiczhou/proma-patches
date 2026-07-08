@@ -13,13 +13,21 @@ description: |
 
 > **角色**: 子会话（叶子节点）加载的操作手册。定义如何理解任务契约、拆解里程碑、执行自审、上报事件。
 
+> ### 📍 任务启动第一件事（2026-07-08 macp2 事故后强制）
+>
+> 你被 leaf_add 加入树时，返回结果带 `startup_notice`（引擎强制）——**必读**：
+> 1. **先加载本 SKILL**（尤其 §4.6「调用形式红线」），再干活。
+> 2. G1-G5 自审的 SubAgent 只能用内置 **`Agent` 工具**（进程内）；🚫 禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度；macp2 事故）。
+> 3. 撞错修根因，禁换名重试新建会话。收敛：角色 1/3/5 + 轮≤3 + `red_count=0` 停。
+> 4. 每 leaf subagent_spawn ≤ 15（引擎 `E_SUBAGENT_BUDGET_EXCEEDED` 硬拦）。
+
 ---
 
 ## §0 元数据
 
 ```yaml
 skill_name: tree-worker
-version: 2.2
+version: 2.5
 target: 子会话（叶子 Worker / create_session 创建的执行会话；子 Commander 由 fork_session 创建）
 requires:
   - tree-state.js                          # 通过 commander 间接调用，worker 不直接调
@@ -96,6 +104,83 @@ load_on: create_session  # 原则 11：叶子 = create_session；子 Commander �
 > **步骤 9 前必须步骤 8 完成**：worker 调 set-status done 时引擎查 `audit_gate.verdict=pass`，没过 → `E_GATEKEEPER_REQUIRED`。若卡在这，先确认 commander 是否已调步骤 8（上行 `blocked` 催一下）。
 > **撞 `E_ALIGNMENT_NOT_VERIFIED`**：说明步骤 5 没做（commander 没回填 alignment event），worker 这边上行 `blocked` 提示母会话补 alignment 评估，**不要自己伪造 alignment**（auditor 必须独立，伪造会被拦）。
 
+### §2.5.1 SubAgent 辅助（步骤 6 干活期间，鼓励但非强制）
+
+> 2026-07-07 新增（SubAgent 入树）。worker 在步骤 6 干活时，可 spawn SDK SubAgent 放大产能；每个 SubAgent 通过本 leaf 上的 `subagent_spawn` 事件被树"看见"。SubAgent **不是树实体**（无 leaf_id / 无 Proma session_id），是 worker 本 leaf 事件溯源的劳动单元；worker 永远是自己 leaf 的 actor（caller-binding 不变）。
+
+**两种辅助场景**：
+
+| 场景 | SubAgent role | 用途 | 落盘 + 事件 |
+|------|--------------|------|------------|
+| milestone 实施（§2.5 步骤 6） | `implement` / `research` | 辅助生成代码/文档/调研——比如让 SubAgent 写一个模块的初稿、查一组资料 | 每个 SubAgent 产出落 `<treeDir>/deliverables/subagent-outputs/sub-<本leaf>-<序号>.md`；append `subagent_spawn`（role=implement/research，output_ref 同上，status=done） |
+| done 前内容审查（§4.6） | `review` | G1-G5 多视角审查 | 同上，详见 §4.6 |
+
+**关键约束**：
+- SubAgent 的劳动是**辅助**，milestone 的 `expect_outputs`（交付物）**仍是 worker 自己的责任**——worker 必须把 SubAgent 产出整合/校验为自己的交付物，不能让 SubAgent 产出直接当 milestone 交付物而不经过 worker 审阅。
+- 每个 SubAgent **都要** append 一条 `subagent_spawn` 到本 leaf（不论 role）。`subagent_id` 父段必须 = 本 leaf_id；`status=done` 时 `output_ref` 文件必须存在 + size>0。
+- SubAgent 产出落盘用绝对路径 `<treeDir>/deliverables/<output_ref>`（treeDir 从 tree_state 或 leaf 上下文取）。
+- SubAgent 不得当 caller（worker 仍是本 leaf actor）；SubAgent 不得当 auditor-of-record（审计背书必须独立 leaf）。
+
+**`subagent_spawn`（implement/research）示例**：
+
+```yaml
+- type: subagent_spawn
+  meta:
+    subagent_id: "sub:rvreq1-A1-worker:01"     # 父段 = 本 leaf_id
+    role: implement                              # 或 research
+    purpose: "为 M2 调研 3 个评测引擎方案，输出对比表"
+    output_ref: "subagent-outputs/sub-rvreq1-A1-worker-01.md"   # 相对 deliverables 根
+    status: done
+```
+
+> SubAgent 辅助是**鼓励**的（放大产能、并行提速），不是强制的——小任务 worker 自己干即可。但一旦 spawn，就必须按上述规则落盘 + 事件溯源，否则引擎 `E_DELIVERABLE_MISSING` / `E_DELIVERABLE_EMPTY` / `E_SCHEMA_INVALID`。
+
+---
+
+## §2.6 路径语义（治 BUG-2，重要）
+
+> 2026-07-07 新增。worker 写文件、填 `expect_outputs` / `output_ref` 时，路径基准必须分清，否则引擎解析双重嵌套 → `E_DELIVERABLE_MISSING`。
+
+**两条路径规则**：
+
+| 字段 | 路径基准 | 解析后绝对路径 |
+|------|---------|--------------|
+| `milestone.expect_outputs`（worker 交付物） | **deliverables 根** = `<treeDir>/deliverables/` | `<treeDir>/deliverables/<expect_outputs>` |
+| `subagent_spawn.meta.output_ref`（SubAgent 产出） | **deliverables 根** = `<treeDir>/deliverables/` | `<treeDir>/deliverables/<output_ref>` |
+
+两者**都是相对 deliverables 根**，**不要**带 `deliverables/` 前缀（会双重嵌套）。
+
+**正/误例子**：
+
+```
+✅ milestone.expect_outputs: "design.md"
+   → 引擎解析 <treeDir>/deliverables/design.md
+   → 文件落 <treeDir>/deliverables/design.md
+
+❌ milestone.expect_outputs: "deliverables/design.md"
+   → 引擎解析 <treeDir>/deliverables/deliverables/design.md（双重嵌套）
+   → 文件实际在 <treeDir>/deliverables/design.md → E_DELIVERABLE_MISSING
+
+✅ milestone.expect_outputs: "docs/api.md"
+   → <treeDir>/deliverables/docs/api.md
+
+❌ milestone.expect_outputs: "/docs/api.md"（绝对路径，引擎拒）
+❌ milestone.expect_outputs: "../api.md"（含 ..，引擎拒，path-safe 校验）
+
+✅ subagent_spawn.output_ref: "subagent-outputs/sub-rvreq1-A1-worker-01.md"
+   → 引擎解析 <treeDir>/deliverables/subagent-outputs/sub-rvreq1-A1-worker-01.md
+   → 文件实际落 <treeDir>/deliverables/subagent-outputs/sub-rvreq1-A1-worker-01.md（一致）
+
+❌ subagent_spawn.output_ref: "deliverables/subagent-outputs/sub-...01.md"
+   → 双重嵌套 → E_DELIVERABLE_MISSING
+
+❌ subagent_spawn.output_ref: "<treeDir>/deliverables/subagent-outputs/sub-...01.md"（绝对路径，引擎拒）
+```
+
+**写文件时**：worker 用绝对路径 `<treeDir>/deliverables/<outPath>` 落盘（treeDir 从 tree_state 或 leaf 上下文取）。填字段时只填相对 deliverables 根的部分。
+
+**done 门禁 size>0 校验**（治 BUG-3）：引擎在 `cmdLeafSetStatus(status=done)` 时，对每个 `expect_outputs` 校验文件存在 + `fs.statSync().size > 0`；0 字节 → `E_DELIVERABLE_EMPTY`。SubAgent 产出在 `subagent_spawn status=done` 时同样校验。worker 落盘后自检文件非空。
+
 ---
 
 ## §3 上行消息模板
@@ -109,6 +194,8 @@ load_on: create_session  # 原则 11：叶子 = create_session；子 Commander �
 **必填字段**: `event`, `deliverables`, `self_check`, `milestones`, `context_usage`, `drift_declaration`
 
 > **self_check schema（v2.4 强化，引擎硬校验）**：必须是 `[{item, pass, evidence}]` 数组。`item` = 检查项描述；`pass` = true/false；`evidence` = ≥10 字的客观证据（引用产出文件的具体位置/行/段落，禁止空泛"已检查"）。缺 `evidence` 或 <10 字 → done event 被 `E_SELFCHECK_INVALID` 拦，必须重写。
+
+> **SubAgent 诚实性提醒（2026-07-07 补）**：若 worker 用了 SubAgent 辅助（§2.5.1）或 §4.6 多视角审查，self_check **不得**对 SubAgent 身份/产出撒谎——例如不得写 "reviewer_session_id 合法" 实则填了占位 UUID（旧 BUG-1，已被引擎 E_REVIEW_FORGERY 拦截），不得写 "SubAgent 产出完整" 实则文件 0 字节（BUG-3，已被 E_DELIVERABLE_EMPTY 拦截）。新机制下 worker 用真 `subagent_spawn` 事件 + 真 `output_ref` 落盘，self_check 如实核验：① 本 leaf events 中 subagent_spawn 数量 = 实际 spawn 的 SubAgent 数；② 每个 output_ref 文件存在且非空；③ review_round 的 reviewer_ref 都能溯源到 subagent_spawn。撒谎会被审计（commander 他审 + 独立 auditor）追溯查出。
 
 ```yaml
 event: done
@@ -305,11 +392,22 @@ dod:
 ## §4.6 done 前 G1-G5 多子Agent 内容审查（ISS-003，review_required=true 时强制）
 
 > 对应引擎硬约束：`cmdLeafSetStatus` done 门禁校验 events[] 须含 ≥1 条 `review_round` 事件（schema + 末轮 red_count===0 + 总轮数≤3）。
-> 2026-07-04 新增（ISS-003 阶段一）。与 §4.2 互补：§4.2 是每个 Mi 后的快速单 Agent 对齐自检；§4.6 是全部 Mi 完成后、done 前的多视角内容审查收敛。
+> 2026-07-07 重写（SubAgent 入树）：reviewer 走 `reviewer_kind:subagent` + `reviewer_ref=sub:<本leaf>:<序号>`，由本 leaf 上的 `subagent_spawn` 事件溯源；不再用 `reviewer_session_id` 填假 UUID（旧路径已被引擎 E_REVIEW_FORGERY 拦截，因为 SDK SubAgent 没有 Proma session_id，假 UUID 无法溯源）。与 §4.2 互补：§4.2 是每个 Mi 后的快速单 Agent 对齐自检；§4.6 是全部 Mi 完成后、done 前的多视角内容审查收敛。
 
 **触发条件**：`brief.audit_meta.review_required === true`（commander 下发 brief 时标记），或 worker 自检交付物为设计文档/架构级/跨文件（≥1000 字）时主动开启。
 
 **与 §4.2 的关系**：§4.2 不废弃（仍用于 milestone 级快速自检），但 review_required=true 时 done 前必须**额外**跑 §4.6。审计角色（§10，commander 派 leaf 模式）是另一条独立链，不冲突。
+
+**SubAgent 在树体系中的定位**：SubAgent **不是树实体**（无 leaf_id / 无 Proma session_id），是 worker 本 leaf **事件溯源**的劳动单元。worker 永远是自己 leaf 的 actor（caller-binding 不变）；SubAgent 通过 worker 在自己 leaf 上 append 的 `subagent_spawn` 事件被树"看见"。因此 §4.6 的 reviewer 是"worker 自派的代理人"，标注 `independence:self_delegated`（自审 / 第一道筛）。
+
+> ### ⚠️ 调用形式红线（2026-07-08 macp2 事故强制；违者＝成本爆炸）
+>
+> **SubAgent 必须用内置 `Agent` 工具**（进程内 SDK subagent，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启 → 不建 Proma 会话、不进侧边栏、只花 token）：
+> ```
+> Agent(description:"G1 完整性审查", prompt:"<视角专属指令，读 deliverables/<文件>，返回 findings JSON [{item,severity,evidence≥10字}]>", subagent_type:"Explore")
+> ```
+> **🚫 严禁** `mcp__session__create_session` / `fork_session` / `mcp__collaboration__delegate_agent`(delegate_agents) 当 reviewer —— **建真实会话＝烧独立 API 额度**（macp2 事故：4 分钟炸 207 会话，DeepSeek 余额打负）。
+> **撞错（E_DUPLICATE_SESSION_ID 等）修根因，禁换名（v2/b/x）重试新建会话**。**收敛**：角色分档 1/3/5（上限 5），轮数 ≤3，`red_count=0` 停，未收敛升级（blocked 上行）不重试。
 
 **执行步骤**（最多 3 轮，红色归零收敛）：
 
@@ -318,40 +416,160 @@ dod:
    - 1000–5000 字或跨 2-3 文件 → 3 reviewer（G1 + G2 一致性 + G3）
    - \> 5000 字或跨多文件/架构级 → 5 reviewer（G1-G5 全视角）
 
-2. **并行 Fork N 个子 Agent**，每个分配一个视角：
+2. **并行 spawn N 个 SubAgent**（**必须用上面红线的 `Agent` 工具，进程内；🚫禁 `create_session`/`fork_session`/`delegate_agent`**），每个分配一个视角：
    - **G1 完整性**：交付物是否覆盖 brief.my_mission / dod.deliverables 全部要求
    - **G2 一致性**：交付物内部 / 跨文件是否自洽（命名、接口、术语）
    - **G3 可执行性**（红色必改）：能否跑/编译/通过测试；命令、依赖、路径是否正确
    - **G4 可读性**：结构、表达、受众适配
    - **G5 格式合规**（红色必改）：对照 dod.quality_gates 逐项
 
-   每个子 Agent prompt 给出 brief / dod / milestone / 产出路径，要求**只提 findings，不重写**，每条 finding 标 `severity: red|yellow|green` + `evidence`（≥10 字，引用具体位置）。
+   每个 SubAgent prompt 给出 brief / dod / milestone / 产出路径，要求**只提 findings，不重写**，每条 finding 标 `severity: red|yellow|green` + `evidence`（≥10 字，引用具体位置）。
 
-3. **收集 N 份 findings → 写 review_round event**（`mcp__tree__tree_event_append`）：
+3. **每个 SubAgent 产出必须落盘**到 `<treeDir>/deliverables/subagent-outputs/sub-<自己leaf_id>-<序号>.md`（含该 perspective 的 findings 列表）。序号从 `01` 起，两位数。**禁止只把 findings 留在 SubAgent 返回值里不落盘**——后续 `subagent_spawn` 事件 `status=done` 时引擎会校验 output_ref 文件存在且 size>0（否则 `E_DELIVERABLE_MISSING` / `E_DELIVERABLE_EMPTY`）。
+
+4. **每个 SubAgent 对应 append 一条 `subagent_spawn` 事件到本 worker leaf**（`mcp__tree__tree_event_append`）：
+   - `tree_id` / `leaf_id` = 本 worker 自己的 tree_id / leaf_id
+   - `type` = `subagent_spawn`
+   - `meta`:
+     - `subagent_id` = `sub:<自己leaf_id>:<序号>`（如 `sub:rvreq1-A1-worker:01`）。**父段必须 = 本 leaf_id**，否则引擎 `E_SCHEMA_INVALID`。
+     - `role` = `review`
+     - `perspective` = `G1` / `G2` / `G3` / `G4` / `G5`（review 角色必填）
+     - `purpose` = 非空，一句话说明这个 SubAgent 干什么（如 "G1 完整性审查：覆盖 brief.my_mission 全部要求"）
+     - `output_ref` = 相对 **deliverables 根**的路径（如 `subagent-outputs/sub-rvreq1-A1-worker-01.md`）。引擎解析为 `<treeDir>/deliverables/<output_ref>` 校验存在 + size>0。
+     - `status` = `done`（产出落盘成功）或 `failed`（SubAgent 失败，可省 output_ref）
+
+5. **收集 N 份 findings → 写 review_round event**（`mcp__tree__tree_event_append`，仍 append 到本 worker leaf）：
    ```yaml
    event: review_round
    meta:
      round_no: 1
      reviewers:
-       - perspective: G1
-         reviewer_session_id: <子Agent session_id；SDK SubAgent 无 Proma session_id 时填一个合法 UUID，≠ 自己 session_id，≠ added_by>
+       - reviewer_kind: subagent              # 新字段：subagent = 自派代理人（溯源本 leaf 的 subagent_spawn 事件）
+         reviewer_ref: "sub:rvreq1-A1-worker:01"   # = 对应 subagent_spawn 的 subagent_id；父段必须=本 leaf_id
+         perspective: G1
          findings:
            - { severity: red, item: "评测流程图缺异常分支", evidence: "flow.mmd 第3段未画 timeout 分支，与 error-handling.md 不一致" }
            - { severity: green, item: "API 列表完整", evidence: "api.yaml 覆盖 brief 要求的 8 个端点" }
+       - reviewer_kind: subagent
+         reviewer_ref: "sub:rvreq1-A1-worker:02"
+         perspective: G3
+         findings:
+           - { severity: yellow, item: "评测命令缺超时参数", evidence: "run.sh 第 5 行 timeout 未设置，长任务可能挂死" }
      red_count: 1
      converged: false
+     independence: self_delegated              # worker 自派 SubAgent 审自己 = 自审 / 第一道筛；诚实标注
    ```
-   ⚠️ `reviewer_session_id` 不得 = 自己 session_id（自审，引擎 `E_REVIEW_FORGERY` 拦截）、不得 = added_by（commander 不能自审下属）。
+   ⚠️ **字段约束**：
+   - `reviewer_kind:subagent` 时**必须**给 `reviewer_ref`（sub:... 格式），**禁止**给 `reviewer_session_id`（互斥，给了 → `E_REVIEW_FORGERY`）。
+   - 引擎溯源：本 leaf events 中**必须**有 `type=subagent_spawn` 且 `meta.subagent_id === reviewer_ref` 的事件；无匹配 → `E_REVIEW_FORGERY`（"reviewer_ref 无对应 subagent_spawn，涉嫌伪造"）。
+   - `reviewer_kind:session`（旧路径，他审 / 独立 reviewer）保留向后兼容：走 `reviewer_session_id` + UUID_RE + ≠本leaf.session_id + ≠added_by。**注意（A3 审计修正）**：引擎 session 路径**只校验 UUID 格式合法性**（UUID_RE + ≠本leaf.session_id + ≠added_by），**不校验真实性/liveness**（不调 `checkSessionAlive`，因 SDK SubAgent 无真 session_id，强查会误杀）。所以 worker 若走 session + **格式合法的假 UUID**，引擎**会放行**——但 **SKILL 明确禁止 worker 这么做**（worker §4.6 自审场景**必须**用 `reviewer_kind:subagent`，诚实路径），且 commander 他审会 `list_messages` 抽查 `reviewer_session_id` 真实性兜底（§4 Step4）。worker 走 session+假 UUID 蒙混属伪造审查记录，违反 worker 契约。
 
-4. **若末轮 red_count > 0** → 按 findings 自改 → 再 Fork N 个子 Agent（至少 60% 新 session，避免视角重复）→ 写 round 2 → …
-5. **最多 3 轮**：red_count=0 即收敛（converged: true）→ 可 done；3 轮仍红 → 不再循环，上行 `blocked` 请求 commander 介入（引擎拦截 total_rounds>3 的 done）。
+6. **若末轮 red_count > 0** → 按 findings 自改 → 再 spawn N 个 SubAgent（新序号 03/04/..，同样落盘 + append subagent_spawn）→ 写 round 2 → …
+7. **最多 3 轮**：red_count=0 即收敛（converged: true）→ 可 done；3 轮仍红 → 不再循环，上行 `blocked` 请求 commander 介入（引擎拦截 total_rounds>3 的 done）。
 
-**已知局限（阶段一，诚实标注）**：引擎 review 门禁【仅防格式伪造 + 自审】，**不防内容伪造**——worker 自写一条格式合法但全 green 的 review_round 可蒙混通过。**真实防线是 commander 验收时抽查 reviewer findings 与产出文件的相关性**（见 tree-commander SKILL §4 Step4）。阶段二（Layer2 findings-产出文件相关性校验）将补引擎层内容真实性。这与 self_check 同安全级别（self_check 也是 worker 自写、引擎只防格式）。
+**`subagent_spawn` + `review_round` 完整示例（可直接复制）**：
+
+假设 worker `leaf_id=rvreq1-A1-worker`，5 reviewer（G1-G5），deliverables 根 = `<treeDir>/deliverables/`。先写 5 个 findings 文件到 `<treeDir>/deliverables/subagent-outputs/sub-rvreq1-A1-worker-01.md` ~ `-05.md`，然后：
+
+```yaml
+# 步骤 A：5 条 subagent_spawn 事件（append 到本 worker leaf）
+- type: subagent_spawn
+  meta:
+    subagent_id: "sub:rvreq1-A1-worker:01"
+    role: review
+    perspective: G1
+    purpose: "G1 完整性审查：交付物是否覆盖 brief.my_mission / dod.deliverables 全部要求"
+    output_ref: "subagent-outputs/sub-rvreq1-A1-worker-01.md"
+    status: done
+
+- type: subagent_spawn
+  meta:
+    subagent_id: "sub:rvreq1-A1-worker:02"
+    role: review
+    perspective: G2
+    purpose: "G2 一致性审查：交付物内部 / 跨文件是否自洽"
+    output_ref: "subagent-outputs/sub-rvreq1-A1-worker-02.md"
+    status: done
+
+- type: subagent_spawn
+  meta:
+    subagent_id: "sub:rvreq1-A1-worker:03"
+    role: review
+    perspective: G3
+    purpose: "G3 可执行性审查（红色必改）：命令/依赖/路径是否正确"
+    output_ref: "subagent-outputs/sub-rvreq1-A1-worker-03.md"
+    status: done
+
+- type: subagent_spawn
+  meta:
+    subagent_id: "sub:rvreq1-A1-worker:04"
+    role: review
+    perspective: G4
+    purpose: "G4 可读性审查：结构/表达/受众适配"
+    output_ref: "subagent-outputs/sub-rvreq1-A1-worker-04.md"
+    status: done
+
+- type: subagent_spawn
+  meta:
+    subagent_id: "sub:rvreq1-A1-worker:05"
+    role: review
+    perspective: G5
+    purpose: "G5 格式合规审查（红色必改）：对照 dod.quality_gates 逐项"
+    output_ref: "subagent-outputs/sub-rvreq1-A1-worker-05.md"
+    status: done
+
+# 步骤 B：1 条 review_round 事件（append 到本 worker leaf）
+- type: review_round
+  meta:
+    round_no: 1
+    reviewers:
+      - reviewer_kind: subagent
+        reviewer_ref: "sub:rvreq1-A1-worker:01"
+        perspective: G1
+        findings:
+          - { severity: red, item: "评测流程图缺异常分支", evidence: "flow.mmd 第3段未画 timeout 分支，与 error-handling.md 不一致" }
+          - { severity: green, item: "API 列表完整", evidence: "api.yaml 覆盖 brief 要求的 8 个端点" }
+      - reviewer_kind: subagent
+        reviewer_ref: "sub:rvreq1-A1-worker:02"
+        perspective: G2
+        findings:
+          - { severity: yellow, item: "术语混用", evidence: "design.md 用 '评测'，api.yaml 用 '评估'，需统一" }
+      - reviewer_kind: subagent
+        reviewer_ref: "sub:rvreq1-A1-worker:03"
+        perspective: G3
+        findings:
+          - { severity: red, item: "评测命令缺超时", evidence: "run.sh 第 5 行 timeout 未设置" }
+      - reviewer_kind: subagent
+        reviewer_ref: "sub:rvreq1-A1-worker:04"
+        perspective: G4
+        findings:
+          - { severity: green, item: "结构清晰", evidence: "三级标题 + 每节有摘要，符合读者预期" }
+      - reviewer_kind: subagent
+        reviewer_ref: "sub:rvreq1-A1-worker:05"
+        perspective: G5
+        findings:
+          - { severity: yellow, item: "Mermaid 主题未配", evidence: "flow.mmd 未声明 theme，与 quality_gates 第 2 条 '统一暗色主题' 不符" }
+    red_count: 2
+    converged: false
+    independence: self_delegated
+```
+
+第 2 轮：worker 自改 red 项 → spawn 序号 06/07/.. 的 SubAgent 复审 → 写 round_no=2，直到某轮 red_count=0 + converged:true。done 门禁放行。
+
+**诚实声明（reviewer_kind:subagent + independence:self_delegated 的语义）**：
+
+`reviewer_kind:subagent` 标记的 reviewer 是 **worker 自审 / 第一道筛**——SubAgent 是 worker 自己派的代理人，不是独立第三方。引擎能保证：① reviewer_ref 真能溯源到本 leaf 上的一条 subagent_spawn；② 该 SubAgent 有非空产出（size>0，治 BUG-3）。但引擎**不校验**findings 内容真实性（worker 仍可写全 green 蒙混）。
+
+**真实的内容防线是 commander 他审**（见 tree-commander SKILL §4 Step4）：commander 验收时会把 worker 的 review_round 当作"自审视图"对待，独立判断 findings 是否与产出文件相关；commander 可派自己的 SubAgent（记 commander leaf）做独立复核（independence:independent）。worker 不得用 `reviewer_kind:session` + 假 UUID 冒充独立 reviewer（旧 BUG-1 路径，已被引擎 E_REVIEW_FORGERY 拦截——session 模式要求真 UUID + ≠本leaf.session_id + ≠added_by，worker 没有第二个真 session）。
 
 **禁止**：
-- `reviewer_session_id` = 自己 session / added_by（`E_REVIEW_FORGERY`）
+- `reviewer_kind:subagent` 缺 `reviewer_ref`，或 `reviewer_ref` 父段 ≠ 本 leaf_id（`E_SCHEMA_INVALID` / `E_REVIEW_FORGERY`）
+- `reviewer_kind:subagent` 同时给 `reviewer_session_id`（互斥，`E_REVIEW_FORGERY`）
+- `reviewer_ref` 指向不存在的 `subagent_spawn`（`E_REVIEW_FORGERY`）
+- SubAgent 产出文件缺失（`E_DELIVERABLE_MISSING`）或 0 字节（`E_DELIVERABLE_EMPTY`，治 BUG-3）
 - findings 为空或 evidence < 10 字（`E_REVIEW_FORGERY`）
 - 跳过审查直接 done（`E_REVIEW_NOT_CONVERGED`）
+- 用假 UUID 填 `reviewer_session_id` 冒充独立 reviewer（旧 BUG-1 路径，`E_REVIEW_FORGERY`）
 
 ---
 
@@ -536,6 +754,8 @@ drift_declaration: false
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-07-08 | v2.5 | **macp2 事故修复**：§4.6 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（成本爆炸，macp2 事故）；撞错禁换名重试；收敛（角色 1/3/5 + 轮≤3 + red_count=0 停） |
+| 2026-07-07 | v2.4 | SubAgent 入树：§4.6 重写——reviewer 走 `reviewer_kind:subagent` + `reviewer_ref=sub:<本leaf>:<序号>`（溯源本 leaf 的 `subagent_spawn` 事件），不再用 `reviewer_session_id` 填假 UUID（旧 BUG-1 路径已被引擎 E_REVIEW_FORGERY 拦截）；标注 `independence:self_delegated`（worker 自审/第一道筛，内容真实性最终靠 commander 他审）。新增 §2.5.1 SubAgent 辅助（implement/research SubAgent 同样走 subagent_spawn）；新增 §2.6 路径语义（治 BUG-2：expect_outputs / output_ref 均相对 deliverables 根，禁带 `deliverables/` 前缀）；§3.1 加 SubAgent 诚实性提醒；引擎新错误码 `E_DELIVERABLE_EMPTY`（治 BUG-3：0 字节产物）。 |
 | 2026-07-04 | v2.3 | ISS-003：新增 §4.6 done 前 G1-G5 多子Agent 内容审查（review_required=true 时强制，含分档/红色归零/最多3轮/已知局限诚实标注）。与 §4.2 milestone 级自检互补不冲突 |
 | 2026-06-19 | v2.2 | 审计驱动修订：load_on 从 fork_session 修正为 create_session（原则 11：叶子 = create_session）；target 描述明确子 Commander 由 fork_session 创建 |
 | 2026-06-19 | v2.1 | 新增 §10 审计角色（触发判定、最小 Fork 结构、审计 done 格式、审计禁止行为）；§0 引用 tree-audit-methodology.md |

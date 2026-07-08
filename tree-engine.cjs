@@ -77,7 +77,7 @@ const STATUS_TRANSITIONS = {
   archived:         ['archived'],
   segment_pending:  ['active', 'segment_pending'],
 };
-const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round'];
+const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round', 'subagent_spawn'];
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
@@ -171,9 +171,30 @@ const E_SESSION_NOT_ALIVE = 'E_SESSION_NOT_ALIVE';
 const E_REVIEW_NOT_CONVERGED = 'E_REVIEW_NOT_CONVERGED';  // worker done 但 review 未收敛/未跑
 const E_REVIEW_FORGERY = 'E_REVIEW_FORGERY';              // review_round schema 伪造/自审
 const E_REVIEW_FLAGGED_BLOCK = 'E_REVIEW_FLAGGED_BLOCK';  // 父链有 flagged leaf, 需先补审
+// SubAgent 入树 (2026-07-07): 产物文件存在但 0 字节。BUG-3 修复 — done 门禁 + subagent_spawn 都要查 size>0.
+const E_DELIVERABLE_EMPTY = 'E_DELIVERABLE_EMPTY';
+// 2026-07-08 macp2 事故后预算护栏：单 leaf subagent_spawn 数超 audit_meta.max_subagent_spawn_per_leaf。
+const E_SUBAGENT_BUDGET_EXCEEDED = 'E_SUBAGENT_BUDGET_EXCEEDED';
 
 // v0.2.2: 真实 MCP session_id 格式校验（UUID v1-v5 不区分版本）
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// SubAgent 入树 (2026-07-07): SubAgent 标识格式 sub:<leaf_id>:<seq>。
+//   父段=leafId（caller-binding 的延伸：SubAgent 是父 leaf 的劳动单元，不能借别 leaf 的 SubAgent 做审查）。
+//   用于 subagent_spawn.meta.subagent_id 与 review_round.reviewer_kind=subagent 的 reviewer_ref 一致性校验。
+const SUBAGENT_ID_RE = /^sub:[a-zA-Z0-9_-]+:[0-9]+$/;
+
+// 2026-07-08 macp2 事故后：tree_init / leaf_add 结果强制返回的"任务启动须知"，把 SubAgent 调用红线
+//   （必须用 Agent 工具，禁 create_session/fork_session/delegate_agent）+ 预算护栏前置到任务启动。
+//   事故根因：commander 没读 SKILL 调用红线，误用 create_session 当 reviewer，4 分钟炸 207 会话打负额度。
+const TREE_STARTUP_NOTICE = [
+  '⚠️ 任务启动须知（2026-07-08 macp2 事故后强制）',
+  '1. SubAgent 必须用内置 Agent 工具（进程内，CLAUDE_CODE_ENABLE_TASKS 已开启）。调用形如 Agent(description, prompt, subagent_type)',
+  '2. 🚫 严禁 create_session / fork_session / delegate_agent 当 reviewer —— 建真实会话＝烧独立 API 额度（macp2 事故 4 分钟炸 207 会话、DeepSeek 余额打负）',
+  '3. 撞错（E_DUPLICATE_SESSION_ID 等）修根因，禁换名（v2/b/x）重试新建会话',
+  '4. 预算护栏（引擎硬拦，不靠自觉）：active leaf 数 ≤ root_dod.node_budget（默认 20）；每 leaf subagent_spawn 数 ≤ audit_meta.max_subagent_spawn_per_leaf（默认 15）',
+  '5. 必读：加载 tree-commander/worker SKILL，尤其 §13.5 / §4.6「调用形式红线」',
+].join('\n');
 
 // V9+ Phase 5 (R3 P0 / D2-B1 修复): 占位 UUID 模式（00000000-0000-0000-0000-XXXXXXXXXXXX）
 //   dbc-spec/zombie 等金标准测试用此类 UUID 走"直接 JSON 写入"路径，对应 zombie leaf 场景。
@@ -249,6 +270,7 @@ const DEFAULT_AUDIT_META = {
   max_self_corrections: 2,
   heartbeat_interval_minutes: 15,
   review_required: false,  // ISS-003: 默认 opt-in (false), 防 dbc-spec/v10-cleanroom 金标准回归; nanju 类树显式 true
+  max_subagent_spawn_per_leaf: 15,  // 2026-07-08 macp2 事故后预算护栏：每 leaf 最多 15 个 subagent_spawn（= 5 reviewer × 3 轮），tree_init audit_meta 可覆盖
   sweet_spot_limits: {
     'claude-sonnet-4-6': { min: 100000, max: 200000, hard: 300000 },
     'deepseek-v4-pro': { min: 150000, max: 250000, hard: 400000 },
@@ -325,6 +347,9 @@ const ERROR_TO_HELP = {
   E_REVIEW_NOT_CONVERGED:     'alignment_workflow',       // worker done 但 review 未收敛
   E_REVIEW_FORGERY:           'alignment_workflow',       // review_round schema 伪造/自审
   E_REVIEW_FLAGGED_BLOCK:     'alignment_workflow',       // 父链 flagged, 需先补审
+  // ---- SubAgent 入树 ----
+  E_DELIVERABLE_EMPTY:        'how_to_worker_lifecycle',  // 产物 0 字节（done 门禁 / subagent_spawn）
+  E_SUBAGENT_BUDGET_EXCEEDED:        'how_to_subagent_lifecycle',  // 2026-07-08 macp2 预算护栏：单 leaf subagent_spawn 超限
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -760,6 +785,7 @@ async function cmdInit(args) {
 
   return {
     tree: { tree_id, created_at: state.created_at, dir, workspace_root },
+    startup_notice: TREE_STARTUP_NOTICE,  // 2026-07-08 macp2 事故后：强制任务启动须知（SubAgent 调用红线 + 预算）
     root_leaf: { leaf_id: rootLeafId, session_id: rootSessionId, is_pending: rootSessionId === PENDING_ROOT },
     // V10-helper (D4 Layer 2): tree_init 返回值注入 tips —— Agent 第一次建树即拿到 next_steps。
     //   原则：渐进披露。只给 4 条最关键的 next_steps + SKILL 路径，不塞全文。
@@ -982,7 +1008,7 @@ async function cmdLeafAdd(args) {
     // root leaf 算 active；待创建的新 leaf 未计入。超出时拒绝，逼操作者先归档或调高预算。
     // V8: budget=0 必须被尊重（原 `|| 10` 短路把 0 当 10）。typeof + isFinite 严格挡 null/undefined/字符串/NaN。
     const _nodeBudget = state.root_dod && state.root_dod.node_budget;
-    const maxLeaves = (typeof _nodeBudget === 'number' && Number.isFinite(_nodeBudget)) ? _nodeBudget : 10;
+    const maxLeaves = (typeof _nodeBudget === 'number' && Number.isFinite(_nodeBudget)) ? _nodeBudget : 20;  // 2026-07-08 macp2 事故后默认 10→20（放大 2-3x，允许更大树）
     const activeCount = Object.values(state.leaves).filter(l => l.status !== 'archived').length;
     if (activeCount >= maxLeaves) {
       throw new TreeStateError(E_TREE_NODE_BUDGET_EXCEEDED,
@@ -1020,7 +1046,7 @@ async function cmdLeafAdd(args) {
     state.leaves[leaf_id] = leaf;
 
     writeState(tree_id, state);
-    result = { leaf };
+    result = { leaf, startup_notice: TREE_STARTUP_NOTICE };  // 2026-07-08 macp2 事故后：worker 入树也返回启动须知
   });
   return result;
 }
@@ -1200,6 +1226,65 @@ function isReviewRequired(leaf, state) {
   return treeAm.review_required === true;  // 默认 false (opt-in, 防金标准回归)
 }
 
+// SubAgent 入树 (2026-07-07): subagent_spawn 事件 schema 校验。
+//   设计：SubAgent 不是树实体（无 leaf），是父 leaf 事件溯源的劳动单元。父 spawn SubAgent 后写一条
+//   subagent_spawn 事件到自 leaf.events。review_round.reviewer_kind=subagent 通过 reviewer_ref 反向溯源本事件。
+//   诚实标注：和 review_round / self_check 同安全级别 —— events 是 worker 可写，本函数【仅防格式伪造】，
+//   不防内容伪造（worker 可写格式合法的 subagent_spawn 蒙混）。内容真实性由 commander 验收抽样兜底。
+function validateSubagentSpawnSchema(meta, leaf, leafId, treeDir) {
+  if (!meta || typeof meta !== 'object') {
+    throw new TreeStateError(E_SCHEMA_INVALID, `subagent_spawn on "${leafId}" has invalid meta (must be object)`);
+  }
+  // subagent_id: sub:<leafId>:<seq>。父段必须 === 本 leaf（禁借别 leaf SubAgent）。
+  const sid = meta.subagent_id;
+  if (typeof sid !== 'string' || !SUBAGENT_ID_RE.test(sid)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `subagent_spawn on "${leafId}" has invalid subagent_id (must match /^sub:<leaf_id>:<seq>$/, got "${sid}")`);
+  }
+  if (sid.split(':')[1] !== leafId) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `subagent_spawn on "${leafId}" has subagent_id "${sid}" whose parent segment must equal this leaf_id (borrowing another leaf's SubAgent is forbidden)`);
+  }
+  // role: 限定四种劳动类型（review/research/implement/audit），与 Proma delegate_agent role 对齐。
+  if (!['review', 'research', 'implement', 'audit'].includes(meta.role)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `subagent_spawn on "${leafId}" has invalid role "${meta.role}" (review|research|implement|audit)`);
+  }
+  // perspective: 仅 review 必填（G1-G5），其余可选。
+  if (meta.role === 'review') {
+    if (typeof meta.perspective !== 'string' || meta.perspective.length === 0) {
+      throw new TreeStateError(E_SCHEMA_INVALID, `subagent_spawn on "${leafId}" role=review requires non-empty perspective (G1-G5)`);
+    }
+  }
+  // purpose: 必填非空字符串（SubAgent 的劳动意图留痕）。
+  if (typeof meta.purpose !== 'string' || meta.purpose.length === 0) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `subagent_spawn on "${leafId}" requires non-empty purpose`);
+  }
+  // status: 可选，缺省 done。先解析 status，再按 status 决定 output_ref 校验强度。
+  //   P0 修复（A2 审计 2026-07-07）：原代码 output_ref 非空校验在 status 解析之前，导致
+  //   status=failed + 省略 output_ref 被误拒 E_SCHEMA_INVALID，与下方注释/SKILL（failed 可省）矛盾。
+  const status = meta.status === undefined ? 'done' : meta.status;
+  if (!['done', 'failed'].includes(status)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `subagent_spawn on "${leafId}" has invalid status "${meta.status}" (done|failed)`);
+  }
+  // output_ref: status=done 时必填 + path-safe + 文件存在 + size>0；status=failed 时可选（失败 SubAgent 可无产物）。
+  if (status === 'done') {
+    if (typeof meta.output_ref !== 'string' || meta.output_ref.length === 0) {
+      throw new TreeStateError(E_SCHEMA_INVALID, `subagent_spawn on "${leafId}" status=done requires non-empty output_ref (deliverables-relative path)`);
+    }
+    assertSafeExpectOutputs([meta.output_ref], `subagent_spawn on "${leafId}" meta.output_ref`);
+    // 解析相对 deliverables/ 根（与 cmdLeafSetStatus done 门禁同取法）。
+    const droot = (leaf._deliverables_root) || path.join(treeDir, 'deliverables');
+    const resolved = path.join(droot, meta.output_ref);
+    if (!fs.existsSync(resolved)) {
+      throw new TreeStateError(E_DELIVERABLE_MISSING,
+        `subagent_spawn on "${leafId}" status=done but output_ref "${meta.output_ref}" not found. resolved: ${resolved}`);
+    }
+    if (fs.statSync(resolved).size === 0) {
+      throw new TreeStateError(E_DELIVERABLE_EMPTY,
+        `subagent_spawn on "${leafId}" status=done but output_ref "${meta.output_ref}" is empty (0 bytes). resolved: ${resolved}`);
+    }
+  }
+  // status==='failed': output_ref 可选；若提供也不校验存在/大小（失败 SubAgent 可无产物）。
+}
+
 function validateReviewRoundSchema(meta, leaf, leafId) {
   if (!meta || typeof meta !== 'object') {
     throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" has invalid meta (must be object)`);
@@ -1215,17 +1300,44 @@ function validateReviewRoundSchema(meta, leaf, leafId) {
     if (typeof r.perspective !== 'string' || r.perspective.length === 0) {
       throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer missing perspective (G1-G5)`);
     }
-    // reviewer_session_id: UUID 格式 + ≠ leaf.session_id + ≠ added_by (防自审/防借 caller 身份).
-    //   注: 不调 checkSessionAlive —— SDK SubAgent 无 Proma session_id, 强校验误杀合规 worker.
-    //   内容真实性靠 commander 抽样 + 阶段二 Layer2.
-    if (typeof r.reviewer_session_id !== 'string' || !UUID_RE.test(r.reviewer_session_id)) {
-      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" has invalid reviewer_session_id (UUID required)`);
-    }
-    if (r.reviewer_session_id === leaf.session_id) {
-      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" = leaf owner session (self-review forbidden)`);
-    }
-    if (leaf.added_by && r.reviewer_session_id === leaf.added_by) {
-      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" = added_by (commander cannot self-review own worker)`);
+    // reviewer_kind: 缺省 session（向后兼容历史 review_round），新增 subagent 分支。
+    //   - session: 老逻辑（UUID + ≠leaf.session_id + ≠added_by），防自审/防借 caller 身份。
+    //   - subagent: SubAgent 是 owner 代理人（owner 自审 by design），跳过 ≠owner/≠added_by；
+    //     但必须 reviewer_ref 反向溯源到本 leaf 上的 subagent_spawn 事件，堵借别 leaf SubAgent 做审查。
+    //   注: 不调 checkSessionAlive —— session kind 的 reviewer 可能是 SDK SubAgent 无 Proma session_id，
+    //       subagent kind 本就无 session_id，强校验误杀合规 worker。内容真实性靠 commander 抽样 + 阶段二 Layer2.
+    const rkind = r.reviewer_kind || 'session';
+    if (rkind === 'session') {
+      if (typeof r.reviewer_session_id !== 'string' || !UUID_RE.test(r.reviewer_session_id)) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" has invalid reviewer_session_id (UUID required)`);
+      }
+      if (r.reviewer_session_id === leaf.session_id) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" = leaf owner session (self-review forbidden)`);
+      }
+      if (leaf.added_by && r.reviewer_session_id === leaf.added_by) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" = added_by (commander cannot self-review own worker)`);
+      }
+    } else if (rkind === 'subagent') {
+      // 互斥：reviewer_kind=subagent 禁用 reviewer_session_id（用 reviewer_ref，否则伪造空间）。
+      if (r.reviewer_session_id !== undefined) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" reviewer_kind=subagent must not carry reviewer_session_id (use reviewer_ref instead)`);
+      }
+      // reviewer_ref 必填 + 格式 + 父段 = 本 leaf。
+      if (typeof r.reviewer_ref !== 'string' || !SUBAGENT_ID_RE.test(r.reviewer_ref)) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" reviewer_kind=subagent has invalid reviewer_ref (must match /^sub:<leaf_id>:<seq>$/, got "${r.reviewer_ref}")`);
+      }
+      if (r.reviewer_ref.split(':')[1] !== leafId) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" reviewer_ref "${r.reviewer_ref}" parent segment must = this leaf (borrowing another leaf's SubAgent forbidden)`);
+      }
+      // 溯源：本 leaf.events 必须有 type=subagent_spawn 且 meta.subagent_id===reviewer_ref（堵凭空伪造）。
+      const evs = Array.isArray(leaf.events) ? leaf.events : [];
+      const found = evs.some((e) => e && (e.type === 'subagent_spawn' || e.event_type === 'subagent_spawn') && e.meta && e.meta.subagent_id === r.reviewer_ref);
+      if (!found) {
+        throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" reviewer_ref "${r.reviewer_ref}" has no matching subagent_spawn event on this leaf (forgery suspected)`);
+      }
+      // 跳过 ≠owner/≠added_by：SubAgent 是 owner 代理人（owner 自审 by design）。
+    } else {
+      throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" has invalid reviewer_kind "${rkind}" (session|subagent)`);
     }
     const findings = Array.isArray(r.findings) ? r.findings : null;
     if (!findings || findings.length === 0) {
@@ -1261,6 +1373,11 @@ function validateReviewRoundSchema(meta, leaf, leafId) {
   }
   if (meta.red_count !== _actualRed) {
     throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" red_count=${meta.red_count} mismatches actual red findings=${_actualRed}`);
+  }
+  // independence: 可选标注（SubAgent 入树配套）。仅校验合法值，不强制、不阻断。
+  //   合法值：'self_delegated'（owner 自审/SubAgent 代理人）/ 'independent'（独立第三方）。
+  if (meta.independence !== undefined && !['self_delegated', 'independent'].includes(meta.independence)) {
+    throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" has invalid independence "${meta.independence}" (self_delegated|independent)`);
   }
 }
 
@@ -1354,6 +1471,14 @@ async function cmdLeafSetStatus(args) {
             throw new TreeStateError(
               E_DELIVERABLE_MISSING,
               `cannot set status=done: deliverable "${outPath}" not found. milestone: ${m.id}, leaf: ${leaf_id}, resolved: ${resolved}`
+            );
+          }
+          // BUG-3 修复 (SubAgent 入树配套, 2026-07-07): 产物必须 size>0（堵 0 字节空文件蒙混 done）。
+          //   与 subagent_spawn 的 size 校验同一错误码 E_DELIVERABLE_EMPTY，单一信源。
+          if (fs.statSync(resolved).size === 0) {
+            throw new TreeStateError(
+              E_DELIVERABLE_EMPTY,
+              `cannot set status=done: deliverable "${outPath}" is empty (0 bytes). milestone: ${m.id}, leaf: ${leaf_id}, resolved: ${resolved}`
             );
           }
           // v0.7 批次5 (V9+): 拒符号链接（堵 symlink 逃逸 deliverables/，审计[3]；path.relative 不解析 symlink）
@@ -1881,6 +2006,22 @@ async function cmdEventAppend(args, callerSessionId) {
         E_BORROWED_IDENTITY,
         `event_append rejected: caller "${callerSessionId}" cannot write done event to leaf "${leaf_id}" (session=${leaf.session_id}). Only the leaf owner itself can mark done.`
       );
+    }
+
+    // SubAgent 入树 (2026-07-07): subagent_spawn 事件 schema 校验。
+    //   父永远是 caller（caller-binding 不动）—— 这里只校验事件 schema，不改 caller 校验。
+    //   treeDir(tree_id) 取产物根的父目录（与 cmdLeafSetStatus done 门禁同取法）。
+    if (opts.type === 'subagent_spawn') {
+      // 2026-07-08 macp2 事故后预算护栏：单 leaf subagent_spawn 数 ≤ audit_meta.max_subagent_spawn_per_leaf（默认 15）
+      const _maxSpawn = (state.audit_meta && typeof state.audit_meta.max_subagent_spawn_per_leaf === 'number')
+        ? state.audit_meta.max_subagent_spawn_per_leaf : 15;
+      const _spawnCount = (Array.isArray(leaf.events) ? leaf.events : [])
+        .filter((e) => e && (e.type === 'subagent_spawn' || e.event_type === 'subagent_spawn')).length;
+      if (_spawnCount >= _maxSpawn) {
+        throw new TreeStateError(E_SUBAGENT_BUDGET_EXCEEDED,
+          `subagent_spawn on "${leaf_id}" rejected: ${_spawnCount} existing subagent_spawn events >= max ${_maxSpawn} (audit_meta.max_subagent_spawn_per_leaf). Raise via tree_init audit_meta or stop spawning (converge review). [macp2 预算护栏]`);
+      }
+      validateSubagentSpawnSchema(meta || {}, leaf, leaf_id, treeDir(tree_id));
     }
 
     // v0.7 Phase A 批次2 (A5): done event 的 self_check schema 硬约束（strict: 必须存在且合法）。
@@ -3981,11 +4122,11 @@ Round 2:
   },
 
   error_code_index: {
-    title: '全部错误码索引（40 个）',
+    title: '全部错误码索引（41 个）',
     related: [],
-    content: `# error_code_index — 40 个错误码索引
+    content: `# error_code_index — 41 个错误码索引
 
-> 共 40 个 E_* 错误码定义于 tree-engine.cjs（grep \`const E_\` 校验）。
+> 共 41 个 E_* 错误码定义于 tree-engine.cjs（grep \`const E_\` 校验）。
 > 注：E_NO_OWNERSHIP 属于 session 层 patches.cjs，非 tree 错误码，此处不收录。
 
 ## 基础错误码（自解释，help=null）
@@ -4007,6 +4148,7 @@ Round 2:
 - E_CHILDREN_NOT_DONE — 子 leaf 未全部 done [help: role_semantics]
 - E_DEPTH_EXCEEDED — commander 嵌套超过 3 层 [help: role_semantics]
 - E_DELIVERABLE_MISSING — done 时缺少交付物 [help: alignment_workflow]
+- E_DELIVERABLE_EMPTY — 交付物文件存在但 0 字节（done 门禁 / subagent_spawn）[help: how_to_worker_lifecycle]
 - E_AUDITOR_NOT_INDEPENDENT — auditor 与被审 leaf 不独立 [help: how_to_register_auditor]
 - E_AUDIT_PREMATURE — 时序错（pass 早于前置）[help: alignment_workflow]
 - E_ALIGNMENT_NOT_VERIFIED — worker 缺 alignment 回填 [help: alignment_workflow]
@@ -4079,6 +4221,68 @@ V10 加固要求 auditor 在自己 session 内调 audit_gate（堵 E_BORROWED_ID
 - 不要在 CLI / 脚本里直接拼 UUID 调写入工具`,
   },
 
+  how_to_subagent_lifecycle: {
+    title: 'SubAgent 入树（事件溯源劳动单元）',
+    related: ['alignment_workflow', 'how_to_worker_lifecycle', 'self_audit_forbidden'],
+    content: `# how_to_subagent_lifecycle — SubAgent 入树
+
+## 核心模型
+SubAgent **不是树实体**（不占 leaf、不占 session_id、不受 caller-binding）—— 它是父 leaf **事件溯源的劳动单元**。
+父 leaf spawn 一个 SubAgent 干活，干完后父在**自 leaf.events** 追加一条 \`subagent_spawn\` 事件留痕。
+
+## 1. 父 leaf 写 subagent_spawn 事件
+\`\`\`
+mcp__tree__tree_event_append({
+  tree_id, leaf_id: <父自己的 leaf_id>,
+  type: 'subagent_spawn',
+  json: {
+    subagent_id: 'sub:<父 leaf_id>:<序号>',   // 父段必须是本 leaf_id
+    role: 'review' | 'research' | 'implement' | 'audit',
+    perspective: 'G1',                          // role=review 必填，其余可选
+    purpose: '<非空，劳动意图>',
+    output_ref: 'deliverables/相对路径',         // 路径安全（复用 expect_outputs 规则）
+    status: 'done' | 'failed'                    // 可选，缺省 done
+  }
+})
+\`\`\`
+- status=done 时引擎校验 \`output_ref\` 文件存在 + size>0（0 字节 → E_DELIVERABLE_EMPTY）。
+- status=failed 时 output_ref 不校验存在/大小。
+
+## 2. review_round 用 SubAgent 做审查
+review_round.reviewer 可声明 \`reviewer_kind: 'subagent'\`：
+\`\`\`
+{
+  perspective: 'G2',
+  reviewer_kind: 'subagent',
+  reviewer_ref: 'sub:<本 leaf_id>:<与 subagent_spawn 同序号>',  // 反向溯源
+  findings: [...]
+}
+\`\`\`
+- \`reviewer_kind=subagent\` 禁用 \`reviewer_session_id\`（互斥，用 reviewer_ref）。
+- 引擎校验：本 leaf.events 必须有匹配的 \`subagent_spawn\` 且 \`meta.subagent_id === reviewer_ref\`，否则 E_REVIEW_FORGERY。
+- SubAgent 是 owner 代理人（owner 自审 by design）→ 跳过 ≠owner/≠added_by 校验。
+
+## 3. independence 标注（可选）
+review_round.meta 可带 \`independence: 'self_delegated' | 'independent'\`（仅校验合法值，不强制）。
+- \`self_delegated\`：owner 自己派的 SubAgent 审查（含本机制）。
+- \`independent\`：独立第三方（独立 session 的 auditor）。
+
+## 4. 与 caller-binding 的关系
+**SubAgent 永远不当 caller**：caller-binding（callerSessionId === audit_session_id）针对的是 audit_gate / milestone_set_result / leaf_set_session 这类身份敏感写操作，SubAgent 不调这些。
+父 leaf 永远是 caller：subagent_spawn 事件由父 leaf 的 session 写入（cmdEventAppend 的 caller 校验一行没改）。
+
+## 常见错误
+- E_SCHEMA_INVALID: subagent_id 父段 ≠ 本 leaf / role 非法 / perspective 缺 / output_ref 路径不安全
+- E_DELIVERABLE_MISSING: status=done 但 output_ref 文件不存在
+- E_DELIVERABLE_EMPTY: status=done 但 output_ref 文件 0 字节（与 done 门禁同源 BUG-3）
+- E_REVIEW_FORGERY: reviewer_kind=subagent 但无匹配 subagent_spawn / reviewer_ref 父段错位 / 同时给了 reviewer_session_id
+
+## 关联
+- alignment_workflow — review_round 完整 schema
+- self_audit_forbidden — caller-binding 不动的边界
+- how_to_worker_lifecycle — done 门禁 size>0`,
+  },
+
   full_guide: {
     title: '完整指南入口（SKILL.md）',
     related: [],
@@ -4092,7 +4296,7 @@ V10 加固要求 auditor 在自己 session 内调 audit_gate（堵 E_BORROWED_ID
 - §3 5 件套契约模板（brief/dod/report/autonomy/self_audit）
 - §4 工作流程 5 步法
 - §5 mcp__tree__* 工具速查（28 个工具）
-- §6 事件路由表（EVENT_TYPE_ENUM 共 9 种：done / blocked / plan / brief_echo / heartbeat_reply / nudge / limit / status_check / review_round）
+- §6 事件路由表（EVENT_TYPE_ENUM 共 10 种：done / blocked / plan / brief_echo / heartbeat_reply / nudge / limit / status_check / review_round / subagent_spawn）
 - §7 三档纠偏决策树（low/mid/high）
 - §8 心跳通道
 - §9 验收 Agent prompt 模板
@@ -4108,11 +4312,11 @@ V10 加固要求 auditor 在自己 session 内调 audit_gate（堵 E_BORROWED_ID
 1. 直接读文件：\`Read("skills/tree-commander/SKILL.md")\`
 2. 或问具体 topic：\`mcp__tree__tree_help('<topic>')\`
 
-## topic 列表（共 15 个）
+## topic 列表（共 16 个）
 how_to_init | how_to_register_auditor | role_semantics | how_to_worker_lifecycle | v10_constraints |
 self_audit_forbidden | borrowed_identity | naming_convention | common_mistakes |
 alignment_workflow | nudge_escalation | audit_tree_structure | error_code_index |
-session_liveness | full_guide`,
+session_liveness | how_to_subagent_lifecycle | full_guide`,
   },
 };
 
