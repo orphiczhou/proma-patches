@@ -45,4 +45,5 @@
 - **P0a auditor role**：role='auditor' 独立审计 leaf，简化协议（brief_echo+done+audit_gate，无 milestone）。关键：resolveAuditorIndep 的 root trust anchor（行 2432-2446）天然支持 root 给 auditor 背书，**不改 resolveAuditorIndep**。auditor 是叶子节点（不能当 parent/operator，同 worker）。state.version 1.1。
 - **P0b TaoWatcher 收窄**：删 C-13/C-15/R-03/R-06/W-10/W-13（35→29 条）+ patches.cjs 废止 audit_log 写入。tao-watcher 逻辑在 patches.cjs（4 副本仅根 + release/patch-l 2 份含 tao-watcher），不在 engine。
 - **P1b fix_evidence**：review_round findings 加可选 finding_id + done event meta.red_findings_resolved 跨事件校验（治 macp4-W3 假收敛：red 降 yellow 但文档没改）。
-- 全量 90/90 绿（auditor 20 + subagent 30 + p0-3 19 + iss003 13 + p1b 8）。commit 3852c61。已部署 Pro（.bak-pre-auditor-role-20260708，待用户重启重测）。
+- 全量 90/90 绿（auditor 20 + subagent 30 + p0-3 19 + iss003 13 + p1b 8）。commit 3852c61。已部署 Pro。
+- **audtest Pro 端到端测试（2026-07-09）**：端到端失败但有价值。✅ P0b 噪音降低完全通过（C-13/R-03/R-06/C-15 假阳性 24-38→0）+ 单元验证 4/5。❌ P0a auditor 完整 done 未跑通（Proma fork identity timeout 卡死 auditor session，BUG-A 跨仓）。发现 **BUG-2（leaf_add caller-binding 失效，macp2 加固漏洞）**：cmdLeafAdd 不透传 callerSessionId（dispatchLeaf 行 4528 `case 'add': return await cmdLeafAdd(rest);`，cmdLeafAdd 行 816 无 callerSessionId 参数），fork 副本可手填 added_by=root 创建 leaf。**待修**（见 `.context/active/handoff-post-audtest-2026-07-09.md`，含精确修复点）。
