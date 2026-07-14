@@ -4,6 +4,26 @@
 
 新条目追加在顶部。
 
+## 🔖 2026-07-15 e2e04 负面场景验证✅（drift/flagged/max_sessions 三机制补齐，Sprint 1-5 矩阵 8/8）
+
+e2e03 之后的负面场景机制验证。主会话 a5c20252 作编排方精确驱动 commander d5b039b9（GLM-5.2）在 pro 跑三棵小树，补 e2e03 ⚪/🟡 三机制。完整报告 [e2e04-verification-2026-07-15.md](./active/e2e04-verification-2026-07-15.md)。
+
+**三场景全通过**：
+- ✅ **③ E_MAX_SESSIONS（e2e04max, max_sessions=3）**：第3个 worker 在 **create_session 阶段**被 E_MAX_SESSIONS 拦（patches 前置预检 findCallerTreesForBypassGuard+预检，Sprint 5 聚类 A），session 未建立=**钱没花**。比 engine leaf_add 兜底（L1121）更前置。三方铁证：pro sessions 无 C + registry=3=max + session_count reached=true。registry source=create_session 证 patches 主动旁路登记。
+- ✅ **① drift 三档（e2e04drf）**：drift_append×3 递进（direction/low/nudge → mid/limit → production/high/prune），leaf.drift_history + state.drift_log 双写各 3 条。
+- ✅ **② flagged 篡改（e2e04flg, review_required=true）**：编排方直接编辑 tree-state 篡改 C-commander（done+伪造audit_gate.pass+review_evidence.flagged+无review_round）→ leaf_add 子被 **E_REVIEW_FLAGGED_BLOCK** 拦（即使伪造 audit_gate.pass，因 isFlagged 看 review_round 不看 audit_gate 字段）；补 review_round 后放行。证 P1-S03 flagged 动态派生防篡改蒙混。
+
+**Sprint 1-5 矩阵 8/8 完成**：e2e03 三项未触发/等价（drift / flagged / max_sessions 上限）全由 e2e04 补齐真实触发。
+
+**三项额外发现**（记待改进，不阻断）：
+- **A. patches 跨树预检 false positive**：commander 合法跨多树时被旧树 reached 误伤（findCallerTreesForBypassGuard 扫 caller 所属所有树，任一 reached 即拒）。非 bug，保守策略代价。解除=事后调大旧树 max_sessions（e2e04max 3→20，备份 .bak-pre-maxrelax）。
+- **B. worker/auditor 不能当 parent**（引擎 L1072-1082，仅 commander 可有子）。commander 自主调 tree_help(role_semantics) 核实并正确识别。场景① 原设计"A-worker 下挂 A1"被否，改聚焦 drift 留痕（D1 prune 级联 sd3e2e/Sprint 3 已证，不重复）。
+- **C. isFlagged 动态 worker 分支疑似 dead code**：动态分支只对 role=worker，但 worker 不能当 parent → 在 leaf_add 父链拦截路径（isFlagged 唯一调用点 L1092）实际走不到。可能仅 migrate 用途，待核实。
+
+**方法学**：编排方精确驱动（逐场景自包含 prompt + 读 tree-state 监督）适合负面场景（需精确构造异常态），与 e2e03 自主协作互补。**落实 e2e03 §8.1 教训**：全程 tree-state.json 为 ground truth，零 API 消息数误判，零 idle 误建会话（e2e03 误建 driver/ping 各 1，本次 0）。
+
+**成本**：8 真实 session（worker 不干活，单 session 成本 < e2e03），~35 分钟墙钟（含 pro 冷启动 + 两次中途诊断/篡改）。零引擎/patches/SKILL 改动（367/0 基线不动；篡改仅场景②模拟攻击 + 场景③调参解除跨树阻塞，均备份 .bak）。
+
 ## 🔖 2026-07-14 e2e03 端到端真实项目验证✅（tree-system 补丁形式 GLM-5.2 自主协作跑通，全自主 tree-harness 子会话）
 
 Sprint 6 之后「真实项目端到端验证」。在 pro（引擎 5532fa5f + patches 339082af + SKILL 8b2d20f2）由 **GLM-5.2 commander(124ccb14) 自主**端到端跑通 tree-system：1 root + 3 worker（create_session 非 fork 派生，77ms 内并行）+ 1 auditor(role=auditor)，**全部 status=done**，产出 **1157 行**架构形式化文档落到 `D:/codes/tree-harness/03_ARCHITECTURE/`（class-diagram.puml 205 / data-model.md 505 / sequence-diagrams×4 112+129+86+120）。完整报告 [e2e03-verification-2026-07-14.md](./active/e2e03-verification-2026-07-14.md)。
