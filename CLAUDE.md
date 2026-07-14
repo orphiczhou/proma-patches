@@ -42,6 +42,7 @@
 - **remote 调用方受限（D1-A）**：编排方（remote）对 pro 仅 `remote_send_message` 可用；`archive_session` 等被 `R6-external-deny` 拒。清理 pro 会话走 pro 本地。
 - pro userData = `~/.proma-dev/`（实证 e2e03/e2e04 全程；ARCHITECTURE.md §3.1 表 2026-07-15 已修 `.proma-pro/`→`.proma-dev/`）。
 - 🔴 **commander 跨多树触发 patches 跨树预检 false positive**（e2e04 2026-07-15 踩坑）：`findCallerTreesForBypassGuard` 扫 caller 所属**所有树**，任一 reached(max_sessions) 即拒 create_session——即使目标树远没 reached。一个 commander 跨多棵测试树时，旧树 reached 会误伤新树建 worker（症状：create_session 返回 E_MAX_SESSIONS 指向**另一棵**树）。解除：事后调大旧树 `audit_meta.max_sessions`（备份 .bak）；或每棵测试树用独立 commander session。
+- 🔴 **commander 协议简化 gap（nanju 2026-07-15 教训）**：nanju commander 推进 04_API_SPEC 时跳了 worker 自审（tree-worker §4.6 review_round G1-G5 进程内 SubAgent）+ commander 审计（铁律 5/§14 auditor）——**根因**：建 tree `audit_meta.review_required=false`（关 worker 自审强约束，done 门禁不校验 review_round）+ brief 标 auditor「（可选）」（误导 commander 跳铁律 5）+ glm commander 自主简化（没走铁律 3 三步门）。对比 e2e03（走完整 auditor role + 交叉审 11pass/3fail）。**改正（建 tree + brief 模板）**：文档/产出任务建 tree 默认 `review_required=true`（worker §4.6 自审强制，引擎 done 门禁校验 review_round 末轮 red_count=0）+ brief auditor **必派不标可选**（铁律 5 文档任务≥4 auditor，§14）。SKILL §4.6/§14/铁律 3-5 设计完整，是**配置+执行没继承**，非设计缺失。
 
 ## 文档引擎一致性（P0 高发区）
 任何 SKILL 错误码/触发点/字段必须对照 tree-engine 实际校验逻辑（grep 错误码常量 + 看抛错条件）。历次审计抓出的 P0 都是文档与引擎不一致（如 E_REVIEW_FORGERY 触发点、output_ref 解析基准）。
