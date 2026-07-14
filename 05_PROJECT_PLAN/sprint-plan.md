@@ -11,11 +11,12 @@
 
 | 维度 | 状态 |
 |---|---|
-| 引擎版本 | v0.16.5 + V10 P3 + IHL R6 + 07-09 caller-binding + create_session budget |
+| 引擎版本 | v0.16.5 + V10 P3 + IHL R6 + 07-09 caller-binding + create_session budget；2026-07-15 删 isFlagged 动态 worker dead code 分支（e2e04 核实，零语义变化；已部署 pro dist `818f6cb2` + 重启加载，全量测试 16/0 零回归）|
 | 基线 | ✅ 源码统一 + 文档治理 + .context 统一 |
 | PRD | ✅ 01_PRD/ 5 份（定位/场景/指标/team-config/护栏）|
 | 方法论 | 🟡 本轮补建中（coverage-audit / sprint-plan / workflow）|
 | 测试 | dbc-spec 48/0 / audit-attacks 18/0 / v10-cleanroom 54/54 |
+| 端到端验证 | ✅ e2e03 正向（GLM-5.2 自主协作跑通）+ e2e04 负面（drift/flagged/max_sessions 三机制）= Sprint 1-5 新机制实证矩阵 **8/8**（2026-07-15，[报告](../.context/active/e2e04-verification-2026-07-15.md)）|
 | 部署 | Dev（权威源）✅ / Release 落后暂缓 / 未向 Proma 提交 PR |
 
 ---
@@ -29,6 +30,9 @@ Sprint 3（Phase D）        ← ✅ 完成（prune/migrate/watcher 语义完整
 Sprint 4（跨工作区 + TAO） ← ✅ 完成（workspace 拦截 P1/P2 + TAO 角色规则 + P1-S05 命运决策）
 Sprint 5（安全根治）       ← ✅ 完成（聚类 A/B 单边缓解 + 跨仓标记，2026-07-14）
 Sprint 6（产品化验证）     ← 🟡 准备✅（5 项材料齐）+ 外部待办（PR/实验/团队，2026-07-14）
+
+端到端验证（非 Sprint）   ← ✅ e2e03 正向 + e2e04 负面 = Sprint 1-5 机制实证矩阵 8/8（2026-07-15）
+                          ← 🧹 isFlagged 动态 worker dead code 清理（e2e04 发现 C，零语义变化，未部署 pro）
 ```
 
 ### Sprint ↔ User Stories 覆盖映射（PRD 域 ↔ 计划域双向追溯）
@@ -115,6 +119,8 @@ Sprint 6（产品化验证）     ← 🟡 准备✅（5 项材料齐）+ 外部
 **目标**：根治「约束只覆盖合规路径」（聚类 A）+ 「门禁互相架空」（聚类 B）。
 
 > ✅ **完成总结（2026-07-14）**：四项全部完成。全量 **286/0 零回归** + 新增 sprint5 三测试 **81/0**（max-sessions 34 + patches-bypass 27 + gate-reachability 20）= 367 全绿。聚类 A/B **单边缓解全部落地**（engine max_sessions 硬护栏 + patches create_session 旁路登记 + SKILL auditor fallback + 门禁可达性审计无绕过链）；跨仓根治（SDK 回调 / subagent_trace_id / fork identity）**标记汇报**，不在 tree-harness 范围。详见 CHANGELOG [Unreleased] Sprint 5 + note 2026-07-14 Sprint 5 条目。
+>
+> 🔬 **e2e04 端到端实证（2026-07-15）**：Sprint 5 的 max_sessions（patches 前置预检「钱没花」）+ flagged 篡改检测（E_REVIEW_FLAGGED_BLOCK，伪造 audit_gate.pass 蒙混不过）两机制在真实 MCP 异常输入下触发，补齐 e2e03 的等价/未触发项 → Sprint 1-5 机制实证矩阵 **8/8**。同时 e2e04 发现 C 触发 isFlagged 动态 worker dead code 分支清理（见 §一 引擎版本，零语义变化）。
 
 | 交付物 | 类型 | 验收 | 状态 |
 |---|---|---|---|

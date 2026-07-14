@@ -1356,9 +1356,9 @@ function isFlagged(leaf, state) {
   const evs = Array.isArray(leaf.events) ? leaf.events : [];
   const hasReview = evs.some((e) => e && (e.type === 'review_round' || e.event_type === 'review_round'));
   if (hasReview) return false;  // 已补审 → 不 flagged
-  // 未补审：migrate 静态 flagged（存量 done-未审）|| 动态（新 leaf done worker 该审未审）
+  // 未补审：migrate 静态 flagged（存量 done-未审）
   if (leaf.review_evidence && leaf.review_evidence.flagged === true) return true;
-  if (leaf.status === 'done' && leaf.role === 'worker' && isReviewRequired(leaf, state)) return true;
+  // 2026-07-15 e2e04 核实：动态 worker 分支已删（dead code—worker 不能当 parent L1072，在 leaf_add 父链拦截路径走不到；静态 review_evidence.flagged + migrate 规则11 已覆盖）
   return false;
 }
 

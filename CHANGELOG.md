@@ -9,6 +9,27 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), adheres to [Sem
 
 ## [Unreleased]
 
+### 2026-07-15 e2e04 负面场景验证✅ + isFlagged dead code 清理（零引擎语义变化）
+
+e2e03 之后的**负面场景机制验证**。在 pro（引擎 `5532fa5f` + patches `339082af` + SKILL `8b2d20f2`）由 GLM-5.2 commander + 编排方精确驱动三棵小树，补齐 e2e03 未演练的三机制。完整报告 [.context/active/e2e04-verification-2026-07-15.md](./.context/active/e2e04-verification-2026-07-15.md)。
+
+**三场景全通过 + Sprint 1-5 机制实证矩阵 8/8**：
+- ✅ **E_MAX_SESSIONS 双层护栏**（e2e04max, max_sessions=3）：第3个 worker 在 **create_session 阶段**被拦（patches 前置预检 `findCallerTreesForBypassGuard`，session 未建立=**钱没花**），比 engine leaf_add 兜底更前置；registry count=3/max=3/reached=true。
+- ✅ **drift 三档联动**（e2e04drf）：drift_append×3 递进（direction/low/nudge → mid/limit → production/high/prune），leaf.drift_history + state.drift_log 双写各 3 条。
+- ✅ **flagged 篡改检测**（e2e04flg, review_required=true）：篡改 C-commander（done + 伪造 audit_gate.pass + review_evidence.flagged + 无 review_round）→ leaf_add 子被 **E_REVIEW_FLAGGED_BLOCK** 拦（即使伪造 audit_gate.pass，因 isFlagged 看 review_round 不看 audit_gate 字段）；补 review_round 后放行。证 P1-S03 flagged 从 events 动态派生、防篡改蒙混。
+- e2e03 三项未触发/等价（drift / flagged / max_sessions 上限）全由 e2e04 补齐真实触发 → **Sprint 1-5 新机制实证矩阵 8/8 完成**（e2e03+e2e04 合并）。
+
+**三项额外发现**（记待改进，不阻断）：A. patches 跨树预检 false positive（保守策略代价）；B. worker/auditor 不能当 parent（引擎 L1072-1082）；**C. isFlagged 动态 worker 分支 = dead code（见下）**。
+
+**isFlagged 动态 worker 分支删除（dead code，e2e04 发现 C 核实）**（tree-engine.cjs `isFlagged` L1355-1363，已部署 pro：dist md5 `818f6cb2` + 重启加载，2026-07-15）：
+- e2e04 SubAgent 全引擎核实：`isFlagged` 三分支中 #3（`status==='done' && role==='worker' && isReviewRequired`）是 dead code——isFlagged 全引擎仅 1 调用点（cmdLeafAdd 父链扫描 L1092），而 worker 不能当 parent（L1072-1082，segment_append 只改 session 不改 parent），故 done worker 永不是新 leaf 祖先，#3 走不到。
+- 删除 #3（git diff 2+/2-，**净 0 行**），保留有效路径：#1 hasReview→false + #2 `review_evidence.flagged===true`（migrate 规则11 静态标记，e2e04 场景②实证）。L1361 注释标 "2026-07-15 e2e04 核实"。
+- **零行为变化**：dead code 不可达，删除零语义影响、零回归（不触测试套件）。flagged 拦截机制不变（静态分支 #2 仍是有效拦截路径）。
+
+**文档同步**：note（e2e04 条目，已写）/ sprint-plan（e2e04 完成 + dead code 清理状态）/ 本 CHANGELOG 条目。**API.md + ERROR-CODES.md 的 `E_REVIEW_FLAGGED_BLOCK` 高层描述（"父链有 flagged leaf，需先补审"）不涉及 isFlagged 三分支细节，无需改**（静态分支仍提供拦截）。**ARCHITECTURE.md / 03_ARCHITECTURE/data-model.md 无 isFlagged/flagged 提及，无需改**。引擎 md5/行数同步走 `sync-doc-md5.cjs` 单独流程（不盲替历史快照）；CLAUDE.md 更新不在本同步范围。
+
+**零回归**：e2e04 零引擎/patches/SKILL 改动（367/0 基线不动，篡改仅场景②模拟攻击 + 场景③调参解除跨树阻塞，均备份 .bak）；dead code 删除零语义影响（不可达分支）。pro dist 已从 `5532fa5f` 更新为 `818f6cb2`（删 dead code + 重启加载新引擎；dead code 不可达，运行时零行为差异）。全量测试 16 文件零回归。
+
 ### Sprint 6 产品化验证 准备✅（2026-07-14，外部待办）
 
 Sprint 6「产品化验证」的 5 项**准备**全部完成。**执行（PR 提交/实验跑/团队试用）= 外部依赖**，标记汇报，不在 tree-harness 单边范围。无引擎/patches 改动（367/0 零回归基线未动）。

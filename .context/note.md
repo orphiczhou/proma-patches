@@ -4,6 +4,24 @@
 
 新条目追加在顶部。
 
+## 🔖 2026-07-15 thdev tree 调度（P2/P3 单边深化，3 worker 独立子会话 + GLM 余额阻塞）
+
+用 tree-system 调度 thdev tree（主会话 a5c20252 作 root，workspace=proma）派 3 worker 独立子会话处理 e2e04 后单边深化。2 完成 + 1 印证。
+
+**W1 删 isFlagged dead code（thdev-A-worker）✅**：删 tree-engine.cjs L1361 第3动态分支（e2e04 发现 C）+ node -c + **全量测试 16 文件零回归** + 部署 pro（dist md5 `818f6cb2` + 重启加载新引擎）。dead code 不可达，零行为差异。
+
+**W2 上游 PR 方向1 核实（thdev-B-worker）✅ 印证**：clone proma-ai/Proma → D:/codes/Proma-upstream（完整）。主会话源码核实方向1（补丁 C 跨渠道清 sdkSessionId 上游化）：`agent-session-manager.ts` **L621** 跨工作区切时清 sdkSessionId（#903 收敛点）→ 方向1 gap **不成立**，印证 first-pr-draft 颠覆性结论（方向1 不适合 PR）。E1 范围收窄（方向1 排除，需找别的改进点）。PR 提交=外部。
+
+**W3 文档同步（thdev-C-worker）✅ done**：CHANGELOG（e2e04 + dead code 条目）+ sprint-plan（引擎版本 + 端到端 8/8）。初版误改 skills/assets/core/tdb* 测试 fixture（已回滚）+ "未部署pro"措辞过时（已修正为已部署 818f6cb2）。
+
+**🔴 阻塞 + 教训**：
+- **GLM-5.2 两渠道余额不足**（ZLM cbb12a0b + proma-official 都 billing_error/unknown_error）。W1/W2 卡余额（旧 worker archived 前改了文件但没 done），W3 运气好先 done。新 worker glm 也卡（用户手动鞭策无效）。核心验证（W1 测试 16/0 + W2 源码 L621）由**主会话补完**（主会话额度够）。
+- **隶属子会话 + workspace**：create_session 默认到 default 工作区（南大项目），须显式 workspace_id=proma。隶属靠 tree leaf（added_by=root），**不靠 fork**（fork 继承主会话 489 条历史太重）。正确姿势：create_session(workspace=proma, 不指定则去 default) + leaf_add 隶属 root。
+- **W-08 leaf purity 瑕疵**：初版 brief 让 worker 直接 event_append 违反 W-08（worker 不应写 tree，应上报 commander）。已改：worker 结果回复，主会话 root 写 tree event。
+- **archive 时机**：archive 跑中的 worker 丢失上下文（旧 W1/W2 archive 前改了文件但没 done event）。应等 worker 停再 archive。
+
+**外部待续**（E1-E5 不变）：E1 PR 提交 / E2 团队 / E3 实验(花钱) / E4-E5 跨仓根治。
+
 ## 🔖 2026-07-15 e2e04 负面场景验证✅（drift/flagged/max_sessions 三机制补齐，Sprint 1-5 矩阵 8/8）
 
 e2e03 之后的负面场景机制验证。主会话 a5c20252 作编排方精确驱动 commander d5b039b9（GLM-5.2）在 pro 跑三棵小树，补 e2e03 ⚪/🟡 三机制。完整报告 [e2e04-verification-2026-07-15.md](./active/e2e04-verification-2026-07-15.md)。
