@@ -40,7 +40,8 @@
 - API list_messages 的 text 截断到 ~1KB；要精确结论发简短问题 wait=true。
 - 🔴 **监督 tree-system 进度读 tree-state.json（文件通道），禁用 API `list_messages` 消息数判进度**（e2e03 实证教训 2026-07-14）：GLM-5.2 commander 在**单个长未提交轮**内完成全部多步工作（tree_init→create_session→leaf_add→done→audit_gate… 共 N 次 tree write），轮内 tool call **不立即落 API 消息表**，直到轮结束才提交。故 commander 自主跑长任务时 API `list_messages` 全程 `total=1`（仅初始 user 消息）是**正常假信号**，≠卡死（早期笔记「total>1 才算启动」对长自主轮不成立，已证伪）。ground truth = pro tree-state.json：`~/.proma-dev/agent-workspaces/<slug>/.context/trees/<tree_id>/tree-state.json`（每次 tool call 原子落盘，leaves/events/session_registry/audit_log 实时可读）。曾因此误判 commander 卡死、误建 driver 欲转受控方式，撞 `E_DUPLICATE_LEAF` 才发现早已跑完 3 worker——**浪费轮询 + 污染**。判 commander 死活：`remote_get_session_info` status=busy（正在处理）+ tree-state 是否推进，二者皆停滞才算真卡死；任一推进就继续等。
 - **remote 调用方受限（D1-A）**：编排方（remote）对 pro 仅 `remote_send_message` 可用；`archive_session` 等被 `R6-external-deny` 拒。清理 pro 会话走 pro 本地。
-- pro userData = `~/.proma-dev/`（实证 2026-07-14 e2e03 全程；ARCHITECTURE.md §3.1 表标 `.proma-pro/` **过时**待修，勿信）。
+- pro userData = `~/.proma-dev/`（实证 e2e03/e2e04 全程；ARCHITECTURE.md §3.1 表 2026-07-15 已修 `.proma-pro/`→`.proma-dev/`）。
+- 🔴 **commander 跨多树触发 patches 跨树预检 false positive**（e2e04 2026-07-15 踩坑）：`findCallerTreesForBypassGuard` 扫 caller 所属**所有树**，任一 reached(max_sessions) 即拒 create_session——即使目标树远没 reached。一个 commander 跨多棵测试树时，旧树 reached 会误伤新树建 worker（症状：create_session 返回 E_MAX_SESSIONS 指向**另一棵**树）。解除：事后调大旧树 `audit_meta.max_sessions`（备份 .bak）；或每棵测试树用独立 commander session。
 
 ## 文档引擎一致性（P0 高发区）
 任何 SKILL 错误码/触发点/字段必须对照 tree-engine 实际校验逻辑（grep 错误码常量 + 看抛错条件）。历次审计抓出的 P0 都是文档与引擎不一致（如 E_REVIEW_FORGERY 触发点、output_ref 解析基准）。

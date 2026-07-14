@@ -377,7 +377,7 @@ segment_pending → active (新 session 接管)
 ```
 - 段 1 `prefix`: 小写字母开头，4-8 字符，仅 `[a-z0-9_]`
 - 段 2 `path`: 树定位（root 空 / 子 `A` `B` `C` / 孙 `A1` `A2` / 曾孙 `A1a` `A1b`）；**不允许两个连续大写字母**（如 `RT` 非法）
-- 段 3 `role`: 角色短名，可含连字符（如 `eval` `api` `ui`）
+- 段 3 `role`: 正则段为 `(\w+)`（字母数字下划线，**不含连字符**）；命名约定取 leaf 的 `role` 字段值（root/commander/worker/auditor，见 §3 ROLE_ENUM），如 `e2e03-A-worker` 段 3 = `worker`。正则本身宽泛，但 `leaf.role` 字段由引擎 cmdLeafAdd 做 ROLE_ENUM 硬校验（越界抛 `E_SCHEMA_INVALID`）
 - 段 4 `suffix`: 可选；`s<N>` 表竹节 / `i<N>` 表尝试序号
 
 **示例**: `e2e03-B-worker` = e2e03 项目第 2 子（B）执行 worker 角色。

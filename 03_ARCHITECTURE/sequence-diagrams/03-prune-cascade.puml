@@ -61,7 +61,7 @@ eng -> c2 : leaf_set_status(c2, pruned)
 c2 -> state : c2.status = pruned\n(E_LEAF_AUTO_PRUNED 级联)
 
 ' ── 阶段 4：drift_log 记录 ──
-eng -> eng : tree_drift_append(parent,\n  kind=escalation, severity=high,\n  action=prune, fork_to=null,\n  reason="nudge_count≥7 cascade")
+eng -> eng : tree_drift_append(parent,\n  kind=production, severity=high,\n  action=prune, fork_to=null,\n  reason="nudge_count≥7 cascade")
 note right of eng
   drift_history 留痕：fork_to=null 表无重派
   （pruned 不像 drift_declare 那样可 fork 救回）

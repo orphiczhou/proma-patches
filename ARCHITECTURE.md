@@ -85,7 +85,7 @@
 | 正式版 | `D:\Proma\` | 双击 | `Proma.exe`（黑）| - | - | `~/.proma/` | - |
 | Dev | `D:\Proma-dev\` | `start-dev.bat` | `Proma-white.exe`（白）| `dev` | `1` | `~/.proma-dev/` | ✅ |
 | Release | `D:\Proma-dev\` | `start-release.bat` | `Proma-coral.exe`（珊瑚）| `release` | `0` | `~/.proma/`（共享）| ❌ |
-| Pro | `D:\Proma-dev\` | `start-pro.bat` | `Proma-green.exe`（绿）| `pro` | `1` | `~/.proma-pro/` | ✅ |
+| Pro | `D:\Proma-dev\` | `start-pro.bat` | `Proma-green.exe`（绿）| `pro` | `1` | `~/.proma-dev/` | ✅ |
 | Release-Fresh | `D:\Proma-dev\` | `start-release-fresh.bat` | 同 Release | `release-fresh` | `1` | `~/.proma-release-fresh/` | ✅ |
 
 ### 3.2 两变量体系（v0.16.5 修正）

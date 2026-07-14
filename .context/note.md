@@ -18,7 +18,7 @@ e2e03 之后的负面场景机制验证。主会话 a5c20252 作编排方精确�
 **三项额外发现**（记待改进，不阻断）：
 - **A. patches 跨树预检 false positive**：commander 合法跨多树时被旧树 reached 误伤（findCallerTreesForBypassGuard 扫 caller 所属所有树，任一 reached 即拒）。非 bug，保守策略代价。解除=事后调大旧树 max_sessions（e2e04max 3→20，备份 .bak-pre-maxrelax）。
 - **B. worker/auditor 不能当 parent**（引擎 L1072-1082，仅 commander 可有子）。commander 自主调 tree_help(role_semantics) 核实并正确识别。场景① 原设计"A-worker 下挂 A1"被否，改聚焦 drift 留痕（D1 prune 级联 sd3e2e/Sprint 3 已证，不重复）。
-- **C. isFlagged 动态 worker 分支疑似 dead code**：动态分支只对 role=worker，但 worker 不能当 parent → 在 leaf_add 父链拦截路径（isFlagged 唯一调用点 L1092）实际走不到。可能仅 migrate 用途，待核实。
+- **C. isFlagged 动态 worker 分支 = dead code（SubAgent 核实确认）**：全引擎仅 1 调用点（L1092 leaf_add 父链扫描）；worker 不能当 parent（L1072）→ done worker 永不是新 leaf 祖先 → 动态分支 #3 走不到；migrate 用静态 review_evidence.flagged（规则11 L3798）不经 #3。静态分支 #2 才有效（e2e04 场景②实证）。建议删 #3 或标防御性。
 
 **方法学**：编排方精确驱动（逐场景自包含 prompt + 读 tree-state 监督）适合负面场景（需精确构造异常态），与 e2e03 自主协作互补。**落实 e2e03 §8.1 教训**：全程 tree-state.json 为 ground truth，零 API 消息数误判，零 idle 误建会话（e2e03 误建 driver/ping 各 1，本次 0）。
 

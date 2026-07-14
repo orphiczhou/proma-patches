@@ -44,7 +44,7 @@ end note
 root -> ws_new : create_session(channel, model)\n'' 干净会话，ctx=0%
 ws_new --> root : session_id_new
 
-root -> eng : tree_register_session(tree_id,\n  session_id=session_id_new,\n  source=segment, caller=root)
+root -> eng : tree_register_session(tree_id,\n  session_id=session_id_new,\n  source=create_session, caller=root)
 activate eng
 note right of eng
   Sprint 5 max_sessions 守卫

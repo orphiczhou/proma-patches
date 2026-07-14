@@ -142,8 +142,8 @@ C1-worker 未落库（present=False）。
 ### B. 引擎硬约束：worker/auditor 不能当 parent（L1072-1082）
 场景① 原设计「A-worker 下挂 A1-worker」被引擎拒（`parent is a worker (atomic leaf). Only commanders can have children`）。commander 自主调 `tree_help(role_semantics)` 核实并正确识别、汇报「step5 引擎层不可行」，未盲目重试。引擎 L1072-1082：parent role∈{worker,auditor} → throw E_SCHEMA_INVALID，只有 commander/root 可有子。**价值**：role 语义约束真实 MCP 下生效 + commander 能自主调 help 诊断。
 
-### C. isFlagged 动态 worker 分支疑似 dead code（待核实）
-`isFlagged`（L1355）三分支：(1) hasReview→false (2) review_evidence.flagged===true→true（静态）(3) `status==='done' && role==='worker' && isReviewRequired`→true（动态 worker）。isFlagged 唯一调用点是 leaf_add 父链扫描（L1092）。但**动态 worker 分支要求 leaf 是 worker，而 worker 不能当 parent（发现 B）**——flagged worker 永不会是某新 leaf 的祖先。该分支在 leaf_add 拦截路径实际走不到。可能用途：migrate 回灌标记。**诚实标注**：未深挖，记入待核实（potential dead code），不阻断结论。
+### C. isFlagged 动态 worker 分支 = dead code（SubAgent 核实确认）
+`isFlagged`（L1355）三分支：(1) hasReview→false (2) `review_evidence.flagged===true`→true（静态）(3) `status==='done' && role==='worker' && isReviewRequired`→true（动态 worker）。SubAgent 全引擎核实结论：**#3 是 dead code**。证据链：(a) isFlagged 全引擎仅 1 调用点 cmdLeafAdd 父链扫描 L1092；(b) worker 不能当 parent（L1072-1082，且 segment_append 只改 session 不改 parent、migrate 规则4 是数据修复不建新父子，无路径让 worker 进祖先链）；(c) cmdMigrate 不调 isFlagged，只设静态 `review_evidence.flagged`（规则11 L3798-3821 标记存量 done worker）。故 done worker 永不是新 leaf 祖先 → #3 走不到。**静态分支 #2（migrate 标记）才是有效路径**（e2e04 场景②实证）。建议：可删 #3（L1361）或补注释标防御性（仅手工篡改 tree-state 让 worker 当 parent 时才有意义，但那是引擎防不住的 Layer4 攻击）。
 
 ---
 
