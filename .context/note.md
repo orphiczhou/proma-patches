@@ -10,7 +10,7 @@
 
 **W1 删 isFlagged dead code（thdev-A-worker）✅**：删 tree-engine.cjs L1361 第3动态分支（e2e04 发现 C）+ node -c + **全量测试 16 文件零回归** + 部署 pro（dist md5 `818f6cb2` + 重启加载新引擎）。dead code 不可达，零行为差异。
 
-**W2 上游 PR 方向1 核实（thdev-B-worker）✅ 印证**：clone proma-ai/Proma → D:/codes/Proma-upstream（完整）。主会话源码核实方向1（补丁 C 跨渠道清 sdkSessionId 上游化）：`agent-session-manager.ts` **L621** 跨工作区切时清 sdkSessionId（#903 收敛点）→ 方向1 gap **不成立**，印证 first-pr-draft 颠覆性结论（方向1 不适合 PR）。E1 范围收窄（方向1 排除，需找别的改进点）。PR 提交=外部。
+**W2 上游 PR 方向1 深化（thdev-B-worker）✅ 成立（颠覆主会话浅判）**：clone proma-ai/Proma → D:/codes/Proma-upstream（HEAD=**v0.14.20**，超 v0.13.3 假设，首个 PR 须 target v0.14.x）。W2 深入核实 first-pr-draft §九（116 行实证）：方向1 gap **成立**——非"创建即矛盾"，而是 **stale-meta 漂移**（session.meta channelId/modelId 创建后永不回写 `agent-session-manager.ts:188`，功能性消费者 `agent-collaboration-tools.ts:375`+`feishu-bridge.ts:542` 读陈旧值；automation 复用 `automation-scheduler.ts:156` 触发）。与 #903 同向（仅写真实值不动 sdkSessionId）。TS 草案 sendMessage 单点守卫 ~15 行（agent-orchestrator.ts:907-909 间）。就绪度 65-70%，建议 Issue 先行（维护者 may 判 session.channelId by design）。🔴 **主会话浅判错**（L621 grep 判"不成立"）——W2 深入读源码+commit(#903 2c9408c9)+多处定位纠正。教训：复杂 gap 判断不能浅 grep。E1 聚焦方向1（stale-meta PR）。提交=外部。
 
 **W3 文档同步（thdev-C-worker）✅ done**：CHANGELOG（e2e04 + dead code 条目）+ sprint-plan（引擎版本 + 端到端 8/8）。初版误改 skills/assets/core/tdb* 测试 fixture（已回滚）+ "未部署pro"措辞过时（已修正为已部署 818f6cb2）。
 

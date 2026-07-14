@@ -243,3 +243,116 @@ channelId/modelId 可能与实际 SDK 调用不一致，导致：
 - **不凭 sed 补丁臆造 TS 源码 PR**：必须源码核实，否则是猜测。
 - **不碰 tree-engine/patches 闭源组件**：它们是 ADDENDUM 闭源，不能进上游 PR。
 - **不替代用户的 GitHub 操作**：提交是外部依赖，子会话只准备材料。
+
+---
+
+## 九、方向 1 源码核实实证（W2 · 2026-07-15 clone 核实）
+
+> 本节是对 §四方向 1 + §五模板中所有 `[需源码核实]` 占位的**实证回填**。核实基于 clone 上游 main 的真实 TS 源码，给出 file:function:line 级证据。
+> 维护：thdev-B-worker（W2）｜ 产出：2026-07-15
+
+### 9.1 核实方法与版本事实（含重要修正）
+
+- **clone**：`proma-ai/Proma` main → `D:/codes/Proma-upstream`（exit 0，未污染 tree-harness 仓）。
+- ⚠️ **版本修正**：clone HEAD = **v0.14.20**（`apps/electron/package.json` version），**已超出本文 §一假设的 v0.13.3**。#903 在 v0.13.3 落地，main 又向前迭代了一个小版本（最新 commit `2a3d9b37` #1142）。**首个 PR 必须 target 最新 main（v0.14.x），而非 v0.13.3**。
+- **#903 commit 实证**（`git log`）：
+  - `2c9408c9` `refactor(agent): sdkSessionId 清除收敛为仅 thinking-signature 一处 (#903)`
+  - `58773654` `fix(agent): 长任务断连后保留 sdkSessionId，避免上下文丢失重启 (#903) (#905)`
+  - 源码注释佐证（`agent-orchestrator.ts:674-677`）：「仅在确定旧会话永久无效时（thinking-signature）才清除磁盘 meta；其余场景保留，新 SDK 会话产生的 sdkSessionId 会通过 onSessionId 回调自动覆盖。」
+
+### 9.2 gap 真实性判定：**部分真实 ——「stale-meta 漂移」**
+
+方向 1 的原表述「create_session 后 channelId/modelId 与实际 SDK 调用不一致」**经核实需精确化**：上游不存在「create_session 写 A、紧接着 SDK 调用用 B」的直接矛盾（创建路径与运行路径在 automation/collaboration 场景下是一致的，见 9.3）。真实 gap 是更隐蔽的**「session.meta 的 channelId/modelId 创建后永不回写，却被功能性消费者读取」**：
+
+| 维度 | 核实结论 | 证据 |
+|---|---|---|
+| 创建时写入 | ✅ `createAgentSession` 把 channelId/modelId 直接存入 meta | `agent-session-manager.ts:188-205` |
+| 运行时取值 | ✅ `sendMessage` 用**每次调用的 input** channel/model，不读 meta | `agent-orchestrator.ts:789,879,895`；`generateTitle:547-566` |
+| 运行后回写 | ❌ **从不**把 input 的 channel/model 同步回 meta | 全仓 `updateAgentSessionMeta(...channelId/modelId)` 零命中 |
+| 创建后任何路径更新 | ❌ **无**。3 个通用 IPC 更新器仅 pin/archive/completion | `ipc.ts:1828(TOGGLE_PIN)/1843(CLEAR_COMPLETION_STATE)/1860(TOGGLE_ARCHIVE)` |
+| 对照（CHAT 老路径） | CHAT 有 `updateConversationMeta({modelId,channelId})`，Agent 没有 | `ipc.ts:1201` |
+| 功能性消费者读取 | ⚠️ **存在**，会读到陈旧值 | 见 9.3 第 4 点 |
+
+**结论：gap 真实，但属「陈旧元数据漂移」而非「创建即矛盾」。** 当 input 的 channel/model ≠ 创建默认值时（UI 会话中途切换渠道 / automation 复用 session 模式），meta 与实际运行值发散，功能性消费者读到错误值。
+
+### 9.3 定位（file:function:line）
+
+1. **写入点（唯一）**：`agent-session-manager.ts:188` `createAgentSession(title?, channelId?, workspaceId?, modelId?)` → `:197-205` 写入 meta，**此后全生命周期不再变更**。
+2. **运行取值点**：`agent-orchestrator.ts:788` `sendMessage(input)` → `:789` 解构 `channelId/modelId`（来自 input）；`:879` `getChannelById(channelId)`；`:895` `decryptApiKey(channelId)`；`:547-566` `generateTitle({channelId,modelId})`。**全部用 input 值，零回写**。
+3. **IPC 透传点**：`ipc.ts:2208-2219` `AGENT_IPC_CHANNELS.SEND_MESSAGE` → 直接 `runAgent(input, ...)`，**不与 session.channelId 做一致性校验/同步**。
+4. **功能性消费者（读到陈旧值即受害）**：
+   - `agent-collaboration-tools.ts:375,411,465` —— 委派摘要/恢复 `getDelegationSummary` 读 `session.channelId/modelId`。
+   - `feishu-bridge.ts:542,562` —— 飞书 Session 镜像用 `session.channelId ?? default ?? settings` 作为镜像绑定渠道（**首选 session 值**），`:563` modelId 却走 `botConfig.defaultModelId`（与 session 解耦，本身也是一处不一致）。
+5. **发散场景**：
+   - UI 会话中途切换渠道：renderer **无任何 IPC 能更新 Agent session 的 channelId/modelId**（9.2 表已证），故切换后 session.channelId 停留在创建默认值。
+   - automation 复用模式：`automation-scheduler.ts:156` `reuseSessionId` + `:207-208` 运行用 `automation.channelId/modelId`，若 ≠ 复用 session 的存储值 → 漂移。（新建模式 `:158` 创建与 `:207-208` 运行同值，一致。）
+6. **#903 清除点（不可触碰）**：`agent-orchestrator.ts:677,1758,2126` 均为「仅 thinking-signature 清 sdkSessionId」。
+
+### 9.4 与 #903 的关系（方向调整的关键）
+
+- 方向 1 的修复**必须是「把实际使用的 channel/model 回写 meta」**（一致性强化），**绝不是「channel 变化就清 sdkSessionId」**（后者即补丁 F/H，已被 #903 commit `2c9408c9` 明确否决为「过度清除致上下文丢失」）。
+- 二者**同向不冲突**：#903 的哲学是「保持 session 状态真实、不过度清除 resume 指针」；本修复补的是「**写入真实值**」这一面 —— 让 meta 的 channel/model 如实反映运行实际，同时**完全不动 sdkSessionId**（resume 指针照常保留；channel 真变了时新 sdkSessionId 由 `:675` 所述 onSessionId 回调自动覆盖）。
+- 这是把草案 §五「不做什么」里「不改 sdkSessionId 清除策略」从承诺升级为**架构论证**。
+
+### 9.5 TS 改动草案（最小守卫）
+
+**位置**：`agent-orchestrator.ts` `sendMessage` 内，API Key 解密成功（`:907`）之后、`activeSessions.set`（`:909`）之前。此时 channel 已校验、key 已解密，且尚未抢占槽位。
+
+```ts
+// 2.2 同步本轮实际使用的 channelId/modelId 到 session meta
+// 避免存储值与运行值漂移（功能性消费者：飞书镜像 feishu-bridge.ts:542、
+// 委派摘要 agent-collaboration-tools.ts:375 会读取 session.channelId/modelId）。
+// 与 #903 同向：仅写入真实值，绝不触碰 sdkSessionId / resume 指针。
+// 只覆盖入参确实提供的字段（modelId 在 IPC 路径可能为 undefined，不可误清）。
+try {
+  const currentMeta = getAgentSessionMeta(sessionId)
+  if (currentMeta) {
+    const updates: Partial<AgentSessionMeta> = {}
+    if (channelId !== undefined && currentMeta.channelId !== channelId) {
+      updates.channelId = channelId
+    }
+    if (modelId !== undefined && currentMeta.modelId !== modelId) {
+      updates.modelId = modelId
+    }
+    if (Object.keys(updates).length > 0) {
+      updateAgentSessionMeta(sessionId, updates)
+    }
+  }
+} catch { /* 会话可能已删除 */ }
+```
+
+**为什么只覆盖已定义字段**：IPC Agent 发送路径（`ipc.ts:2209`）的 `AgentSendInput.modelId` 可能为空，若用 `{ channelId, modelId }` 整体写入会把已存在的 modelId 误清为 undefined。逐字段守卫避免回归。
+
+**改动量**：单点、约 15 行、无新概念、无新 IPC、无多实例/插件层。完全符合 §五「合并理由」的架构契合 + 低侵入可回滚。
+
+### 9.6 测试方案
+
+1. **单元测试**（`agent-session-manager.test.ts` 已存在）：建 session(channelId=A, modelId=M1)，模拟 `sendMessage` 入参 (channelId=B, modelId=M2)，断言 `getAgentSessionMeta(id).channelId === 'B' && modelId === 'M2'`。
+2. **不误清回归**：建 session(modelId=M1)，`sendMessage` 入参 modelId=undefined，断言 session.modelId **仍为 M1**（守卫不覆盖空值）。
+3. **不动 sdkSessionId 回归**：建 session(sdkSessionId=S, channelId=A)，`sendMessage` 入参 channelId=B，断言 session.sdkSessionId **仍为 S**（#903 resume 保留不被破坏）。
+4. **现有套件**：`bun test`（agent-session-manager.test / agent-model-routing.test / agent-workspace-manager.test 等）全绿 + `tsc --noEmit` typecheck 通过。
+
+### 9.7 就绪度与诚实风险评估
+
+**就绪度：~65-70%（可提交，但非「一眼就合」）。**
+
+| 风险 | 等级 | 缓解 |
+|---|---|---|
+| 维护者认为 session.channelId 是「创建默认值，by design 不可变」 | **高** | 以 9.3 第 4 点反驳：飞书镜像/委派摘要**功能性读取**它 → 它必须反映真实 → 不是纯元数据。领投用 feishu-mirror 漂移做 concrete harm。**或先开 Issue 讨论「session.channelId 语义」再提 PR。** |
+| UI 是否允许 Agent 会话中途切渠道（若锁定则 gap 收窄） | 中 | 残留核实项（9.8）；即便 UI 锁定，automation 复用 + 飞书镜像仍成立 |
+| 版本漂移 v0.14.20 → 新版 | 低 | PR 基于 main HEAD；本核实已在最新 main 验证 |
+| modelId undefined 误清 | 低 | 9.5 守卫逐字段覆盖 + 9.6 回归测试覆盖 |
+
+**诚实建议**：方向 1 是「一致性强化」PR，不是「修明显崩溃」。最稳路径是**先开一个 Issue**（标题如「Agent session channelId/modelId never synced after creation → stale in feishu mirror & delegation summary」），附 9.3 证据，让维护者先确认「session.channelId 应为创建默认还是当前值」的语义，再提 PR。这避免「by design」被直接关 PR 的风险，也符合 §六「外部依赖需维护者响应」的现实。
+
+### 9.8 残留核实项（提 PR 前需补）
+
+- [~] **renderer 侧**：Agent 会话 UI 是否允许中途切换渠道/模型？若允许 → 切换后 AgentSendInput 带新值、session.meta 不更新（本 gap 的 UI 路径实证）；若锁定 → gap 收窄到 automation 复用 + 飞书镜像。需读 `apps/electron/src/renderer/components/agent/*` + `atoms/agent-atoms.ts`。
+  - **[部分闭合 · 2026-07-15 W2 复核]** 已在 IPC 层证明：main 侧无任何「更新 agent session channelId/modelId」的 handler——§9.2 已全量枚举 `updateAgentSessionMeta` 调用点（30+），IPC 通道仅 `TOGGLE_PIN`(`ipc.ts:1828`)/`CLEAR_COMPLETION_STATE`(`:1843`)/`TOGGLE_ARCHIVE`(`:1860`)/`RENAME`(`:1780`)/`SET_PERMISSION_MODE`(`:2310`)/`ATTACH_DIR`(`:2568,2584`)/`ATTACH_FILE`(`:2608,2622`)，无一写 channel/model。故 renderer **即便** UI 暴露切换入口，也无对应 IPC 能持久化 → 切换后 `AgentSendInput` 带新值而 meta 停留旧值，**gap 在 IPC 层已成立，不依赖 renderer 是否锁定**。renderer 核实仅用于判断「UI 是否暴露该入口」(影响严重度评级，不影响 gap 存在性)。
+- [x] **复现路径已锁定**：automation reuse 模式 = 最干净实证——`automation-scheduler.ts:156` 复用旧 session（存储 channel A）+ `:207-208` 运行用 `automation.channelId`(B)，无需 UI 即可触发 stale-meta（见 9.3 第 5 点，源码已核实）。
+- [ ] feishu-bridge.ts:563 modelId 走 `botConfig.defaultModelId` 而非 session.modelId —— 是否应一并统一为 session.modelId（另一处不一致，可纳入本 PR 或单列）。
+- [ ] 在上游 fork 实跑复现：建 session(channel A) → 中途用 channel B 发消息 → 查 feishu 镜像绑定记录的渠道（实证 9.3 第 4 点的 harm）。
+
+### 9.9 小结
+
+方向 1 **成立但需语义前置确认**：gap 真实（stale-meta 漂移，源码实证）、修复最小（sendMessage 单点守卫 ~15 行）、与 #903 同向不冲突、有测试抓手。主要不确定性是维护者对「session.channelId 语义」的判定 —— 故推荐 **Issue 先行 → PR 跟进**，而非直接砸 PR。这与本文 §〇「找到上游真正需要的改进」+ §六「提交是外部依赖」的诚实基调一致。
