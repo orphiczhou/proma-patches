@@ -24,6 +24,26 @@
 
 **前置验证（任何 SubAgent 设计前）**：确认目标会话（如 pro commander）工具集**是否含进程内 Agent 工具**。若无 → 设计降维（单 reviewer 或 commander 自审）。
 
+## 🔴 P0 教训：brief 审计义务不可标"可选"（nanju 2026-07-15）
+
+**事故**：nanju04 测试（pro e2e，GLM-5.2 commander）派 4 worker 产 04_API_SPEC 细分文档（agent-comm / frontend-backend-api / data-model-api / events），4 worker 全 done、产物落盘，但**全程无独立 auditor leaf、worker 无 review_round 自审**。对照同 SKILL 同 commander 的 e2e03（派了完整 D-auditor），根因是 **brief 配置释放了审计义务**，不是 SKILL 逻辑问题。
+
+**根因链（两条独立）**：
+- **链 A — worker 无自审（无 review_round）**：`audit_meta.review_required=false` → done 门禁不要求 review_round → worker 不跑 §4.6 G1-G5（worker SKILL §4.6 触发=review_required=true **或** 自检"设计文档/架构级/跨文件≥1000字"主动开；nanju 4 worker 产出的确是设计文档，但 GLM worker 没主动开 §4.6）。
+- **链 B — commander 无 auditor**：`root_dod.self_check` 写 `auditor role审查(可选)一致性pass`——**"（可选）"直接释放了 commander 派 auditor 的义务**。e2e03 对照组写 `1 auditor status=done 且 audit_log 含 passed/failed 统计`（硬 DoD）→ commander 派了 D-auditor(role=auditor)；nanju 写"可选" → commander 全程靠 root 信任锚兜底，不建 auditor leaf。
+- **SKILL 结构性盲区（放大器）**：铁律 5/§14.1 触发词是"文档**审计**/验证/终局审查"+"对**已完成**文档可信度评估"——04_API_SPEC 是**产出**新文档（非审计已有文档），commander 判定 §14 不触发，铁律 5 不激活。SKILL 对"重要产出类文档"无强制 auditor 兜底（已在 tree-commander SKILL §14.1 措辞补一条修复）。
+
+**铁律（写 brief / 建 tree 必须遵守）**：
+1. **产出类文档任务（≥1 份设计文档/API 规格/架构文档/PRD 等正式交付物）默认 `review_required=true`** —— 让引擎 done 门禁强制 worker 跑 §4.6 review_round 自审，不靠 worker 自觉。
+2. **auditor 写成硬 DoD，禁止"（可选）"措辞** —— self_check 写 `1 auditor status=done 且 audit_log 含 N 条 findings`（参照 e2e03），不能写"（可选）"。brief 一旦标可选，GLM commander 会自主跳过整条 auditor 链。
+3. **brief checklist**（建 tree 前过一遍）：
+   - [ ] 产出含正式文档/架构级/跨文件交付物？→ `review_required=true`
+   - [ ] DoD 里 auditor 是硬条件（非"可选"）？
+   - [ ] prefix ≤8 字符（`[a-z][a-z0-9_]{3,7}`），禁 `nanju04api`(10字符) 这种超长名 → E_NAME_INVALID 全卡死
+4. **prefix 命名**（nanju 首版副根因）：`nanju04api`（10字符）违反 §12，4 worker leaf_add 全 `E_NAME_INVALID` 卡死（call-log 14 calls 止步 leaf_add）；改 `nanju04`（6字符）才跑通。建 tree 时 `root_brief.prefix` 必 ≤8 字符，init 不校验 prefix 长度（leaf_add 才校验），故命名错会潜伏到建 worker 时才暴露。
+
+> 与 macp2 教训互补：macp2=SubAgent **调用形式**必须钉死（防成本爆炸）；nanju=brief **审计义务**不可标可选（防质量防线被一句话释放）。两者都是"SKILL/brief 没钉死 → GLM 自主简化 → 事故"。
+
 ## 部署同步口诀（改 engine/SKILL 后）
 > 权威源 = `D:/codes/tree-harness/`（2026-07-09 起）。改完从这里部署到 dist。
 1. `D:/codes/tree-harness/tree-engine.cjs` → `D:/Proma-dev/resources/app/dist/tree-engine.cjs`（pro，cp 后需用户重启 pro app 才加载新引擎）
@@ -42,7 +62,6 @@
 - **remote 调用方受限（D1-A）**：编排方（remote）对 pro 仅 `remote_send_message` 可用；`archive_session` 等被 `R6-external-deny` 拒。清理 pro 会话走 pro 本地。
 - pro userData = `~/.proma-dev/`（实证 e2e03/e2e04 全程；ARCHITECTURE.md §3.1 表 2026-07-15 已修 `.proma-pro/`→`.proma-dev/`）。
 - 🔴 **commander 跨多树触发 patches 跨树预检 false positive**（e2e04 2026-07-15 踩坑）：`findCallerTreesForBypassGuard` 扫 caller 所属**所有树**，任一 reached(max_sessions) 即拒 create_session——即使目标树远没 reached。一个 commander 跨多棵测试树时，旧树 reached 会误伤新树建 worker（症状：create_session 返回 E_MAX_SESSIONS 指向**另一棵**树）。解除：事后调大旧树 `audit_meta.max_sessions`（备份 .bak）；或每棵测试树用独立 commander session。
-- 🔴 **commander 协议简化 gap（nanju 2026-07-15 教训）**：nanju commander 推进 04_API_SPEC 时跳了 worker 自审（tree-worker §4.6 review_round G1-G5 进程内 SubAgent）+ commander 审计（铁律 5/§14 auditor）——**根因**：建 tree `audit_meta.review_required=false`（关 worker 自审强约束，done 门禁不校验 review_round）+ brief 标 auditor「（可选）」（误导 commander 跳铁律 5）+ glm commander 自主简化（没走铁律 3 三步门）。对比 e2e03（走完整 auditor role + 交叉审 11pass/3fail）。**改正（建 tree + brief 模板）**：文档/产出任务建 tree 默认 `review_required=true`（worker §4.6 自审强制，引擎 done 门禁校验 review_round 末轮 red_count=0）+ brief auditor **必派不标可选**（铁律 5 文档任务≥4 auditor，§14）。SKILL §4.6/§14/铁律 3-5 设计完整，是**配置+执行没继承**，非设计缺失。
 
 ## 文档引擎一致性（P0 高发区）
 任何 SKILL 错误码/触发点/字段必须对照 tree-engine 实际校验逻辑（grep 错误码常量 + 看抛错条件）。历次审计抓出的 P0 都是文档与引擎不一致（如 E_REVIEW_FORGERY 触发点、output_ref 解析基准）。

@@ -4,6 +4,33 @@
 
 新条目追加在顶部。
 
+## 🔖 2026-07-15 nanju 测试根因：brief 审计义务标"可选"→commander 跳过 auditor + worker 无自审
+
+nanju04 测试（pro e2e，GLM-5.2 commander）派 4 worker 产 04_API_SPEC 细分文档，4 worker 全 done 产物落盘，但**全程无 auditor leaf、worker 无 review_round 自审**。ground truth = pro tree-state.json + call-log.jsonl（文件通道，非 API 消息数）。详细根因 + 铁律已入 [CLAUDE.md P0 教训 nanju](../CLAUDE.md)。
+
+**三个版本执行轨迹对照**：
+
+| 版本 | prefix | 结果 | auditor | worker 自审 |
+|---|---|---|---|---|
+| nanju04api（首版） | `nanju04api`(10字符) | **卡死**（4×leaf_add `E_NAME_INVALID`，init 不校验 prefix 长度，leaf_add 才校验） | — | — |
+| nanju04（重试） | `nanju04`(6字符) | 跑通，4 worker done | ❌ 无（root 信任锚兜底） | ❌ 无 review_round |
+| e2e03（对照） | `e2e03`(5字符) | 跑通，3 worker done | ✅ D-auditor(role=auditor) | worker 简化链 |
+
+**根因链（两条独立 + 放大器 + 副根因）**：
+- **链 A（worker 无自审）**：`audit_meta.review_required=false` → done 门禁不要求 review_round → worker 不跑 §4.6（worker SKILL §4.6 触发=review_required=true **或** 自检"设计文档/架构级/跨文件≥1000字"主动开；nanju worker 产出的确是设计文档但 GLM 没主动开）。修复：产出类文档任务默认 review_required=true。
+- **链 B（commander 无 auditor，首要诱因）**：`root_dod.self_check` 写 `auditor role审查(可选)一致性pass`——**"（可选）"释放了审计义务**。铁证：e2e03 同 SKILL 同 commander 写硬 DoD `1 auditor status=done 且 audit_log 含统计` → 派了 D-auditor；nanju 写"可选" → 不派。**同 SKILL 不同执行，差异唯一锁定在 brief 措辞**。修复：auditor 写硬 DoD，禁"可选"。
+- **放大器（SKILL §14 盲区）**：铁律 5/§14.1 触发词是"文档**审计**/验证/终局审查"+"对**已完成**文档评估"——04_API_SPEC 是**产出**新文档，commander 判定 §14 不触发。SKILL 对"重要产出类文档"无强制 auditor 兜底。
+- **副根因（prefix 超长）**：`nanju04api`(10字符) 违反 §12 `[a-z][a-z0-9_]{3,7}`(4-8字符)，首版全卡死。
+
+**commander 层观察**：GLM-5.2 对协议步骤不熟，靠撞错试错推进（E_SELFCHECK_INVALID / E_ALIGNMENT_NOT_VERIFIED 漏步骤4 / E_DELIVERABLE_MISSING / E_SCHEMA_INVALID root milestones 空），最终都修对（引擎门禁起作用）。关键简化=跳过 auditor leaf（冷启动期 root 当 auditor 不算违规，但跳过了独立审查防线）。
+
+**改动（仅 `D:\codes\tree-harness\`，未动 pro 引擎/patches/nanju）**：
+1. **CLAUDE.md** 新增 P0 教训节（macp2 后）：事故+根因链+4 铁律+brief checklist+prefix 副根因。与 macp2 互补定位（macp2=调用形式钉死防成本；nanju=审计义务不可标可选防质量）。
+2. **tree-commander SKILL §14.1** 措辞明确化（仅加一条触发条件，不动 §14.2-14.6 逻辑）：`🔴 重要产出类文档任务（设计文档/API规格/架构文档/PRD/数据模型等正式交付物）：产出后必须按 §14.2 派 auditor 复核...仍属 §14 审计范围（nanju04 教训）`。
+3. **.context/note.md** 本条目（交叉引用）。
+
+**结论**：首要根因=brief 把 auditor 标"可选"（非 SKILL 逻辑 bug）。nanju04 复跑时 brief 改硬 DoD + review_required=true 即可验证（不在本次范围，禁动 nanju）。
+
 ## 🔖 2026-07-15 thdev tree 调度（P2/P3 单边深化，3 worker 独立子会话 + GLM 余额阻塞）
 
 用 tree-system 调度 thdev tree（主会话 a5c20252 作 root，workspace=proma）派 3 worker 独立子会话处理 e2e04 后单边深化。2 完成 + 1 印证。

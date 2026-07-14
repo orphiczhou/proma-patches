@@ -955,6 +955,7 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 - 任务 brief 中含 "审计/审查/验证/验收/终局/converge/audit/verify/review" 等关键词
 - 需要对一份已完成文档进行可信度评估
 - 子会话 done 上报后进入 §4 Step 4 质量门
+- 🔴 **重要产出类文档任务**（设计文档 / API 规格 / 架构文档 / PRD / 数据模型等正式交付物）：产出后**必须**按 §14.2 派 auditor 复核一致性 / 完整性，**不能仅靠 worker 自报 done + §4 Step4 单验收 Agent**。此类任务即便 brief 不含"审计"关键词、也不属于"评估已有文档"，**仍属 §14 审计范围**（nanju04 教训 2026-07-15：brief 标 auditor"（可选）"+ audit_meta.review_required=false → 4 worker 产 API 文档全程无 auditor leaf、无 review_round 自审；对照 e2e03 同 SKILL 写硬 DoD → 派了完整 D-auditor）。详见 [CLAUDE.md P0 教训 nanju](../../CLAUDE.md)
 
 ### §14.2 最小审计树结构（强制执行）
 
