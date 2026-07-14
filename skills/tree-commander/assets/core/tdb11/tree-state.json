@@ -1,7 +1,7 @@
 {
-  "version": "1.0",
   "tree_id": "tdb11",
-  "created_at": "2026-07-03T18:26:14.702+08:00",
+  "version": "1.1",
+  "created_at": "2026-07-14T21:29:44.724+08:00",
   "last_heartbeat": null,
   "root_brief": {
     "parent_intent": "dbc unit test"
@@ -21,7 +21,7 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "active",
-      "created_at": "2026-07-03T18:26:14.702+08:00",
+      "created_at": "2026-07-14T21:29:44.724+08:00",
       "added_by": null,
       "last_event_ts": null,
       "last_event_type": null,
@@ -29,7 +29,17 @@
       "drift_history": [],
       "milestones": [],
       "segment_chain": [],
-      "autonomy_overrides": {},
+      "brief": {
+        "parent_intent": "dbc unit test"
+      },
+      "dod": {
+        "deliverables": [],
+        "node_budget": 10,
+        "max_depth": 3
+      },
+      "report_protocol": null,
+      "autonomy": null,
+      "self_audit": null,
       "events": [],
       "audit_gate": {
         "verdict": "skip",
@@ -38,7 +48,8 @@
       },
       "nudge_count": 0,
       "nudge_log": [],
-      "audit_log": []
+      "audit_log": [],
+      "alignment_pending": false
     },
     "tdb11-H2-worker": {
       "leaf_id": "tdb11-H2-worker",
@@ -49,7 +60,7 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "done",
-      "created_at": "2026-07-03T18:26:14.709+08:00",
+      "created_at": "2026-07-14T21:29:44.730+08:00",
       "added_by": "00000000-0000-0000-0000-000000000001",
       "last_event_ts": null,
       "last_event_type": null,
@@ -57,7 +68,11 @@
       "drift_history": [],
       "milestones": [],
       "segment_chain": [],
-      "autonomy_overrides": {},
+      "brief": null,
+      "dod": null,
+      "report_protocol": null,
+      "autonomy": null,
+      "self_audit": null,
       "events": [],
       "audit_gate": {
         "verdict": "pass",
@@ -75,6 +90,9 @@
     "plan_ack_seconds": 300,
     "max_self_corrections": 2,
     "heartbeat_interval_minutes": 15,
+    "review_required": false,
+    "max_subagent_spawn_per_leaf": 15,
+    "max_sessions": 50,
     "sweet_spot_limits": {
       "claude-sonnet-4-6": {
         "min": 100000,
@@ -93,9 +111,23 @@
       }
     }
   },
-  "_deliverables_root": "C:\\Users\\sir_c\\.proma\\agent-workspaces\\proma\\workspace-files\\skills\\tree-commander\\assets\\core\\tdb11\\deliverables",
+  "session_registry": {
+    "00000000-0000-0000-0000-000000000001": {
+      "leaf_id": "tdb11-root",
+      "registered_at": "2026-07-14T21:29:44.725+08:00",
+      "source": "leaf_add",
+      "caller": null
+    },
+    "00000000-0000-0000-0000-000000000002": {
+      "leaf_id": "tdb11-H2-worker",
+      "registered_at": "2026-07-14T21:29:44.730+08:00",
+      "source": "leaf_add",
+      "caller": "00000000-0000-0000-0000-000000000001"
+    }
+  },
+  "_deliverables_root": "D:\\codes\\tree-harness\\skills\\tree-commander\\assets\\core\\tdb11\\deliverables",
   "_meta": {
-    "workspace_root": "C:\\Users\\sir_c\\.proma\\agent-workspaces\\proma\\workspace-files\\skills\\tree-commander",
+    "workspace_root": "D:\\codes\\tree-harness\\skills\\tree-commander",
     "tao_version": null,
     "tao_watcher_session_id": null,
     "tao_health_check_session_id": null,

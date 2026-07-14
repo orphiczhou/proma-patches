@@ -25,9 +25,13 @@ const path = require('path');
 const SANDBOX = path.join(__dirname, 'core');       // test-sandbox/core/ — tree 数据目录（tree-state.js 副本保留但不再 spawn）
 // 引擎 require（M3：内联引擎，消除对 tree-state.js 文件的 spawn 依赖）
 // 自适应查找 tree-engine.cjs（让本文件在 test-sandbox/、skills/assets/、激活 assets/ 下都能定位 engine）
+// 权威源定位（2026-07-14）：候选首位放 tree-harness 根的 tree-engine.cjs（统一源码 P0-D03 后的权威源），
+//   skills/tree-commander/assets → ../../../tree-engine.cjs。patch-l/dist 等旧版降为兜底，
+//   避免默认 require 到旧版导致期望漂移（金标准 39/0 失守根因之一）。
 const _findEngine = () => {
   if (process.env.PROMA_TREE_ENGINE && fs.existsSync(process.env.PROMA_TREE_ENGINE)) return process.env.PROMA_TREE_ENGINE;
   const cands = [
+    path.join(__dirname, '..', '..', '..', 'tree-engine.cjs'),  // 权威源：tree-harness/tree-engine.cjs
     path.join(__dirname, '..', 'patch-l', 'tree-engine.cjs'),
     path.join(__dirname, '..', '..', '..', 'release', 'tree-system-v0.2.2', 'patch-l', 'tree-engine.cjs'),
     path.join(__dirname, '..', '..', '..', 'workspace-files', 'release', 'tree-system-v0.2.2', 'patch-l', 'tree-engine.cjs'),
@@ -67,6 +71,9 @@ const UUID = {
   worker:  '00000000-0000-0000-0000-000000000002',
   auditor: '00000000-0000-0000-0000-000000000003',
   other:   '00000000-0000-0000-0000-000000000004',
+  // V10 session_id 唯一性：同一棵树内每个 leaf 的 session_id 必须唯一（engine L897-909 硬约束）。
+  //   同 tree 多 worker 场景（V9-b 第二 worker、C4b）需用 worker2，否则第二 leaf add 静默失败 → leaf not found。
+  worker2: '00000000-0000-0000-0000-000000000005',
 };
 
 // ---- 引擎运行器（M3：engine.run 替代 execFileSync spawn）----
@@ -129,12 +136,41 @@ function tamperLeaf(tree_id, leaf_id, mutateFn) {
 
 // 初始化 tree + 一个 auditor-commander leaf（V2 白名单后，auditor 必须是树中真实 leaf session）
 // 返回 {tid, auditorSession}。auditorSession = UUID.auditor（auditor-commander leaf 的 session）
+//
+// V10-auditor-active (2026-07-14 修)：resolveAuditorIndep 要求 auditor leaf 自身
+//   ① status='done' ② events 非空 ③ 自己 audit_gate.verdict='pass'（engine L2549-2560）。
+//   旧 setup 只建 active/无 event/skip 的 auditor，14 用例因此全部卡在 E_AUDITOR_NOT_INDEPENDENT。
+//
+// 引导困境：非 root auditor 无法通过 audit-gate 命令拿到自己的 pass
+//   （pass 要求"被审者已有 done 事件"engine L3028-3036，而 auditor 自己还没干活 → 循环依赖）。
+//   engine 的唯一引导路径是 root 信任锚（L2485 root 自审 + L2502-2516 root 可审任意非 root leaf）。
+//   故 fixture 直接写入结构状态：root（信任锚，已有 brief_echo 满足≥1 event 活跃门）背书
+//   auditor 的 audit_gate=pass，再补 brief_echo+done + status=done。该状态通过 validate 的
+//   resolveAuditorIndep 复检（root 作为 auditor 的背书者合法）—— 与 tamperLeaf 模拟"绕过命令直接写文件"
+//   同性质，仅用于 fixture 自举，不改 engine。
 async function setupTreeWithAuditor(budget) {
   const { tid } = await setupTree(budget);
+  const rootLid = `${tid}-root`;
+  const audLid = `${tid}-Aud-commander`;
   await run(['leaf', 'add', tid, '--json', JSON.stringify({
-    leaf_id: `${tid}-Aud-commander`, session_id: UUID.auditor, parent: `${tid}-root`, path: 'Aud',
+    leaf_id: audLid, session_id: UUID.auditor, parent: rootLid, path: 'Aud',
     role: 'commander', model: 'claude-sonnet-4-6', channel: 'anthropic', added_by: UUID.root,
   })]);
+  // root 写一条 brief_echo（满足 root 担任背书者的"≥1 event"最低活跃度门，engine L2511-2513）
+  await run(['event', 'append', tid, rootLid, '--type', 'brief_echo', '--json', JSON.stringify({ ack: 'root_anchor' })]);
+  // 自举 auditor：直接写结构状态（root 信任锚背书 audit_gate=pass + done 双事件 + status=done）。
+  //   满足 V10-auditor-active 三要件，使该 auditor 可被 resolveAuditorIndep 放行。
+  const nowIso = new Date().toISOString();
+  tamperLeaf(tid, audLid, (l) => {
+    l.status = 'done';
+    l.last_event_type = 'done';
+    l.last_event_ts = nowIso;
+    l.events = [
+      { type: 'brief_echo', ts: nowIso, meta: { ack: 'auditor_bootstrap' } },
+      { type: 'done', ts: nowIso, meta: { self_check: [{ item: 'auditor_leaf_bootstrap', pass: true, evidence: 'setupTreeWithAuditor activates auditor for V10-auditor-active (root trust-anchor endorsed)' }] } },
+    ];
+    l.audit_gate = { verdict: 'pass', auditor_session_id: UUID.root, ts: nowIso };
+  });
   return { tid, auditorSession: UUID.auditor };
 }
 
@@ -143,6 +179,16 @@ async function addWorker(tid, leafPath) {
   const leafId = `${tid}-${leafPath}-worker`;
   await run(['leaf', 'add', tid, '--json', JSON.stringify({
     leaf_id: leafId, session_id: UUID.worker, parent: `${tid}-root`,
+    path: leafPath, role: 'worker', model: 'claude-sonnet-4-6', channel: 'anthropic',
+    added_by: UUID.root,
+  })]);
+  return leafId;
+}
+// 同 tree 第二个 worker（session_id 唯一性：V10 要求每 leaf session 唯一，engine L897-909）
+async function addWorker2(tid, leafPath) {
+  const leafId = `${tid}-${leafPath}-worker`;
+  await run(['leaf', 'add', tid, '--json', JSON.stringify({
+    leaf_id: leafId, session_id: UUID.worker2, parent: `${tid}-root`,
     path: leafPath, role: 'worker', model: 'claude-sonnet-4-6', channel: 'anthropic',
     added_by: UUID.root,
   })]);
@@ -329,9 +375,13 @@ CASES.V2_FORGED = async () => {
   console.log('\n[V2] audit-gate auditor 必须是树中真实 leaf session（白名单，E_AUDITOR_NOT_INDEPENDENT）');
   const { tid } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'V2');
-  // 伪造非树中 UUID → 白名单拦（黑名单下会放行）
+  // V10-uuid-format-strict (2026-07-14 修)：原用全 f（ffffffff-...），现被 E_INVALID_UUID_STRICT 拦在格式门
+  //   （engine L237-238 全 f ∈ FORBIDDEN_UUIDS），到不了白名单检查 —— 错误码变了。
+  //   引擎新行为合理（V10 有意加固：格式校验前置，拒明显伪造值）。保留用例测试意图（"伪造非树中 UUID
+  //   auditor 被白名单拦"）：改用合法 v4 格式但不在树中的 UUID（55555555-5555-4455-8555-555555555555），
+  //   通过格式门，命中白名单 → E_AUDITOR_NOT_INDEPENDENT（"not found as any leaf session"）。
   await expectFail('V2 伪造非树中UUID auditor 拦截',
-    ['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', 'ffffffff-ffff-ffff-ffff-ffffffffffff'],
+    ['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', '55555555-5555-4455-8555-555555555555'],
     E.AUDITOR_NOT_INDEPENDENT);
 };
 
@@ -448,8 +498,13 @@ CASES.V4 = async () => {
   await expectFail('V4-a audit_pass=true 无 auditor 拦截',
     ['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true'],
     E.AUDITOR_NOT_INDEPENDENT);
-  await expectFail('V4-b auditor=self(根) 拦截',
-    ['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', UUID.root],
+  // V4-b (2026-07-14 修): 原期望 auditor=UUID.root(=added_by) 被拦，基于旧"黑名单 auditor!=added_by"心智。
+  //   V10 改白名单+信任锚模型后，root 作为 trust-anchor 可审任意非 root leaf（engine L2502-2516 在
+  //   added_by 检查 L2532 之前 return null），root 审计"root 自己 added 的 worker"是合法的（root 独立于 worker，
+  //   不是 worker 自审）。原期望过时。改为 auditor=worker 自己的 session（真正的自审：被审 leaf 自己的 session_id）
+  //   —— 这才是"self-approving forbidden"的本意，保留用例测试意图。
+  await expectFail('V4-b auditor=self(worker自己) 拦截',
+    ['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', UUID.worker],
     E.AUDITOR_NOT_INDEPENDENT);
   await expectOk('V4-c 独立 auditor 放行',
     ['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', auditorSession]);
@@ -487,24 +542,22 @@ CASES.CP2 = async () => {
 // ---------- 批次5 (V9): expect_outputs 禁止绝对路径/路径遍历 ----------
 CASES.V9 = async () => {
   console.log('\n[V9] expect_outputs 绝对路径/路径遍历被拦 (E_DELIVERABLE_MISSING)');
-  const { tid, auditorSession } = await setupTreeWithAuditor();
+  // V9+ Phase 4 (R2 P0, 2026-07-14 修)：引擎现在在 milestone add 时即校验 expect_outputs 路径安全
+  //   （assertSafeExpectOutputs，engine L1969-1975），而非等到 set-status=done 才查。
+  //   旧用例构造 milestone 后走完 done 全流程再断言 set-status 被拦 —— 但 milestone add 已先失败，
+  //   后续 set-result/events/audit_gate 因 milestone 不存在而静默失败，set-status 最终报 E_SCHEMA_INVALID
+  //   （milestones 非空门），错误码漂移。引擎新行为更严（攻击在声明时即拦），合理。
+  //   保留用例测试意图（"绝对路径/路径遍历冒充交付物被拒"）：直接断言 milestone add 被拦 E_DELIVERABLE_MISSING。
+  const { tid } = await setupTreeWithAuditor();
   const sysFile = process.platform === 'win32' ? 'C:/Windows/win.ini' : '/etc/hosts';
-  // (a) 绝对路径（系统文件冒充交付物）→ 拦
+  // (a) 绝对路径（系统文件冒充交付物）→ milestone add 即拦
   const leafId = await addWorker(tid, 'V9a');
-  await run(['milestone', 'add', tid, leafId, '--json', JSON.stringify({ id: 'M1', desc: 'abs', expect_outputs: [sysFile] })]);
-  await run(['milestone', 'set-result', tid, leafId, 'M1', '--audit-pass', 'true', '--audit-session-id', auditorSession]);
-  await run(['event', 'append', tid, leafId, '--type', 'brief_echo', '--json', JSON.stringify({ alignment: '95%', auditor_session_id: auditorSession })]);
-  await run(['event', 'append', tid, leafId, '--type', 'done', '--json', JSON.stringify({ self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
-  await run(['audit', 'gate', tid, leafId, '--verdict', 'pass', '--audit-session-id', auditorSession]);
-  await expectFail('V9-a 绝对路径拦截', ['leaf', 'set-status', tid, leafId, 'done'], E.DELIVERABLE_MISSING);
-  // (b) 路径遍历（../逃出 deliverables/）→ 拦
-  const leafId2 = await addWorker(tid, 'V9b');
-  await run(['milestone', 'add', tid, leafId2, '--json', JSON.stringify({ id: 'M1', desc: 'trav', expect_outputs: ['../../../etc/hosts'] })]);
-  await run(['milestone', 'set-result', tid, leafId2, 'M1', '--audit-pass', 'true', '--audit-session-id', auditorSession]);
-  await run(['event', 'append', tid, leafId2, '--type', 'brief_echo', '--json', JSON.stringify({ alignment: '95%', auditor_session_id: auditorSession })]);
-  await run(['event', 'append', tid, leafId2, '--type', 'done', '--json', JSON.stringify({ self_check: [{ item: 'x', pass: true, evidence: 'e' }] })]);
-  await run(['audit', 'gate', tid, leafId2, '--verdict', 'pass', '--audit-session-id', auditorSession]);
-  await expectFail('V9-b 路径遍历拦截', ['leaf', 'set-status', tid, leafId2, 'done'], E.DELIVERABLE_MISSING);
+  await expectFail('V9-a 绝对路径拦截', ['milestone', 'add', tid, leafId, '--json', JSON.stringify({ id: 'M1', desc: 'abs', expect_outputs: [sysFile] })], E.DELIVERABLE_MISSING);
+  // (b) 路径遍历（../逃出 deliverables/）→ milestone add 即拦
+  //   注：原用 addWorker(tid,'V9b') 复用 UUID.worker 触发 V10 session_id 唯一性硬约束（engine L897-909）
+  //   → 第二 leaf add 静默失败 → milestone add 报 E_LEAF_NOT_FOUND（错误码漂移）。改用 worker2 独立 session。
+  const leafId2 = await addWorker2(tid, 'V9b');
+  await expectFail('V9-b 路径遍历拦截', ['milestone', 'add', tid, leafId2, '--json', JSON.stringify({ id: 'M1', desc: 'trav', expect_outputs: ['../../../etc/hosts'] })], E.DELIVERABLE_MISSING);
 };
 
 // ---------- 批次5 (V5b-tamper): alignment_pending 标志篡改无效（审计[1] 回归）----------

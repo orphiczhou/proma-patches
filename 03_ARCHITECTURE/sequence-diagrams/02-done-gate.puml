@@ -1,0 +1,129 @@
+@startuml 02-done-gate
+title tree_leaf_set_status(done) — 引擎 8 道 DbC 门禁（cmdLeafSetStatus, tree-engine.cjs）
+
+actor "worker\n(caller=worker.session_id)" as w
+participant "tree_engine" as eng
+database "leaf.milestones[]" as ms
+database "leaf.events[]" as ev
+database "leaf.audit_gate" as ag
+collections "deliverables_fs" as fs
+
+note over w, fs
+  set-status done 是 §13.3 步骤 7（最末步）
+  前置：步骤 0-6 全过 + deliverables 落盘
+  引擎在 cmdLeafSetStatus 入口一次性跑 8 道门禁
+end note
+
+w -> eng : tree_leaf_set_status(worker, status=done)
+activate eng
+
+' ── 门禁 1：milestones 数组非空 ──
+eng -> ms : 读取 milestones
+alt milestones.length === 0
+  eng --> w : ❌ E_SCHEMA_INVALID\n(milestones array empty, §13.3 步骤1 漏做)
+  note right of eng
+    门禁 1：done 前必须 tree_milestone_add
+    否则无 milestone 可 audit_pass
+  end note
+end
+
+' ── 门禁 2：每个 milestone audit_pass=true ──
+loop 每个 Mi in milestones
+  alt Mi.audit_pass !== true
+    eng --> w : ❌ E_SCHEMA_INVALID\n(Mi.audit_pass not true, §13.3 步骤2 漏做\n  或 audit_session_id 缺失/不匹配)
+    note right of eng
+      门禁 2：caller(root) 必须先 tree_milestone_set_result
+      audit_session_id=root.session_id（冷启动）或独立 auditor.session_id（正常期）
+    end note
+  end
+end
+
+' ── 门禁 3：expect_outputs 文件存在 ──
+loop 每个 Mi.expect_outputs
+  eng -> fs : fs.existsSync(<treeDir>/deliverables/<outPath>)
+  alt 文件不存在
+    eng --> w : ❌ E_DELIVERABLE_MISSING\n(expect_outputs 声明的文件未落盘\n  禁绝对路径/.. 遍历/symlink)
+    note right of eng
+      门禁 3：路径相对 deliverables 根
+      解析为 <treeDir>/deliverables/<outPath>
+    end note
+  end
+end
+
+' ── 门禁 4：每个 deliverable 文件 size > 0 ──
+loop 每个 Mi.expect_outputs
+  eng -> fs : fs.statSync(<treeDir>/deliverables/<outPath>).size
+  alt size === 0
+    eng --> w : ❌ E_DELIVERABLE_EMPTY\n(BUG-3: 0 字节产物视为未交付\n  与 E_DELIVERABLE_MISSING 同等拦截)
+    note right of eng
+      门禁 4：治 worker/SubAgent 写空文件冒充交付
+      需写真实非空内容后重试
+    end note
+  end
+end
+
+' ── 门禁 5：alignment event 留痕（V5b 硬前置） ──
+eng -> ev : 查找 brief_echo event 且 meta.alignment 非空 且 meta.auditor_session_id 非空
+alt 无匹配的 alignment event
+  eng --> w : ❌ E_ALIGNMENT_NOT_VERIFIED\n(§13.3 步骤4 漏做\n  commander 未回填 alignment)
+  note right of eng
+    门禁 5：worker 不能自伪造 alignment
+    auditor 必须独立（root 信任锚或 auditor leaf）
+    撞此错误 → 上行 blocked 提示母会话补 alignment
+  end note
+end
+
+' ── 门禁 6：done event 留痕 ──
+eng -> ev : 查找 type=done event
+alt 无 done event
+  eng --> w : ❌ E_AUDIT_PREMATURE\n(§13.3 步骤5 漏做\n  或步骤顺序反了：set-status 跑在 done event 之前)
+  note right of eng
+    门禁 6：caller 必须 = leaf.session_id（堵 commander 代写）
+    否则 E_BORROWED_IDENTITY
+  end note
+end
+
+' ── 门禁 7：audit_gate.verdict = pass ──
+eng -> ag : 读取 audit_gate.verdict
+alt audit_gate.verdict !== 'pass'
+  eng --> w : ❌ E_GATEKEEPER_REQUIRED\n(§13.3 步骤6 漏做\n  caller===audit_session_id 未过门禁背书)
+  note right of eng
+    门禁 7：caller(root 或 auditor) 必须 = audit_session_id
+    audit_gate pass 前置：步骤 4 alignment + 步骤 5 done event
+    缺前置 → audit_gate 调用本身被 E_ALIGNMENT_NOT_VERIFIED 拦
+  end note
+end
+
+' ── 门禁 8：review_required 时 review_round 收敛 ──
+opt audit_meta.review_required === true
+  eng -> ev : 查找 type=review_round event 数组
+  alt 无任何 review_round event
+    eng --> w : ❌ E_REVIEW_NOT_CONVERGED\n(ISS-003: review_required=true 时\n  需 ≥1 条 review_round event)
+  else 有 review_round events
+    eng -> ev : 取 round_no 最大的一条
+    alt 末轮 red_count !== 0 OR 总轮数 > 3
+      eng --> w : ❌ E_REVIEW_NOT_CONVERGED\n(末轮 red_count 未归零\n  或总轮数 >3 上行 blocked)
+      note right of eng
+        门禁 8：reviewer_kind=subagent 时需匹配 subagent_spawn
+        否则 E_REVIEW_FORGERY
+        收敛条件：角色数 2/3/5 + 轮 ≤3 + 末轮 red_count=0
+      end note
+    end
+  end
+end
+
+' ── 全部 pass → 状态流转 ──
+note over eng : 全 8 道门禁通过 ✓
+eng -> eng : leaf.status = 'done'\nleaf.last_event_type = 'done'\nleaf.last_event_ts = now()
+eng -> eng : validate()（postcondition，全树不变量）
+eng --> w : { ok:true, leaf.status:'done' }
+deactivate eng
+
+note over w, fs
+  附：caller-binding 错误码（不在 8 门禁内，撞在工具入口）
+  • E_BORROWED_IDENTITY — caller ≠ leaf.session_id（worker 自调工具的 caller 必须 = 自己 session_id）
+  • E_STATUS_EVENT_MISMATCH — status 与 last_event_type 不同步（V10-status-event-sync）
+  • E_TS_NOT_MONOTONIC — ts 早于上一条 event（V10-timestamp-monotonic）
+end note
+
+@enduml

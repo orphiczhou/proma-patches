@@ -1,0 +1,205 @@
+@startuml class-diagram
+' =============================================================================
+' Proma 改造项目 — 模块依赖与桥接类图（03_ARCHITECTURE/class-diagram.puml）
+' 维护: 周星星 + Proma Agent | 来源: ARCHITECTURE.md §1.1 / §4 / §9
+' 配套: design-files-mapping-2026-07-09.md §五 P0-3
+' =============================================================================
+
+title Proma 改造项目 — 模块依赖 / global.__proma__ 桥接 / sed 补丁 A-K / SDK 入树点
+
+skinparam backgroundColor #FAFAFA
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+skinparam arrowColor #444
+skinparam arrowThickness 1
+skinparam classBorderColor #555
+skinparam noteBorderColor #888
+skinparam noteBackgroundColor #FFF8DC
+
+left to right direction
+
+' =============================================================================
+' 外部客户端层
+' =============================================================================
+package "外部 MCP 客户端 (stdio)" {
+  component "Claude Code /\n外部 MCP 客户端" as ClaudeCode
+  component "**proma-mcp-server.cjs**\n(零依赖 stdio 桥)" as McpServer {
+    method "--dev / --release / --pro"
+    method "stdio in/out ↔ HTTP out"
+  }
+}
+
+' =============================================================================
+' Layer 0：商业版 main.cjs（被 sed 补丁的载体）
+' =============================================================================
+package "Proma Electron 主进程" {
+  component "**main.cjs**\n(571K 行 / 0.12.23)\n含 15 个闭源模块" as MainCjs {
+    method "createAgentSession()"
+    method "forkAgent()"
+    method "listChannels()"
+    method "listSessions()"
+    method "listWorkspaces()"
+    method "getSessionInfo() / Context()"
+    method "listMessages()"
+    method "sendMessage()"
+    method "archiveSession()"
+    method "discoverInstances()"
+    method "runAgentHeadless()"
+    method "initAutoUpdater()"
+    method "AppUserModelId setter"
+    method "userData path resolver"
+  }
+
+  note right of MainCjs
+    **sed 补丁 A-K (11 个注入点)**
+    ─────────────────────────────
+    patch_A   : global.__proma_getMcpServers__ MCP 钩子注入
+    patch_B   : API 桥接 + require("./proma-dev-patches.cjs")
+                + global.__proma__ 导出 12 函数
+    patch_B2  : 桥接扩展 runAgentHeadless
+    patch_B3  : 桥接扩展 listAgentWorkspaces
+    patch_C1-5: 频道 + 模型元数据覆盖 (MCP 建会话走后端 channel/model/API Key)
+    patch_D   : Renderer 同步 (UI 模型选择器 ↔ metadata)
+    patch_E   : UI 守卫移除
+    patch_F   : ⚠️ 已被 patch_H 替代 (跨渠道 sdkSessionId 防护)
+    patch_G   : CLAUDE_CONFIG_DIR 无条件覆盖 (修 Dev fork 失败 0/3→3/3)
+    patch_H   : 跨频道/跨 provider 模型切换完整修复 (channelId/modelId 任变清 sdkSessionId)
+    patch_I   : initAutoUpdater 首行 return (禁用更新检查)
+    patch_J   : AppUserModelId 动态隔离 com.proma.{NAME}
+    patch_K   : userData 路径动态化 electron-{NAME}
+                (v0.16.5: 双条件 ISOLATED+NAME)
+  end note
+}
+
+' =============================================================================
+' 桥接层：global.__proma__（patch_B 产出）
+' =============================================================================
+package "global.__proma__ 桥接层 (12 函数)" {
+  interface "__proma__" as PromaBridge {
+    + createAgentSession(channel_id, model_id, title, workspace_id)
+    + forkAgent(source_session_id, up_to_message_uuid, ...)
+    + listAgentWorkspaces()
+    + listChannels()
+    + listSessions(workspace_id, include_archived, limit)
+    + getSessionInfo(session_id)
+    + getSessionContext(session_id)
+    + listMessages(session_id, limit, offset)
+    + sendMessage(session_id, message, wait, notify, model_id, channel_id)
+    + archiveSession(session_id, archived)
+    + discoverInstances(refresh, hosts)
+    + runAgentHeadless(...)
+  }
+}
+
+' =============================================================================
+' Layer 1：proma-dev-patches.cjs（独立插件层，3268 行）
+' =============================================================================
+package "Layer 1 — **proma-dev-patches.cjs** (3268 行)" {
+  component "PromaDevPatches\n(由 patch_B require 加载)" as Patches {
+    method "12 个 mcp__session__* 工具 handler"
+    method "12 个 mcp__remote-session__* 工具 handler"
+    method "HTTP bridge handler (localhost:19876-95)"
+    method "TAO Watcher (checkAllRules, 5min 周期)"
+    method "sdk.createSdkMcpServer({name:'tree'}) handler"
+    method "callTreeState(workspaceSlug, args, callerSessionId)"
+    method "W-AUDIT-* tamper detection"
+  }
+}
+
+' =============================================================================
+' Layer 2：tree-engine.cjs（内联引擎层，5045 行）
+' =============================================================================
+package "Layer 2 — **tree-engine.cjs** (5045 行, 工作区零源码)" {
+  component "TreeEngine" as TreeEngine {
+    method "run(cmd, args, treesRoot, callerSessionId)"
+    method "29 个 mcp__tree__* 工具 (cmdXxx)"
+    method "DbC 21 校验点 (Phase A + V4-V9 + R2/M2)"
+    method "V10 八大加固 (Trust Anchor 等)"
+    method "TAO Watcher 35 规则 (W/R/C/W-AUDIT)"
+    method "applyNudge(rule_id, severity)"
+    method "atomic write + file lock"
+    method "ERROR_TO_HELP help_hint 映射"
+  }
+
+  database "tree-state.json\n(per tree, 磁盘)" as TreeState {
+    method "schema_version: 0.7"
+    method "tree_id / root_brief / root_dod"
+    method "leaves: { leaf_id: { role, status, ... } }"
+    method "events[] / audit_log[]"
+    method "heartbeats[] / drift_log[]"
+    method "audit_gate { verdict, auditor_session_id }"
+  }
+}
+
+' =============================================================================
+' SDK 入树点（Agent SDK 通过 createSdkMcpServer 调进 tree-engine）
+' =============================================================================
+package "Agent SDK 入树点" {
+  component "Agent SDK\nsdk.createSdkMcpServer({name:'tree'})" as AgentSdk {
+    method "工具调用 → handler"
+  }
+  component "callTreeState(workspaceSlug,\nargs, callerSessionId)" as CallTreeState
+  note right of AgentSdk
+    **SDK 入树点数据流**
+    ──────────────────
+    Agent SDK 调 mcp__tree__*
+      ↓
+    sdk.createSdkMcpServer handler (patches.cjs L1190)
+      ↓ callerSessionId 透传
+    callTreeState(workspaceSlug, args, callerSessionId)
+      ↓ 找 trees_dir
+    treeEngine.run(cmd, args, treesRoot, callerSessionId)
+      ↓
+    cmdXxx (Precondition → Apply → Postcondition)
+      ↓ atomic write + file lock
+    tree-state.json (磁盘)
+  end note
+}
+
+' =============================================================================
+' 依赖箭头（关键流向）
+' =============================================================================
+
+' main.cjs → require(patches.cjs)（patch_B 注入点触发）
+MainCjs ..> Patches : "patch_B:\nrequire('./proma-dev-patches.cjs')"
+
+' main.cjs → global.__proma__ 桥接（patch_B 导出 12 函数）
+MainCjs ..> PromaBridge : "patch_B 导出 12 桥接函数"
+Patches ..> PromaBridge : "进程内直连调用\n(零拷贝)"
+
+' patches.cjs 内联 tree-engine.cjs（v0.7+ 内联策略，工作区零源码）
+Patches ..> TreeEngine : "patch (require) 内联\nrequire('./tree-engine.cjs')"
+
+' tree-engine → tree-state.json
+TreeEngine ..> TreeState : "atomic write + file lock"
+
+' SDK 入树点 → patches handler → callTreeState → treeEngine.run
+AgentSdk ..> CallTreeState : "工具调度"
+CallTreeState ..> TreeEngine : "treeEngine.run(cmd, args)"
+
+' 外部 stdio 桥（Claude Code → mcp-server → HTTP bridge → patches handler）
+ClaudeCode --> McpServer : "stdio MCP\n(mcpServers.proma-dev-session)"
+McpServer ..> Patches : "HTTP bridge\nlocalhost:19876-95"
+Patches ..> PromaBridge : "global.__proma__ 进程内调用"
+
+' 频道/模型元数据（patch_C1-5 + patch_H 同步流向）
+MainCjs ..> PromaBridge : "patch_C1-5 / patch_H\n频道模型元数据覆盖"
+
+' 用户数据隔离（patch_G / patch_K）
+MainCjs ..> MainCjs : "patch_G (CLAUDE_CONFIG_DIR)\npatch_K (userData 路径)"
+
+' =============================================================================
+' 图例
+' =============================================================================
+legend right
+  |= 线型 |= 含义 |
+  | ──→  | 实线箭头: 进程间 / stdio / HTTP 调用 |
+  | ┄┄→  | 虚线箭头: 进程内 require / global 桥接 / 文件 IO |
+  ─────────────────────────
+  **三层叠加策略** (ARCHITECTURE §2):
+   1. sed 补丁层 (main.cjs 字符串替换, A-K)
+   2. 独立插件层 (proma-dev-patches.cjs)
+   3. 内联引擎层 (tree-engine.cjs, 工作区零源码)
+endlegend
+
+@enduml

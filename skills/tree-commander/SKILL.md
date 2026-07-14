@@ -186,24 +186,34 @@ self_audit:
 
 ```text
 对每个子任务:
-  1. fork_session(from=<parent_session>, new_channel_id=..., new_model_id=...)
-     或 create_session(channel_id=..., model_id=..., title=<命名规范的标题>)
-  2. 首条消息 = §3 的 5 件套完整 YAML（直接复制粘贴模板）
-  3. 调 mcp__tree__tree_leaf_add(tree_id=<tree_id>, leaf=<leaf 对象>)
-     leaf 对象必填字段（缺任一 → E_SCHEMA_INVALID）：
+  1. create_session(channel_id=..., model_id=..., title=<命名规范的标题>)
+     ⚠️ Sprint 2（design-commander-spawn）：正常派生**强制 create_session**（不 fork）。
+        理由：fork 继承父会话历史 → 上下文污染 + token 重；create_session 干净 + 契约驱动。
+        fork 仅用于 §7 纠偏重档 / F1 崩溃恢复（需继承到 milestone 历史，是「从某点重试」语义）。
+  2. 调 mcp__tree__tree_leaf_add(tree_id=<tree_id>, leaf=<leaf 对象，含 5 件套持久化>)
+     leaf 对象必填字段 + 5 件套（缺必填 → E_SCHEMA_INVALID）：
      ```yaml
      leaf:
        leaf_id: "<prefix>-<A1>-worker"        # 命名见 §12；prefix = tree init 时 root_brief.prefix，与 tree_id 解耦
-       session_id: "<worker 的 Proma session_id，fork_session/create_session 后获得>"
+       session_id: "<worker 的 Proma session_id，create_session 后获得>"
        parent: "<root 或父 commander 的 leaf_id>"
        path: "A1"   # 仅本层路径段（worker 在 root 下 = "A1"；嵌套在 commander 下 = "A1/B1"）。⚠️ 不是完整 leaf_id（"vpro1-A1-worker" ✗），不是 "root → leaf" 路径链。由 leaf_id 按引擎 parsePathFromLeafId 派生 = leaf_id 去 prefix 和 role 后缀的段（不符 → E_SCHEMA_INVALID）
-       role: "worker"                          # 枚举 root|commander|worker（leaf_add 拒绝 role=root，root 只由 init 创建）
+       role: "worker"                          # 枚举 root|commander|worker|auditor（leaf_add 拒绝 role=root，root 只由 init 创建）
        model: "GLM-5.2"
        channel: "<渠道 id>"
        added_by: "<commander/root 的 session_id>"   # 非 root 必填（操作者追溯链）
+       # Sprint 2 约束 4：5 件套持久化进 leaf（下游启动后 tree_leaf_get 读，混合任务书机制）
+       brief: <§3.1 brief 对象>
+       dod: <§3.2 dod 对象>
+       report_protocol: <§3.3 report 对象>
+       autonomy: <§3.4 autonomy 对象>
+       self_audit: <§3.5 self_audit 对象>
      ```
      （命名强制校验在工具内置，失败返回 error.code 如 E_NAME_INVALID）
-  4. 对 self_audit 的每个 milestone 调:
+  3. 首条消息（混合任务书）= send_message(session_id=<新会话>, message="你的任务书在 leaf <leaf_id>，启动后调 mcp__tree__tree_leaf_get(tree_id=<tree_id>, leaf_id=<leaf_id>) 读 5 件套，然后 brief_echo 对齐")
+     ⚠️ 不再把完整 5 件套 YAML 塞进首条消息（已持久化进 leaf，避免冗余 + 依赖父会话传递）。
+  4. 下游会话（commander/worker）启动首步：tree_leaf_get(自己的 leaf_id) 读 5 件套 → brief_echo 对齐（§6）
+  5. 对 self_audit 的每个 milestone 调:
      mcp__tree__tree_milestone_add(tree_id=<tree_id>, leaf_id=<leaf_id>, milestone=<milestone 对象>)
 ```
 
@@ -390,6 +400,8 @@ self_audit:
 
 > 依据：设计文档 §5.2 三档纠偏表 + §5.3 纠偏决策树 + §10.5 纠偏执行流程。
 
+> 📍 **fork 使用边界（2026-07-14 Sprint 2 约束 4）**：本节**重档剪枝**用 `fork_session`（需继承到 milestone 历史，是"从某点重试"语义）。**正常派生**（root→commander→worker 建人）**用 `create_session`**，见 §4 Step 2。fork 仅用于"重试/恢复"语义，不是正常建人手段。
+
 ### 决策树（if-else）
 
 ```text
@@ -436,6 +448,8 @@ self_audit:
 全部动作调 tree_drift_append 记录。
 ```
 
+> ⚠️ **中档限权工具失同步（2026-07-14）**：`tree_leaf_autonomy_override` 已于 Sprint 1 删除（autonomy_overrides 死字段清理，见 CLAUDE.md / note 2026-07-14 Sprint 1 收尾）。中档限权当前**无可用工具**——中档档位暂**降级为加强版 nudge**（send_message 明确"权限限制 + 必须先纠正方向"，severity 标 mid），不调不存在的 autonomy_override。轻档 / 重档不受影响。替代限权机制（如 milestone 门禁加严）待后续 Sprint 补。
+
 ### 三档递进原则
 
 | 档位 | 触发 | 动作 | 执行者 |
@@ -464,7 +478,12 @@ prompt: |
   步骤:
   1. 调用 mcp__tree__tree_leaf_list_active(tree_id=<tree_id>)
      返回: {ok:true, leaves:[{leaf_id, session_id, last_event_ts, context_usage_pct},...]}
-  2. 对每个 active 叶子调用 mcp__session__list_messages(session_id, limit=3) 获取最近活动
+  2. 对每个 active 叶子（约束 6 ctx 集成，2026-07-14）:
+     a. mcp__session__get_session_context(session_id=leaf.session_id) → 拿真实 token 用量 + context_window
+        → ctx_pct = round(usage_tokens / context_window * 100)（治"ctx 永远 0"：心跳主动查真实 ctx）
+     b. mcp__session__list_messages(session_id, limit=3) 获取最近活动
+     c. mcp__tree__tree_leaf_set_context(tree_id, leaf_id, ctx_pct) 写真实 ctx
+        → ctx>=85% 时引擎自动 set leaf.status=segment_pending（竹节刚性触发，见 §8.3）
   3. 组装数据后，调用哨兵 Agent（subagent_type=explorer），prompt 见下方判定矩阵
   4. 对哨兵判定为 stale/silent 的叶子:
      mcp__session__send_message(session_id, "status_check: 请报告当前步骤、已产出文件、预计完成时间、是否有阻塞")
@@ -516,8 +535,12 @@ prompt: |
       → 仅记录，不动作
     
     elif verdict.verdict == "sweet_spot_risk":
-      → 在 heartbeat 日志中标记预警
-      → 下次心跳仍 >=85% 则触发竹节交接（v0.3 实现）
+      → 引擎已在步骤 2c 写入真实 ctx；ctx>=85% 时引擎自动 set leaf.status=segment_pending（约束 6 刚性，2026-07-14，替代 v0.3 未实现）
+      → commander 检测到 segment_pending → 执行竹节交接（bamboo-joint handoff）:
+        1) mcp__session__create_session(...) 建 new session（干净会话接续，非 fork）
+        2) mcp__tree__tree_segment_append(tree_id, leaf_id, new_session_id)（segment_chain 留痕）
+        3) mcp__tree__tree_leaf_set_session(tree_id, leaf_id, new_session_id)
+        4) mcp__tree__tree_leaf_set_status(tree_id, leaf_id, "active")（恢复 active，新竹节干活）
     
     elif verdict.verdict == "stale":
       → 已发 status_check（步骤 4 完成）
@@ -579,6 +602,8 @@ prompt: |
 ## §10 灾难恢复检查表
 
 > 依据：设计文档 §8.3 灾难恢复（4 类故障 F1-F4）。
+
+> 📍 **F1/F4 的 fork 语义（2026-07-14 Sprint 2 约束 4）**：F1 子会话崩溃、F4 配额恢复后的重 Fork 都用 `fork_session`——它们是"从某 milestone 点重试"语义，**需要继承到该点的历史**，故保留 fork（与 §7 重档一致）。**正常派生建人用 create_session（§4 Step 2）**，勿混用。
 
 | 故障 | 现象 | 恢复动作 | mcp__tree__* 工具 |
 |------|------|---------|------------------|
@@ -794,6 +819,35 @@ auditor leaf done 后，可给 worker / 下级 auditor 背书：
 
 auditor role 引入后，root 信任锚（§13.2）**仍保留**：冷启动期（无任何 auditor leaf done 时）root 当所有 leaf 的 auditor。转正常期后逐步交给 auditor leaf 链式背书（上级 auditor 背书下级 auditor，§13.4.3）。root 永远是最后兜底的信任锚——auditor leaf 的 audit_gate=pass 在冷启动期由 root 背书（§13.4.1 步骤5）。
 
+#### §13.4.5 auditor session 卡死 fallback（P1-S04 单边缓解，2026-07-14 Sprint 5）
+
+> **场景**：auditor leaf 创建流程（§13.4.1）中，步骤1 `fork_session` 产出的 auditor session 因 **Proma fork identity timeout（BUG-A 跨仓）** 卡死——session identity 未就绪，auditor 无法调 `mcp__tree__*`（caller 校验失败）或 session 长时间无响应。导致 auditor role done 路径不可用（P1-S04，audtest 端到端失败根因）。
+>
+> **根因跨仓**：fork identity timeout 是 Proma app 层 bug（fork 后 session identity 异步就绪，偶发超时），tree-harness 单边无法根治。本节是**单边缓解**（SKILL fallback），让 auditor 流程在 fork 卡死时仍可恢复。真正根治需 Proma 修 fork identity（跨仓，标记汇报，不在 tree-harness 范围）。
+
+**判定 auditor session 卡死**（满足任一，区别于 pro 正常冷启动慢）：
+- fork 后 `list_messages` / `send_message` 长时间无响应（>3 分钟，远超 pro 冷启动预期）
+- auditor 调 `mcp__tree__*` 反复报 caller 校验失败（session identity 未注入）
+- `get_session_info` 返回异常或 session 状态长期异常
+
+**fallback 流程**（root 执行，单边缓解）：
+```text
+[caller=root] 1. mcp__session__archive_session(session_id=<卡死的 auditor session>)
+                 # Proma 层归档卡死 session（释放侧边栏；session_registry 记录不删——Sprint 5 max_sessions 仍计它）
+[caller=root] 2. mcp__session__fork_session（或 create_session）→ 新 auditor session
+                 # 🚫仍禁 create_session/delegate_agent 当 SubAgent（macp2 红线 §13.5）；这里是建 auditor 真 session，合法
+[caller=root] 3. tree_leaf_set_session(leaf_id=<auditor leaf>, new_session_id=<新 session>)
+                 # caller=root.session_id === leaf.added_by（root 创建了该 auditor leaf，§13.4.1 步骤2 set-session caller-binding 放行）
+                 # 把 auditor leaf 的 session 换成新的（保留 leaf_id + 已有 events；新 session 登记 session_registry，Sprint 5 max_sessions）
+[caller=新session] 4. 继续 §13.4.1 步骤3（brief_echo/done/audit_gate/set-status done），caller 用新 session
+```
+
+**约束（红线）**：
+- 🔴 fallback 是**异常恢复**，不是常规路径。同一 auditor leaf 重 fork **≤2 次**；超过 → 停下排查 fork identity 根因（跨仓），勿无限重试（每次重 fork 新增 session_registry 记录，会撞 max_sessions）。
+- 🔴 归档卡死 session **不释放** max_sessions 额度（session_registry 记历史 session 总数防 macp2 型爆炸——归档≠没创建过）。频繁 fallback 本身就是反指标。
+- 🔴 若 auditor leaf **已 done**（§13.4.1 步骤6 后才卡死，罕见），**不要 fallback**——leaf 状态已完成，session 卡死不影响 leaf。
+- **替代方案**：若 fork 反复卡死（>2 次），回退 §13.4.4 root 信任锚（root 当 auditor），不强制走独立 auditor leaf。root 信任锚不依赖 fork，无 identity timeout 风险。
+
 ### §13.5 SDK SubAgent 的位置（2026-07-07 重写：SubAgent 入树）
 
 SDK SubAgent（researcher / code-reviewer / implementer / 任意自定义 role）是**父 leaf 上 `subagent_spawn` 事件溯源的一等劳动单元**。commander / commander-下任意级 leaf 都鼓励用 SubAgent 放大产能：调研、审查（G1-G5 维度）、实现、审计维度，均可派 SubAgent 干活，再把劳动记录挂在自己 leaf 上。
@@ -812,7 +866,7 @@ SDK SubAgent（researcher / code-reviewer / implementer / 任意自定义 role�
 >
 > **撞错（`E_DUPLICATE_SESSION_ID` 等）修根因，禁止换名（v2/b/x）重试新建会话**（macp2 循环放大器）。
 >
-> **收敛条件（成本有界）**：角色数按交付物分档 1/3/5（**上限 5**），轮数 **≤3**，末轮 `red_count=0` 即停，未收敛则**升级（blocked 上行）而非无限重试**。总调用 ＝ 角色数 × 轮数，有界可预算。
+> **收敛条件（成本有界）**：角色数按交付物分档 2/3/5（**上限 5**），轮数 **≤3**，末轮 `red_count=0` 即停，未收敛则**升级（blocked 上行）而非无限重试**。总调用 ＝ 角色数 × 轮数，有界可预算。
 
 #### §13.5.1 怎么记：父 leaf 上 append subagent_spawn 事件
 
@@ -1052,7 +1106,7 @@ declare done 前逐项确认：
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
-| 2026-07-08 | v2.5 | **macp2 事故修复**：§13.5 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度，macp2 事故 4 分钟炸 207 会话、DeepSeek 余额打负）；撞错修根因禁换名(v2/b/x)重试；收敛条件（角色 1/3/5 上限 5 + 轮≤3 + red_count=0 停/未收敛升级） |
+| 2026-07-08 | v2.5 | **macp2 事故修复**：§13.5 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度，macp2 事故 4 分钟炸 207 会话、DeepSeek 余额打负）；撞错修根因禁换名(v2/b/x)重试；收敛条件（角色 2/3/5 上限 5 + 轮≤3 + red_count=0 停/未收敛升级） |
 | 2026-07-07 | v2.4 | SubAgent 入树：§13.5 重写（SubAgent = 父 leaf 上 subagent_spawn 事件溯源的一等劳动单元；caller-binding 不变；新增 §13.5.1 写法示例 + §13.5.2 reviewer_kind:subagent / independence）；§4 Step4 加 independence 双重保险意识（self_delegated 第一道筛 / independent 第二道闸 / commander 抽查重点 + 可派自己 SubAgent 独立复核）；§14 加审计维度 leaf 可派 SubAgent 深度审查；§13.7 错误码速查表加 E_DELIVERABLE_EMPTY + E_REVIEW_FORGERY |
 | 2026-07-04 | v2.3 | ISS-003：§4 Step4 加 review_required=true 验收核查（核 review_round event + 抽查 findings 真实性，引擎只防格式，commander 抽查是内容真实性的真实防线） |
 | 2026-06-19 | v2.2 | 审计驱动修订：requires 中 commander-methodology.md 版本引用从 v1.0 更新为 v1.2 |

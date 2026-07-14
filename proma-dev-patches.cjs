@@ -254,6 +254,66 @@ function validateWorkspaceId(workspaceId) {
 // session fork 链 (竹节交接/深度探索) 留余量到 10。R4 祖先链遍历也用此上限兜底。
 const MAX_DELEGATION_DEPTH = 10;
 
+// macp2 爆炸护栏 (2026-07-09, brief harness 评估新增): create_session 数量预算。
+//   背景: macp2 commander 4 分钟扁平 create_session 207 reviewer（不入 tree，绕过 node_budget /
+//   subagent_budget / TaoWatcher 全部）。delegationDepth 只防链式深递归，不防扁平重复。此为引擎层补充。
+//   注: 行为约束（SKILL §13.5 + startup_notice）是治本，本预算是防御纵深（引擎硬拦）。
+const CREATE_SESSION_BUDGET_WINDOW_MS = 60000;  // 60s 滚动窗口
+const CREATE_SESSION_BUDGET_MAX = 20;           // 单 caller 60s 内最多 20 次（macp2 ~50/60s 远超）
+const _createSessionBudgetMap = new Map();      // sourceSessionId -> [timestamps]
+function checkCreateSessionBudget(sourceSid) {
+  if (!sourceSid) return null;  // 外部/remote 无 caller 不限（走 R6 降级，已有 lineage 限制）
+  const now = Date.now();
+  const arr = (_createSessionBudgetMap.get(sourceSid) || []).filter(t => now - t < CREATE_SESSION_BUDGET_WINDOW_MS);
+  if (arr.length >= CREATE_SESSION_BUDGET_MAX) {
+    return { code: 'E_SESSION_BUDGET_EXCEEDED', count: arr.length };
+  }
+  arr.push(now);
+  _createSessionBudgetMap.set(sourceSid, arr);
+  // 偶发清理过期 key（防内存泄漏）
+  if (_createSessionBudgetMap.size > 1000) {
+    for (const [k, v] of _createSessionBudgetMap) {
+      if (!v.some(t => now - t < CREATE_SESSION_BUDGET_WINDOW_MS)) _createSessionBudgetMap.delete(k);
+    }
+  }
+  return null;
+}
+
+// Sprint 5 (聚类 A, improvement P0-S01 单边方案, 2026-07-14): create_session 旁路根治 — 定位 caller 所属 tree。
+//   根因：SDK 原生 create_session 不经 mcp__tree__leaf add，tree engine 对其零感知（macp2 4 分钟 207 session
+//   不入树，绕过 node_budget / subagent_budget / max_sessions 全部）。delegationDepth 只防链式深递归不防扁平重复。
+//   本函数扫描所有 workspace 的 trees_dir，找 sourceSessionId 所属的 tree（在 leaves[].session_id 或 session_registry 里）。
+//   返回 [{ trees_dir, tree_ids:[] }]，供 create_session handler 做 max_sessions 预检（create 前拒绝）+ 旁路登记（create 后）。
+//   只读扫描，永不抛（异常返回 []，non-fatal —— 引擎侧 max_sessions 仍兜底）。
+function findCallerTreesForBypassGuard(sourceSessionId) {
+  if (!sourceSessionId) return [];
+  let treeEngine;
+  try { treeEngine = require("./tree-engine.cjs"); } catch (_) { return []; }
+  if (!treeEngine || typeof treeEngine.findTreesBySession !== 'function') return [];
+  const os = require("os");
+  const home = os.homedir();
+  const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
+  const base = isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces");
+  const results = [];
+  let wsEntries = [];
+  try { wsEntries = fs.readdirSync(base); } catch (_) { return results; }
+  for (const wsName of wsEntries) {
+    const wsRoot = path.join(base, wsName);
+    try { if (!fs.statSync(wsRoot).isDirectory()) continue; } catch (_) { continue; }
+    const candidates = [
+      path.join(wsRoot, "workspace-files", ".context", "trees"),
+      path.join(wsRoot, ".context", "trees"),
+    ];
+    for (const treesDir of candidates) {
+      try { if (!fs.existsSync(treesDir) || !fs.statSync(treesDir).isDirectory()) continue; } catch (_) { continue; }
+      let treeIds = [];
+      try { treeIds = treeEngine.findTreesBySession(treesDir, sourceSessionId); } catch (_) { treeIds = []; }
+      if (treeIds && treeIds.length) results.push({ trees_dir: treesDir, tree_ids: treeIds });
+    }
+  }
+  return results;
+}
+
 // 判定结果结构: { allow: bool, rule: string, reason: string, audit: bool }
 //   allow=true 放行; audit=true 表示放行但记审计日志 (老会话兼容/系统特权/meta 丢失/外部 send)。
 
@@ -666,9 +726,64 @@ function createToolHandlers(sourceSessionId) {
       // mcp__tree__* 工具失败. 运行时再现: GLM-5.2 v1 落 "undefined" slug → E_NO_TREES_DIR.
       const wsCheck = validateWorkspaceId(args.workspace_id);
       if (!wsCheck.ok) return jsonResult({ ok: false, error: wsCheck.error });
-      const workspaceId = wsCheck.normalized || args.workspace_id;
+      let workspaceId = wsCheck.normalized || args.workspace_id;
       // 未指定 workspace_id 时不强制, createAgentSession 内部有 fallback, 加上
       // findTreesDirForWorkspace 的 slug "undefined" fallback 保护 (V10 已修).
+
+      // Sprint 4 跨工作区 P1 Part B (cross-workspace-tree-issue §五 P1):
+      // agent 调用方工作区锁定 — 堵平台 createAgentSession 不校验 workspaceId 导致
+      //   9 工作区漂移. Part A (validateWorkspaceId / R2-R4) 只校验 workspace 存在, 但
+      //   9 个工作区都在索引里所以拦不住 agent 跨工作区漂移. 本锁: agent 调用方
+      //   (sourceSessionId 存在 = 非顶层 user/automation) 建子会话必须留在自己的
+      //   workspace 内 —— 显式跨 → E_WORKSPACE_FORBIDDEN; 未指定 → 强制=调用方 workspace
+      //   (防子会话 workspaceId=undefined 漂出 + 保证子树同工作区). 顶层 user/automation
+      //   (无 sourceSessionId) 不受限 (跨工作区属 admin 操作). remote_create_session 是
+      //   独立 handler, 不经此锁. 与 main.cjs createAgentSession 平台层校验 (P2) 互补.
+      if (sourceSessionId) {
+        try {
+          const _callerMeta = a.getAgentSessionMeta(sourceSessionId);
+          const _callerWs = _callerMeta && _callerMeta.workspaceId;
+          if (_callerWs) {
+            if (workspaceId && workspaceId !== _callerWs) {
+              return jsonResult({ ok: false, error: { code: 'E_WORKSPACE_FORBIDDEN', msg: `create_session rejected: agent caller ${sourceSessionId.slice(0, 8)} is in workspace ${_callerWs.slice(0, 8)} but requested workspace ${workspaceId.slice(0, 8)}. Agents cannot cross workspaces (cross-workspace-tree-issue §五 P1). Cross-workspace creation is an admin/user operation, not an agent operation.` } });
+            }
+            if (!workspaceId) {
+              // 未显式指定 → 强制到调用方 workspace (防 workspaceId=undefined 漂移 + 子树同工作区)
+              workspaceId = _callerWs;
+            }
+          }
+        } catch (e) { log(`[create_session] caller-workspace lock check skipped (non-fatal): ${e && e.message ? e.message : String(e)}`); }
+      }
+
+      // macp2 爆炸护栏 (2026-07-09): create_session 数量预算（在 delegationDepth 前, 成本低先拦）
+      const _budgetHit = checkCreateSessionBudget(sourceSessionId);
+      if (_budgetHit) {
+        return jsonResult({ ok: false, error: { code: _budgetHit.code, msg: `create_session rejected: caller ${sourceSessionId ? sourceSessionId.slice(0, 8) : '(no-caller)'} created ${_budgetHit.count} sessions in last ${CREATE_SESSION_BUDGET_WINDOW_MS / 1000}s (max ${CREATE_SESSION_BUDGET_MAX}). Possible session-splosion (macp2 pattern: create_session used as reviewer, bypassing tree budget). Converge review, reuse sessions, or use in-process SubAgent (CLAUDE.md P0 红线).` } });
+      }
+
+      // Sprint 5 (聚类 A, improvement P0-S01 单边方案, 2026-07-14): create_session 旁路根治 — max_sessions 预检。
+      //   根因：SDK 原生 create_session 不经 mcp__tree__leaf add，engine 对其零感知（macp2 207 session 不入树）。
+      //   单边方案（子会话能做）：create 前查 caller 所属 tree 的 session 总数，达 max_sessions → 拒绝（钱没花）；
+      //   create 后把新 session 登记到所属 tree session_registry（旁路可见，让 max_sessions/审计覆盖旁路 create）。
+      //   跨仓根治（标记汇报，不做）：真正根治需 Proma SDK create_session 回调钩子 + subagent_trace_id（Layer 4 平台层）。
+      let _pendingBypassRegister = null;
+      if (sourceSessionId) {
+        try {
+          const _ownerTrees = findCallerTreesForBypassGuard(sourceSessionId);
+          if (_ownerTrees.length) {
+            const _eng = require("./tree-engine.cjs");
+            for (const _ot of _ownerTrees) {
+              for (const _tid of _ot.tree_ids) {
+                const _sc = await _eng.run('tree', ['session-count', _tid], _ot.trees_dir);
+                if (_sc && _sc.ok && _sc.reached) {
+                  return jsonResult({ ok: false, error: { code: 'E_MAX_SESSIONS', msg: `create_session rejected: caller ${sourceSessionId.slice(0, 8)}'s tree "${_tid}" has ${_sc.count} sessions (max ${_sc.max}, reached). macp2-style session-splosion guard (聚类A 旁路根治). Archive sessions, reuse via segment handoff, or raise audit_meta.max_sessions.` } });
+                }
+              }
+            }
+            _pendingBypassRegister = _ownerTrees;
+          }
+        } catch (e) { log(`[create_session] max_sessions bypass precheck skipped (non-fatal): ${e && e.message ? e.message : String(e)}`); }
+      }
 
       // 层1加固 §6: delegationDepth 预检 (createAgentSession 之前, 超限直接拒绝避免孤儿 session)
       let _newDepth = 0;
@@ -698,6 +813,18 @@ function createToolHandlers(sourceSessionId) {
             a.updateAgentSessionMeta(meta.id, { delegationDepth: 0, triggeredBy: 'user' });
           }
         } catch (e) { log(`[create_session] lineage write failed (non-fatal): ${e && e.message ? e.message : String(e)}`); }
+        // Sprint 5 (聚类 A): create 成功后登记旁路 session 到所属 tree session_registry
+        //   （旁路可见，让 max_sessions/审计覆盖旁路 create_session —— macp2 型爆炸的根因缓解）。
+        if (_pendingBypassRegister && meta && meta.id) {
+          const _eng2 = require("./tree-engine.cjs");
+          for (const _ot of _pendingBypassRegister) {
+            for (const _tid of _ot.tree_ids) {
+              try {
+                await _eng2.run('tree', ['register-session', _tid, '--session-id', meta.id, '--source', 'create_session', '--caller', sourceSessionId], _ot.trees_dir);
+              } catch (e) { log(`[create_session] bypass session register to tree "${_tid}" failed (non-fatal): ${e && e.message ? e.message : String(e)}`); }
+            }
+          }
+        }
         log(`Session created: ${meta.id.slice(0, 8)} "${meta.title}" channel=${args.channel_id} workspace=${workspaceId || '(default)'} model=${modelId}`);
         return jsonResult({
           session: {
@@ -811,6 +938,17 @@ function createToolHandlers(sourceSessionId) {
         if (args.new_workspace_id) {
           const wsCheck = validateWorkspaceId(args.new_workspace_id);
           if (!wsCheck.ok) return jsonResult({ ok: false, error: wsCheck.error });
+          // Sprint 4 跨工作区 P1 Part B (fork_session 同类漏洞): agent 调用方不能把 fork
+          //   落到别的 workspace (堵 create_session 同源的跨工作区漂移). Part A 只校验存在.
+          if (sourceSessionId) {
+            try {
+              const _callerMeta = a.getAgentSessionMeta(sourceSessionId);
+              const _callerWs = _callerMeta && _callerMeta.workspaceId;
+              if (_callerWs && wsCheck.normalized && wsCheck.normalized !== _callerWs) {
+                return jsonResult({ ok: false, error: { code: 'E_WORKSPACE_FORBIDDEN', msg: `fork_session rejected: agent caller ${sourceSessionId.slice(0, 8)} is in workspace ${_callerWs.slice(0, 8)} but requested new_workspace_id ${wsCheck.normalized.slice(0, 8)}. Agents cannot cross workspaces (cross-workspace-tree-issue §五 P1).` } });
+              }
+            } catch (e) { log(`[fork_session] caller-workspace lock check skipped (non-fatal): ${e && e.message ? e.message : String(e)}`); }
+          }
           updates.workspaceId = wsCheck.normalized || args.new_workspace_id;
         }
 
@@ -1611,7 +1749,6 @@ function createExternalHttpBridge() {
         tt("tree_leaf_set_context", "Update leaf context_usage_pct (0-100+).", { tree_id: z.string(), leaf_id: z.string(), context_pct: z.number() }, (a) => ["leaf", "set-context", a.tree_id, a.leaf_id, String(a.context_pct)]),
         tt("tree_leaf_set_last_event", "Update leaf last_event_type/ts.", { tree_id: z.string(), leaf_id: z.string(), event_type: z.string(), ts: z.string().optional() }, (a) => ["leaf", "set-last-event", a.tree_id, a.leaf_id, a.event_type, ...(a.ts ? ["--ts", a.ts] : [])]),
         tt("tree_leaf_set_session", "Update leaf session_id (e.g. fix PENDING_ROOT root).", { tree_id: z.string(), leaf_id: z.string(), session_id: z.string() }, (a) => ["leaf", "set-session", a.tree_id, a.leaf_id, a.session_id]),
-        tt("tree_leaf_autonomy_override", "Override leaf autonomy (added_must_ask / etc).", { tree_id: z.string(), leaf_id: z.string(), overrides: z.record(z.any()) }, (a) => ["leaf", "autonomy-override", a.tree_id, a.leaf_id, "--json", J(a.overrides)]),
         tt("tree_milestone_set_result", "Set milestone audit result. V4 (v0.7 批次5): audit_pass=true requires independent --audit-session-id (real independent leaf session in tree).", { tree_id: z.string(), leaf_id: z.string(), milestone_id: z.string(), audit_pass: z.boolean(), audit_session_id: z.string().optional(), note_path: z.string().optional() }, (a) => ["milestone", "set-result", a.tree_id, a.leaf_id, a.milestone_id, "--audit-pass", String(a.audit_pass), ...(a.audit_session_id ? ["--audit-session-id", a.audit_session_id] : []), ...(a.note_path ? ["--note-path", a.note_path] : [])]),
         // ---- Append ----
         tt("tree_event_append", "Append an event (done/blocked/plan/brief_echo/heartbeat_reply/nudge/limit/status_check). done requires self_check schema; brief_echo+alignment requires independent auditor (v0.7).", { tree_id: z.string(), leaf_id: z.string(), type: z.string(), meta: z.record(z.any()) }, (a) => ["event", "append", a.tree_id, a.leaf_id, "--type", a.type, "--json", J(a.meta)]),
@@ -1628,6 +1765,9 @@ function createExternalHttpBridge() {
         tt("tree_leaf_list_active", "List active (non-archived) leaves.", { tree_id: z.string() }, (a) => ["leaf", "list-active", a.tree_id], true),
         tt("tree_leaf_list_all", "List all leaves (including archived).", { tree_id: z.string() }, (a) => ["leaf", "list-all", a.tree_id], true),
         tt("tree_tree_dump", "Dump full tree state as JSON.", { tree_id: z.string() }, (a) => ["tree", "dump", a.tree_id], true),
+        // Sprint 5 (聚类 A/E, 2026-07-14): session_registry 维护 — max_sessions 硬护栏（防 macp2 型会话爆炸）。
+        tt("tree_register_session", "Register a bypass session_id (from create_session, not leaf_add) into the tree session_registry. Makes SDK-native create_session visible to the engine so the max_sessions guard + audit cover bypass sessions. Idempotent (dedup — already-registered sessions don't double-count). Throws E_MAX_SESSIONS if tree session count would exceed audit_meta.max_sessions.", { tree_id: z.string(), session_id: z.string(), source: z.string().optional(), caller: z.string().optional() }, (a) => ["tree", "register-session", a.tree_id, "--session-id", a.session_id, ...(a.source ? ["--source", a.source] : []), ...(a.caller ? ["--caller", a.caller] : [])]),
+        tt("tree_session_count", "Get tree session count vs max_sessions (read-only budget precheck). Returns { count, max, reached }. reached=true means max_sessions hit — next session registration (leaf_add / register-session / set-session) will be rejected with E_MAX_SESSIONS.", { tree_id: z.string() }, (a) => ["tree", "session-count", a.tree_id], true),
         tt("tree_drift_list", "List drift entries.", { tree_id: z.string(), leaf_id: z.string().optional(), since: z.string().optional() }, (a) => ["drift", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.since ? ["--since", a.since] : [])], true),
         tt("tree_heartbeat_tail", "Tail heartbeat log.", { tree_id: z.string(), leaf_id: z.string().optional(), n: z.number().optional() }, (a) => ["heartbeat", "tail", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.n ? ["-n", String(a.n)] : [])], true),
         tt("tree_event_list", "List events.", { tree_id: z.string(), leaf_id: z.string().optional(), type: z.string().optional() }, (a) => ["event", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.type ? ["--type", a.type] : [])], true),
@@ -2135,7 +2275,14 @@ function homeDir() {
 function loadTaoConfig() {
   try {
     if (fs.existsSync(TAO_CONFIG_PATH)) {
-      return JSON.parse(fs.readFileSync(TAO_CONFIG_PATH, "utf8"));
+      const loaded = JSON.parse(fs.readFileSync(TAO_CONFIG_PATH, "utf8"));
+      // D3 (2026-07-14): 合并默认字段（旧 config 无 silence_minutes/silenced_until 时补默认）
+      // P1-S05 (2026-07-14): nudge_log_cap 默认 50（旧 config 无则补, 防 nudge_log 无限膨胀）
+      return Object.assign({
+        silence_minutes: 0,
+        silenced_until: null,
+        nudge_log_cap: 50,
+      }, loaded);
     }
   } catch (e) {
     log("[Patch M] config load failed: " + (e && e.message));
@@ -2145,9 +2292,22 @@ function loadTaoConfig() {
     interval_seconds: 300,
     stale_tree_hours: 24,
     nudge_send_limit: 2,
+    nudge_log_cap: 50,       // P1-S05: nudge_log 保留最近 N 条（防膨胀, <=0 关闭）
     workspace_overrides: {},
-    rules_enabled: []
+    rules_enabled: [],
+    silence_minutes: 0,      // D3: 用户设置的静默分钟数（展示用）
+    silenced_until: null,    // D3: 实际生效的绝对截止时间戳(ms)；null=未静默
   };
+}
+
+// D3 (2026-07-14): watcher 静默决策 —— 纯函数，便于单测（patches.cjs 顶层有 electron 副作用，无法直接 require 整模块）。
+//   silence_minutes: 配置展示用（用户设的静默分钟数）；silenced_until: 实际生效的绝对截止时间戳(ms)。
+//   返回 { skip, remainingMs, reason }。nowMs 由调用方传入（生产用 Date.now()，测试可注入）。
+function decideWatcherSilence(cfg, nowMs) {
+  const until = cfg && typeof cfg.silenced_until === "number" ? cfg.silenced_until : null;
+  if (until == null) return { skip: false, remainingMs: 0, reason: "not silenced" };
+  if (nowMs >= until) return { skip: false, remainingMs: 0, reason: "silence window expired" };
+  return { skip: true, remainingMs: until - nowMs, reason: "silenced until " + new Date(until).toISOString() };
 }
 
 function saveTaoConfig(cfg) {
@@ -2255,8 +2415,18 @@ class TAOWatcher {
     this.running = true;
     try {
       const cfg = loadTaoConfig();
-      const staleMs = (cfg.stale_tree_hours || 24) * 3600 * 1000;
+      // D3 (2026-07-14): 静默窗口检查 —— silenced_until 未过期则本轮跳过（减少噪音/成本）。
+      //   过期后自动恢复正常（nowMs >= until → skip=false）。config-patch / silence IPC 可设/清。
       const now = Date.now();
+      const _silence = decideWatcherSilence(cfg, now);
+      if (_silence.skip) {
+        log("[Patch M] Watcher[" + this.workspace.workspace_id + "] silenced, skip run (" + _silence.reason + ", " + Math.round(_silence.remainingMs / 1000) + "s remaining)");
+        this.last_run_at = new Date().toISOString();
+        this.last_run_status = "ok";
+        this.last_error = null;
+        return;
+      }
+      const staleMs = (cfg.stale_tree_hours || 24) * 3600 * 1000;
 
       // 1. 扫描 trees 目录
       let treeEntries = [];
@@ -2561,6 +2731,47 @@ function ruleR06(tree) {
 // (在下个 Edit 追加, 因为需要 IPC 调用函数)
 
 // ============================================================
+// Sprint 4 TAO Watcher 按角色分发规则 (cross-workspace-tree-issue §七 + SECURITY 聚类 C)
+// ============================================================
+// 设计意图: 每条 leaf-scoped 规则有明确适用 role scope. 之前靠各规则函数自己的
+//   `if (leaf.role !== X) return []` 自过滤 (散落易漏: 新规则忘加 guard → 错配).
+//   本表是单一信源 + 结构防御层: dispatch 时按 leaf.role 只跑该 role 的规则, 即使某
+//   函数 guard 写错/漏写也不会错配到其他 role (纵深防御, 补 isSharedSessionLeaf 守卫).
+//   a8111bf5 根因 (worker 规则 W-01 经共享 session 注入根指挥官) 已被 isSharedSessionLeaf
+//   修; 本表再加结构层: worker 规则 (W-01/W-08/W-11/W-12/W-AUDIT-NO-ALIGN) 结构上
+//   绝不发给非 worker leaf, commander 规则 (C-06) 绝不发给 worker/root.
+//   null = 所有 role 适用 (规则函数自带更细条件, 如 W-AUDIT-SELF 的 root 自审例外).
+//   ⚠️ 本表必须与各 rule 函数的 role guard 完全一致, 否则引入回归 —— 测试强制静态校验.
+//   tree-scoped 规则 (R-01/R-04/R-05) 不在此表 (无 leaf role 维度).
+const RULE_ROLE_SCOPE = {
+  // Tier 1 leaf-scoped
+  'C-02': null,                    // ruleC02: 无 role guard (任何有 milestone 的 leaf)
+  'C-03': null,                    // ruleC03: 无 role guard (任何 status=done leaf with pending milestone)
+  'C-06': ['commander'],           // ruleC06: if (leaf.role !== "commander" || status !== done)
+  'W-AUDIT-SELF': null,            // ruleAuditSelf: 无 role guard, root 自审例外 (函数内 if role===root return)
+  'W-AUDIT-WORKER': null,          // ruleAuditWorker: 无 role guard (查 auditor leaf 的 role)
+  'W-AUDIT-TAMPER': null,          // ruleAuditTamper: 无 role guard (查 audit_log 篡改痕迹)
+  'W-AUDIT-NO-ALIGN': ['worker'],  // ruleAuditNoAlign: if (leaf.role !== "worker")
+  // Tier 2 leaf-scoped (仅 active/pending_brief/segment_pending)
+  'W-01': ['worker'],              // ruleW01: a8111bf5 根因 — worker 缺 brief_echo, worker 专属
+  'W-08': ['worker'],              // ruleW08: worker leaf purity (不直调 tree 写工具)
+  'W-11': ['worker'],              // ruleW11: worker 单条消息长度
+  'W-12': ['worker'],              // ruleW12: worker 上行 event 字段合法
+  'C-11': ['commander', 'root'],   // ruleC11: if (role !== "commander" && role !== "root")
+};
+// ruleId 对 leaf.role 是否适用. null/absent scope → 所有 role (规则自带更细条件).
+function ruleAppliesToRole(ruleId, role) {
+  const scope = RULE_ROLE_SCOPE[ruleId];
+  if (!scope) return true;
+  return scope.includes(role);
+}
+// role 感知的 leaf 规则分发: 不在 scope → 跳过 (结构防御, 补函数内自过滤).
+function maybeForLeaf(ruleId, leaf, fn, tree) {
+  if (!ruleAppliesToRole(ruleId, leaf.role)) return;
+  maybe(ruleId, fn, leaf, tree);
+}
+
+// ============================================================
 // checkAllRules: 对 tree 跑所有适用规则
 // ============================================================
 
@@ -2605,16 +2816,16 @@ async function checkAllRules(tree, workspace, cfg) {
           " session_id shared by multiple leaves (bug-b-repro or dirty data), skip tier1 rules");
       continue;
     }
-    maybe("C-02", ruleC02, leaf, tree);
-    maybe("C-03", ruleC03, leaf, tree);
-    maybe("C-06", ruleC06, leaf, tree);
+    maybeForLeaf("C-02", leaf, ruleC02, tree);
+    maybeForLeaf("C-03", leaf, ruleC03, tree);
+    maybeForLeaf("C-06", leaf, ruleC06, tree);
     // V10 Phase 3 followup R5 (移到 Tier 1, 不依赖 status): tamper detection 必须对
     // done leaf 跑, 因为篡改痕迹 (audit_gate=pass / audit_log pass=true) 都是 done
     // 之后才看的. 之前放在 Tier 2 (有 status 守卫) 导致 v626 全 done tree 永远检测不到.
-    maybe("W-AUDIT-SELF", ruleAuditSelf, leaf, tree);
-    maybe("W-AUDIT-WORKER", ruleAuditWorker, leaf, tree);
-    maybe("W-AUDIT-TAMPER", ruleAuditTamper, leaf, tree);
-    maybe("W-AUDIT-NO-ALIGN", ruleAuditNoAlign, leaf, tree);
+    maybeForLeaf("W-AUDIT-SELF", leaf, ruleAuditSelf, tree);
+    maybeForLeaf("W-AUDIT-WORKER", leaf, ruleAuditWorker, tree);
+    maybeForLeaf("W-AUDIT-TAMPER", leaf, ruleAuditTamper, tree);
+    maybeForLeaf("W-AUDIT-NO-ALIGN", leaf, ruleAuditNoAlign, tree);
   }
 
   // Tier 2 (IPC)
@@ -2626,11 +2837,11 @@ async function checkAllRules(tree, workspace, cfg) {
           " session_id shared by multiple leaves (bug-b-repro or dirty data), skip tier2 rules");
       continue;
     }
-    maybe("W-01", ruleW01, leaf, tree);
-    maybe("W-08", ruleW08, leaf, tree);
-    maybe("W-11", ruleW11, leaf, tree);
-    maybe("W-12", ruleW12, leaf, tree);
-    maybe("C-11", ruleC11, leaf, tree);
+    maybeForLeaf("W-01", leaf, ruleW01, tree);
+    maybeForLeaf("W-08", leaf, ruleW08, tree);
+    maybeForLeaf("W-11", leaf, ruleW11, tree);
+    maybeForLeaf("W-12", leaf, ruleW12, tree);
+    maybeForLeaf("C-11", leaf, ruleC11, tree);
   }
 
   return all;
@@ -2689,6 +2900,20 @@ async function applyNudge(tree, violation, cfg) {
       send_message: leaf.nudge_count <= (cfg.nudge_send_limit || 2)
     };
     leaf.nudge_log.push(nudgeEntry);
+
+    // P1-S05 命运决策落地 (2026-07-14): 保留 TaoWatcher + 补可观测.
+    //   决策依据 pro 26-tree 实测: vcb2=4 条 (真实价值, 捕获 W-01/W-08 违规) 但 macp2b=15052
+    //   条 (nudge_log 无上限膨胀, 状态污染, 无行为效果). nudge_send_limit 只限 send_message
+    //   不限 log → log 无限增长. 加 nudge_log 上限: 保留最近 N 条 (默认 50, cfg.nudge_log_cap
+    //   可配, <=0 关闭). 用专用累计计数器 leaf.nudge_log_dropped_total 记历史总丢弃数
+    //   (独立于哪些条目存活, 永远准确, 可观测: 一眼知道累计浪费多少).
+    const _nudgeLogCap = (cfg && typeof cfg.nudge_log_cap === 'number') ? cfg.nudge_log_cap : 50;
+    if (_nudgeLogCap > 0 && leaf.nudge_log.length > _nudgeLogCap) {
+      const _dropped = leaf.nudge_log.length - _nudgeLogCap;
+      leaf.nudge_log = leaf.nudge_log.slice(-_nudgeLogCap);
+      leaf.nudge_log_dropped_total = (typeof leaf.nudge_log_dropped_total === 'number' ? leaf.nudge_log_dropped_total : 0) + _dropped;
+      log("[Patch M] leaf " + leaf.leaf_id + " nudge_log capped to " + _nudgeLogCap + " (dropped " + _dropped + ", total_dropped=" + leaf.nudge_log_dropped_total + ")");
+    }
 
     // P0b (2026-07-08): 废止 tao-watcher 写 audit_log（macp4-A4 实证 29-43 条噪音掩盖真审计结果）。
     //   tao-watcher 只保留 nudge_log + send_message（鞭策），不再污染 audit_log（审计结果专由独立 auditor leaf 写）。
@@ -2844,7 +3069,7 @@ function ruleW08(leaf, tree) {
   if (msgs.length === 0) return [];
   // v0.7+: worker 调任何 mcp__tree__* 写工具都违反 leaf purity（worker 只该 send_message 上报）。
   // 工具全名 mcp__tree__tree_<cmd>（MCP server name="tree", tool name="tree_init" 等）。
-  const writeTools = /mcp__tree__tree_(init|backup|restore|migrate|leaf_add|leaf_set_status|leaf_set_context|leaf_set_last_event|leaf_set_session|leaf_autonomy_override|milestone_add|milestone_set_result|event_append|drift_append|heartbeat_append|segment_append|nudge_append|audit_gate|audit_append)\b/i;
+  const writeTools = /mcp__tree__tree_(init|backup|restore|migrate|leaf_add|leaf_set_status|leaf_set_context|leaf_set_last_event|leaf_set_session|milestone_add|milestone_set_result|event_append|drift_append|heartbeat_append|segment_append|nudge_append|audit_gate|audit_append)\b/i;
   for (const m of msgs) {
     const text = msgText(m);
     if (writeTools.test(text)) {
@@ -3024,9 +3249,28 @@ function ruleAuditNoAlign(leaf, tree) {
     return {
       ok: true,
       config: cfg,
+      silence: decideWatcherSilence(cfg, Date.now()),  // D3: 暴露静默决策（skip/remainingMs/reason）
       manager_started: taoWatcherManager.started,
       watchers: taoWatcherManager.status().watchers
     };
+  });
+
+  // proma:watcher-silence -- D3: 静默 N 分钟 { minutes: N }；minutes<=0 清除静默
+  //   设置 silenced_until = now + minutes*60000。watcher runOnce 检测未过期则跳过（减噪/省成本）。
+  //   不重启 watcher（静默只影响 runOnce 内决策，timer 照常 tick；过期自动恢复）。
+  ipcMain.handle("proma:watcher-silence", async (_event, arg) => {
+    const minutes = arg && typeof arg.minutes === "number" ? arg.minutes : 0;
+    const cfg = loadTaoConfig();
+    if (minutes <= 0) {
+      cfg.silence_minutes = 0;
+      cfg.silenced_until = null;
+    } else {
+      const cap = Math.min(60 * 24 * 7, Math.max(1, Math.floor(minutes)));  // 1 分钟～7 天
+      cfg.silence_minutes = cap;
+      cfg.silenced_until = Date.now() + cap * 60 * 1000;
+    }
+    saveTaoConfig(cfg);
+    return { ok: true, silence_minutes: cfg.silence_minutes, silenced_until: cfg.silenced_until };
   });
 
   // proma:watcher-toggle -- 全局开关 { enabled: bool }
@@ -3085,7 +3329,7 @@ function ruleAuditNoAlign(leaf, tree) {
       return { ok: false, error: "config patch object required" };
     }
     const cfg = loadTaoConfig();
-    for (const k of ["enabled", "interval_seconds", "stale_tree_hours", "nudge_send_limit", "workspace_overrides", "rules_enabled"]) {
+    for (const k of ["enabled", "interval_seconds", "stale_tree_hours", "nudge_send_limit", "nudge_log_cap", "workspace_overrides", "rules_enabled", "silence_minutes", "silenced_until"]) {
       if (k in arg) cfg[k] = arg[k];
     }
     saveTaoConfig(cfg);
@@ -3093,6 +3337,6 @@ function ruleAuditNoAlign(leaf, tree) {
     return { ok: true, config: cfg };
   });
 
-  log("[Patch M] Watcher IPC registered: proma:watcher-status / toggle / set-interval / run-now / config-patch");
+  log("[Patch M] Watcher IPC registered: proma:watcher-status / toggle / set-interval / run-now / config-patch / silence");
 })();
 

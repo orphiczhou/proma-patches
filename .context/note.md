@@ -4,6 +4,552 @@
 
 新条目追加在顶部。
 
+## 🔖 2026-07-14 e2e03 端到端真实项目验证✅（tree-system 补丁形式 GLM-5.2 自主协作跑通，全自主 tree-harness 子会话）
+
+Sprint 6 之后「真实项目端到端验证」。在 pro（引擎 5532fa5f + patches 339082af + SKILL 8b2d20f2）由 **GLM-5.2 commander(124ccb14) 自主**端到端跑通 tree-system：1 root + 3 worker（create_session 非 fork 派生，77ms 内并行）+ 1 auditor(role=auditor)，**全部 status=done**，产出 **1157 行**架构形式化文档落到 `D:/codes/tree-harness/03_ARCHITECTURE/`（class-diagram.puml 205 / data-model.md 505 / sequence-diagrams×4 112+129+86+120）。完整报告 [e2e03-verification-2026-07-14.md](./active/e2e03-verification-2026-07-14.md)。
+
+**Sprint 1-5 新机制实证矩阵**（8 项：6 触发 / 1 等价 / 1 无场景）：
+- ✅ **5件套持久化(S2)**：3 worker leaf 全持久化 brief/dod/report_protocol/autonomy/self_audit，worker done.tried 记「tree_leaf_get 读 5 件套」。
+- ✅ **create_session 派生(S2)**：session_registry 5 session 全 source=create_session（非 fork）。
+- 🟡 **done-未审拦截(S1)**：无 flagged 字段触发（无篡改），功能等价 done门禁触发——3 worker `set-status done` 全撞 **E_GATEKEEPER_REQUIRED**。
+- ✅ **max_sessions(S5)**：count=5 ≪ max_sessions 50，预算余量 90%。
+- ⚪ **drift 联动(S2)**：drift_log 空（clean run 无 drift，未演练；机制就位）。
+- ✅ **done 门禁 8 道**：E_GATEKEEPER_REQUIRED 实证 gate 7 + 02-done-gate.puml 逐道还原 + 全错误码。
+- ✅ **auditor 审+独立性**：3 轮 × 14 项交叉审（**11 pass / 3 fail**，3 真实 findings：drift kind=escalation 越界 / source=segment 越界 / data-model LEAF_NAME_RE 自相矛盾，带 file:line 证据，非橡皮图章）；auditor_session_id 独立，root 背书防 self-audit。
+- ✅ **协作效果**：3 worker 并行 ~13 分钟产 3 份独立文档（≈2x 串行加速），5 件套契约让跨产物实体名/枚举一致（11 项跨产物 pass）。
+
+**🔴 关键方法学教训（必读，已入 CLAUDE.md）**：监督期 commander API `list_messages` 持续 `total=1` 达 ~18 分钟，我**误判「卡死」并误建 driver 欲转受控方式**。driver 撞 `E_DUPLICATE_LEAF` 才发现 commander 早已建树并跑完 3 worker+正建 auditor。根因：GLM-5.2 在**单个长未提交轮**内完成 35 次 tree write，轮内 tool call 不立即落 API 消息表。**正解：tree-state.json（文件通道，每次 tool call 原子落盘）是 ground truth；监督 tree-system 必须读 tree-state，不能以 API 消息数判进度**。误建 driver/ping 已尝试归档被 remote `R6-external-deny` 拒（D1-A：remote 仅 send_message）。
+
+**副发现**：ARCHITECTURE.md §3.1 表标 pro userData=`~/.proma-pro/` **过时**，实证为 `~/.proma-dev/`（CLAUDE.md L35 正确），建议修。
+
+**成本**：5 真实协作 session（≪ macp2 207），全程 GLM-5.2，~21 分钟墙钟。零引擎/patches/SKILL 改动（367/0 基线不动）。补 success-metrics 团队维度实证（并行/契约自洽/事中拦截/auditor 增益）。
+
+## 🔖 2026-07-14 Sprint 6 产品化验证 准备✅（5 项材料齐 + 外部待办标记，全自主 tree-harness 子会话）
+
+Sprint 6「产品化验证」**准备**全部完成。全自主，无引擎/patches 改动（367/0 零回归基线未动）。**执行（PR 提交/实验跑/团队试用）= 外部依赖**，标记汇报。5 项交付全在 `05_PROJECT_PLAN/`。
+
+**核心颠覆性结论（颠覆 sprint-plan/success-metrics 预设）**：
+- 🔴 **上游仓库核实为 `proma-ai/Proma`**（非 sprint-plan/success-metrics 反复假设的 `ErlichLiu/Proma`——后者是 release 分发别名，仓库主体在 proma-ai 组织）。AGPL-3.0 开源，**Bun workspace monorepo + TypeScript 源码**（`apps/electron/src/main/lib/*.ts`），非打包后 main.cjs。设 **PR Bounty 计划**，维护者欢迎 PR。已迭代到 **v0.13.3**（tree-harness 补丁针对 v0.12.x，**版本不同步**）。
+- 🔴 **任务预设「补丁 I/J 低风险易合并」不成立**：I（禁更新）对上游有害（README 列自动更新为桌面特性）/ J（AppUserModelId 动态）上游单实例无场景 / F-H（跨渠道清 sdkSessionId）**方向相反**——上游 v0.13.3 #903 刚把 sdkSessionId 清除**收敛为仅 thinking-signature 跨模型不兼容一处**（上游发现"清除→resume 指针丢失→上下文冷启动"是更严重 bug）。**没有一个现成补丁适合首个 PR**。sed 补丁（minified main.cjs）≠ 源码 PR（TS），适配工作量≈重新实现。
+- **首个 PR 真正路径**：基于 tree-harness 研究经验，在上游 v0.13.x 源码找真实改进点（方向 1：MCP 会话频道/模型一致性，补丁 C 的上游化），需 clone 上游源码核实 gap → fork `orphiczhou/Proma`（已存在，patch-kit 所在仓）→ 适配 TS PR。提交=外部。
+
+**5 项交付**：
+1. **首个 Proma PR 草稿**（`05_PROJECT_PLAN/first-pr-draft.md`）— 上游事实修正 + 补丁逐个适用性评估矩阵（I/J/F/H/A/C/D/E/G/K/B 全评估）+ 推荐路径（3 方向）+ PR 材料模板 + 风险/回滚 + 外部依赖。诚实结论：没有现成"低风险易合并"补丁。
+2. **对照实验设计**（`05_PROJECT_PLAN/experiment-design.md`）— 5 任务（T1 并行开发/T2 审计/T3 长任务/T4 成本敏感/T5 反对照）× 3 模式 × 3 重复=45 次。🔴 **解决 success-metrics §三 gap**：Layer1 边界界定——**budget（rate limit，在 patches.cjs）∈ Layer1 / max_sessions（count limit，依赖 tree-engine session_registry）∈ Layer2**。依据：维度不同（速率 vs 总量）+ 所在文件不同（patches vs engine）。模式 A 裸 prompt / B Layer1-only（含 budget 不含 max_sessions/workspace 锁/TAO，因这些都依赖 tree-engine）/ C tree-system。指标采集协议 + 归因（控制变量矩阵）+ 预期假设。执行=外部（~$45-225）。
+3. **tree-state 聚合脚本 + n=1 数据**（`05_PROJECT_PLAN/aggregate-metrics.cjs` + `metrics-n1-20260714.json`）— 只读分析工具（零引擎改动），扫三实例 userData 全 tree-state.json。🔴 **按 tree_id 去重**（433 活树文件→**230 唯一树**，跨 workspace 副本重复是数据卫生坑）。聚合指标：完成率 17.4%（40/230，⚠️混大量测试树 macp*/cr*/e2e*，需实验 T5 校准，非产品失败）/ 拦截率 39.1%（90/230，**gate 拦下 166 次=门禁真实有效**）/ 失控树 65（全为 Sprint 4 nudge_log_cap 之前历史，nanju-iter2=32588 最严重，**反指标验证 cap 必要性**）/ flagged=0 E_MAX_SESSIONS=0（Sprint 5 新机制，历史树无，需新树观测）。**过程指标单边可采**（success-metrics 拆两档：过程 vs 终验）。健壮处理 leaves 是 map（非数组）、events 在 leaf 内、老树无 session_registry（distinct 回退）、3 个 c26c2x 坏文件跳过。
+4. **Q2 树形 UI 面板重评估**（`05_PROJECT_PLAN/q2-tree-ui-reevaluation.md`）— 决策 **v1 不做**（v2 候选）。引擎内联（v0.7+）解决后端零源码泄漏，与 UI 可视化**正交**，UI 从"必须配套"降为"可选增强"。n=1 场景 tree_dump + aggregate-metrics 已够；renderer 注入脆弱（依赖 minified DOM class `.tabbar-bg`/`.automation-entry`，升级就坏）。触发条件：≥2 团队主动要 / 上游接受 tree-system。若做则走独立 webview（不注入 renderer）。
+5. **外部依赖 backlog**（`05_PROJECT_PLAN/external-dependencies-backlog.md`）— E1 PR 提交 / E2 团队试用 / E3 实验执行 / E4 SDK create_session 回调（聚类 A 跨仓根治）/ E5 fork identity（BUG-A 跨仓）。每项标单边已做 vs 外部待办 vs 阻塞谁。建议顺序：E1 PR → E3 实验 → E2 团队并行 → E4/E5 跨仓长期。
+
+**关键设计决策**：
+- Layer1/Layer2 边界用"rate vs count + 所在文件"双重判定（非随意划线）：budget 是单 caller 速率限制（patches.cjs），max_sessions 是 distinct session 总量（tree-engine session_registry）。这让 Layer1-only 可独立配置（只部署 patches 不部署 engine），实验可重复。
+- 聚合脚本按 tree_id 去重（保留 leafCount+events 最完整副本）：n=1 自用数据里树跨 default/undefined/workspace-files 三副本重复，不去重会 433 当 230 算，虚高。诚实记录此坑。
+- n=1 完成率 17.4% ≠ 产品失败：230 棵多为实验性测试建树（macp*/cr*/tdb* 等本就不跑完），真实任务完成率需实验 T5 校准。这正是 success-metrics §六"过程指标单边可采 vs 终验指标外部"拆档的体现。
+
+**文档同步**：sprint-plan（Sprint 6 🟡 准备✅ + 外部待办 + 路线图）/ CHANGELOG（[Unreleased] 顶部 Sprint 6 条目）/ note（本条目）。product-positioning §五 out-of-scope「树形 UI」维持（Q2 评估印证）。success-metrics §二A 维护者维度修正建议（上游仓库名 + 合并率分母重定义）待用户确认回写。
+
+**零回归**：Sprint 6 纯文档/脚本准备，367/0 基线未动。脚本 `node -c` 通过 + 实跑产出 n=1 JSON。无引擎/patches/SKILL 改动，无需部署 pro。
+
+## 🔖 2026-07-14 Sprint 5 完成（安全根治 聚类 A/B — sprint-plan 最难 Sprint，全自主 tree-harness 子会话）
+
+Sprint 5 四项全部完成。全量 **286/0 零回归** + 新增 sprint5 三测试 **81/0**（max-sessions 34 + patches-bypass 27 + gate-reachability 20）= **367 全绿**。pro e2e 实证。聚类 A/B 单边缓解全落地，跨仓根治标记汇报。
+
+**1. max_sessions 引擎硬护栏**（tree-engine.cjs `28cb42bb`→`5532fa5f`，5045→5216 行）— improvement P0 / 聚类 E（成本失控）：
+- **根因**：node_budget 只数 leaf（默认 20）、CREATE_SESSION_BUDGET（patches）只限单 caller 速率（20/60s），两者都拦不住「多 caller 累积 + SDK 原生 create_session 旁路（不入 tree）」的总量爆炸（macp2 4 分钟 207 session 不入树，绕过 node_budget/subagent_budget/TaoWatcher 全部）。
+- **实现**：新增 `E_MAX_SESSIONS` + `audit_meta.max_sessions`（默认 **50**，≈ node_budget 20 的 2.5x，留余量给 segment 交接/auditor/旁路 reviewer；远低于 macp2 207）+ tree-state `session_registry`（distinct session 登记簿）。
+- **四路径登记**（堵绕过链，关键）：cmdInit root / cmdLeafAdd / cmdLeafSetSession / cmdTreeRegisterSession 全调 `registerSessionToState`。`registerSessionToState` 跳过 PENDING_ROOT/非UUID（不占额度——它们不是真实 create 产物）。`countSessions` 兜底（registry 缺失 → leaves distinct session 重建，不误拦旧树）。
+- **新命令**：`tree register-session`（旁路登记，供 patches create_session 调）+ `tree session-count`（只读预检 {count,max,reached}）。migrate 规则14 回灌旧树 session_registry（从 leaves distinct session 回灌，让历史树也受保护）。导出 `findTreesBySession(treesRoot, sessionId)`（session→tree 反查，供 patches 定位 caller 所属 tree）。
+- **测试** sprint5-max-sessions-test **34/0**（engine 真实 require，16 用例覆盖 init/add/register/set-session/migrate/findTreesBySession 全路径 + E_MAX_SESSIONS 拦截 leaf_add/register/set-session 三入口 + max_sessions 自定义 + PENDING_ROOT 不占额度 + node_budget vs max_sessions 独立性 + 干净失败未污染）。
+
+**2. create_session 旁路根治单边方案**（proma-dev-patches.cjs `93cd64f4`→`339082af`，3268→3342 行）— improvement P0-S01 / 聚类 A（约束同构盲区，最致命）：
+- **根因**：tree engine 与 Proma SDK 间无双向契约（无 create_session 回调、无 session 身份强绑定）。所有约束都在 `mcp__tree__*` 入口，agent 用 SDK 原生 create_session 旁建 session 时 engine 零感知。**约束只能约束走协议的人，约束不了不走协议的人**。
+- **单边方案**（子会话能做）：新增 `findCallerTreesForBypassGuard(sourceSessionId)`（扫描所有 workspace trees_dir，定位 caller 所属 tree）。create_session handler 加：(a) **max_sessions 预检**（budget 后、delegationDepth 前——顺序 rate→count→depth，成本低的先拦）caller 所属 tree 任一 reached → 拒绝 E_MAX_SESSIONS（钱没花）；(b) **create 成功后旁路登记**（register-session）把新 session 登记到所属 tree session_registry（旁路可见，让 max_sessions/审计覆盖旁路 create）。新增 MCP 工具 `tree_register_session`/`tree_session_count`（agent 可调）。non-fatal 降级（预检/登记失败不阻断 create，engine 侧 max_sessions 仍兜底）。
+- **测试** sprint5-patches-bypass-test **27/0**（mirror 逻辑 applyBypassGuardPrecheck 5 用例 + 源码静态 22 项：helper/候选/non-fatal + 预检 E_MAX_SESSIONS/session-count/reached + 顺序 budget<预检<depth + 登记 register-session/source + _pendingBypassRegister 连接 + 顺序 lineage<登记<log + MCP 工具 + readOnly）。patches 顶层 electron 副作用无法 require → mirror 契约 + 源码静态（同 sprint3-d3/sprint4 模式）。
+- 🔴 **跨仓标记**（不强行做）：真正根治需 Proma SDK create_session 回调钩子 + subagent_trace_id（Layer 4 平台层 capability-based 调用 + event hash chain，SECURITY §4.3 远期路线）。
+
+**3. 门禁前置可达性审计**（聚类 B）— improvement / 验证，**无新绕过链需修复**：
+- **审计范围**：done 门禁链（unified-workflow §⑤ 8 门禁）+ max_sessions session 写入路径完整性。
+- **结论：无新绕过链**。历史修复完整：（P0-S03 done event 自动同步 status 已删，status=done 单一入口 cmdLeafSetStatus）/（P0-S04 audit_gate 信任锚 SKILL §13）/（P1-S03 flagged 动态化堵篡改）/（P2-S02 5件套持久化）/（macp3 review_round+subagent append 前置校验防 events 污染）。max_sessions 四路径登记完整（grep 确认 registerSessionToState 4 调用点 + migrate 回灌 + PENDING_ROOT 跳过）。
+- **关键审计证据**：grep `.status = 'done'` 字面量赋值 = **0 处**（status=done 只经 cmdLeafSetStatus `leaf.status = new_status` 单一入口）；cmdEventAppend done 路径代码行无 leaf.status 赋值（P0-S03 修复完整，注释里的历史说明 leaf.status='done' 已排除）。
+- **测试** sprint5-gate-reachability-test **20/0**（静态审计回归保护——防未来改动重新引入绕过链，如有人重新加 done event 自动同步 / 新增 session 写入不登记 / 移除 done caller-binding）。聚类 B"形式≠内容"原则推广到测试层。
+
+**4. auditor role 端到端 fallback**（commander SKILL §13.4.5）— improvement P1-S04：
+- SKILL 加 §13.4.5：auditor session 因 Proma fork identity timeout（BUG-A 跨仓）卡死时，root 归档卡死 session（archive_session）+ 重 fork 新 session + leaf set-session 换新 session（caller=root=added_by 放行）+ 继续 §13.4.1 流程。
+- **红线**：同一 auditor leaf 重 fork ≤2 次（每次重 fork 新增 session_registry 记录，撞 max_sessions）；归档 session 不释放 max_sessions 额度（registry 记历史 session 总数防爆炸——归档≠没创建过）；已 done 的 auditor leaf 不 fallback；替代方案回退 §13.4.4 root 信任锚（不依赖 fork，无 identity timeout 风险）。
+- 🔴 **跨仓标记**：fork identity timeout 是 Proma app 层 bug，SKILL fallback 是单边缓解；真正根治需 Proma 修 fork identity。无引擎/patches 改动（纯 SKILL 教化 + set-session 已在 max_sessions 四路径登记覆盖）。
+
+**部署**：pro dist engine `5532fa5f` + patches `339082af` + commander SKILL `8b2d20f2`（md5 **三校验 = 权威源**）+ 重启 pro（MSYS_NO_PATHCONV=1 taskkill Proma-green 全杀 + powershell Start-Process start-pro.bat，进程 21:12 加载新代码）+ remote 探活（discover pro@19877，225 sessions）+ **pro e2e 实证**（commander `77326cb6` GLM-5.2：tree_init s5pro1 ok + tree_session_count 返回 **count=1/max=50/reached=false**，definitive 证明新引擎加载 + tree_session_count MCP 工具注册生效 + session_registry root 登记持久化）。备份 `.bak-pre-sprint5-20260714`（源 engine/patches + dist engine/patches/SKILL）。
+
+**文档同步**：CLAUDE.md（engine md5/行数 5045→5216 + patches 3268→3342 + Sprint 5 改动说明 + ENGINE_PATH md5 + 部署口诀 md5）/ ERROR-CODES.md（加 E_MAX_SESSIONS §六 + 计数 50→51 engine 42→43）/ CHANGELOG（Unreleased 顶部 Sprint 5 条目）/ sprint-plan（Sprint 5 ✅ + 路线图 + 交付物状态列 + 跨仓标记）。历史快照 md5（Sprint 1-4 条目）保持原值勿动。
+
+**关键设计决策**：
+- max_sessions 默认 50（非 node_budget 的 20）：session 数天然 > leaf 数（segment 交接换 session / auditor 独立 session / 旁路 reviewer），需留余量；但远低于 macp2 207。
+- session_registry 记 distinct session 总数（含历史/归档）：防爆炸语义是"短时间创建大量 session"，归档≠没创建过。node_budget 数 active leaf（归档释放），max_sessions 数历史 session（归档不释放）——两个维度互补。
+- max_sessions 四路径登记（非仅 leaf_add）：堵 set-session 绕过链（segment 交接换的真实 session 必须登记，否则 max_sessions 可被 set-session 路径绕过——这正是聚类 B"门禁互相架空"的体现，任务3 审计抓到并修复）。
+
+## 🔖 2026-07-14 Sprint 4 完成（跨工作区 P1/P2 + TAO 角色规则 + P1-S05 命运决策）
+
+Sprint 4 四项全部完成，全量 **215/0 零回归**（baseline 未动）+ 新增 sprint4-patches **71/0** = 286 全绿。
+
+**跨工作区 P1（patches Part B）**：cross-workspace-tree-issue §五 P1 定义两部分。Part A（validateWorkspaceId / R2-R4，已做）只校验 workspace **存在于索引**——但 9 个工作区都在索引里，所以拦不住 agent 跨工作区漂移。**Part B（本轮缺口）= agent 调用方工作区锁**：sourceSessionId 存在（agent 调用，非顶层 user/automation）时，建子会话必须留在自己 workspace 内——显式跨 → `E_WORKSPACE_FORBIDDEN`；未指定 → 强制=调用方 workspace（防 workspaceId=undefined 漂出 + 保证子树同工作区）。create_session（L702）+ fork_session new_workspace_id（L850）双入口。顶层 user/automation 不受限（跨工作区属 admin 操作）。remote_create_session 独立 handler 不经此锁。
+
+**跨工作区 P2（main.cjs 平台层）**：createAgentSession 原本 `meta3.workspaceId = workspaceId` 无条件写入（即使 workspace 不存在），是 9 工作区漂移的平台根因。本轮 main.cjs L386653 加守卫 `if (workspaceId && !getAgentWorkspace(workspaceId)) throw E_WORKSPACE_NOT_FOUND`（在 meta3 构建前，无效 workspace 无状态副作用/无孤儿）。补 Part A/B 之外的平台层路径（automation/bot/直调 API）。正常流程（合法 workspaceId）不触发。
+- ⚠️ **高风险闭源 main.cjs sed 铁律执行**：备份 `.bak-pre-sprint4-20260714` + 锚点唯一性校验（`function createAgentSession(title, channelId, workspaceId, modelId)` count=1）+ Node 精确单次字符串替换（+220 bytes，honors "字符串替换非重构建"原则，比 sed 多行可靠）+ `node -c` 通过 + 重启 pro 探活（231 sessions）+ create_session happy path 实证（session d755bb5b 正确挂 eb5e3f9c workspace）。**无崩溃无回归**。注：P2 是直编 dist/main.cjs（非 apply-patches.sh A-K 管道，因铁律禁重构建）。
+
+**TAO Watcher 按角色分发**：a8111bf5 真因（worker 规则 W-01 经共享 session 注入根指挥官）**已被 isSharedSessionLeaf 守卫修**（V10 Phase 3 followup）。本轮加**结构防御层**：`RULE_ROLE_SCOPE` 中心表（单一信源，root/commander/worker/auditor 各 role 的适用规则）+ `ruleAppliesToRole` / `maybeForLeaf` 结构分发——dispatch 时按 leaf.role 只跑该 role 的规则，即使某函数 guard 写错/漏写也不会错配（纵深防御，补 isSharedSessionLeaf）。之前靠 15 个规则函数各自 `if (leaf.role !== X) return []` 自过滤（散落易漏）。worker 规则（W-01/W-08/W-11/W-12/W-AUDIT-NO-ALIGN）结构上绝不发给非 worker leaf。表 null-scope 项（C-02/C-03/W-AUDIT-SELF/WORKER/TAMPER）= 全 role 适用（规则自带更细条件，如 W-AUDIT-SELF 的 root 自审例外）。**测试含表↔函数 guard 一致性静态校验**（12 规则逐个提取函数体 guard 断言与 scope 一致，防漂移回归——最关键回归保护）。
+
+**P1-S05 TaoWatcher 命运决策**：
+- **统计**（pro 26-tree 实测 nudge_log 非空条目 + tao-watcher-script audit_log）：
+  - 真实价值：**vcb2=4 条**（W-01×2 + W-08×2，正常 worker 场景捕获真实违规，印证 note 07-09 vcb2 验证）；v10e2e=8 / v10e2e-v2=3（小量真实）。
+  - 失控膨胀：**macp2b=15052** / macp2x=7521 / audtest=6766 / macp3=5325（nudge_log 无上限累积，状态污染，无行为效果——nudge_send_limit 只限 send_message 不限 log）。
+  - 0 触发：sd3e2e/verifycb2/e2e-v10-test/macp-cleanroom/s2verify5p（合规/短命，watcher 跑了但无违规，非"watcher 没跑"）。
+- **决策**：**保留 + 补可观测**。砍掉选项被 vcb2 实证否决（非纯安全剧场）；as-is 选项被 macp2b 15052 膨胀否决。
+- **落地**：applyNudge 加 `nudge_log_cap`（默认 50，cfg 可配 <=0 关闭）+ 专用累计计数器 `leaf.nudge_log_dropped_total`（独立于哪些条目存活，永远准确，一眼知累计浪费——重载 dropped_old 到 last entry 不可靠，因带计数的条目可能被再截掉）。loadTaoConfig 两处默认 + config-patch 白名单。**file-log 留 follow-up**（watcher 运行日志独立落盘，更大 scope）。
+
+**测试**：sprint4-patches-test **71/0**（Task1 workspace 锁 6 + Task3 role 分发 29 + Task4 nudge_log cap 5 + 源码静态 13 + 表↔guard 一致性 12 + Task4 静态 6）。patches.cjs 顶层 electron 副作用无法 require 整模块 → mirror 纯逻辑契约 + 源码静态校验（同 sprint3-d3 模式）。
+
+**部署**：pro dist patches `93cd64f4`（md5 双校验=权威源，3174→3268 行）+ main.cjs P2 直编 + 重启 pro（进程 19:41→19:55 加载新代码）+ remote 探活（231 sessions）+ create_session happy path 实证。备份 `.bak-pre-sprint4-20260714`（源 patches/engine + dist main.cjs/patches）。engine md5 `28cb42bb` 未变（Sprint 4 未动引擎）。无 SKILL 改动。
+
+**文档同步**：CLAUDE/API/ARCHITECTURE/README/ERROR-CODES md5 `901b3cf3`→`93cd64f4` + 行 3174→3268（当前态行）；CHANGELOG/note 历史快照（Sprint 3 条目）保持原值勿动。ERROR-CODES 加 `E_WORKSPACE_FORBIDDEN`（P1 新码）+ 标注 P2 平台层 `E_WORKSPACE_NOT_FOUND` throw（L386653）+ 计数 49→50。ARCHITECTURE/README 标注 main.cjs 第 12 处 sed（P2 直编，非 A-K）。CHANGELOG Pending 移除 3 已完成 Sprint 4 项，加 TaoWatcher file-log follow-up。sprint-plan Sprint 4 ✅ + 路线图总览 1/2/3/4 标完成。
+
+**无争议项 / 无需用户决策**：四项均全自主完成，P2 main.cjs sed 风险已通过备份+锚点+验证闭环（无降级），P1-S05 命运决策数据充分（26-tree 实测）无需用户仲裁。
+
+## 🔖 2026-07-14 Sprint 3 Phase D 完成（D1 prune 级联 / D2 版本管理 / D3 watcher 静默）
+
+Sprint 3 Phase D 三项全部完成，全量 **215/0 零回归**（164 基线 + 51 新 D 测试）。
+
+**D1 prune/archive 级联语义**（tree-engine.cjs `cmdLeafSetStatus`）：
+- 父 leaf set-status=pruned → 未 done 后代（active/pending_brief/segment_pending）级联 pruned（+ drift 留痕，联动约束 5）
+- 已 done 后代保留（防误删成果）且**不下降其子树**（整棵 done 子树保持原状）
+- 终态后代（pruned/archived）不动；**archived 不级联**（archived=隐藏非删除，子保留可恢复）
+- **root 永不被级联**（信任锚；parent=null 天然不可达 + `role==='root'` 防御性 skip）
+- 实现：迭代 DFS（stack + visited 防环），同一 withLock 事务内强制状态变更，绕过 STATUS_TRANSITIONS/caller-binding（级联子是内部变更非新 API 调用；caller 已通过 target leaf caller-binding 校验）。result 加 `cascaded:[{leaf_id,from,to}]`
+- 测试 `sprint3-d1-cascade-test.cjs` **19/0**（active 级联/done 保留/递归 3 层/done 子树不下降/终态不动/archived 不级联/root 防级联）。关键：fresh worker 初始 status=`pending_brief`（非 active），pending_brief 是非 done → 也级联（额外覆盖边界）
+
+**D2 migrate 版本号（schema 版本管理）**（tree-engine.cjs 顶部常量 + cmdInit + cmdMigrate 规则 12）：
+- 新增 `SCHEMA_VERSION='1.1'`（单一信源）+ `SCHEMA_LADDER=['1.0','1.1']` + `SCHEMA_HISTORY` + `compareVersion`
+- cmdInit: `version: SCHEMA_VERSION`（原硬编码 '1.1'）；cmdMigrate 规则 12 重构：按 ladder 从 startVersion 逐级升到 SCHEMA_VERSION，每跳记一条 change（version-dispatch 可追溯）；超前 ladder 则 clamp 回（防漂移）
+- **⚠️ SCHEMA_VERSION 保持 '1.1' 不升 1.2**：Sprint 3 未引入新 tree-state.json 字段（D1 是行为变更非 schema 字段，D3 在 patches.cjs）。升 1.2 会破坏 auditor-role-test Case 8（硬断言 version 1.0→1.1）。D2 的价值=版本管理机制（单一信源 + ladder 分发 + 可追溯），非版本号本身
+- 测试 `sprint3-d2-version-test.cjs` **10/0**（新树 version/1.0→1.1/幂等/dry-run/0.9 多跳 dispatch/2.0 clamp）
+
+**D3 watcher silence_minutes**（proma-dev-patches.cjs TAO Watcher）：
+- `loadTaoConfig` 默认加 `silence_minutes:0`/`silenced_until:null`（旧 config 合并默认）；纯函数 `decideWatcherSilence(cfg, nowMs)` → {skip, remainingMs, reason}
+- `runOnce` loadTaoConfig 后检 silence，未过期则本轮跳过（减噪/省成本），过期自动恢复
+- IPC `proma:watcher-silence {minutes}`（<=0 清除，clamp 1min~7天）；status 暴露 silence 决策；config-patch 白名单加两字段
+- 测试 `sprint3-d3-silence-test.cjs` **22/0**（**⚠️ patches.cjs 顶层有 electron 副作用无法 require 整模块 → 纯逻辑 mirror 契约测试 + 源码静态校验 8 项**；若未来 patches.cjs 导出 decideWatcherSilence 应改 require 实测）
+
+**全量 215/0**：6 核心 94 + dbc-spec 39 + sprint2 31 + sprint3 D1/D2/D3 19+10+22=51。ENGINE_PATH 全指权威源（md5 `28cb42bb`/5045 行；patches `901b3cf3`/3174 行）。
+
+**部署 pro**：dist md5 双校验 = 权威源（28cb42bb/901b3cf3）+ 重启 pro（进程 15:46→19:06 加载新引擎）。备份 `.bak-pre-sprint3-phaseD-20260714`（源 + dist）。
+
+**pro e2e 实证（D1 cascade）**：会话 `78457d75`（GLM-5.2）建树 sd3e2e，create_session 产 3 子 session（commander + 2 worker，绕 one-session-one-leaf），leaf set-status commander=pruned → **返回 cascaded=[{L1a-worker,pending_brief→pruned},{L1b-worker,pending_brief→pruned}]**，两 worker leaf_get 确认 status=pruned + drift_history 含 `cascade prune: parent "sd3e2e-L1-commander" pruned (D1 cascade semantics)`。**definitive 证明 pro 加载新引擎 + D1 cascade 经 MCP 层 + 真实 session 端到端生效**。e2e 过程 2 个测试指令 bug（leaf_add 漏 model/channel；单 session 复用 → E_DUPLICATE_SESSION_ID），均非引擎问题，第三次（多 session）成功。
+
+**🔴 文档同步事故 + 教训（md5 自动化的边界）**：本次写了 `.context/sync-doc-md5.cjs` 想 automation 化 md5/行数同步，**首版有 3 bug**：(1) Git Bash md5sum 输出前导 `\` 未 strip → 写出 `\28cb42bb...` 损坏值；(2) `split('\n').length` 比 `wc -l` 多 1 → 行数 off-by-one（5046 vs 5045）；(3) 盲替旧 md5 列表含 `42ba5d51`（那是 workspace-files **旧源**的 md5，非过期引用）+ 含历史快照 md5（CLAUDE L56 BUG-2 修复时 md5）→ 把历史快照也改成当前值，失真。**修正**：脚本降级为**只自动同步行数**（机械安全）+ md5 仅报告不自动替换（人工判断权威行 vs 历史快照）。落实 note 既有结论「md5 反复同步是坏实践 → 归 backlog 自动化」的审慎版：能自动化的（行数）自动化，不能安全自动化的（md5 上下文判断）留人工。事故已全部手工修复 + 复扫 clean。
+
+## 🔖 2026-07-14 测试治理：6 核心测试 require 修到权威源（94/0 假绿灯→真实验证）
+
+**问题**（父会话核实发现的治理缺口）：6 核心测试 `ENGINE_PATH` 全指向旧源
+`C:/Users/sir_c/.proma/.../workspace-files/tree-engine.cjs`（md5 `42ba5d51`，4928 行，**不含** 5 件套/drift 联动/ctx 竹节/restore-tree_id 等所有 Sprint 1+2 新改动），而非权威源
+`D:/codes/tree-harness/tree-engine.cjs`（md5 `9f575fb8`，4961 行）。导致这 6 测试"94/0"验证的是**旧逻辑**，对新改动无回归保护（假绿灯）。
+
+**改动**（最小改动，与 sprint2 测试已确立模式一致）：6 文件 `const ENGINE_PATH` 字符串值从旧源路径改为权威源绝对路径
+`'D:/codes/tree-harness/tree-engine.cjs'`：
+- auditor-role / iss003-review-gate / p0-1-sync-fix / p0-3-status-transition / p1b-fix-evidence / subagent-lifecycle
+- 选绝对路径而非 dbc-spec 的 `_findEngine`：`.context/plan/` 位置固定（dbc-spec 用 `_findEngine` 是因 assets 会被 cp 到 test-sandbox/激活 assets 等多处，需自适应；6 核心测试无此需求，直指权威源更简单可读）
+
+**全量重跑**（全部不带 env，确认 ENGINE_PATH 修后默认指权威源）：
+| 测试 | 结果 |
+|------|------|
+| 6 核心测试 | auditor 20 + iss003 13 + p0-1 4 + p0-3 19 + p1b 8 + subagent 30 = **94/0** |
+| dbc-spec | 39/0（_findEngine 候选首位权威源，已修过） |
+| sprint2-five-piece | 15/0 |
+| sprint2-drift-linkage | 9/0 |
+| sprint2-ctx-segment | 7/0 |
+| **合计** | **164/0 零回归** |
+
+**失败用例判断**：**无失败**。6 测试验证的特性（auditor role P0a / ISS-003 review 门禁 / P0-1 done 同步 / P0-3 状态流转 / P1b fix_evidence / subagent 入树）均为 Sprint 1 之前特性，权威源完全兼容——引擎只加了新东西（5 件套/drift 联动/ctx 竹节/restore tree_id），未删旧逻辑。无需改任何测试期望。
+
+**🔴 测试治理原则（权威源唯一）**：
+1. 所有测试 `ENGINE_PATH` 必须指向权威源 `D:/codes/tree-harness/tree-engine.cjs`，**严禁**指 `workspace-files/` 旧源（已非权威，md5 `42ba5d51`，无新改动）。
+2. 新增测试一律用绝对路径直指权威源（`.context/plan/*`），或参照 dbc-spec `_findEngine`（assets 多副本场景）——本质都是"候选首位权威源"。
+3. 「X/0 绿」的可信前提是确认被测引擎 = 权威源 md5 `9f575fb8`。假绿灯根因 = require 旧源（本次）或期望过时（dbc-spec 上次），两者都是文档/测试失同步。
+4. 当前可信基线：**164/0 全量真实验证权威源**（6 核心 94/0 真实化 + dbc-spec 39/0 + sprint2 31/0）。此前"6 核心 94/0"是假绿灯，现已恢复真实可信。
+
+## 🔖 2026-07-14 Sprint 2 约束 3 复核激活（milestone 门禁，状态修正 + minor 教化）
+
+methodology-coverage-audit 约束 3 🔴→🟢（原"纸面"判断过期）。
+
+**复核结论**：约束 3 实际已激活，原"纸面"基于 07-04 中期评价（V3 之前 18/18 milestones=[]）。
+- ✅ 引擎 V3 硬强制：cmdLeafSetStatus done 前置 milestones 非空 + 全部 audit_pass=true（L1476/L1496）。dbc-spec V3 用例验证（39/0 含 V3）。引擎强制 = done leaf milestone 非空率必然 100%（不 add 无法 done）
+- ✅ commander §13.3 步骤 1 已教 milestone_add（root 冷启动配 done 前置 8 步流程）
+- ✅ worker §2 步骤 2 补 milestone_add 持久化教化（本轮，minor gap：原只教拆解没教调 milestone_add）
+
+**改动**：worker SKILL §2 步骤 2 加「调 tree_milestone_add 持久化 + V3 硬约束说明」（无引擎改动，纯 SKILL 教化）。Sprint 2 四约束（3/4/5/6）全部处理完毕。
+
+## 🔖 2026-07-14 Sprint 2 约束 6 部分激活（ctx 竹节刚性触发 + SKILL 心跳教化）
+
+methodology-coverage-audit 约束 6 🔴→🟡：引擎竹节刚性触发 + SKILL 教哨兵写真实 ctx。
+
+**Part A 引擎刚性**（tree-engine.cjs，md5 `365bb8bd`→`9f575fb8`，4941→4961 行）：
+- cmdLeafSetContext（L1722）：写 context_usage_pct 后，若 pct≥阈值（audit_meta.ctx_segment_threshold 默认 85）且 status=active 且 role≠root → 自动 set segment_pending + drift handoff（联动约束 5）
+- 替代 SKILL §8.3「下次心跳仍 ≥85% 触发竹节（v0.3 实现）」的**未实现**手动竹节——现在引擎刚性触发
+- 边界：pending_brief（还没 brief_echo 不会超阈值）/done/pruned/archived（终态）/root（信任锚）不触发
+
+**Part B SKILL 软约束**（commander §8）：
+- §8.1 步骤 2 改：哨兵对每个 active leaf 调 `get_session_context(session_id)` 拿真实 token/contextWindow → 算 ctx_pct → `leaf_set_context` 写入（治"ctx 永远 0"根因：旧 §8.3 写的是哨兵输入里的旧 context_usage_pct=0，循环写 0）
+- §8.3 sweet_spot_risk：引擎已自动 segment_pending，commander 竹节交接 4 步（create_session → segment_append → set-session → set-status active）
+
+**测试**：sprint2-ctx-segment-test.cjs **7/0**（阈值下/阈值上/root 不触发/done 不触发/自定义阈值）。零回归：drift 9/0 + 5 件套 15/0 + dbc-spec 39/0
+
+**部署**：pro dist 引擎 `9f575fb8` + commander SKILL `2d0c1464`（双校验）+ 重启 pro。备份 `.bak-pre-ctx-segment-20260714`
+
+**⚠️ 待实战验证**：哨兵心跳是否真执行 get_session_context（软约束，需真实长任务观察 ctx 写入率）。引擎竹节刚性已测试验证，但 ctx 非全 0 靠哨兵执行
+
+## 🔖 2026-07-14 Sprint 2 约束 5 完成（drift 联动 + restore tree_id bug 修复）
+
+methodology-coverage-audit 约束 5 🟡→✅：状态变更全留痕（set-session/migrate/restore 联动写 drift）。
+
+**引擎改动**（tree-engine.cjs，md5 `2d281ebf46`→`365bb8bd`，4895→4941 行）：
+- cmdLeafSetSession（L1816）：session_id 变更后双写 drift（kind=rhythm / action=self_correct, from/to=session）
+- cmdRestore（L2457）：恢复后双写 drift（kind=production / severity=high / action=declare, root leaf + drift_log）
+- cmdMigrate（L3636）：迁移后双写 drift（kind=production / severity=mid / action=declare, root leaf + drift_log）；`--dry-run` 不写
+- **顺带修复 pre-existing P1 bug**：restore tree_id mismatch。cmdRestore L2431 校验 `parsed.tree_id !== tree_id`，但 tree-state.json（cmdInit L728 state 构造）**无 tree_id 字段** → restore 对当前格式永远 `E_BACKUP_CORRUPT`（阻塞 SKILL §10 F3 灾难恢复）。修：cmdInit state 加 `tree_id` 字段（自描述）+ cmdMigrate 规则 13 补旧树。writeState/readState 不注入 tree_id（保持现状，tree_id 是数据字段非派生）
+
+**测试**：`.context/plan/sprint2-drift-linkage-test.cjs` **9/0**（set-session / restore / migrate drift 内容 + migrate dry-run 不写）。零回归：dbc-spec 39/0 + 5 件套 15/0
+
+**部署**：pro dist 已 cp（md5 `365bb8bd` 双校验）+ 重启 pro。备份 `.bak-pre-drift-linkage-20260714`（源 + dist）
+
+**SKILL 影响**：drift 联动是引擎自动行为，agent 无需手动 drift_append 记录状态变更（手动 drift_append 仍可用于偏差记录）。SKILL §5 drift_append 工具说明无需改
+
+## 🔖 2026-07-14 Sprint 2 约束 4 收尾完成（5 件套持久化 + create_session 派生，pro 实证）
+
+design-commander-spawn §八 检查清单全项完成，methodology-coverage-audit 约束 4 🔴→✅。
+
+**本轮收尾**：
+- worker SKILL §2/§2.5：启动首步 `tree_leaf_get(自己 leaf_id)` 读 leaf 持久化 5 件套（混合任务书机制）；§2.5 阶段1/3 改 create_session + 读 leaf（去掉旧 send_message 收 5 件套）
+- commander §7/F1：加 fork 边界标注（重档剪枝/F1 崩溃恢复用 fork=重试语义；正常派生用 create_session §4）。顺带标 §7 中档 `autonomy_override` 失同步（Sprint 1 已删工具，中档降级加强 nudge，替代机制待补）
+- **新增 5 件套持久化测试** `.context/plan/sprint2-five-piece-test.cjs`（**15/0**）：root 5件套 / leaf_add 持久化 / 向后兼容 / 部分传 / validate 五类。关键发现 `engine.run` 返回 `Object.assign({ok:true}, result)`（L4826）——数据字段在**顶层**（`r.leaf`），非 `r.result.leaf`（p0-3 用 `result:out` 整个 out 是对的；测试 harness 写法陷阱）
+- pro 重启加载新引擎（taskkill Proma-green + start-pro.bat，进程 14:25→**15:01**，dist md5 `2d281ebf46` 含 5 件套）
+- **pro 端到端验证**（commander `d218bd5c` GLM-5.2）：tree_init(root_brief/root_dod) → tree_leaf_get(root) → **brief/dod 均非 null 完整回填**（47s，38k input tokens）。证明 pro 引擎确实加载 5 件套 + tree 工具链路通。create_session 派生：commander 会话本身由 remote_create_session 建（非 fork），机制可用
+
+**约束 4 状态**：methodology-coverage-audit 🔴→✅（引擎持久化 + SKILL 教化 + 测试 15/0 + pro 实证全链路）
+
+**测试治理发现（归 backlog）**：现有 6 核心测试 require workspace-files 旧引擎（md5 `42ba5d51`，4928 行，无 5 件套），"94/0 核心测试"验证的是旧逻辑。dbc-spec + 本轮 5 件套测试用权威源。建议统一 require 路径到权威源（测试治理 Sprint，改路径需验旧/新引擎行为差异）
+
+**SKILL md5**：commander `152c22c1` / worker `0caa7249`（已同步 pro `~/.proma-dev/.../skills/`）
+
+## 🔖 2026-07-14 Sprint 2 约束 4 进行中（commander 派生 + 5 件套持久化）
+
+design-commander-spawn 提案实施（Sprint 2 约束 4）：
+
+**引擎（完成）**：
+- `cmdLeafAdd` leaf 构造（L1031）+ root leaf 构造（L753）加 5 件套字段：`brief`/`dod`/`report_protocol`/`autonomy`/`self_audit`（object，默认 null，向后兼容旧 leaf）
+- cmdLeafAdd 从 input 接收 5 件套持久化；root leaf 从 state.root_brief/root_dod
+- node -c + 测试 **121/0**（iss003 13 + p0-3 19 + subagent 30 + auditor 20 + dbc-spec 39，向后兼容确认）
+- tree md5 变（35d67340e2 → 新），已部署 PRO dist
+
+**SKILL（commander §4 Step 2 完成）**：
+- 正常派生**强制 create_session**（删 fork 二选一），标注 fork 仅用于 §7 纠偏重档 / F1 崩溃恢复
+- 新流程：create_session → leaf_add（含 5 件套持久化）→ 首条消息含 leaf_id（混合任务书，非塞完整 5 件套）→ 下游启动 tree_leaf_get 读 5 件套 → brief_echo
+- role 枚举注释补 auditor
+
+**剩余（Sprint 2 约束 4 收尾）**：
+- worker SKILL 启动读 leaf 任务书（commander §4 Step 4 已覆盖"下游会话启动 tree_leaf_get"，worker SKILL 加交叉引用即可）
+- SKILL §7/F1 标注 fork 仅纠偏/恢复（§4 已述，§7/F1 加显式注）
+- pro 重启加载新引擎（含 5 件套）+ pro 端到端验证（建 tree 测 leaf_add 5 件套 + tree_leaf_get 读，烧钱，可选）
+- methodology-coverage-audit 约束 4 状态 🔴→🟡（引擎+SKILL done，待 pro 验证）
+
+**关键设计点**：5 件套持久化进 leaf → commander/worker 启动主动 tree_leaf_get 读（混合任务书），不依赖 fork 继承父历史。防"fork 污染 + token 重"，符合契约驱动。
+
+## 🔖 2026-07-14 部署 PRO dist + Pro 重启加载新引擎
+
+部署累计引擎改动到 PRO dist（D:/Proma-dev/resources/app/dist/，备份 .bak-pre-sprint1-deploy-20260714）：
+- `tree-engine.cjs`: `35d67340e2`（删 autonomy + flagged 动态化 isFlagged + cmdHelp 42）
+- `proma-dev-patches.cjs`: `611751b2`（删 tree_leaf_autonomy_override 注册 + 正则，原 `cbc0f133`）
+- md5 双校验通过（dist = 权威源）
+
+Pro 实例重启（taskkill Proma-green + start-pro.bat），powershell 确认进程启动时间 14:25（新进程加载新引擎，非旧残留）。remote_list_sessions(pro) 确认可连（238 会话，含 verifycb2 caller-binding 验证会话）。
+
+文档同步：patches md5 `cbc0f133`→`611751b2`（CLAUDE/API/ARCHITECTURE/README/ERROR-CODES）。
+
+**Sprint 1 全部完成 + 金标准恢复 + Pro 加载新引擎**。当前可信基线：6 核心测试 94/0 + dbc-spec 39/0 = **133/0 真实验证**（dbc-spec 首次真实全过）+ Pro 跑新引擎（删 autonomy + flagged 动态化生效）。
+
+## 🔖 2026-07-14 dbc-spec 过时修复完成（39/0，金标准恢复）
+
+dbc-spec.cjs（skills/tree-commander/assets/）过时两处，subAgent 修 + 父会话独立验证 **39/0**：
+
+1. **_findEngine 修**：候选首位加权威源 `D:/codes/tree-harness/tree-engine.cjs`（原首位 patch-l 不存在 → fallback 旧版，是失守根因）。现默认 require 权威源。
+2. **14 用例期望对齐 V10/IHL**（无引擎回归，全是 dbc-spec 过时）：
+   - milestone 校验前置（A1/V3/V9-a，done 前 milestone 必须 audit_pass+非空）
+   - auditor 独立性加严（A2-c/A7/A3-c/V5b×3/V4-c/CP2/V5b-tamper，11 条；V10-auditor-active 三要件 → setupTreeWithAuditor 用 root 信任锚激活）
+   - UUID v4 严格（V2，全 f 前置拦 → 改合法 v4 非树中 UUID）
+   - V9-a/V9-b 路径安全前置到 milestone add + V9-b fixture session_id 唯一性（addWorker2 独立 session）
+   - V4-b 信任锚模型（root 可审任意非 root leaf → 改期望 auditor=worker 自审）
+3. **独立验证**：dbc-spec 39/0（带 env + 不带 env 都过）。文档 dbc-spec 数字 48/0→39/0（README/TESTING 同步）。
+
+**金标准可信度恢复**：dbc-spec 现实际可跑且全过。之前 require 旧版 + 期望过时，「48/0」是**从未真实验证**的声明（dbc-spec 从没在权威源跑过）。这是文档/测试失同步的又一案例（与之前源码/文档失同步同类）。
+
+## 🔖 2026-07-14 Sprint 1 收尾完成（A review_evidence 动态化 + B 删 autonomy）
+
+Sprint 1 两个 🔴 清掉，**Sprint 1（基线收尾）全部完成**：
+
+**B 删 autonomy_overrides 死字段**（improvement P1-S02 闭环）：
+- tree-engine：删 leaf 初始化(L771/L1054) + cmdLeafAutonomyOverride 函数(L1807-1861) + dispatch case + 注释清理（4 处 usage/section/子命令提示）
+- patches：删 tree_leaf_autonomy_override MCP 注册(L1645) + writeTools 正则去 leaf_autonomy_override
+- node -c 通过；**6 核心测试 94/0 全过**（iss003 13 + p0-3 19 + p1b 8 + subagent 30 + auditor 20 + p0-1 4）
+- 旧 leaf 的 autonomy_overrides 字段保留但无人读（引擎容忍多余字段，无害）
+
+**A review_evidence 动态化**（ISS-003 阶段二务实最小集，improvement P1-S03）：
+- 新增 `isFlagged(leaf, state)`：flagged 从 events 动态计算（migrate 静态标记 || 新 leaf done worker 该审未审）
+- flagged 扫描（建子 leaf 父链检查）改用 isFlagged，**堵「新 leaf done-未审不阻断下游」ISS-003 gap**
+- 已补审（有 review_round）→ 不 flagged（放行）；flagged 不再依赖 review_evidence 静态字段，防直接篡改蒙混
+- node -c 通过；iss003 13/0 不破坏（阶段一兼容）
+- 未做：cmdReviewRound/Layer2/R-08（events 自写性根本限制下 ROI 低，留 backlog）
+
+**🔴 新发现：dbc-spec 过时**（pre-existing，非本轮引起）：dbc-spec.cjs 的 require 候选**不含权威源**（找到 release/patch-l 旧版 v0.2.2，3602 行），用 `PROMA_TREE_ENGINE` 指向权威源跑 = **25 通过 / 14 失败**。14 失败全是 V10/IHL 新校验（milestone audit_pass 前置 / E_INVALID_UUID_STRICT / milestone 非空前置）vs dbc-spec 旧期望，**与 autonomy 无关**。dbc-spec 需更新跟 V10/IHL 引擎演进（归测试维护 backlog，影响「金标准 dbc-spec 48/0」可信度声明）。
+
+**引擎状态**：tree-engine 4882 行 md5 `35d67340e2`，patches 3128 行 md5 `cbc0f133`，node -c + 94 核心测试通过。PRO dist 未同步（本轮改动需用户重启 pro 加载）。
+
+## 🔖 2026-07-11 设计文档群组审计 3 轮收敛（会话 bbdefd1e，#19）
+
+对设计文档群组（01_PRD 6 + 05_PROJECT_PLAN 4 + 根目录 ERROR-CODES/BUG-REGISTRY + CLAUDE/API/ARCHITECTURE）做 3 轮「审计→修复→再审」迭代：
+
+- **第1轮**（6 维度 subAgent 并行：跨文档一致性/文档↔引擎/内部逻辑/可执行性/完整性/PRD质量）：52 问题，去重 23 项 P0/P1。修 19 项（md5 再同步 / MAX_DELEGATION_DEPTH 8→10 / ROLE_ENUM 补 auditor / node_budget 10→20 / 4 幽灵码标注 / done 门禁重列 / E_MAX_SESSIONS 改新增 / macp2 红线明确化 / 分档 / F1-F4→R1-R4 / checkpoint 降级 / Cr 发现率 / US-006 / ctx 矛盾等）。
+- **第2轮**（验证修复 + 再审）：**P0=0**（修复无新矛盾），P1=2（分档未贯穿跨 3 文件 + node_budget API L820），P2=8。Agent A 验证 19 项修复 16✅ + 3🟡（半截）。
+- **第3轮**：修 P1（Q1 分档 sed 统一 cost-guardrails+commander/worker SKILL 全 2/3/5 + Q2 node_budget L820）+ 3 项半截（cmdHelp title 41→42 + cost-guardrails L57/L132）+ Q3 行号锚点化（API §5.1 去行号 + ARCHITECTURE §7 加滞后注）+ 几个 P2（F1 行号/checkpoint 悬空引用/§八措辞）。
+
+**✅ 收敛**：P0=0，P1=0。剩 P2 改善项 backlog（不阻断，Agent B 判定可接受留）：
+- Q4 product-positioning 统合表补「开源做壳闭源做肉」商业策略维度
+- Q6 layer2 五场景加 v1 可用性 emoji（场景1🟡/2✅/3🔴/4🟡/5✅，对齐 user-stories 矩阵）
+- Q7 layer2 补「事中熔断」story（macp2 实证需求，v1.5 规划）
+- Q10 ARCHITECTURE §5.2 commander fork→create_session 加 Sprint 2 预告注
+
+**引擎改动**（本轮）：tree-engine cmdHelp 41→42（L4288 title + L4290/L4292 content），md5 现 `544e5f6d33`，node -c 通过。PRO dist 未同步（注释/文字改动无害，下次逻辑改动一并部署）。
+
+**价值**：文档群从「补建后未经审计」到「3 轮审计收敛，P0/P1 清零」——跨文档一致性 + 文档↔引擎一致性 + 内部逻辑 + 可执行性 + 完整性 + PRD 质量六维过关。共修约 30 项（19 + 3 + 7+）。
+
+## 🔖 2026-07-11 设计提案：Commander 派生改 create_session（排期 Sprint 2）
+
+用户诉求：root 派生的各级 commander 不要 fork，重新开会话（create_session）+ 读任务书。经澄清决策：**仅正常派生**改 create_session（纠偏重档 §7 / 崩溃恢复 F1 保留 fork——它们是「从 milestone 重试」语义）；**混合任务书**（父会话 create_session 后发首条消息含 leaf_id → commander 启动调 tree_leaf_get 主动读 leaf 持久化的 5 件套）。
+
+**不违反 macp2 红线**（CLAUDE.md P0 禁的是 create_session 当 reviewer/SubAgent；commander 是执行协调者，不在红线内，受预算护栏约束）。**天然激活约束 4**（5 件套持久化）—— 一举两得。
+
+产出 `05_PROJECT_PLAN/design-commander-spawn.md`（设计提案 + 实施检查清单）。已排期 **Sprint 2**（= 约束 4 激活载体）。sprint-plan Sprint 2 + methodology-coverage-audit 约束 4 已更新引用。实施时改：tree-engine leaf schema 加 5 字段 + cmdLeafAdd 持久化 + commander SKILL §4 Step 2 强制 create_session + §7/F1 保留 fork 标注 + worker 启动读 leaf + 测试 + 文档。
+
+## 🔖 2026-07-11 补 user-stories.md（01_PRD/，补 SubAgent A 缺口）
+
+补 `D:/codes/tree-harness/01_PRD/user-stories.md`：把 Layer1 + Layer2 场景**合并去重**转写成 **8 个标准 user story**（As-a/I-want/so-that + Given/When/Then 验收 + MoSCoW 优先级）+ 3 个 Won't。
+
+优先级矩阵结论：**4 个完全可用**（US-002 深度Fork / US-005 洁净室 / US-007 事故复盘 / US-008 外部编排），**3 个部分可用**（US-001 主线并行+审计 / US-004 多视角评审，依赖 auditor fallback 修复），**1 个 Must 核心未实现**（US-003 竹节交接，ctx 自动触发未做，Sprint 2 补）。供 sprint-plan 排期 + 测试引用。
+
+## 🔖 2026-07-11 方法论补建完成（会话 bbdefd1e，05_PROJECT_PLAN/ 3 份）
+
+建 `D:/codes/tree-harness/05_PROJECT_PLAN/` 目录，补建 3 份方法论文档（基于 SubAgent C 分析）：
+
+- **methodology-coverage-audit.md**：把 V10「内容有效性」原则推广到方法论自身的自审。对照中期评价 6 条死硬约束逐条核实：**0/6 完全激活，3/6 部分（V5b alignment / §14 auditor / 三档纠偏），3/6 仍纸面（milestone_add / 5件套持久化 / ctx竹节）**。提出定期复审 + 纸面/软约束/刚性三档标注机制。
+- **sprint-plan.md**：从事后追溯（CHANGELOG）转事前承诺。6 个 Sprint（基线收尾 / 约束激活 / Phase D / 跨工作区+TAO / 安全根治 / 产品化验证）+ 依赖图 + 版本里程碑 v0.17→v1.0。诚实声明 Sprint 估算缺历史数据 + 部分 Sprint 跨仓/外部依赖。
+- **unified-workflow.md**：串联分散在 6+ 文档的端到端工作流（建树→5件套→worker 9 阶段→审计→done 8 门禁→归档），**补 SubAgent C 指出的人类 checkpoint**（macp2/macp4 都是用户上线才发现）——定义人类审查者 5 个介入节点（建树前/关键done前/审计争议/事故/上线前）。
+
+矫正：方法论「深度极强但分散无统一 PROJECT_PLAN」→ 现有 sprint-plan + workflow 串联 + coverage-audit 自审。诚实点：Sprint 估算缺历史数据；安全根治 Sprint 部分跨仓；产品化 Sprint 外部依赖多。
+
+## 🔖 2026-07-11 产品设计补建完成（会话 bbdefd1e，01_PRD/ 5 份 P0）
+
+确认框架：**上游补丁 + 两层客户**（直接客户=Proma 维护者衡量合并；最终受益者=AI 开发团队衡量协作收益）。建 `D:/codes/tree-harness/01_PRD/` 目录，起草 5 份 P0 文档：
+
+- **product-positioning.md**：定位纲领（两层客户 + 四说统合 + 边界声明 + 用 macp2/audit-gate/v626 实证论证安全 ROI）
+- **layer2-user-scenarios.md**：Layer 2 五场景（①并行实现+独立审计⭐ ②对抗洁净室 ③竹节交接+甜点区 ④多视角设计评审 ⑤事故复盘+IHL）+ 场景↔能力映射矩阵
+- **success-metrics.md**：两层客户指标 + 两条对照基线（vs 裸 prompt / Layer1-only）+ 反指标；**诚实声明多数指标当前无数据**（无真实团队/无基线/未提交 PR），v1 需补对照实验 + 首个 Proma PR
+- **team-config.md**：角色×模型×工具×成本矩阵（macp2 根因之一），含 SubAgent 调用形式红线（进程内 Agent 工具，禁 create_session/fork_session/delegate_agent 当 reviewer）
+- **cost-guardrails.md**：三层护栏（L1 引擎硬拦 / L2 SKILL 红线 / L3 行为引导）+ 收敛条件（角色 1/3/5、轮≤3、red_count=0 停）+ 撞错修根因禁换名重试 + 模型成本三角 + 自检清单
+
+**矫正「实现丰满、PRD 骨感」倒挂**：Layer 2（80% 代码）首次有用户场景与成功指标。诚实点：场景基于 n=1 抽象待真实团队验证；指标多数无数据待对照实验；定位统合把垂直化产品暂列为非主线（v1 不取）。
+
+## 🔖 2026-07-11 .context 统一（A3，建可信基线收尾）
+
+合并 `workspace-files/.context` → `tree-harness/.context`（TH 为权威源）。盘点发现实际只需同步 2 个文件：
+- **note.md**：WS 超集（TH 独有 0 行，WS 独有 176 行）→ TH（md5 现一致 `7436ecd4`）
+- **active/harness-efficiency-assessment-2026-07-09.md**：WS 独有 → TH
+- 其余根文档（PROJECT-INDEX / 待解决问题清单 / README / wiki / 中期评价 5 份）md5 本就一致；active/ 同名 18 份全一致；TH 独有 10 份（含本轮新建的 design-files-mapping/improvement-report）保留。
+
+**今后约定**：`workspace-files/.context` 已废弃（已放 `_MIGRATED-TO-TREE-HARNESS.md` 迁移通知），所有 .context 写入只写 `tree-harness/.context`。运行时数据（trees/）各实例各自保留。
+
+✅ **建可信基线全部完成**：源码统一（第0步）+ 文档治理 A1/A2/C（第1步）+ 代码小修 B1/B2（第2步）+ .context 统一 A3。
+
+## 🔖 2026-07-11 代码小修 B1/B2（会话 bbdefd1e，建可信基线第2步）
+
+**B1 autonomy_overrides 死字段**：grep 确认全引擎零消费（cmdLeafAdd L1054 初始化 + leaf_autonomy_override 工具 L1825 写入，零读取做限权）。处置：tree-engine L1825 加「死字段警告」注释（标注 no-op + 待决策）。删除字段 vs 实现限权消费待用户决策。注：drift_history 留痕仍有效（仅 autonomy_overrides 限权意图是 no-op）。
+
+**B2 leaf_add 事务回滚（BUG-B）**：⚠️ **经代码审查否决修复**。通读 cmdLeafAdd（L816-1070）：所有 throw（caller-binding L872 / duplicate / session唯一 / added_by树内 / parent / 深度 / flagged / budget L1029）都在 push（L1064）前，push 与 writeState（L1066）间无 throw → **cmdLeafAdd 本身无事务问题**，报错时 leaf 未写入。audtest 报告的「幽灵 leaf + session_id 自动生成 + 连带 A4-worker」疑 **fork session 副作用**（非 cmdLeafAdd 事务缺陷）。BUG-REGISTRY BUG-B 状态改「待重新核实」，建议重新设计测试定位幽灵 leaf 真正来源后再决定。
+
+**TH 状态**：tree-engine 加注释后 4934 行 md5 `10f40b49`（PRO dist 仍 `42ba5d51`，注释无害未部署，下次逻辑改动一并同步）。
+
+## 🔖 2026-07-11 文档治理 A1/A2/C 完成（会话 bbdefd1e，建可信基线第1步）
+
+**A1 错误码字典对齐**：
+- 新建 `D:/codes/tree-harness/ERROR-CODES.md`（49 个错误码 = tree-engine 42 + patches 独有 7，从 TH 权威源自动抽取，分 7 类含触发条件/归属/行号）
+- 补全 API.md §5（原 37 → 现 49，补 12 缺口：`E_DELIVERABLE_EMPTY`/`E_REVIEW_*`×3/`E_SESSION_NOT_ALIVE`/`E_STATUS_TRANSITION_INVALID`/`E_SUBAGENT_BUDGET_EXCEEDED` + patches 的 `E_NO_OWNERSHIP`/`E_DELEGATION_TOO_DEEP`/`E_SESSION_BUDGET_EXCEEDED`/`E_TARGET_NOT_FOUND`/`E_WORKSPACE_REQUIRED`）
+- API.md §5.5 加 ERROR-CODES.md 权威源引用
+
+**A2 BUG 注册表**：
+- 新建 `BUG-REGISTRY.md`，理清两套并行命名体系（体系 A `Bug A-x/B-x` V10 P3；体系 B `BUG-n` audtest/harness）
+- 澄清 leaf_add 两个不同漏洞：`Bug B-3`（session_id 唯一性，V10 P3 已修）vs `BUG-2`（caller-binding，07-09 已修）—— **非同名冲突，是不同校验维度**
+- 修正 CLAUDE.md L55 原误述「同名 BUG-2 另指 SECURITY」（SECURITY 实用 `Bug B-3` 体系）
+
+**C 元数据校正**：
+- 行数批量校正：tree-engine 3602→4928，patches 2658→3129（README/API/ARCHITECTURE/DEVELOPMENT/DEPLOYMENT/TESTING 6 文件 sed，CHANGELOG 历史记录正确保留）
+- 21 DbC 校验点：ARCHITECTURE §6.2 已有「截至 2026-06-26」日期限定，准确无需改
+
+**待核实（低优先）**：`E_PATH_TRAVERSAL`/`E_SYMLINK_ESCAPE`/`E_WORKSPACE_CANONICAL`/`E_ROLE_INVALID`（API.md 有记载但 engine const 未定义，疑 patches 字符串抛出，ERROR-CODES.md §8 标注待核实）。
+
+## 🔖 2026-07-09 源码统一：tree-harness 确立为权威源（会话 bbdefd1e，建可信基线第0步）
+
+诊断发现 `tree-engine.cjs` 4 版本不同步（CLAUDE.md「git源=pro md5一致」声明不成立），`proma-dev-patches.cjs` 6 版本 5 个不同 md5（更乱）。用户决策 **tree-harness 为权威源**。
+
+**已执行**（TH 现有 .cjs 已备份 `.bak-pre-source-unify-20260709`）：
+- `TH/tree-engine.cjs` ← workspace-files（4928 行，md5 `42ba5d51`，含 07-09 caller-binding 修复）✅ md5+node -c 通过
+- `TH/proma-dev-patches.cjs` ← **PRO dist**（3129 行，md5 `cbc0f133`，含 create_session budget 护栏 + P0b 废止 tao-watcher audit_log）。**注：WS 落后 PRO 20 行（budget 只部署 dist 没回写 WS），PRO 才是 patches 最新** ✅
+- `proma-mcp-server.cjs` 5 处 md5 一致，未动
+- CLAUDE.md 三处更新：项目结构（权威源声明+行数 4928/3129）、部署口诀（`workspace-files` → `D:/codes/tree-harness`）、BUG-2 状态（待修 → ✅已解决 07-09 会话 4fee5a45，vcb2 实证）
+
+**关键修正（再次确认）**：BUG-2（leaf_add caller-binding）实际已于 07-09 下午修复并 pro 实证，多文档标「待修」是失同步。TH 权威源现已含修复。
+
+**遗留（待用户决策）**：① workspace-files 旧源处置（废弃/降为镜像）② release dist 同步（落后 pro 较多，07-07 note 说暂缓）③ `workspace-files/.context/proma-dev-patches.cjs`（1078 行旧副本）清理 ④ `release/tree-system-v0.2.2/patch-l/`（3602/3025 行历史打包）标注过时。
+
+## 🔖 2026-07-09 设计文件缺口分析 + 待改进报告（会话 bbdefd1e，5路 SubAgent 并行）
+
+参照 nanju（`D:\Codes\multi-agent-collab-platform`）01-06 产品设计文档体系，5 路 general-purpose SubAgent 并行深读（A 产品定位 / B 架构API / C 方法论流程 / D 安全缺陷汇总 / E note.md 挖掘）+ 父会话交叉印证，产出两份报告（落 `D:/codes/tree-harness/.context/active/`）：
+
+- **[design-files-mapping-2026-07-09.md](../../../../../../codes/tree-harness/.context/active/design-files-mapping-2026-07-09.md)** — 设计文件结构映射：对照 01-06 模板逐域评估，P0 缺口 6 份 + P1 缺口 10 份新建清单 + 文档治理建议。
+- **[improvement-report-2026-07-09.md](../../../../../../codes/tree-harness/.context/active/improvement-report-2026-07-09.md)** — 待改进报告：13 条逻辑不自洽 + 36 条设计问题（P0-P3）+ 5 聚类根因 + Top7 优先级 + 推进路径三档。
+
+**关键交叉印证修正（避免后续误判）**：
+1. ✅ **BUG-2（leaf_add caller-binding）实际已解决**（07-09 下午会话 4fee5a45，vcb2 实证拦截生效）。`tree-harness/CLAUDE.md` + audtest 材料 + handoff 标「待修」是**文档失同步**（停留在 07-09 上午）。→ 归入 P1-D03。
+2. ⚠️ **存在两个并行 `.context`**（`D:/codes/tree-harness/.context` vs workspace-files/.context），note.md 已漂移（tree-harness 版停 07-07，本文件到 07-09）。→ 归入 P1-D04，建议统一到 tree-harness 为唯一源。
+3. ⚠️ **TaoWatcher「0 触发」需限定场景**：macp4-A4（auditor 错配）+ macp2/3/4 0 触发；但 vcb2 验证（07-09 18:20）中正常 worker 场景**多次触发**（W-01/W-08），证实 watcher 在 pro 确实运行。
+
+**核心结论**：tree-harness 文档「安全加固/事故复盘/运维知识」极强，但「产品设计视角（PRD/类图/team-config）」缺位，Layer2（80% 代码）零用户场景处于「实现自证需求」。给系统性推进的三个抉择：① 文档治理 vs 功能加固先做哪个 ② 产品设计正向补建是否现在做 ③ TaoWatcher/auditor role 命运（救活/砍掉）。
+
+## 🔖 2026-07-09 Harness 效率综合评估报告（完整交付，会话 4fee5a45）
+
+**完整报告**: [active/harness-efficiency-assessment-2026-07-09.md](./active/harness-efficiency-assessment-2026-07-09.md)（brief 第八节全部 6 节 + 证据方法）
+
+**裁决**: 强支持发起人假设"约束效率低且没完全约束好，逼会话找绕过出路"。核心发现——3 个约束（caller-binding / TaoWatcher / 预算护栏）**同构盲区**: 只覆盖 tree 内合规路径，对 `create_session` 绕过系统性无效。macp2 爆炸正利用此盲区（207 会话不入 tree，tree call-log 仅 25 条）。优化方向是**重新分配**约束（tree 内过度加固 → tree 外观测 + 状态篡改 caller-binding），非简单增减。
+
+**附带产出**:
+- leaf_add caller-binding 修复（workspace engine，66/0 零回归，**未部署** pro dist）
+- 2 个新可利用盲区实证（set-status 跨身份杀 leaf / milestone-add 跨身份注入，3/3 坐实）
+- autonomy_overrides 死字段发现（写而不读，限权放权 no-op）
+- CLAUDE.md「macp2 靠引擎预算护栏堵」记录修正建议（实际靠 startup_notice+SKILL 红线）
+- 3 个测试脚本（p1-leafadd-caller-binding / caller-binding-coverage-audit / 零回归套件）
+
+**不确定性**: TaoWatcher 在 macp3/4（config 已启用）期间 0 触发的原因未定（log=console 不持久化）。建议动态验证。
+
+**细节**: 见下方 4 个分项条目（预算护栏 / TaoWatcher / caller-binding 覆盖地图 / leaf_add 修复）。
+
+**部署状态（2026-07-09 下午，已全部部署 pro dist，⚠️ 待用户重启 pro app 加载）**：
+- `tree-engine.cjs` (dist): leaf_add caller-binding（3处）+ set-status/milestone-add caller-binding（6处）= 9处。备份 `.bak-pre-leafadd-caller-binding-20260709`。
+- `patches.cjs` (dist): create_session 数量预算 `checkCreateSessionBudget`（2处：模块级常量+函数 / create_session handler 内调用，单 caller 60s ≤20）。备份 `.bak-pre-session-budget-20260709`。
+- 验证: p1-leafadd 4/4 + p1-setstatus-milestone 6/6 + 零回归 76/0（p1-leafadd+p0-1 4+p0-3 19+iss003 13+subagent 30）+ budget 算法验证（20过/21拦/独立/无caller不限）+ node -c 全通过。
+- workspace engine 同步（leaf_add + set-status/milestone-add）；workspace patches 未改（48KB 旧副本，dist 是 154KB 实际运行版）。
+- CLAUDE.md: macp2 预算护栏记录已修正（行18，补"仅 tree 内治标 + create_session 绕过无效 + 新 budget 补丁"）。
+- TaoWatcher 0 触发：静态验证 macp4 leaf 全合规（W-01 等 0 违规）→ 倾向"规则没命中"而非"watcher 没跑"，不确定性部分收敛（不敢 require dist patches 动态验证，会启动 watcher 巡检 pro trees 有副作用）。
+
+**pro 实证验证（2026-07-09 17:00，pro 重启后，commander+observer 实跑）**：派 commander（`1cc25570`, GLM-5.2）+ observer（`06c9b305`, GLM-5.2）在 pro 实跑验证。结果三方一致：
+- 🔴 **探针2 攻击 leaf_add**（added_by=observer，caller=commander）→ `E_BORROWED_IDENTITY [P1-cmdLeafAdd-caller-binding]` **精准拦截** ✓（leaf_add caller-binding 在真实 pro MCP 调用下生效，caller 由 pro MCP handler 注入，证实部署链路完整）
+- 探针1 正向 leaf_add（caller=added_by=commander）→ ok ✓（不误伤合法 add）
+- 探针3 milestone_add + 探针4 set-status 正向（commander 是 creator）→ ok ✓（不误伤 owner/creator）
+- observer 交叉确认（tree_leaf_list_all）：仅 `verifycb-root` + `verifycb-A1-worker`，**无 `verifycb-A2-worker`**（攻击真被拦、A2 未落库）+ A1 active + plan event + M1 milestone ✓ — commander 汇报属实
+- 结论：**caller-binding 部署生效 + 不误伤合法流程**。set-status/milestone-add 的攻击拦截由单元测试 6/6 覆盖（dist 代码 = workspace 验证代码），pro 正向不误伤已实证。create_session budget 未实跑（会烧钱，阈值 20，算法已验证 20过/21拦）。
+- 测试树 `verifycb` 留 pro 作证据。commander 91s 完成（41067 input / 237888 cache）。
+
+**pro 全面验证 vcb2（2026-07-09 18:20-18:35，commander+worker+observer 三会话）**：覆盖 caller-binding 全分支 + 完整 §13 done 流程。observer 最终交叉确认全绿：
+- 🔴 **攻击拦截**（observer 跨身份）：set-status → `E_BORROWED_IDENTITY [P1-cmdLeafSetStatus-caller-binding]` ✓；milestone-add → `[P1-cmdMilestoneAdd-caller-binding]` ✓（新增验证；verifycb 只验了 leaf_add）
+- **owner 放行**（worker=A1.session_id）：set-status/milestone-add A1 → ok ✓
+- **creator 放行**（commander=A1.added_by）：set-status/milestone-add A1 → ok ✓
+- 🔴 **完整 §13 done 八步全通**：建树→plan→leaf_add→milestone_add(M1/M2)→brief_echo→milestone_set_result(pass)→alignment 回填→落盘 deliverables→done event→audit_gate(pass, 信任锚闸门2)→set-status done → **A1-worker active→done** ✓（owner 放行 + 8 道门禁全过，无 DbC 拦截）
+- 结论：新 caller-binding 约束在 §13 完整真实任务流下「该拦拦得住、该放放得过」，无逃逸无误伤。端到端部署链路（workspace→dist→pro 重启→MCP caller 注入→约束生效）证实。
+- 🔴 **重要副产品（修正调研报告）**：TaoWatcher 在 vcb2 验证中**多次触发**（observer/worker 绑 leaf 后：W-01 首条无 brief_echo ×2 + W-08 worker 调写工具 leaf purity 违规 ×2）—— 实证 TaoWatcher 在 pro **确实运行**，之前 macp2/3/4 的 0 触发是 leaf 合规（非 watcher 没跑，确认 task12 的"规则没命中"假设）。但 **W-08 在本场景是误报**（worker 合法 owner 操作被当 leaf purity 违规）—— 呼应调研报告"TaoWatcher 假阳性"（已删 R-03/R-06/C-13/C-15；W-08 对 owner 合法操作也假阳性，待评估是否放宽）。
+- 附带 bug：nudge_log ts 用 UTC（10:26Z）vs events ts 用 +08:00，时区表示不统一（小 bug）。
+- 测试树 `vcb2` 留 pro（root active + A1-worker done + M1/M2 + 4 events + 4 nudge）。会话：verifycb2-commander(2369f684)/verifycb2-worker(f3776bb0)/verifycb-observer(06c9b305)。
+
+**⚠️ 工作流缺口发现（2026-07-09，归档验证会话时）**：remote_create_session 创建的会话无法经 MCP 归档——remote caller 归档被 `R6-external-deny`（external 只能 send_message），pro internal 会话归档被 `DENY-legacy-no-lineage`（D5 P1：remote_create_session 创建时不写 parentSessionId → legacy session，互为 legacy 禁 archive/fork）。**根因**：patches.cjs create_session 行697"外部/automation 不写 parentSessionId" + R6/D5 双拦。**唯一可行路径**：pro UI 侧边栏手动归档（UI 直接改 sessions.json，绕过 MCP）。**影响**：主实例通过 remote-session 在 pro 批量创建的会话，清理需 UI 手动，无法自动化。待评估：是否给 remote_create_session 补可选 parentSessionId 参数（让远端会话建立 lineage，解锁 remote 归档）。归入 harness 演进 backlog。
+
+## 2026-07-09 预算护栏评估 — 模式第三次验证（brief 第四节#5，会话 4fee5a45）
+
+**两道护栏都在 tree 引擎内（只管入树操作）**：
+- `E_TREE_NODE_BUDGET_EXCEEDED`（行1023，cmdLeafAdd）：active leaf 数 ≥ root_dod.node_budget（默认 20）→ 拒 add leaf
+- `E_SUBAGENT_BUDGET_EXCEEDED`（行2047，cmdEventAppend subagent_spawn）：单 leaf spawn 数 ≥ max_subagent_spawn_per_leaf（默认 15）→ 拒
+
+**create_session 无数量预算**：patches.cjs create_session patch（dist 行645-712）只有 ① workspace 校验 ② **delegationDepth 限制**（行680 `E_DELEGATION_TOO_DEEP`，防链式深递归）③ lineage/ownership（R1-R6）。**没有 max_sessions / rate limit / 数量预算**。
+
+**macp2 爆炸绕过护栏（铁证）**：macp2 是 commander 把 create_session 当 reviewer **扁平重复创建**（每个 depth=1，不超 MAX_DELEGATION_DEPTH）→ delegationDepth 管不到；create_session 不走 tree_leaf_add/subagent_spawn → 两道 tree 预算护栏管不到。macp2 的 tree call-log 仅 25 条（leaf/add 7 失败 3 / validate 5 / set-status 5），而爆炸的 207 会话是 create_session 创建、**不在 tree call-log**（因 create_session 不入 tree engine）。
+
+**🔴 模式第三次验证（caller-binding + TaoWatcher + 预算护栏同构）**：tree-system 的约束**普遍只覆盖 tree 内合规/声明路径**，对 `create_session` 等原生会话绕过机制**完全无效**。macp2 workaround 正是利用此盲区（用 create_session 绕过 tree_leaf_add 预算）。
+
+**对 CLAUDE.md 记录的修正建议**：CLAUDE.md P0 教训写"macp2 后靠引擎预算护栏堵"——**部分不准确**。引擎预算护栏只堵"若 commander 走合规 tree_leaf_add/subagent_spawn 路径"的爆炸（20 leaf / 15 spawn）。macp2 实际走 create_session 绕过 → 引擎预算护栏无效。真正堵 create_session 绕过的是**行为约束**：startup_notice（引擎注入 tool 结果红线）+ SKILL §13.5/§4.6（教不用 create_session 当 reviewer）+ 进程内 SubAgent（给廉价替代）。这些是"治本"（改变行为），预算护栏是"治标"（限合规路径上限）。
+
+**效率裁决**：预算护栏真实防护价值=中（堵合规路径爆炸，rvreq2/macp3/4 的 subagent_spawn 诚实路径有受益）；但对 macp2 型绕过=0。摩擦=低（默认值宽松，20/15）。归入"保留但别误信能堵绕过"档。
+
+## 2026-07-09 TaoWatcher 效率评估（brief 第四节#1 / 第七节#4 重点，会话 4fee5a45）
+
+**结论先行（对发起人假设"用户直觉 TaoWatcher 效率低"= 强支持，甚至更糟）**：TaoWatcher 在 pro 最近测试中**自动防护产出 = 0**，且有**先天设计盲区**（只巡检 tree 内 leaf，对"绕过树"的攻击无感）。
+
+**实现现状**（patches.cjs Patch M，dist 已 require 加载）：
+- 完整 TAOWatcher 类（行2219）+ Manager（行2316）+ 15 条 Tier1 零 IPC 规则（C-02/03/06/13, R-01/03/04/05/06 等）。
+- tao-rules.json 定义 35 条（R1-6/C1-16/W1-13），engine NUDGE_RULE_WHITELIST 精简到 ~11 条（删 R-03/R-06/C-13/C-15 高噪音假阳性，CLAUDE.md 记录）。
+- 启动：main.cjs 行570900 `require("./proma-dev-patches.cjs")` → 顶层 setTimeout(5000) 后 `startAll()`（行2750/2764）+ global.__proma__ 就绪检查 + 10s 重试。config `~/.proma/agent-workspaces/proma/workspace-files/tao-engine/config.json` 当前 **enabled=true**（mtime 7-08 13:47），interval 300s。
+
+**🔴 0 触发铁证**：扫描 pro 全部 21 个 tree（macp2/3/4/rvreq2/macp-stab/cleanroom 等），`nudge_log` + `audit_log` + `drift_log` **自动触发全 = 0**。所有 nudge 都是 commander/observer **手动调**的（call-log caller_session_id 是真实会话如 dcaed801，非 tao-watcher-script）；macp4 甚至有手动 `nudge R-06 → E_STATUS_INVALID`（leaf 已 done）。
+
+**时序铁证（解释 macp2）**：config.json enabled=true 的 mtime=**7-08 13:47**，而 macp2（207 会话爆炸）tree mtime=**7-08 00:24**（凌晨）→ macp2 爆炸时 watcher config **明确未启用** → 没跑 → 没拦。
+
+**🔴 先天设计盲区（决定性，即便启用也拦不住 macp2 型）**：TaoWatcher 巡检 `tree-state.json` 的 leaves（行2263 扫 trees_dir + 行2623 只查 active/pending_brief leaf）。macp2 爆炸是 commander 用 `create_session` 当 reviewer，**207 会话根本不入树** → watcher 看不到 tree 外的会话爆炸。所以 macp2 型绕过攻击只能靠"引擎预算护栏 + SKILL §13.5 红线 + startup_notice"堵（CLAUDE.md P0 教训），watcher 先天无能为力。这与 caller-binding 覆盖盲区**同构**：约束只覆盖合规路径，对"绕过"裸奔。
+
+**⚠️ 不确定性（部分收敛，2026-07-09 静态验证）**：macp3(14:38)/macp4(18:55) 在 config enabled 之后仍 0 触发。静态检查 macp4 全部 7 个 worker leaf——**对 Tier1 规则全部合规**（brief_echo/done/review_round/subagent_spawn 完整，W-01 等无违规）→ **倾向假设 (c) 规则 0 命中合理**（leaf 流程完整，watcher 即便跑了也抓不到违规）。但仍无法 100% 确认 watcher 实际运行（log=console.log 行175 不持久化；不敢 require dist patches 做动态验证——会触发 startAll→巡检 pro trees 写数据，有副作用）。一个异常线索：`macp4-W1-worker-s2` 状态 pending_brief 但有 done event（status-event 不同步），但这是 V10 collectValidateIssues 范畴非 TaoWatcher Tier1 规则，watcher 不抓它合理。综合：0 触发大概率=leaf 合规+规则没命中，不改变"TaoWatcher 实际产出 0"的裁决。
+
+**效率裁决**：真实防护价值=0（最近测试）/ 摩擦成本=0（没跑）但**工程沉没成本高**（Patch M 全套实现 + 35→11 多轮精简 + 假阳性修复 + 运维）。归入 brief 第八节"重设计"档：要么补 file-log + 健康检查让它可观测可信任，要么承认它是"安全剧场"（看起来在防护，实际没产出）并砍掉减负。
+
+## 2026-07-09 P1 修复 — cmdLeafAdd caller-binding 补全（leaf_add 路径身份借用漏洞，会话 4fee5a45）
+
+**来源**：harness 效率调研（`active/research-brief-harness-efficiency-2026-07-08.md`）附带发现，独立深挖 callerSessionId 全链路后定位。
+
+**Bug（真实 P1 身份借用）**：`engine.run` 第4参 `callerSessionId` 全程透传到 `dispatchLeaf(args, callerSessionId)`（行 4519），但 `dispatchLeaf` 的 `case 'add'`（行 4528）**漏传**给 `cmdLeafAdd`。cmdLeafAdd 现有防御（D2-B1 行 911）只验 `added_by`"树内存在"，**不验"调用者===added_by"**。后果：worker W(session=w-1) 得知树内 commander 的 session_id(cmd-1) 后，调 tree_leaf_add 声明 added_by=cmd-1 → 放行 → leaf 注册成"cmd-1 创建的"，污染溯源链 + 绕过 cmdLeafSetSession 的 isCreator 判断。
+
+**调用链实证**：`run(cmd,args,treesRoot,callerSessionId)` 行4794 → `dispatch(...,callerSessionId)` 行4806 → `dispatchLeaf(args,callerSessionId)` 行4484 → `case 'add': cmdLeafAdd(rest)` 行4528 ✗。call-log 记 `caller_session_id`（行4808），callerSessionId 全程可信（done 路径 audtest 早已实证生效）。
+
+**对照（已落地范式，唯独 leaf_add 漏）**：cmdLeafSetSession 行1743 / cmdEventAppend 行2022 / cmdAuditGate 行2997 / cmdMilestoneSetResult 行1930 都校验 caller binding。
+
+**修复**（`workspace-files/tree-engine.cjs`，3 处，对齐既有范式）：
+1. 行4528 `case 'add'` 透传 `cmdLeafAdd(rest, callerSessionId)`
+2. 行816 签名 `cmdLeafAdd(args, callerSessionId)`
+3. 行~864 加校验：`if (callerSessionId && added_by && callerSessionId !== added_by) throw E_BORROWED_IDENTITY [P1-cmdLeafAdd-caller-binding]`（CLI 不传 caller 跳过，向后兼容）
+
+**验证**（`plan/p1-leafadd-caller-binding-test.cjs`）：A 攻击 caller≠added_by → E_BORROWED_IDENTITY（带标记）✓ / B 正向 caller===added_by → 成功 ✓ / C CLI 不传 caller → 跳过校验 ✓ / D worker 当 added_by → D2-B1 仍拦（caller-binding 不削弱角色校验）✓。
+**零回归**：p0-1 4/0 + p0-3 19/0 + iss003 13/0 + subagent-lifecycle 30/0 = **66 通过 0 失败**。`node -c` 通过。
+
+**状态**：workspace engine 已修+验证，**pro dist 未部署**（部署需 `cp → D:/Proma-dev/resources/app/dist/` + 用户重启 pro app，破坏性，待用户确认）。
+**待办**：① 部署 pro dist（用户确认后）② caller-binding 是否还有别的漏传子命令（dispatchLeaf 全部 case 已核对：set-session/milestone/event/audit 均已透传，仅 add 漏，现已补全）。
+
+### 2026-07-09 延伸 — caller-binding 覆盖地图（系统盘点所有写命令，回答上方待办②）
+
+leaf_add 盲区引出系统盘点：grep 全部 `async function cmd*` 签名 + 读身份敏感命令内部校验。结论：**caller-binding 只覆盖了"身份声明"类操作（add/set-session/milestone-set-result/event-append/audit-*），完全没覆盖"状态/权限/结构篡改"类写操作**。callerSessionId 由 MCP wrapper（Proma app 主进程）注入（done 路径 audtest 已证生效），所以这些盲区在真实 MCP 调用下**都是可利用的**。
+
+| 命令 | 接 callerSessionId | caller 校验 | 威胁等级 | 说明 |
+|------|:-:|:-:|:-:|------|
+| leaf add | ✓(07-09 修) | caller===added_by | 已堵 | 见上条 |
+| leaf set-session | ✓ | caller===added_by/isRootSelf | 已堵 | 行1729 |
+| milestone set-result | ✓ | caller===audit_session_id | 已堵 | 行1895 |
+| event append(done) | ✓ | caller===leaf.session_id | 已堵 | 行1972 |
+| audit gate / append | ✓ | caller===audit/auditor_session_id | 已堵 | 行2980/3100 |
+| **leaf set-status** | ✗ | **无** | **中-高** | 任意 session 可把别人 active leaf → pruned/archived/pending_brief（STATUS_TRANSITIONS 行72 全允许）；active→done 被门禁拦（不能伪造完成），但能"杀死"别人 leaf。行1409 |
+| leaf autonomy-override | ✗ | 无 | 低(死字段) | 见下：autonomy_overrides 写而不读 |
+| leaf set-context / set-last-event | ✗ | 无 | 低 | 元数据篡改 |
+| milestone add | ✗ | 无 | 低-中 | 任意 session 给别人 leaf 加垃圾 milestone（污染）行1844 |
+| drift/heartbeat/segment/nudge append | ✗ | 无 | 低 | 审计/巡检记录，非身份敏感（nudge 有 rule 白名单行97） |
+
+**🔴 附带发现：autonomy_overrides 是死字段**。grep 全引擎，`removed_can_decide` / `added_must_ask` / `autonomy_overrides` **只在 cmdLeafAutonomyOverride（行1808-1835）写入 + 初始化（771/1054），无任何读取/消费点**。即"限权/放权"机制在引擎层根本不生效——SKILL 若教 commander 用 autonomy-override 限权 worker，实际是 no-op。这是典型"摩擦成本>防护价值（=0）"案例 + SKILL/引擎不一致（CLAUDE.md P0 高发区），归入 brief 第八节优化建议"放宽/重设计"档。
+
+**对发起人假设的初步证据**（brief 第二节"硬约束效率低"）：caller-binding 这一类约束**覆盖严重不均**——身份声明类层层加固（6 处），但状态篡改类（set-status 能杀 leaf）完全裸奔。说明约束是"哪里出过事补哪里"的打补丁式演进（leaf_add 是最新一例），而非系统设计。这支持"约束配置不高效"的部分判断，待其他约束（TaoWatcher/预算护栏）评估完出综合裁决。
+
 ## 🔖 新会话必读 — 交接文档（2026-07-07 会话 57f5aec1 → 新会话）
 
 **继续 tree harness 修复迭代，先读**：[active/handoff-iteration-continue-2026-07-07.md](./active/handoff-iteration-continue-2026-07-07.md)

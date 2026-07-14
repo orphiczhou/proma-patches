@@ -46,7 +46,7 @@ const path = require('path');
 const os = require('os');
 
 // ---- 引擎 require ----
-const ENGINE_PATH = 'C:/Users/sir_c/.proma/agent-workspaces/proma/workspace-files/tree-engine.cjs';
+const ENGINE_PATH = 'D:/codes/tree-harness/tree-engine.cjs';
 const engine = require(ENGINE_PATH);
 
 // ---- 临时沙箱 (每次运行一个独立目录, 结束清理) ----

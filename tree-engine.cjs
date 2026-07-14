@@ -12,7 +12,7 @@
  *              drift list | heartbeat tail | event list
  *   Add      : leaf add | milestone add
  *   Update   : leaf set-status | leaf set-context | leaf set-last-event
- *              leaf autonomy-override | milestone set-result
+ *              milestone set-result
  *   Append   : event append | drift append | heartbeat append | segment append
  *   Maintain : init | backup | restore | validate
  *
@@ -24,7 +24,6 @@
  *   node tree-state.js leaf set-status nanju nanju-A-eval done
  *   node tree-state.js leaf set-context nanju nanju-A-eval 47
  *   node tree-state.js leaf set-last-event nanju nanju-A-eval plan
- *   node tree-state.js leaf autonomy-override nanju nanju-A-eval --json '{"added_must_ask":["x"],"reason":"..."}'
  *   node tree-state.js milestone add nanju nanju-A-eval --json '{"id":"M1","desc":"...","expect_outputs":["flow.mmd"]}'
  *   node tree-state.js milestone set-result nanju nanju-A-eval M1 --audit-pass true --note-path docs/x.note.md
  *   node tree-state.js event append nanju nanju-A-eval --type done --json '{"deliverables":["docs/x.md"]}'
@@ -86,6 +85,31 @@ const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare',
 //   而非复用 worker 靠 W-AUDIT-WORKER 打补丁"。auditor leaf 走简化协议（brief_echo+done+audit_gate，无 milestone/review_round），
 //   其 audit_gate=pass 由 root 信任锚背书（resolveAuditorIndep 行 2432-2446 天然放行）或上级 auditor 背书（通用路径 2467-2490）。
 const ROLE_ENUM = ['root', 'commander', 'worker', 'auditor'];
+
+// Sprint 3 D2 (2026-07-14): schema 版本管理 —— 单一信源 + ladder 逐级分发。
+//   旧实现：cmdInit 硬编码 version:'1.1' + cmdMigrate 规则 12 硬编码升 '1.1'，两处易失同步。
+//   D2：SCHEMA_VERSION 单一信源（init/migrate 共用）+ SCHEMA_LADDER 有序版本表 +
+//       SCHEMA_HISTORY 版本变更说明 + compareVersion 语义比较。migrate 按 ladder 从 startVersion
+//       逐级升到 SCHEMA_VERSION，每跳记一条 change（version-dispatch 可追溯）。
+//   ⚠️ 当前 SCHEMA_VERSION='1.1'（Sprint 3 未引入新 tree-state.json 字段，故不升 1.2；
+//      升 1.2 需同步改 auditor-role-test Case 8 期望 from/to + state.version 断言）。
+//      D1 cascade 是 set-status 行为变更（非 schema 字段），D3 在 patches.cjs（非 engine state）。
+const SCHEMA_VERSION = '1.1';
+const SCHEMA_LADDER = ['1.0', '1.1'];  // 有序已知版本（升序）
+const SCHEMA_HISTORY = {
+  '1.0': { desc: 'baseline schema (pre-auditor era)' },
+  '1.1': { desc: 'P0a (2026-07-08): auditor role introduced (no data migration, version-only bump)' },
+};
+function compareVersion(a, b) {
+  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const da = pa[i] || 0, db = pb[i] || 0;
+    if (da !== db) return da - db;
+  }
+  return 0;
+}
 
 // V9+ Phase 4 (R2 P0 / B9 修复): nudge rule_id 白名单 + role→rule 适用性表。
 //   背景：R1 洁净室 B9 暴露 — tree_nudge_append 接受任意 rule_id 字符串（含 "INVALID-RULE-99"），
@@ -177,6 +201,11 @@ const E_REVIEW_FLAGGED_BLOCK = 'E_REVIEW_FLAGGED_BLOCK';  // 父链有 flagged l
 const E_DELIVERABLE_EMPTY = 'E_DELIVERABLE_EMPTY';
 // 2026-07-08 macp2 事故后预算护栏：单 leaf subagent_spawn 数超 audit_meta.max_subagent_spawn_per_leaf。
 const E_SUBAGENT_BUDGET_EXCEEDED = 'E_SUBAGENT_BUDGET_EXCEEDED';
+// Sprint 5 (2026-07-14, 聚类 A/E 安全根治): tree 级总会话数硬护栏 —— 防 macp2 型会话爆炸。
+//   node_budget 只数 leaf，CREATE_SESSION_BUDGET(patches) 只限单 caller 速率，两者都拦不住
+//   "多 caller 累积 + SDK 原生 create_session 旁路（不入树）" 的总量爆炸（macp2 4 分钟 207 session）。
+//   E_MAX_SESSIONS 在 session_registry 层统计 distinct session 总数（含 leaf + patches 登记的旁路）硬拦。
+const E_MAX_SESSIONS = 'E_MAX_SESSIONS';
 
 // v0.2.2: 真实 MCP session_id 格式校验（UUID v1-v5 不区分版本）
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -194,7 +223,7 @@ const TREE_STARTUP_NOTICE = [
   '1. SubAgent 必须用内置 Agent 工具（进程内，CLAUDE_CODE_ENABLE_TASKS 已开启）。调用形如 Agent(description, prompt, subagent_type)',
   '2. 🚫 严禁 create_session / fork_session / delegate_agent 当 reviewer —— 建真实会话＝烧独立 API 额度（macp2 事故 4 分钟炸 207 会话、DeepSeek 余额打负）',
   '3. 撞错（E_DUPLICATE_SESSION_ID 等）修根因，禁换名（v2/b/x）重试新建会话',
-  '4. 预算护栏（引擎硬拦，不靠自觉）：active leaf 数 ≤ root_dod.node_budget（默认 20）；每 leaf subagent_spawn 数 ≤ audit_meta.max_subagent_spawn_per_leaf（默认 15）',
+  '4. 预算护栏（引擎硬拦，不靠自觉）：active leaf 数 ≤ root_dod.node_budget（默认 20）；每 leaf subagent_spawn 数 ≤ audit_meta.max_subagent_spawn_per_leaf（默认 15）；tree 总会话数 ≤ audit_meta.max_sessions（默认 50，Sprint 5 防 macp2 型会话爆炸，含旁路 create_session 登记）',
   '5. 必读：加载 tree-commander/worker SKILL，尤其 §13.5 / §4.6「调用形式红线」',
 ].join('\n');
 
@@ -273,6 +302,8 @@ const DEFAULT_AUDIT_META = {
   heartbeat_interval_minutes: 15,
   review_required: false,  // ISS-003: 默认 opt-in (false), 防 dbc-spec/v10-cleanroom 金标准回归; nanju 类树显式 true
   max_subagent_spawn_per_leaf: 15,  // 2026-07-08 macp2 事故后预算护栏：每 leaf 最多 15 个 subagent_spawn（= 5 reviewer × 3 轮），tree_init audit_meta 可覆盖
+  max_sessions: 50,  // Sprint 5 (聚类 A/E): tree 级总会话数硬上限（含入树 leaf session + patches 登记的旁路 create_session）。
+                     //   默认 50：≈ node_budget(20) 的 2.5x，留余量给 segment 交接/auditor/旁路 reviewer；远低于 macp2 的 207，防爆炸。tree_init audit_meta 可覆盖。
   sweet_spot_limits: {
     'claude-sonnet-4-6': { min: 100000, max: 200000, hard: 300000 },
     'deepseek-v4-pro': { min: 150000, max: 250000, hard: 400000 },
@@ -727,7 +758,8 @@ async function cmdInit(args) {
   const workspace_root = path.resolve(TREES_ROOT, '..', '..');
 
   const state = {
-    version: '1.1',  // P0a (2026-07-08): 1.0→1.1，引入 auditor role（migrate 自动升级旧树版本号）
+    tree_id,  // 自描述（2026-07-14）：restore 跨树校验用，防 backup 误 restore 到别的树（修 restore tree_id mismatch bug）
+    version: SCHEMA_VERSION,  // D2 (2026-07-14)：单一信源 SCHEMA_VERSION（当前 '1.1'）。migrate 按 SCHEMA_LADDER 升级旧树
     created_at: nowIso(),
     last_heartbeat: null,
     root_brief,
@@ -736,6 +768,12 @@ async function cmdInit(args) {
     heartbeat_log: [],
     drift_log: [],
     audit_meta,
+    // Sprint 5 (聚类 A/E, 2026-07-14): session_registry —— tree 级 session 登记簿。
+    //   结构 { session_id: { leaf_id, registered_at, source, caller } }。
+    //   leaf_add 登记（source='leaf_add'）；patches create_session handler 登记旁路（source='create_session'）。
+    //   distinct session_id 总数 ≤ audit_meta.max_sessions，超则 E_MAX_SESSIONS。
+    //   根因：让"SDK 原生 create_session 旁路（不入 tree）"对引擎可见，max_sessions 才能覆盖 macp2 型爆炸。
+    session_registry: {},
     // v0.7 Phase A: deliverables 根目录，A1 文件存在性校验的相对路径基准
     _deliverables_root: path.join(dir, 'deliverables'),
     _meta: {
@@ -768,7 +806,12 @@ async function cmdInit(args) {
     drift_history: [],
     milestones: [],
     segment_chain: [],
-    autonomy_overrides: {},
+    // Sprint 2 约束 4：5 件套持久化（root 的 brief/dod 从 tree_init 参数）
+    brief: state.root_brief || null,
+    dod: state.root_dod || null,
+    report_protocol: null,
+    autonomy: null,
+    self_audit: null,
     events: [],
     // v0.2.2 (TAO): 审计门 + 鞭策记录
     audit_gate: { verdict: 'skip', auditor_session_id: null, ts: null },
@@ -779,6 +822,8 @@ async function cmdInit(args) {
     // worker/commander 才走 alignment_pending 流程（首条 brief_echo 无 alignment 时置 true）。
     alignment_pending: false
   };
+  // Sprint 5 (聚类 A/E): root session 登记（若真实 UUID；PENDING_ROOT/占位由 registerSessionToState 自动跳过不占额度）。
+  registerSessionToState(state, rootSessionId, { leaf_id: rootLeafId, source: 'leaf_add', caller: null });
 
   await withLock(tree_id, () => {
     writeState(tree_id, state);
@@ -810,10 +855,48 @@ function buildInitTips() {
 }
 
 // ============================================================
+// Sprint 5 (聚类 A/E, 2026-07-14): session_registry 计数与登记 helper
+// ============================================================
+//   distinct session_id 总数 = Object.keys(session_registry).length。
+//   防御性兜底：旧树 migrate 前 session_registry 缺失 → 从 leaves distinct session_id 重建计数（不误拦）。
+function countSessions(state) {
+  if (state.session_registry && typeof state.session_registry === 'object' && !Array.isArray(state.session_registry)) {
+    return Object.keys(state.session_registry).length;
+  }
+  const set = new Set();
+  for (const l of Object.values(state.leaves || {})) {
+    if (l && l.session_id) set.add(l.session_id);
+  }
+  return set.size;
+}
+function getMaxSessions(state) {
+  const m = state.audit_meta && state.audit_meta.max_sessions;
+  return (typeof m === 'number' && Number.isFinite(m) && m >= 0) ? m : 50;
+}
+// 登记 session_id 到 registry（去重）。调用方须在 withLock 内，登记后自行 writeState。
+//   返回 true=本次新增（调用方应做 max_sessions 校验），false=已存在（segment 复用等，不多计）。
+function registerSessionToState(state, sessionId, meta) {
+  // 只登记真实 UUID session（PENDING_ROOT/占位/非 UUID 不占额度——它们不是真实 create 产物；
+  //   PENDING_ROOT 是 root 过渡标记，占位 UUID 由 assertMcpEntrySessionId 入口拦）。
+  if (!sessionId || sessionId === PENDING_ROOT || !UUID_RE.test(sessionId)) return false;
+  if (!state.session_registry || typeof state.session_registry !== 'object' || Array.isArray(state.session_registry)) {
+    state.session_registry = {};
+  }
+  if (Object.prototype.hasOwnProperty.call(state.session_registry, sessionId)) return false;
+  state.session_registry[sessionId] = {
+    leaf_id: (meta && meta.leaf_id) || null,
+    registered_at: nowIso(),
+    source: (meta && meta.source) || 'leaf_add',
+    caller: (meta && meta.caller) || null,
+  };
+  return true;
+}
+
+// ============================================================
 // 命令: leaf add
 // ============================================================
 
-async function cmdLeafAdd(args) {
+async function cmdLeafAdd(args, callerSessionId) {
   // leaf add <tree_id> --json '<leaf_initial_json>'
   const { positional, opts } = parseArgs(args);
   const tree_id = positional[0];
@@ -860,6 +943,20 @@ async function cmdLeafAdd(args) {
       );
     }
     assertMcpEntrySessionId(added_by, 'added_by');
+  }
+
+  // P1 防借身份 (cmdLeafAdd caller-binding): 校验 caller === added_by。
+  //   失守根因：dispatchLeaf case 'add' 历史漏传 callerSessionId，cmdLeafAdd 只校验 added_by"树内存在"
+  //   （D2-B1，行 ~911），不校验"调用者是否就是 added_by"。后果：worker W(session=w-1) 得知树内某
+  //   commander 的 session_id(cmd-1) 后，可声明 added_by=cmd-1 注册 leaf → 身份借用，污染溯源链，
+  //   且后续 cmdLeafSetSession 的 isCreator 判断被绕过（leaf 显示成 cmd-1 创建的）。
+  //   修复：与 cmdLeafSetSession L1743 / cmdEventAppend L2022 / cmdAuditGate L2997 同范式 ——
+  //   callerSessionId 必须 === added_by。CLI 不传 caller（undefined）跳过，向后兼容金标准测试。
+  if (callerSessionId && added_by && callerSessionId !== added_by) {
+    throw new TreeStateError(
+      E_BORROWED_IDENTITY,
+      `leaf_add rejected: caller "${callerSessionId}" != added_by "${added_by}" (borrowed identity forbidden; caller must be the operator it declares as added_by — only the session that owns added_by can register this leaf). CLI omits caller for backward compat. [P1-cmdLeafAdd-caller-binding]`
+    );
   }
 
   // 1. 命名校验
@@ -992,15 +1089,11 @@ async function cmdLeafAdd(args) {
       let ancestor = state.leaves[parent];
       let _guard = 0;  // 防 state.json 被手工编辑成环 (新代码加兜底, 优于 calcCommanderDepth 现状)
       while (ancestor && _guard++ < 100) {
-        if (ancestor.review_evidence && ancestor.review_evidence.flagged === true) {
-          const ancEvs = Array.isArray(ancestor.events) ? ancestor.events : [];
-          const hasReview = ancEvs.some((e) => e && (e.type === 'review_round' || e.event_type === 'review_round'));
-          if (!hasReview) {
-            throw new TreeStateError(
-              E_REVIEW_FLAGGED_BLOCK,
-              `cannot add leaf under "${ancestor.leaf_id}": ancestor has review_evidence.flagged=true (pre-ISS-003 done without review). Run G1-G5 review on the flagged ancestor first (append a review_round event), then retry.`
-            );
-          }
+        if (isFlagged(ancestor, state)) {  // ISS-003 阶段二：动态 flagged（migrate 静态 + 新 leaf done-未审），见 isFlagged
+          throw new TreeStateError(
+            E_REVIEW_FLAGGED_BLOCK,
+            `cannot add leaf under "${ancestor.leaf_id}": ancestor flagged (done without review). Run G1-G5 review first (append a review_round event), then retry.`
+          );
         }
         ancestor = ancestor.parent ? state.leaves[ancestor.parent] : null;
       }
@@ -1015,6 +1108,24 @@ async function cmdLeafAdd(args) {
     if (activeCount >= maxLeaves) {
       throw new TreeStateError(E_TREE_NODE_BUDGET_EXCEEDED,
         `cannot add leaf: active_count ${activeCount} >= budget ${maxLeaves}. archive leaves first or increase root_dod.node_budget`);
+    }
+
+    // Sprint 5 (聚类 A/E): session_registry 登记 + max_sessions 硬护栏。
+    //   失守根因（macp2）：node_budget 只数 leaf，CREATE_SESSION_BUDGET(patches) 只限单 caller 速率，
+    //   两者都拦不住"多 caller 累积 + SDK 原生 create_session 旁路（不入树）"的总量爆炸。session_registry
+    //   在 tree 级统计 distinct session 总数（含 patches 登记的旁路），超 max_sessions 硬拦。
+    //   leaf_add 路径：新 leaf session_id 登记（去重——同 session 复用如 segment 交接不多计）。
+    //   校验用 projected（count + 1，若新增）；throw 时 registry 未改（干净失败，writeState 不执行）。
+    const _sessionAlreadyRegistered = state.session_registry
+      ? Object.prototype.hasOwnProperty.call(state.session_registry, session_id) : false;
+    if (!_sessionAlreadyRegistered) {
+      const _projectedSessionCount = countSessions(state) + 1;
+      const _maxSessions = getMaxSessions(state);
+      if (_projectedSessionCount > _maxSessions) {
+        throw new TreeStateError(E_MAX_SESSIONS,
+          `cannot register session "${session_id.slice(0, 8)}" on leaf "${leaf_id}": tree session count ${countSessions(state)} + 1 > max_sessions ${_maxSessions} (audit_meta.max_sessions). macp2-style session-splosion guard. Archive leaves/sessions, reuse sessions (segment handoff), or raise audit_meta.max_sessions via tree_init.`);
+      }
+      registerSessionToState(state, session_id, { leaf_id, source: 'leaf_add', caller: added_by });
     }
 
     const now = nowIso();
@@ -1037,7 +1148,13 @@ async function cmdLeafAdd(args) {
       drift_history: [],
       milestones: [],
       segment_chain: [],
-      autonomy_overrides: {},
+      // Sprint 2 约束 4（design-commander-spawn，2026-07-14）：5 件套契约持久化进 leaf
+      //   commander/worker 启动后用 tree_leaf_get 读自己的任务书（混合机制）。默认 null（未下发），向后兼容旧 leaf。
+      brief: input.brief || null,
+      dod: input.dod || null,
+      report_protocol: input.report_protocol || null,
+      autonomy: input.autonomy || null,
+      self_audit: input.self_audit || null,
       events: [],
       // v0.2.2 (TAO): 审计门 + 鞭策记录
       // P0a: auditor leaf audit_gate 初始 verdict='required'（与 worker 同）—— auditor 不能自审（行 2478 拦），
@@ -1230,6 +1347,21 @@ function isReviewRequired(leaf, state) {
   return treeAm.review_required === true;  // 默认 false (opt-in, 防金标准回归)
 }
 
+// ISS-003 阶段二（务实最小集，2026-07-14）：flagged 动态计算。
+//   原 flagged 扫描只看 migrate 静态标记（review_evidence.flagged），新 leaf（migrate 后
+//   done-未审）无标记 → 不阻断下游，是 ISS-003 gap。改为动态：done worker 该审但无 review_round
+//   → flagged（堵「在未审产出上建子 leaf」）。已补审（有 review_round event）→ 不 flagged（放行）。
+//   flagged 不再依赖 review_evidence 静态字段，而是从 events 派生（防直接篡改字段蒙混）。
+function isFlagged(leaf, state) {
+  const evs = Array.isArray(leaf.events) ? leaf.events : [];
+  const hasReview = evs.some((e) => e && (e.type === 'review_round' || e.event_type === 'review_round'));
+  if (hasReview) return false;  // 已补审 → 不 flagged
+  // 未补审：migrate 静态 flagged（存量 done-未审）|| 动态（新 leaf done worker 该审未审）
+  if (leaf.review_evidence && leaf.review_evidence.flagged === true) return true;
+  if (leaf.status === 'done' && leaf.role === 'worker' && isReviewRequired(leaf, state)) return true;
+  return false;
+}
+
 // SubAgent 入树 (2026-07-07): subagent_spawn 事件 schema 校验。
 //   设计：SubAgent 不是树实体（无 leaf），是父 leaf 事件溯源的劳动单元。父 spawn SubAgent 后写一条
 //   subagent_spawn 事件到自 leaf.events。review_round.reviewer_kind=subagent 通过 reviewer_ref 反向溯源本事件。
@@ -1392,7 +1524,7 @@ function validateReviewRoundSchema(meta, leaf, leafId) {
   }
 }
 
-async function cmdLeafSetStatus(args) {
+async function cmdLeafSetStatus(args, callerSessionId) {
   const { positional } = parseArgs(args);
   const [tree_id, leaf_id, new_status] = positional;
   assertTreeExists(tree_id);
@@ -1409,6 +1541,23 @@ async function cmdLeafSetStatus(args) {
     }
     const leaf = state.leaves[leaf_id];
     const from = leaf.status;
+
+    // P1 防借身份 (cmdLeafSetStatus caller-binding): 校验 caller 是 owner/creator/root-self。
+    //   失守根因：cmdLeafSetStatus 无 caller 校验，任意 session 可把别人 active leaf → pruned/archived
+    //   （跨身份杀 leaf，STATUS_TRANSITIONS 允许）。修复：对齐 cmdLeafSetSession L1743 范式。
+    //   允许: caller===leaf.session_id(owner 改自己,如 worker mark done) || caller===leaf.added_by
+    //   (creator/commander 改子) || (role=root && caller===session_id). CLI 不传 caller 跳过, 向后兼容。
+    if (callerSessionId) {
+      const _isOwner = callerSessionId === leaf.session_id;
+      const _isCreator = leaf.added_by != null && callerSessionId === leaf.added_by;
+      const _isRootSelf = leaf.role === 'root' && callerSessionId === leaf.session_id;
+      if (!_isOwner && !_isCreator && !_isRootSelf) {
+        throw new TreeStateError(
+          E_BORROWED_IDENTITY,
+          `set-status rejected: caller "${callerSessionId}" is not owner(session=${leaf.session_id})/creator(added_by=${leaf.added_by || 'null'})/root-self of leaf "${leaf_id}". Cannot change another leaf's status (P1: prevent cross-identity status tampering — e.g. worker pruning others' leaves). CLI omits caller for backward compat. [P1-cmdLeafSetStatus-caller-binding]`
+        );
+      }
+    }
 
     // P0-3 (2026-07-07): 状态机流转白名单——堵 done→active 回退 / archived 终态复活 / pruned→active|done 复活。
     //   幂等 (X→X) 允许；非法流转抛 E_STATUS_TRANSITION_INVALID。
@@ -1638,8 +1787,53 @@ async function cmdLeafSetStatus(args) {
       }
     }
 
+    // Sprint 3 D1 (2026-07-14): prune 级联语义 —— 父 leaf pruned 时后代 leaf 如何处理。
+    //   规则：
+    //     1. 父 pruned → 未 done 的后代（active/pending_brief/segment_pending）级联 pruned（+ drift 留痕，联动约束 5）。
+    //     2. 已 done 后代保留（防误删成果），且不下降其子树（整棵 done 子树保持原状）。
+    //     3. 终态后代（pruned/archived）不动。
+    //     4. archived 不级联（archived=隐藏非删除，子保留可恢复）。
+    //     5. root 永不被级联（信任锚；其 parent=null 天然不可达，此处 _child.role==='root' 为防御性双保险）。
+    //   实现要点：级联是同一 withLock 事务内的引擎内部强制状态变更（迭代 DFS，visited 防环），
+    //     绕过 STATUS_TRANSITIONS/caller-binding（非新 API 调用；caller 已通过上方 target leaf 的 caller-binding 校验）。
+    let cascaded = [];
+    if (new_status === 'pruned') {
+      const _visited = new Set([leaf_id]);
+      const _stack = [leaf_id];
+      while (_stack.length) {
+        const _cur = _stack.pop();
+        const _childIds = Object.keys(state.leaves).filter((lid) => state.leaves[lid].parent === _cur);
+        for (const _cid of _childIds) {
+          if (_visited.has(_cid)) continue;  // 防环（树结构已 validate 无环，双保险）
+          _visited.add(_cid);
+          const _child = state.leaves[_cid];
+          if (_child.role === 'root') continue;  // 信任锚防级联
+          if (_child.status === 'done') continue;  // 已 done 保留 + 不下降其子树
+          if (_child.status === 'pruned' || _child.status === 'archived') continue;  // 终态不动
+          // active / pending_brief / segment_pending → 级联 pruned
+          const _cFrom = _child.status;
+          _child.status = 'pruned';
+          const _cDrift = {
+            ts: nowIso(),
+            kind: 'rhythm',
+            severity: 'mid',
+            action: 'prune',
+            reason: `cascade prune: parent "${leaf_id}" pruned (D1 cascade semantics)`,
+            leaf_id: _cid,
+            from: _cFrom,
+            to: 'pruned'
+          };
+          if (!Array.isArray(_child.drift_history)) _child.drift_history = [];
+          _child.drift_history.push(_cDrift);
+          if (Array.isArray(state.drift_log)) state.drift_log.push(_cDrift);
+          cascaded.push({ leaf_id: _cid, from: _cFrom, to: 'pruned' });
+          _stack.push(_cid);  // 下降，继续级联其后代（递归传播）
+        }
+      }
+    }
+
     writeState(tree_id, state);
-    result = { leaf: { leaf_id, status: new_status, from } };
+    result = { leaf: { leaf_id, status: new_status, from }, cascaded };
   });
   return result;
 }
@@ -1667,8 +1861,28 @@ async function cmdLeafSetContext(args) {
       throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
     }
     state.leaves[leaf_id].context_usage_pct = pct;
+    // 约束 6（2026-07-14 Sprint 2）：ctx 超阈值自动标 segment_pending（竹节交接刚性触发，
+    //   替代 SKILL §8.3 "v0.3 未实现"的手动竹节）。阈值 audit_meta.ctx_segment_threshold 默认 85（对齐 §8.2 sweet_spot_risk）。
+    //   仅对 status=active 的非 root leaf 触发（pending_brief 还没 brief_echo 不会超阈值；done/pruned/archived 终态不动；root 信任锚不竹节）。
+    const _ctxThreshold = (state.audit_meta && typeof state.audit_meta.ctx_segment_threshold === 'number')
+      ? state.audit_meta.ctx_segment_threshold : 85;
+    const _ctxLeaf = state.leaves[leaf_id];
+    let _segTriggered = false;
+    if (pct >= _ctxThreshold && _ctxLeaf.role !== 'root' && _ctxLeaf.status === 'active') {
+      _ctxLeaf.status = 'segment_pending';
+      _segTriggered = true;
+      // drift 联动（约束 5）：竹节交接留痕
+      const _segDrift = {
+        ts: nowIso(), leaf_id, kind: 'rhythm', severity: 'high', action: 'handoff',
+        reason: `context_usage_pct ${pct}% >= threshold ${_ctxThreshold}%, auto segment_pending (bamboo-joint handoff)`
+      };
+      if (!Array.isArray(_ctxLeaf.drift_history)) _ctxLeaf.drift_history = [];
+      _ctxLeaf.drift_history.push(_segDrift);
+      if (!Array.isArray(state.drift_log)) state.drift_log = [];
+      state.drift_log.push(_segDrift);
+    }
     writeState(tree_id, state);
-    result = { leaf: { leaf_id, context_usage_pct: pct } };
+    result = { leaf: { leaf_id, context_usage_pct: pct, segment_pending: _segTriggered } };
   });
   return result;
 }
@@ -1762,72 +1976,39 @@ async function cmdLeafSetSession(args, callerSessionId) {
       );
     }
     const from = leaf.session_id;
+    // Sprint 5 (聚类 A/E): 先登记新 session + max_sessions 校验（在改 leaf.session_id 前，干净失败不污染 leaf）。
+    //   堵 set-session 绕过链 —— 否则 segment 交接换的真实 session 漏算，max_sessions 可被此路径绕过。
+    if (registerSessionToState(state, new_session_id, { leaf_id, source: 'set_session', caller: from })) {
+      const _ssMax = getMaxSessions(state);
+      if (countSessions(state) > _ssMax) {
+        throw new TreeStateError(E_MAX_SESSIONS,
+          `leaf set-session rejected: tree session count ${countSessions(state)} > max_sessions ${_ssMax} (audit_meta.max_sessions). Archive sessions or raise audit_meta.max_sessions.`);
+      }
+    }
     leaf.session_id = new_session_id;
+    // 约束 5 drift 联动（2026-07-14 Sprint 2）：session_id 变更＝所有权转移/恢复，必须留痕。
+    //   双写 leaf.drift_history + state.drift_log，与 set-status pruned/archived（L1676）同模式。
+    const _ssDrift = {
+      ts: nowIso(), leaf_id, kind: 'rhythm', severity: 'mid', action: 'self_correct',
+      reason: `session_id changed from ${from} to ${new_session_id}`,
+      from, to: new_session_id
+    };
+    if (!Array.isArray(leaf.drift_history)) leaf.drift_history = [];
+    leaf.drift_history.push(_ssDrift);
+    if (!Array.isArray(state.drift_log)) state.drift_log = [];
+    state.drift_log.push(_ssDrift);
     writeState(tree_id, state);
     result = { leaf: { leaf_id, session_id: new_session_id, from } };
   });
   return result;
 }
 
-// ============================================================
-// 命令: leaf autonomy-override
-// ============================================================
-
-async function cmdLeafAutonomyOverride(args) {
-  const { positional, opts } = parseArgs(args);
-  const [tree_id, leaf_id] = positional;
-  assertTreeExists(tree_id);
-  if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
-  if (!opts.json) throw new TreeStateError(E_SCHEMA_INVALID, '--json is required');
-  const input = parseJsonArg(opts.json, 'override json');
-
-  const ts = input.ts || nowIso();
-
-  let result = null;
-  await withLock(tree_id, () => {
-    const state = readState(tree_id);
-    if (!state.leaves[leaf_id]) {
-      throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
-    }
-    const leaf = state.leaves[leaf_id];
-
-    // 合并到 autonomy_overrides
-    const overrides = Object.assign({}, leaf.autonomy_overrides || {});
-    if (Array.isArray(input.added_must_ask)) {
-      overrides.added_must_ask = Array.from(new Set([...(overrides.added_must_ask || []), ...input.added_must_ask]));
-    }
-    if (Array.isArray(input.removed_can_decide)) {
-      overrides.removed_can_decide = Array.from(new Set([...(overrides.removed_can_decide || []), ...input.removed_can_decide]));
-    }
-    overrides.reason = input.reason || overrides.reason || '';
-    overrides.ts = ts;
-    leaf.autonomy_overrides = overrides;
-
-    // 追加 drift_history
-    const driftEntry = {
-      ts,
-      leaf_id,
-      kind: 'direction',
-      severity: 'mid',
-      action: 'limit',
-      reason: input.reason || 'autonomy_override'
-    };
-    leaf.drift_history.push(driftEntry);
-    if (Array.isArray(state.drift_log)) {
-      state.drift_log.push(driftEntry);
-    }
-
-    writeState(tree_id, state);
-    result = { leaf: { leaf_id, autonomy_overrides: overrides } };
-  });
-  return result;
-}
 
 // ============================================================
 // 命令: milestone add / set-result
 // ============================================================
 
-async function cmdMilestoneAdd(args) {
+async function cmdMilestoneAdd(args, callerSessionId) {
   const { positional, opts } = parseArgs(args);
   const [tree_id, leaf_id] = positional;
   assertTreeExists(tree_id);
@@ -1857,6 +2038,20 @@ async function cmdMilestoneAdd(args) {
       throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
     }
     const leaf = state.leaves[leaf_id];
+    // P1 防借身份 (cmdMilestoneAdd caller-binding): 校验 caller 是 owner/creator/root-self。
+    //   失守：无 caller 校验，任意 session 可给别人的 leaf 注入 milestone（污染 + 干扰 done 门禁）。
+    //   对齐 cmdLeafSetStatus 同范式。CLI 不传 caller 跳过。
+    if (callerSessionId) {
+      const _isOwner = callerSessionId === leaf.session_id;
+      const _isCreator = leaf.added_by != null && callerSessionId === leaf.added_by;
+      const _isRootSelf = leaf.role === 'root' && callerSessionId === leaf.session_id;
+      if (!_isOwner && !_isCreator && !_isRootSelf) {
+        throw new TreeStateError(
+          E_BORROWED_IDENTITY,
+          `milestone_add rejected: caller "${callerSessionId}" is not owner/creator/root-self of leaf "${leaf_id}". Cannot inject milestone into another's leaf. CLI omits caller for backward compat. [P1-cmdMilestoneAdd-caller-binding]`
+        );
+      }
+    }
     if (!Array.isArray(leaf.milestones)) leaf.milestones = [];
     for (const m of leaf.milestones) {
       if (m.id === input.id) {
@@ -2440,6 +2635,20 @@ async function cmdRestore(args) {
     if (restoreIssues.length > 0) {
       throw new TreeStateError(E_TREE_NOT_VALIDATED,
         `cannot restore: backup contains ${restoreIssues.length} issue(s). First: ${restoreIssues[0].type} on ${restoreIssues[0].leaf_id || 'tree'}. Refusing to restore non-compliant state.`);
+    }
+    // 约束 5 drift 联动（2026-07-14 Sprint 2）：从备份恢复是高危整树操作，必须留痕。
+    //   写到 root leaf.drift_history + state.drift_log（恢复后的新基线含此记录）。
+    const _rRoot = Object.values(state.leaves).find((l) => l && l.role === 'root');
+    const _rDrift = {
+      ts: nowIso(), kind: 'production', severity: 'high', action: 'declare',
+      reason: `tree restored from backup ${path.basename(full)}`,
+      leaf_id: _rRoot ? _rRoot.leaf_id : null
+    };
+    if (!Array.isArray(state.drift_log)) state.drift_log = [];
+    state.drift_log.push(_rDrift);
+    if (_rRoot) {
+      if (!Array.isArray(_rRoot.drift_history)) _rRoot.drift_history = [];
+      _rRoot.drift_history.push(_rDrift);
     }
     writeState(tree_id, state);
     result = { restored_from: path.basename(full), tree_id };
@@ -3611,16 +3820,72 @@ async function cmdMigrate(args) {
       }
     }
 
-    // 规则 12 (P0a, 2026-07-08): state.version 1.0 → 1.1（引入 auditor role）。
-    //   auditor role 是新增 enum，旧树无 auditor leaf，无需数据迁移；
-    //   历史"假装 auditor"的 leaf（macp4-A4 用 commander 假装）保持原 role，不自动改 auditor
-    //   （会误伤真 commander，且已 done 不影响新机制）。仅升级版本号。
-    if (state.version !== '1.1') {
-      changes.push({ field: 'version', from: state.version, to: '1.1', reason: 'P0a: auditor role introduced' });
-      if (!dryRun) state.version = '1.1';
+    // 规则 12 (D2 重构, 2026-07-14): state.version 升级按 SCHEMA_VERSION 单一信源 + SCHEMA_LADDER 逐级分发。
+    //   旧实现（P0a）硬编码 '1.1'；D2 改为：从 startVersion 按 SCHEMA_LADDER 逐级升到 SCHEMA_VERSION，
+    //   每跳记一条 change（version-dispatch 可追溯），最终 state.version = SCHEMA_VERSION。版本变更说明见 SCHEMA_HISTORY。
+    //   幂等：startVersion === SCHEMA_VERSION 时不记 change（与旧行为一致）。dry-run 只记 change 不落库。
+    //   注：SCHEMA_VERSION 当前='1.1'（见顶部常量说明），故对 1.0 旧树行为不变（1.0→1.1 单跳），auditor-role-test Case 8 仍绿。
+    const _startVersion = state.version || '1.0';
+    if (compareVersion(_startVersion, SCHEMA_VERSION) !== 0) {
+      const _hops = SCHEMA_LADDER.filter(
+        (v) => compareVersion(v, _startVersion) > 0 && compareVersion(v, SCHEMA_VERSION) <= 0
+      );
+      let _prev = _startVersion;
+      for (const _v of _hops) {
+        const _histDesc = (SCHEMA_HISTORY[_v] && SCHEMA_HISTORY[_v].desc) || 'schema version bump';
+        changes.push({ field: 'version', from: _prev, to: _v, reason: _histDesc });
+        _prev = _v;
+      }
+      // 若 startVersion 超前于 ladder（如手改 '2.0'）或 ladder 未覆盖，仍强制回落到 SCHEMA_VERSION（防漂移）
+      if (_prev !== SCHEMA_VERSION) {
+        changes.push({ field: 'version', from: _prev, to: SCHEMA_VERSION, reason: 'fallback: clamp to current SCHEMA_VERSION (start version ahead of ladder or uncovered)' });
+      }
+      if (!dryRun) state.version = SCHEMA_VERSION;
+    }
+
+    // 规则 13（2026-07-14 Sprint 2）：补 tree_id 自描述字段（restore 跨树校验用）。
+    //   cmdInit 新树已写 tree_id；旧树（pre-2026-07-14）无此字段，从命令参数补，让 restore 对历史树也可用。
+    if (!state.tree_id) {
+      changes.push({ field: 'tree_id', from: null, to: tree_id, reason: 'restore cross-tree validation support' });
+      if (!dryRun) state.tree_id = tree_id;
+    }
+
+    // 规则 14（2026-07-14 Sprint 5, 聚类 A/E）：补 session_registry + 从 leaves 回灌 distinct session_id。
+    //   新树已写 session_registry={}; 旧树无此字段 → 回灌让 max_sessions 对历史树也生效。
+    //   仅回灌 leaves 内 session_id（旁路 create_session 登记 patches 运行时补，migrate 无法追溯）。去重不覆盖。
+    const _s5HasRegistry = state.session_registry && typeof state.session_registry === 'object' && !Array.isArray(state.session_registry);
+    if (!_s5HasRegistry) {
+      changes.push({ field: 'session_registry', from: null, to: '{}', reason: 'Sprint 5: session registry backfill (max_sessions guard)' });
+      if (!dryRun) state.session_registry = {};
+    }
+    let _s5Backfilled = 0;
+    const _s5RegRef = state.session_registry || {};
+    for (const l of Object.values(leaves)) {
+      if (l && l.session_id && !Object.prototype.hasOwnProperty.call(_s5RegRef, l.session_id)) {
+        _s5Backfilled++;
+        if (!dryRun) {
+          state.session_registry[l.session_id] = { leaf_id: l.leaf_id, registered_at: l.created_at || nowIso(), source: 'leaf_add', caller: l.added_by || null };
+        }
+      }
+    }
+    if (_s5Backfilled > 0) {
+      changes.push({ field: 'session_registry', from: '{}', to: `${_s5Backfilled} session(s) backfilled from leaves`, reason: 'Sprint 5: backfill leaf sessions into registry for max_sessions guard' });
     }
 
     if (!dryRun) {
+      // 约束 5 drift 联动（2026-07-14 Sprint 2）：schema 迁移是整树变更，留痕到 root + drift_log。
+      const _mRoot = Object.values(leaves).find((l) => l && l.role === 'root');
+      const _mDrift = {
+        ts: nowIso(), kind: 'production', severity: 'mid', action: 'declare',
+        reason: `schema migrated: ${changes.length} change(s), version=${state.version || '?'}`,
+        leaf_id: _mRoot ? _mRoot.leaf_id : null
+      };
+      if (!Array.isArray(state.drift_log)) state.drift_log = [];
+      state.drift_log.push(_mDrift);
+      if (_mRoot) {
+        if (!Array.isArray(_mRoot.drift_history)) _mRoot.drift_history = [];
+        _mRoot.drift_history.push(_mDrift);
+      }
       writeState(tree_id, state);
     }
 
@@ -3632,6 +3897,58 @@ async function cmdMigrate(args) {
     };
   });
   return result;
+}
+
+// ============================================================
+// 命令: tree register-session / session-count (Sprint 5, 聚类 A/E)
+// ============================================================
+
+// register-session <tree_id> --session-id <uuid> [--source <s>] [--caller <sid>]
+// Sprint 5 (聚类 A): 登记旁路 session_id 到 tree session_registry。
+//   供 patches.cjs create_session handler 调用 —— SDK 原生 create_session 不经 mcp__tree__leaf add，
+//   engine 对其零感知（macp2 207 session 不入树，聚类 A 根因）。patches 在 create 成功后调本命令登记，
+//   让旁路 session 对引擎可见，从而 max_sessions 硬护栏 + 审计能覆盖旁路 create。去重（已登记不多计）。
+//   caller-binding：caller 参数记录来源（谁发起的旁路 create），不强制 === 调用方（登记是观测非授权）。
+async function cmdTreeRegisterSession(args) {
+  const { positional, opts } = parseArgs(args);
+  const tree_id = positional[0];
+  assertTreeExists(tree_id);
+  const session_id = opts['session-id'] || positional[1];
+  if (!session_id) throw new TreeStateError(E_SCHEMA_INVALID, '--session-id is required');
+  // 旁路 session 应是真实 create_session 产物；assertMcpEntrySessionId 校验格式 + verifier 真实性（堵伪造登记占预算）。
+  //   CLI 无 verifier 时退化为严格格式（与 leaf_add 入口一致），允许 patches 注入的 mock verifier 放行测试。
+  assertMcpEntrySessionId(session_id, 'session_id');
+  const source = opts.source || 'create_session';
+  const caller = opts.caller || null;
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    const _already = state.session_registry
+      && Object.prototype.hasOwnProperty.call(state.session_registry, session_id);
+    if (!_already) {
+      const _maxSessions = getMaxSessions(state);
+      if (countSessions(state) + 1 > _maxSessions) {
+        throw new TreeStateError(E_MAX_SESSIONS,
+          `register_session rejected: tree "${tree_id}" session count ${countSessions(state)} + 1 > max_sessions ${_maxSessions}. [聚类A 旁路登记超限 — macp2 guard]`);
+      }
+      registerSessionToState(state, session_id, { leaf_id: null, source, caller });
+      writeState(tree_id, state);
+    }
+    result = { session_id, registered: !_already, count: countSessions(state), max: getMaxSessions(state) };
+  });
+  return result;
+}
+
+// session-count <tree_id> → { count, max, reached }（只读，供 patches create_session 预检）
+async function cmdTreeSessionCount(args) {
+  const { positional } = parseArgs(args);
+  const tree_id = positional[0];
+  assertTreeExists(tree_id);
+  const state = readState(tree_id);
+  const count = countSessions(state);
+  const max = getMaxSessions(state);
+  return { count, max, reached: count >= max };
 }
 
 // ============================================================
@@ -4234,11 +4551,11 @@ Round 2:
   },
 
   error_code_index: {
-    title: '全部错误码索引（41 个）',
+    title: '全部错误码索引（42 个）',
     related: [],
-    content: `# error_code_index — 41 个错误码索引
+    content: `# error_code_index — 42 个错误码索引
 
-> 共 41 个 E_* 错误码定义于 tree-engine.cjs（grep \`const E_\` 校验）。
+> 共 42 个 E_* 错误码定义于 tree-engine.cjs（grep \`const E_\` 校验）。
 > 注：E_NO_OWNERSHIP 属于 session 层 patches.cjs，非 tree 错误码，此处不收录。
 
 ## 基础错误码（自解释，help=null）
@@ -4518,20 +4835,22 @@ async function dispatch(cmd, args, callerSessionId) {
 
 async function dispatchLeaf(args, callerSessionId) {
   if (args.length === 0) {
-    throw new TreeStateError(E_SCHEMA_INVALID, 'leaf requires a subcommand: get | list-active | list-all | add | set-status | set-context | set-last-event | set-session | autonomy-override');
+    throw new TreeStateError(E_SCHEMA_INVALID, 'leaf requires a subcommand: get | list-active | list-all | add | set-status | set-context | set-last-event | set-session');
   }
   const [sub, ...rest] = args;
   switch (sub) {
     case 'get': return await cmdLeafGet(rest);
     case 'list-active': return await cmdLeafListActive(rest);
     case 'list-all': return await cmdLeafListAll(rest);
-    case 'add': return await cmdLeafAdd(rest);
-    case 'set-status': return await cmdLeafSetStatus(rest);
+    // P1 防借身份 (caller-binding 补全): add 透传 callerSessionId（cmdLeafAdd 校验 caller===added_by，
+    //   堵 worker 借 commander session_id 注册 leaf）。与 set-session L4533 / event append L4561 同范式。
+    case 'add': return await cmdLeafAdd(rest, callerSessionId);
+    // P1 防借身份: set-status 透传 callerSessionId（cmdLeafSetStatus 校验 caller 是 owner/creator/root-self，堵跨身份杀 leaf）
+    case 'set-status': return await cmdLeafSetStatus(rest, callerSessionId);
     case 'set-context': return await cmdLeafSetContext(rest);
     case 'set-last-event': return await cmdLeafSetLastEvent(rest);
     // P1 防借身份: set-session 透传 callerSessionId（cmdLeafSetSession 校验 caller===leaf.added_by，堵夺权）
     case 'set-session': return await cmdLeafSetSession(rest, callerSessionId);
-    case 'autonomy-override': return await cmdLeafAutonomyOverride(rest);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown leaf subcommand "${sub}"`);
   }
@@ -4543,7 +4862,8 @@ async function dispatchMilestone(args, callerSessionId) {
   }
   const [sub, ...rest] = args;
   switch (sub) {
-    case 'add': return await cmdMilestoneAdd(rest);
+    // P1 防借身份: add 透传 callerSessionId（cmdMilestoneAdd 校验 caller 是 owner/creator/root-self，堵跨身份注入 milestone）
+    case 'add': return await cmdMilestoneAdd(rest, callerSessionId);
     case 'set-result': return await cmdMilestoneSetResult(rest, callerSessionId);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown milestone subcommand "${sub}"`);
@@ -4605,11 +4925,14 @@ async function dispatchSegment(args) {
 
 async function dispatchTree(args) {
   if (args.length === 0) {
-    throw new TreeStateError(E_SCHEMA_INVALID, 'tree requires a subcommand: dump');
+    throw new TreeStateError(E_SCHEMA_INVALID, 'tree requires a subcommand: dump | register-session | session-count');
   }
   const [sub, ...rest] = args;
   switch (sub) {
     case 'dump': return await cmdTreeDump(rest);
+    // Sprint 5 (聚类 A/E): session_registry 维护 —— patches create_session 旁路登记 + max_sessions 预检。
+    case 'register-session': return await cmdTreeRegisterSession(rest);
+    case 'session-count': return await cmdTreeSessionCount(rest);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown tree subcommand "${sub}"`);
   }
@@ -4646,6 +4969,30 @@ function checkSessionAlive(sid) {
 
 function getTreesRoot() {
   return TREES_ROOT;
+}
+
+// Sprint 5 (聚类 A, 2026-07-14): 扫描 treesRoot 下所有 tree，返回 session_id 所属的 tree_id 列表
+//   （session_id 在 leaves[].session_id 或 session_registry 里）。
+//   供 patches.cjs create_session handler 定位 caller 所属 tree，做 max_sessions 预检 + 旁路登记。
+//   只读扫描，永不抛（异常返回 []）；不取锁（读瞬时状态，容忍并发写造成的偶发缺字段）。
+function findTreesBySession(treesRoot, sessionId) {
+  if (!sessionId || !treesRoot) return [];
+  const found = [];
+  let entries = [];
+  try { entries = fs.readdirSync(treesRoot); } catch (_) { return []; }
+  for (const name of entries) {
+    const dir = path.join(treesRoot, name);
+    let st;
+    try { st = fs.statSync(dir); } catch (_) { continue; }
+    if (!st.isDirectory()) continue;
+    const sp = path.join(dir, 'tree-state.json');
+    let state = null;
+    try { state = JSON.parse(fs.readFileSync(sp, 'utf-8')); } catch (_) { continue; }
+    const inLeaves = state.leaves && Object.values(state.leaves).some(l => l && l.session_id === sessionId);
+    const inRegistry = state.session_registry && Object.prototype.hasOwnProperty.call(state.session_registry, sessionId);
+    if (inLeaves || inRegistry) found.push(name);
+  }
+  return found;
 }
 
 // run(cmd, args): CLI 等价入口，永不 throw。
@@ -4700,7 +5047,7 @@ function extractIds(cmd, args) {
 function isCallReadOnly(cmd, sub) {
   if (cmd === 'help' || cmd === 'validate' || cmd === 'migrate') return true;
   if (cmd === 'leaf' && ['get', 'list', 'list-active', 'list-all'].includes(sub)) return true;
-  if (cmd === 'tree' && ['dump', 'list'].includes(sub)) return true;
+  if (cmd === 'tree' && ['dump', 'list', 'session-count'].includes(sub)) return true;
   if (cmd === 'drift' && sub === 'list') return true;
   if (cmd === 'heartbeat' && sub === 'tail') return true;
   if (cmd === 'event' && sub === 'list') return true;
@@ -4854,8 +5201,12 @@ module.exports = {
     E_LEAF_AUTO_PRUNED, E_STATUS_EVENT_MISMATCH,
     // L2-root-cause (层2 身份校验根治) 新增：session 格式合法但不真实存在
     E_SESSION_NOT_ALIVE,
+    // Sprint 5 (聚类 A/E, 2026-07-14): tree 级总会话数硬护栏（防 macp2 型会话爆炸）
+    E_MAX_SESSIONS,
   },
   setSessionVerifier,
+  // Sprint 5 (聚类 A): session→tree 反查（供 patches create_session handler 定位 caller 所属 tree）
+  findTreesBySession,
   // ISS-003 (2026-07-04) 辅助函数导出 —— 仅供测试 (iss003-review-gate-test.cjs) 纯函数降级测试用。
   //   不改变任何引擎逻辑；生产路径仍由 cmdLeafSetStatus 内部调用。
   isReviewRequired,

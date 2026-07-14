@@ -26,10 +26,10 @@
 | 当前版本 | **v0.16.5 + V10 Phase 3 + IHL 6 轮迭代加固** |
 | Layer 1 — MCP 基础设施 | 完工。22 个 session/remote 工具 + 11 个核心补丁 |
 | Layer 2 — 树形会话执行体系 | 接近完工。27 个 tree 工具 + 21 DbC + V10 八大加固 + IHL 6 轮 |
-| 主代码量 | tree-engine.cjs **3602 行** + proma-dev-patches.cjs **2658 行** + main.cjs sed 补丁 11 处 |
+| 主代码量 | tree-engine.cjs **5045 行** + proma-dev-patches.cjs **3268 行** + main.cjs sed 补丁 12 处（11 apply-patches.sh A-K + 1 Sprint 4 直编 P2 createAgentSession 白名单）|
 | 部署实例 | Dev `D:\Proma-dev\`（隔离）+ Release `D:\Proma-release\`（共享） |
 | 上游仓库 | [orphiczhou/proma-patches](https://github.com/orphiczhou/proma-patches)（私有） |
-| 测试覆盖 | dbc-spec 48/0 + audit-attacks 18/0 + v10-cleanroom 54/54 + v10-regression 14/0 |
+| 测试覆盖 | dbc-spec 39/0 + audit-attacks 18/0 + v10-cleanroom 54/54 + v10-regression 14/0 |
 
 ---
 
@@ -186,7 +186,7 @@ Release 版改用 `--release` 参数并修正路径。
 │  │                                                  │    │
 │  │  ┌────────────────────────────────────────────┐  │    │
 │  │  │  树形会话执行体系（Tree System）            │  │    │
-│  │  │  tree-engine.cjs（3602 行，21 DbC 校验点） │  │    │
+│  │  │  tree-engine.cjs（5045 行，21 DbC 校验点） │  │    │
 │  │  │                                            │  │    │
 │  │  │  - 三层角色：root / commander / worker     │  │    │
 │  │  │  - 27 个 mcp__tree__* MCP 工具             │  │    │
@@ -259,7 +259,7 @@ Design by Contract（契约式编程）—— 每个 tree-engine 子命令就像
 
 | 测试套件 | 通过率 |
 |---|---|
-| `test-sandbox/dbc-spec.cjs` | **48/0** |
+| `test-sandbox/dbc-spec.cjs` | **39/0** |
 | `test-sandbox/audit-attacks.cjs` | **18 攻击 / 0 BYPASS** |
 | `test-sandbox/v10-cleanroom.cjs` | **54/54** |
 | `test-sandbox/v10-regression.cjs` | 14/0 |
@@ -346,8 +346,8 @@ V10 升级把"字段存在性校验"升级为"内容有效性校验"。在 V10 P
 
 | 文件 | 部署路径 |
 |---|---|
-| 引擎部署版 | `D:\Proma-dev\resources\app\dist\tree-engine.cjs`（3602 行） |
-| 插件部署版 | `D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs`（2658 行） |
+| 引擎部署版 | `D:\Proma-dev\resources\app\dist\tree-engine.cjs`（5045 行） |
+| 插件部署版 | `D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs`（3268 行） |
 | MCP 桥接 | `D:\Proma-dev\resources\app\dist\proma-mcp-server.cjs` |
 | 仓库源 | `workspace-files/tree-engine.cjs` + `proma-dev-patches.cjs`（与部署版字字节同步） |
 

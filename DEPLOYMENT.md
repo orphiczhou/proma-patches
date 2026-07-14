@@ -477,7 +477,7 @@ ISOLATED === "0"  →  @proma/electron/          +  ~/.proma/          (共享�
 
 ### 8.6 正式版 ASAR 与 Dev dist 完全分叉
 
-`D:\Proma\resources\app.asar`（135MB 单文件）是 v0.12.23 原始版，**无任何 sed 补丁**。`D:\Proma-dev\resources\app\dist\` 已远超（tree-engine.cjs 3602 行 vs 正式版 0）。
+`D:\Proma\resources\app.asar`（135MB 单文件）是 v0.12.23 原始版，**无任何 sed 补丁**。`D:\Proma-dev\resources\app\dist\` 已远超（tree-engine.cjs 4928 行 vs 正式版 0）。
 
 **禁止**直接修改正式版 asar —— 一旦破坏，重建 Dev 流程会失败。
 

@@ -18,7 +18,7 @@ description: |
 > 你被 leaf_add 加入树时，返回结果带 `startup_notice`（引擎强制）——**必读**：
 > 1. **先加载本 SKILL**（尤其 §4.6「调用形式红线」），再干活。
 > 2. G1-G5 自审的 SubAgent 只能用内置 **`Agent` 工具**（进程内）；🚫 禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度；macp2 事故）。
-> 3. 撞错修根因，禁换名重试新建会话。收敛：角色 1/3/5 + 轮≤3 + `red_count=0` 停。
+> 3. 撞错修根因，禁换名重试新建会话。收敛：角色 2/3/5 + 轮≤3 + `red_count=0` 停。
 > 4. 每 leaf subagent_spawn ≤ 15（引擎 `E_SUBAGENT_BUDGET_EXCEEDED` 硬拦）。
 
 ---
@@ -59,17 +59,26 @@ load_on: create_session  # 原则 11：叶子 = create_session；子 Commander �
 
 > 对应设计文档: §3 核心契约, §3.5 自审契约, §6.1
 
-收到指挥官下发的 5 件套契约（brief / dod / report / autonomy / self_audit）后，按以下流程执行：
+> 📍 **启动首步（2026-07-14 Sprint 2 约束 4，混合任务书机制）**：worker 启动后指挥官发来的首条消息只含 `leaf_id`（混合任务书，非完整 5 件套）。**第一件事是 `mcp__tree__tree_leaf_get(tree_id=<tree_id>, leaf_id=<自己的 leaf_id>)` 主动读 leaf 持久化的 5 件套**（commander §4 Step 2 写进 leaf 的 `brief`/`dod`/`report_protocol`/`autonomy`/`self_audit` 字段），不依赖 fork 继承父历史（正常派生是 create_session，干净会话）。详见 §2.5 阶段 3。
+
+worker 会话启动 → 读 leaf 任务书 → 拿到 5 件套契约（brief / dod / report / autonomy / self_audit）后，按以下流程执行：
 
 ```
+0. 启动首步：tree_leaf_get 读自己的 5 件套
+   mcp__tree__tree_leaf_get(tree_id=<tree_id>, leaf_id=<自己的 leaf_id>)
+   从返回的 leaf.brief / leaf.dod / leaf.report_protocol / leaf.autonomy / leaf.self_audit 取出 5 件套
+   ⚠️ 权威任务书来源（持久化进 leaf，崩溃恢复 / 竹节交接不丢）；指挥官首条 send_message 只给 leaf_id 指路
+
 1. 解析 5 件套
    逐条阅读 brief.in_scope / brief.out_of_scope / dod.deliverables / dod.quality_gates
    理解 autonomy.can_decide / must_report / must_ask 的边界
 
-2. 写出 milestones 列表
+2. 写出 milestones 列表并持久化
    优先使用 self_audit.milestones（如已提供）
    若未提供，基于 brief.my_mission 自己拆解
    每个 Mi 包含: id / desc / expect_outputs
+   持久化：调 mcp__tree__tree_milestone_add(tree_id, leaf_id=自己, milestone={id,desc,expect_outputs}) 逐个 add
+   （V3 硬约束：done 前 milestones 必须非空 + 全部 audit_pass；不 add → done 被 E_* 拦）
 
 3. 发送 brief_echo
    用自己的话复述理解 + milestones_preview（模板见 §3.4）
@@ -90,9 +99,9 @@ load_on: create_session  # 原则 11：叶子 = create_session；子 Commander �
 
 | 阶段 | 调用者 | 工具 / 动作 | worker 做什么 |
 |------|--------|------------|--------------|
-| 1. fork | commander | `mcp__session__fork_session` / `create_session` | （被动）被创建，拿到自己的 session_id |
-| 2. leaf_add | commander | `mcp__tree__tree_leaf_add` | （被动）被登记为 tree 里的 leaf，拿到 leaf_id |
-| 3. 收 5 件套 | commander → worker | `send_message`（首条=5 件套 YAML） | 解析 brief/dod/report/autonomy/self_audit，理解任务边界 |
+| 1. 派生 | commander | 正常派生：`create_session`（§4 Step 2）；仅 §7 纠偏重档 / F1 崩溃恢复用 `fork_session` | （被动）被创建，拿到自己的 session_id |
+| 2. leaf_add | commander | `mcp__tree__tree_leaf_add`（含 5 件套持久化进 leaf） | （被动）被登记为 tree 里的 leaf，拿到 leaf_id |
+| 3. 读 5 件套 | **worker 主动** | 首条 send_message 只含 `leaf_id`（混合任务书）→ worker 调 `tree_leaf_get(自己的 leaf_id)` 读 leaf 持久化的 5 件套 | 解析 brief/dod/report/autonomy/self_audit，理解任务边界 |
 | 4. brief_echo（首条） | **worker 主动** | `mcp__tree__tree_event_append(type=brief_echo, meta={my_understanding, milestones_preview})` | 用自己的话复述 brief + 列 milestones（无 alignment 字段） |
 | 5. alignment 回填 | commander（root 身份） | `tree_event_append(type=brief_echo, meta={alignment, auditor_session_id=root.session_id})` | （被动）等待 commander 回填对齐评估；撞 `E_ALIGNMENT_NOT_VERIFIED` 说明这步没做，上行 `blocked` 提示母会话 |
 | 6. 干活 | **worker 主动** | 产出文件落盘 `deliverables/` + 每个 Mi 自审（§4）+ review_round（若 review_required，§4.6） | 执行 milestones，每个 Mi 完成跑 §4.2 自审、产出 `.note.md` |
@@ -409,7 +418,7 @@ dod:
 > Agent(description:"G1 完整性审查", prompt:"<视角专属指令，读 deliverables/<文件>，返回 findings JSON [{item,severity,evidence≥10字}]>", subagent_type:"Explore")
 > ```
 > **🚫 严禁** `mcp__session__create_session` / `fork_session` / `mcp__collaboration__delegate_agent`(delegate_agents) 当 reviewer —— **建真实会话＝烧独立 API 额度**（macp2 事故：4 分钟炸 207 会话，DeepSeek 余额打负）。
-> **撞错（E_DUPLICATE_SESSION_ID 等）修根因，禁换名（v2/b/x）重试新建会话**。**收敛**：角色分档 1/3/5（上限 5），轮数 ≤3，`red_count=0` 停，未收敛升级（blocked 上行）不重试。
+> **撞错（E_DUPLICATE_SESSION_ID 等）修根因，禁换名（v2/b/x）重试新建会话**。**收敛**：角色分档 2/3/5（上限 5），轮数 ≤3，`red_count=0` 停，未收敛升级（blocked 上行）不重试。
 
 **执行步骤**（最多 3 轮，红色归零收敛）：
 
@@ -762,7 +771,7 @@ drift_declaration: false
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
-| 2026-07-08 | v2.5 | **macp2 事故修复**：§4.6 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（成本爆炸，macp2 事故）；撞错禁换名重试；收敛（角色 1/3/5 + 轮≤3 + red_count=0 停） |
+| 2026-07-08 | v2.5 | **macp2 事故修复**：§4.6 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（成本爆炸，macp2 事故）；撞错禁换名重试；收敛（角色 2/3/5 + 轮≤3 + red_count=0 停） |
 | 2026-07-07 | v2.4 | SubAgent 入树：§4.6 重写——reviewer 走 `reviewer_kind:subagent` + `reviewer_ref=sub:<本leaf>:<序号>`（溯源本 leaf 的 `subagent_spawn` 事件），不再用 `reviewer_session_id` 填假 UUID（旧 BUG-1 路径已被引擎 E_REVIEW_FORGERY 拦截）；标注 `independence:self_delegated`（worker 自审/第一道筛，内容真实性最终靠 commander 他审）。新增 §2.5.1 SubAgent 辅助（implement/research SubAgent 同样走 subagent_spawn）；新增 §2.6 路径语义（治 BUG-2：expect_outputs / output_ref 均相对 deliverables 根，禁带 `deliverables/` 前缀）；§3.1 加 SubAgent 诚实性提醒；引擎新错误码 `E_DELIVERABLE_EMPTY`（治 BUG-3：0 字节产物）。 |
 | 2026-07-04 | v2.3 | ISS-003：新增 §4.6 done 前 G1-G5 多子Agent 内容审查（review_required=true 时强制，含分档/红色归零/最多3轮/已知局限诚实标注）。与 §4.2 milestone 级自检互补不冲突 |
 | 2026-06-19 | v2.2 | 审计驱动修订：load_on 从 fork_session 修正为 create_session（原则 11：叶子 = create_session）；target 描述明确子 Commander 由 fork_session 创建 |

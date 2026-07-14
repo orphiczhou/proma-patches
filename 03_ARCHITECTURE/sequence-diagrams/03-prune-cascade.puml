@@ -1,0 +1,86 @@
+@startuml 03-prune-cascade
+title prune 级联 DFS — TAO Watcher nudge_count ≥ 7 强制 pruned（V10-nudge-escalation）
+
+actor "TAO Watcher\n(proma-dev-patches.cjs\n setInterval 5min)" as watcher
+participant "tree_engine" as eng
+database "tree_state.json" as state
+participant "parent_leaf" as parent
+participant "child_leaf_1" as c1
+participant "child_leaf_2" as c2
+participant "grandchild_1a" as g1a
+
+note over watcher, state
+  触发条件（ARCHITECTURE §8.2 / API §错误码 E_LEAF_AUTO_PRUNED）：
+  nudge_count 阶梯：3 → medium / 5 → high / 7 → 强制 pruned
+  Watcher 周期巡逻：loadAllTreesWithActiveLeaves → checkAllRules
+end note
+
+' ── 阶段 1：Watcher 检测违规并 nudge ──
+watcher -> eng : applyNudge(tree_id, parent, rule_id, severity)
+note right of eng
+  R1 全规则兜底守卫（补 tree 级，IHL R1 修复）
+  每次 nudge：parent.nudge_count += 1
+end note
+eng -> state : parent.nudge_count = 1, severity=medium
+watcher -> eng : applyNudge(...)  '' 多轮违规累计
+eng -> state : parent.nudge_count = 3, severity=medium
+watcher -> eng : applyNudge(...)
+eng -> state : parent.nudge_count = 5, severity=high
+watcher -> eng : applyNudge(...)
+eng -> state : parent.nudge_count = 7
+
+' ── 阶段 2：nudge_count ≥ 7 触发强制 pruned ──
+watcher -> eng : applyNudge(...)（第 7+ 次）
+activate eng
+alt parent.nudge_count >= 7
+  note right of eng
+    E_LEAF_AUTO_PRUNED 触发
+    Watcher 强制 cmdLeafSetStatus(parent, status=pruned)
+    （绕过 caller=parent.session_id 的常规约束，
+     Watcher 是引擎内的特权调用者）
+  end note
+  eng -> parent : leaf_set_status(parent, pruned)
+  parent -> state : parent.status = pruned
+end
+
+' ── 阶段 3：DFS 级联 pruned 子孙 ──
+note over eng
+  级联策略：DFS 后序遍历 parent.children
+  （pruned 是终结态，子孙不可独立存活）
+end note
+
+eng -> eng : DFS_visit(parent)
+
+eng -> c1 : leaf_set_status(c1, pruned)
+c1 -> state : c1.status = pruned\n(E_LEAF_AUTO_PRUNED 级联)
+
+eng -> g1a : leaf_set_status(g1a, pruned)
+g1a -> state : g1a.status = pruned\n(E_LEAF_AUTO_PRUNED 级联)
+
+eng -> c2 : leaf_set_status(c2, pruned)
+c2 -> state : c2.status = pruned\n(E_LEAF_AUTO_PRUNED 级联)
+
+' ── 阶段 4：drift_log 记录 ──
+eng -> eng : tree_drift_append(parent,\n  kind=escalation, severity=high,\n  action=prune, fork_to=null,\n  reason="nudge_count≥7 cascade")
+note right of eng
+  drift_history 留痕：fork_to=null 表无重派
+  （pruned 不像 drift_declare 那样可 fork 救回）
+  被 pruned 的 leaf 不再被 V10-auditor-active 接受
+  （resolveAuditorIndep .filter 跳过 pruned，IHL R3）
+end note
+eng -> state : parent.drift_history[] += {action:prune, ...}
+
+' ── 阶段 5：Watcher 汇报 + 收尾 ──
+eng --> watcher : { pruned: [parent, c1, g1a, c2],\n  reason: E_LEAF_AUTO_PRUNED }
+deactivate eng
+
+note over watcher, state
+  附加约束：
+  • pruned leaf 不可恢复（status 流转白名单单向）
+  • 下次 Watcher 巡逻不再对 pruned leaf 跑 Tier 2 规则
+    （但仍跑 Tier 1 的 W-AUDIT-* 篡改检测）
+  • 若 parent 是 commander leaf，子 leaf 全 pruned 后
+    树本身进入"孤根"状态，由上层 commander 决定是否 archive
+end note
+
+@enduml

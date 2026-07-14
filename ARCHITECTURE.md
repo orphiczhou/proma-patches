@@ -26,7 +26,7 @@
 │                        │ global.__proma__ 桥接                    │
 │  ┌─────────────────────▼──────────────────────────────────────┐  │
 │  │ Layer 2 — 树形会话执行体系 (V10 Phase 3 + IHL R6)            │  │
-│  │   tree-engine.cjs (3602 行, 工作区零源码)                    │  │
+│  │   tree-engine.cjs (5045 行, 工作区零源码)                    │  │
 │  │   · 29 个 mcp__tree__* 工具                                 │  │
 │  │   · DbC 21 校验点 + V10 八大加固 + C5 Trust Anchor           │  │
 │  │   · TAO Watcher 35 规则 + W-AUDIT-* tamper detection        │  │
@@ -52,9 +52,9 @@
 
 | 层 | 文件 | 部署路径 | 用途 |
 |---|---|---|---|
-| **sed 补丁层** | `main.cjs` | `D:/Proma-dev/resources/app/dist/main.cjs` | 字符串替换，11 个补丁 A-K，常量改 / 小段注入 |
-| **独立插件层** | `proma-dev-patches.cjs` | 同上（2658 行）| 新增 MCP 工具 / 复杂逻辑 / HTTP bridge / TAO Watcher |
-| **内联引擎层** | `tree-engine.cjs` | 同上（3602 行）| 树形会话引擎（v0.7+ 内联，工作区零源码泄漏）|
+| **sed 补丁层** | `main.cjs` | `D:/Proma-dev/resources/app/dist/main.cjs` | 字符串替换，11 个补丁 A-K + Sprint 4 直编 createAgentSession workspace 白名单（P2），常量改 / 小段注入 |
+| **独立插件层** | `proma-dev-patches.cjs` | 同上（3268 行）| 新增 MCP 工具 / 复杂逻辑 / HTTP bridge / TAO Watcher |
+| **内联引擎层** | `tree-engine.cjs` | 同上（5045 行）| 树形会话引擎（v0.7+ 内联，工作区零源码泄漏）|
 
 ### 2.3 11 个 sed 补丁
 
@@ -210,7 +210,7 @@ HTTP bridge 在 19876-19895 范围内自动选端口，启动顺序决定具体�
   "root_brief": { "goal": "...", "boundary": [...] },
   "root_dod": {
     "max_depth": 3,
-    "node_budget": 10,
+    "node_budget": 20,
     "deliverables_check": ["..."]
   },
   "leaves": {
@@ -255,7 +255,7 @@ HTTP bridge 在 19876-19895 范围内自动选端口，启动顺序决定具体�
 ### 5.2 三层 role 枚举
 
 ```
-ROLE_ENUM = ['root', 'commander', 'worker']
+ROLE_ENUM = ['root', 'commander', 'worker', 'auditor']
 ```
 
 | Role | 创建方式 | 权限 | 关键约束 |
@@ -361,6 +361,8 @@ Layer 4 模型层契约                    █░░░░░░░░░░░�
 ---
 
 ## 七、三层防御拓扑（V10 Phase 3 + IHL R6 新增）
+
+> ⚠️ 下图中的 `L行号` 引用可能滞后（engine 加注释后漂移 100-680 行），**以 `grep 函数名 tree-engine.cjs` 实际定位为准**（如 `grep -n "async function cmdEventAppend" tree-engine.cjs`）。行号引用是历史快照，函数名稳定。
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -499,7 +501,7 @@ nudge_count:
 
 **问题**：v0.2.x 的 role 字段是自由文本，SKILL.md §13 只举例 `root/eval/api/ui`，无 enum 限制，导致 qfv2 跑出 5 层嵌套（root → C → Cr → Ccr1 → worker），LLM 指令保真度每层掉 39%（Laban ICLR 2026），5 层 = 92% 信息丢失。
 
-**修复**：`ROLE_ENUM = ['root', 'commander', 'worker']`，`E_ROLE_INVALID` 拒绝其他值；`E_DEPTH_EXCEEDED` 硬限 depth ≤ 3；worker 不能 add leaf。
+**修复**：`ROLE_ENUM = ['root', 'commander', 'worker', 'auditor']`（P0a 加 auditor），role 非法抛 `E_SCHEMA_INVALID`（`E_ROLE_INVALID` 为文档遗留，引擎未定义）；`E_DEPTH_EXCEEDED` 硬限 depth ≤ 3；worker 不能 add leaf。
 
 ---
 

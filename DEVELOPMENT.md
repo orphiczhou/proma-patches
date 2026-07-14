@@ -46,7 +46,7 @@ D:\Proma-dev\resources\app\dist\
 ├── preload.cjs               ← 85650 行，Electron renderer 桥接
 ├── proma-dev-patches.cjs     ← 主插件（约 3000+ 行）
 ├── proma-mcp-server.cjs      ← stdio MCP 桥接
-└── tree-engine.cjs           ← Tree 引擎（3602 行，含 21 DbC + V10 八大加固）
+└── tree-engine.cjs           ← Tree 引擎（4928 行，含 21 DbC + V10 八大加固）
 ```
 
 ### 1.4 .context/ 文档导航

@@ -1,0 +1,120 @@
+@startuml 04-ctx-segment
+title ctx≥85% 竹节交接 — segment_pending → segment_append → set-session → active
+
+actor "TAO Watcher" as watcher
+actor "commander\n(root)" as root
+participant "worker_session_old\n(ctx 接近甜点)" as ws_old
+participant "new_session\n(干净 SDK session)" as ws_new
+participant "tree_engine" as eng
+database "tree_state.json" as state
+database "leaf.segment_chain[]" as seg
+database "session_registry" as reg
+
+note over watcher, state
+  约束 6（刚性）：leaf.context_usage_pct >= 85 → 自动 set status=segment_pending
+  Watcher 每 5min 巡逻调 get_session_context 检测
+end note
+
+' ── 阶段 1：Watcher 检测 ctx 接近甜点 ──
+watcher -> ws_old : get_session_context(ws_old.session_id)
+ws_old --> watcher : { input_tokens, total_tokens, context_window }\nctx_pct ≈ 87%
+
+watcher -> eng : tree_leaf_set_context(worker,\n  context_pct=87)
+activate eng
+eng -> state : leaf.context_usage_pct = 87
+
+alt ctx_pct >= 85
+  note right of eng
+    引擎自动：leaf.status = 'segment_pending'
+    （状态机允许 active → segment_pending 流转）
+    V10 约束 6 刚性触发，不依赖 Watcher 显式 set_status
+  end note
+  eng -> state : leaf.status = segment_pending
+end
+eng --> watcher : { ok:true, status:segment_pending }
+deactivate eng
+
+' ── 阶段 2：commander 创建干净 session 并登记 ──
+note over root
+  竹节交接指令由 commander 接收（Watcher 上报）
+  commander 不复用 worker_session_old（其 ctx 已饱和）
+  ⇒ create_session 拿干净 SDK session
+end note
+
+root -> ws_new : create_session(channel, model)\n'' 干净会话，ctx=0%
+ws_new --> root : session_id_new
+
+root -> eng : tree_register_session(tree_id,\n  session_id=session_id_new,\n  source=segment, caller=root)
+activate eng
+note right of eng
+  Sprint 5 max_sessions 守卫
+  session_registry 登记 new session
+  E_MAX_SESSIONS 若超 audit_meta.max_sessions
+end note
+eng -> reg : session_registry[] += session_id_new
+eng --> root : { ok:true }
+deactivate eng
+
+' ── 阶段 3：segment_append（竹节链留痕） ──
+root -> eng : tree_segment_append(worker,\n  new_session_id=session_id_new)
+activate eng
+note right of eng
+  segment_chain[] 留痕：
+  [{ segment_no, session_id_old, session_id_new, ts, reason }]
+  ctx≥85% 是竹节交接的标准 reason
+  handoff brief（≤2K tokens）由 worker_session_old 输出
+  （进度 + 关键发现 + 未完成 milestones）
+end note
+eng -> seg : segment_chain[] += { segment_no:N+1, ... }
+eng -> state : leaf.segment_chain 落盘
+eng --> root : { ok:true, segment_no:N+1 }
+deactivate eng
+
+' ── 阶段 4：set-session 切换 ──
+root -> eng : tree_leaf_set_session(worker,\n  session_id=session_id_new)
+activate eng
+note right of eng
+  caller-binding：caller=root.session_id === leaf.added_by
+  （root 创建了 worker leaf，§13.3 步骤1）
+  允许 root 切换 worker leaf 的 session_id
+end note
+eng -> state : leaf.session_id = session_id_new
+eng --> root : { ok:true }
+deactivate eng
+
+' ── 阶段 5：恢复 active，new_session 接续工作 ──
+root -> eng : tree_leaf_set_status(worker,\n  status=active)
+activate eng
+note right of eng
+  状态机：segment_pending → active 允许流转
+  （不同于 pruned 终结态）
+end note
+eng -> state : leaf.status = active\nleaf.last_event_type = segment
+eng --> root : { ok:true, status:active }
+deactivate eng
+
+' ── 阶段 6：new_session 接续 milestone 工作 ──
+root -> ws_new : send_message("接续 <worker leaf_id> 的未完成 milestones")
+note over ws_new
+  新 session 干净 ctx=0%
+  • 读 leaf.segment_chain 了解历史
+  • 读 leaf.events 了解已完成的 milestone
+  • 续做剩余 Mi，不再受 ctx 87% 压力
+  • 续产 deliverables 时若再撞 ctx≥85%
+    ⇒ 触发 segment_chain[N+2] 二次竹节
+end note
+ws_new -> eng : tree_leaf_get(worker)   '' 读历史上下文
+eng --> ws_new : leaf 含 segment_chain / 已完成 events
+ws_new -> eng : tree_event_append(worker, type=heartbeat_reply,\n  meta={ segment_no:N+1, status:resuming })
+
+note over watcher, state
+  附加语义：
+  • segment_chain 是 worker 的"竹节史"，每次交接 +1
+  • 整 leaf 的 milestones / expect_outputs / audit_gate 不变
+    （竹节只换 session，不换 leaf 身份）
+  • 若 new_session 也撞 ctx≥85%，重复阶段 1-5（segment_no 自增）
+  • leaf_id 命名可带 sN 后缀表竹节（如 nanju-A-eval-s2），
+    但引擎不强求；segment_chain 字段是权威留痕
+end note
+
+@enduml

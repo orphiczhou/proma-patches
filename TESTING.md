@@ -29,7 +29,7 @@ Proma 项目采用 4 层测试金字塔，自底向上：
                              │
                 ┌────────────┴─────────────┐
                 │  单元测试（spec）          │  21 DbC 校验点
-                │  dbc-spec (48/0)          │  字段存在 + 内容有效
+                │  dbc-spec (39/0)          │  字段存在 + 内容有效
                 └──────────────────────────┘
 ```
 
@@ -46,7 +46,7 @@ Proma 项目采用 4 层测试金字塔，自底向上：
 
 | 套件 | 路径 | 通过率 | 类型 | 说明 |
 |---|---|---|---|---|
-| **dbc-spec** | `test-sandbox/dbc-spec.cjs` | **48/0** | 单元 | 21 DbC 校验点（Phase A + V4-V9 + R2-T7/M2） |
+| **dbc-spec** | `test-sandbox/dbc-spec.cjs` | **39/0** | 单元 | 21 DbC 校验点（Phase A + V4-V9 + R2-T7/M2） |
 | **audit-attacks** | `test-sandbox/audit-attacks.cjs` | **18/0** | 对抗 | 18 攻击向量，0 BYPASS |
 | **audit-extra** | `test-sandbox/audit-extra.cjs` | **21 case** | 对抗 | 审计子会话留的补充对抗集 |
 | **v10-cleanroom** | `test-sandbox/v10-cleanroom.cjs` | **54/54** | 洁净室 | Cr2 双轮收敛，从 spec 独立写 |
@@ -57,7 +57,7 @@ Proma 项目采用 4 层测试金字塔，自底向上：
 
 ### 2.2 套件角色详解
 
-#### dbc-spec（DbC 单元测试，48/0）
+#### dbc-spec（DbC 单元测试，39/0）
 
 覆盖 21 个 DbC 校验点（Design by Contract）：
 
@@ -125,7 +125,7 @@ V10 八大加固点引入后的回归测试，确保 V4-V9 已堵漏洞未因 V1
 ```bash
 # 1. 单元测试（最快，先跑）
 node test-sandbox/dbc-spec.cjs
-# 期望：48/0
+# 期望：39/0
 
 # 2. 对抗测试
 node test-sandbox/audit-attacks.cjs
@@ -219,7 +219,7 @@ console.log('validate:', validate);
 
 | 维度 | 基线 | 实际 |
 |---|---|---|
-| DbC 校验点覆盖 | 21 个 100% | 48/0 ✅ |
+| DbC 校验点覆盖 | 21 个 100% | 39/0 ✅ |
 | 攻击向量拦截 | 18 个 0 BYPASS | 18/0 ✅ |
 | V10 加固点覆盖 | 8 个 100% | 54/54 ✅ |
 | V10 回归 | 0 退化 | 14/0 ✅ |
@@ -242,7 +242,7 @@ console.log('validate:', validate);
 
 - V4-V9（6/24）：dbc-spec 36/0 + audit-attacks 18/0 + audit-extra 21 case
 - R2-T7 + M2（6/25 早晨）：dbc-spec 39/0 + audit-attacks 18/0 + patch-l vs dist diff 空
-- V10 Phase 1-2（6/25 下午）：v10-cleanroom 54/54 + v10-regression 14/0 + dbc-spec 48/0
+- V10 Phase 1-2（6/25 下午）：v10-cleanroom 54/54 + v10-regression 14/0 + dbc-spec 39/0
 - V10 Phase 3（6/25 20:36）：Bug A/B 修复，6 套件 164 全过
 
 ---

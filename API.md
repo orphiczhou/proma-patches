@@ -2,7 +2,7 @@
 
 > 维护: 周星星 + Proma Agent | 版本: V10 Phase 3 + IHL R6（2026-06-26）
 > 配套文档: [ARCHITECTURE.md](./ARCHITECTURE.md) · [SECURITY.md](./SECURITY.md)
-> 数据源: `D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs` (2658 行) · `tree-engine.cjs` (3602 行)
+> 数据源: `D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs` (3268 行) · `tree-engine.cjs` (5045 行)
 
 ---
 
@@ -349,7 +349,7 @@ nudge_escalation | audit_tree_structure | error_code_index | full_guide
 | `leaf` | object | 是 | 完整 leaf JSON：`{leaf_id, session_id, parent, path, role, model, channel, added_by}` |
 
 **约束**：
-- `role` 必须在 `['root', 'commander', 'worker']`（否则 `E_ROLE_INVALID`）
+- `role` 必须在 `['root', 'commander', 'worker', 'auditor']`（P0a 新增 auditor；非法 role 抛 `E_SCHEMA_INVALID`，非 `E_ROLE_INVALID`——后者为文档遗留，引擎未定义）
 - `role === 'root'` 拒绝（root 必须由 `tree_init` 创建）
 - `depth > max_depth` → `E_DEPTH_EXCEEDED`
 - 父节点 status 不能是 `active`（`E_PARENT_MISSING`）
@@ -627,7 +627,7 @@ Tail 心跳日志。**只读**。
 
 ## 五、错误码字典
 
-### 5.1 基础错误（tree-engine.cjs L76-100）
+### 5.1 基础错误（engine 常量区，实际 L124-179；行号随版本变，以 `grep "const E_"` 为准）
 
 | 错误码 | 含义 | 触发场景 |
 |---|---|---|
@@ -646,6 +646,7 @@ Tail 心跳日志。**只读**。
 | `E_IO` | IO 错误 | 磁盘读写失败 |
 | `E_UNKNOWN` | 未知错误 | 兜底 |
 | `E_GATEKEEPER_REQUIRED` | 需守卫 | 内部错误 |
+| `E_STATUS_TRANSITION_INVALID` | 非法状态流转 | P0-3：done→active 等违 STATUS_TRANSITION_RULES |
 
 ### 5.2 DbC 错误（CP1-CP6 + V4-V9）
 
@@ -658,10 +659,14 @@ Tail 心跳日志。**只读**。
 | `E_SELFCHECK_INVALID` | 自检不合规 | V6: 全 pass:false / schema 错 |
 | `E_TREE_NODE_BUDGET_EXCEEDED` | 节点预算超限 | CP2: node_count > budget |
 | `E_TREE_NOT_VALIDATED` | 树未通过 validate | 整树结构不合规 |
-| `E_ROLE_INVALID` | role 非法 | 不在 ROLE_ENUM |
+| ~~`E_ROLE_INVALID`~~ | ⚠️ 文档遗留（引擎未定义） | role 非法实抛 `E_SCHEMA_INVALID`，见 ERROR-CODES §8 |
 | `E_DEPTH_EXCEEDED` | 深度超限 | 重复出现，CP3 |
-| `E_PATH_TRAVERSAL` | 路径遍历 | V9: 绝对路径 / `..` |
-| `E_SYMLINK_ESCAPE` | symlink 逃逸 | V9: symlink 指向工作区外 |
+| ~~`E_PATH_TRAVERSAL`~~ | ⚠️ 文档遗留 | 路径遍历校验抛 `E_DELIVERABLE_MISSING`，见 ERROR-CODES §8 |
+| ~~`E_SYMLINK_ESCAPE`~~ | ⚠️ 文档遗留 | symlink 校验抛 `E_DELIVERABLE_MISSING` |
+| `E_DELIVERABLE_EMPTY` | 交付物为空 | done 时文件存在但空 |
+| `E_REVIEW_NOT_CONVERGED` | review 未收敛 | ISS-003：worker done 但 review_round 未收敛/未跑 |
+| `E_REVIEW_FORGERY` | review 伪造 | ISS-003：review_round schema 伪造/非法自写 |
+| `E_REVIEW_FLAGGED_BLOCK` | 父链有 flagged | 父链存在 flagged leaf，需先补审 |
 
 ### 5.3 V10 八大加固错误（V10 Phase 1-2）
 
@@ -680,20 +685,29 @@ Tail 心跳日志。**只读**。
 | `E_TS_NOT_MONOTONIC` | V10-timestamp-monotonic | ts 早于上一条 event |
 | `E_LEAF_AUTO_PRUNED` | V10-nudge-escalation | nudge_count ≥ 7 强制 pruned |
 | `E_STATUS_EVENT_MISMATCH` | V10-status-event-sync | status 与 last_event_type 不同步 |
-| `E_WORKSPACE_CANONICAL` | V10-workspace-canonical | slug "undefined" / null / "" 未 fallback |
+| ~~`E_WORKSPACE_CANONICAL`~~ | ⚠️ 文档遗留（引擎未定义） | workspace 规范化无独立错误码，见 ERROR-CODES §8 |
+| `E_SUBAGENT_BUDGET_EXCEEDED` | subagent 预算超限 | 单 leaf spawn 数 ≥ max_subagent_spawn_per_leaf（默认 15）|
+| `E_SESSION_NOT_ALIVE` | session 不真实 | layer2 verifier：session 不存在/已死 |
 
-### 5.4 IHL R2/R4 错误（patches.cjs）
+### 5.4 patches layer1 错误（caller ownership / 会话，proma-dev-patches.cjs）
 
-| 错误码 | 含义 |
-|---|---|
-| `E_WORKSPACE_NOT_FOUND` | workspace_id 不在白名单（create_session / fork_session）|
-| `E_NO_TREES_DIR` | workspace 缺 `.context/trees/` 目录 |
+| 错误码 | 含义 | 触发 |
+|---|---|---|
+| `E_NO_OWNERSHIP` | caller 无权限 | R1-R6：caller 与目标 session 无血缘（堵跨 session 冒用）|
+| `E_DELEGATION_TOO_DEEP` | 委派深度超限 | create/fork depth > MAX_DELEGATION_DEPTH（防链式递归）|
+| `E_SESSION_BUDGET_EXCEEDED` | 会话预算超限 | 单 caller 60s create_session > 20（macp2 爆炸护栏，2026-07-09）|
+| `E_TARGET_NOT_FOUND` | 目标 session 不存在 | send_message/fork 的 target 找不到 |
+| `E_WORKSPACE_REQUIRED` | remote 缺 workspace_id | ISS-001：无法自动解析目标实例 workspace |
+| `E_WORKSPACE_NOT_FOUND` | workspace 不在索引 | workspace_id 不在实例白名单 |
+| `E_NO_TREES_DIR` | 无 trees 目录 | workspace 缺 `.context/trees/` |
 
 ### 5.5 ERROR_TO_HELP 映射（D4 Layer 3）
 
-V10 Helper D4 设计：37 个错误码自动映射到 13 个 help_topic。错误返回附 `help_hint: "Use mcp__tree__tree_help('xxx')"`，引导 Agent 反向学习。
+V10 Helper D4 设计：错误码自动映射到 help_topic。错误返回附 `help_hint: "Use mcp__tree__tree_help('xxx')"`，引导 Agent 反向学习。
 
 完整映射见 [tree-engine.cjs `ERROR_TO_HELP` 常量]。
+
+> 📖 **错误码唯一权威源**：[ERROR-CODES.md](./ERROR-CODES.md)（49 个错误码，从 tree-engine.cjs + patches.cjs 自动抽取，含触发条件/归属/行号）。本节为速查，细节以 ERROR-CODES.md 为准。新增错误码必须同步两处（CLAUDE.md「文档引擎一致性 P0 高发区」）。
 
 ---
 
@@ -706,7 +720,7 @@ V10 Helper D4 设计：37 个错误码自动映射到 13 个 help_topic。错误
 await mcp__tree__tree_init({
   tree_id: "demo-2026",
   root_brief: { goal: "Demo tree", boundary: [...] },
-  root_dod: { max_depth: 3, node_budget: 10, deliverables_check: [...] },
+  root_dod: { max_depth: 3, node_budget: 20, deliverables_check: [...] },
   session_id: "ce9a1e2f-...",  // 当前 root session
   model: "glm-5.2", channel: "proma-official"
 })
@@ -775,7 +789,7 @@ await mcp__tree__tree_help({ topic: "v10_constraints" })
 
 ### 7.1 ROLE_ENUM
 ```
-['root', 'commander', 'worker']
+['root', 'commander', 'worker', 'auditor']
 ```
 
 ### 7.2 STATUS_ENUM
@@ -803,7 +817,7 @@ await mcp__tree__tree_help({ topic: "v10_constraints" })
 
 ### 7.6 默认配置
 - `max_depth`: 3
-- `node_budget`: 10
+- `node_budget`: 20（macp2 后 10→20）
 - `nudge_escalation`: 3→medium, 5→high, 7→pruned
 - `ts_tolerance`: now+60s（future tolerance）
 - `stale_tree_hours`: 24
@@ -818,8 +832,8 @@ await mcp__tree__tree_help({ topic: "v10_constraints" })
 | [SECURITY.md](./SECURITY.md) | 威胁模型 + 已修复漏洞 |
 | [.context/proma-dev-wiki.md](.context/proma-dev-wiki.md) | 完整技术 Wiki |
 | [.context/reference/methodology/commander-methodology-v10.md](.context/reference/methodology/commander-methodology-v10.md) | V10 工程方法论 |
-| [D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs](D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs) | 工具定义源码（2658 行）|
-| [D:/Proma-dev/resources/app/dist/tree-engine.cjs](D:/Proma-dev/resources/app/dist/tree-engine.cjs) | 引擎源码（3602 行）|
+| [D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs](D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs) | 工具定义源码（3268 行）|
+| [D:/Proma-dev/resources/app/dist/tree-engine.cjs](D:/Proma-dev/resources/app/dist/tree-engine.cjs) | 引擎源码（5045 行）|
 
 ---
 

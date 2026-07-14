@@ -1,0 +1,112 @@
+@startuml 01-lifecycle
+title tree-system 建树全生命周期（冷启动信任锚 root 作 auditor，§13.3 八步）
+
+actor "commander\n(root)" as root
+participant "worker_session" as ws
+database "tree_engine\n(mcp__tree__*)" as eng
+database "tree_state.json" as state
+collections "deliverables_fs\n(<treeDir>/deliverables/)" as fs
+
+note over root, state
+  冷启动期判定（§13.1）：树内尚无任何 leaf 满足 V10-auditor-active
+  （status=done + events 非空 + audit_gate=pass）
+  ⇒ 所有 audit_session_id 填 root.session_id（§13.2）
+end note
+
+' ── 步骤 0：tree_init + root.events 非空（闸门2 前置） ──
+root -> eng : tree_init(tree_id, root_brief, root_dod, session_id=root.session_id)
+eng -> state : 创建 leaves[root]（role=root, status=active, audit_gate.verdict=skip）
+eng --> root : { ok:true, tips.next_steps }
+
+root -> eng : tree_event_append(root, type=plan|status_check, meta={...})
+note right of eng
+  步骤 0：root.events 非空
+  （只增不减，做一次永久满足闸门2 前置）
+end note
+eng -> state : root.events[] += plan
+
+' ── 步骤 1：create_session + leaf_add（含 5 件套持久化） ──
+root -> ws : create_session(channel, model)   '' 派生干净 worker 会话
+ws --> root : session_id
+
+root -> eng : tree_leaf_add(leaf={leaf_id=<worker>, session_id=ws, parent=root,\n  role=worker, added_by=root.session_id})
+note right of eng
+  步骤 1：leaf_add 含 5 件套
+  （brief/dod/report_protocol/autonomy/self_audit 持久化进 leaf）
+  caller-binding：root 创建 worker leaf
+end note
+eng -> state : leaves[worker] = {status:pending_brief, ...}
+
+' ── 步骤 1（续）：milestone_add ──
+root -> eng : tree_milestone_add(worker, milestone={id:M1, desc, expect_outputs:[...]})
+eng -> state : worker.milestones[] += M1
+
+' ── 步骤 2：milestone_set_result（信任锚背书，audit_session_id=root.session_id） ──
+root -> eng : tree_milestone_set_result(worker, M1,\n  audit_pass=true, audit_session_id=root.session_id)
+note right of eng
+  步骤 2：caller(root) === audit_session_id
+  闸门2 放行（冷启动信任锚例外路径）
+end note
+eng -> state : worker.milestones[M1].audit_pass = true
+
+' ── 步骤 3：brief_echo（worker 自发，无 alignment） ──
+root -> ws : send_message("启动首步：tree_leaf_get(自己的 leaf_id) 读 5 件套")
+ws -> eng : tree_leaf_get(worker)   '' 主动读持久化 5 件套
+eng --> ws : leaf.brief / dod / report_protocol / autonomy / self_audit
+
+ws -> eng : tree_event_append(worker, type=brief_echo,\n  meta={my_understanding, milestones_preview})
+note right of eng
+  步骤 3：caller=worker.session_id（自发）
+  首条 brief_echo 无 alignment 字段
+end note
+eng -> state : worker.events[] += brief_echo(无 alignment)
+
+' ── 步骤 4：alignment 回填（root 以 auditor 身份回填，V5b 硬前置） ──
+root -> eng : tree_event_append(worker, type=brief_echo,\n  meta={alignment:"0.92 (aligned)", auditor_session_id=root.session_id})
+note right of eng
+  步骤 4：caller(root) === auditor_session_id
+  V5b 前置：步骤 6 audit_gate pass 缺此条 → E_ALIGNMENT_NOT_VERIFIED
+end note
+eng -> state : worker.events[] += brief_echo(含 alignment)
+
+' ── 步骤 5（干活阶段）：worker 产出 + done event ──
+ws -> fs : 写 deliverables/<expect_outputs 声明的相对路径>
+note right of fs
+  每个 expect_outputs 文件需真实落盘且 size>0
+  （否则步骤 7 撞 E_DELIVERABLE_MISSING / E_DELIVERABLE_EMPTY）
+end note
+
+ws -> eng : tree_event_append(worker, type=done,\n  meta={self_check:[{item,pass,evidence}], deliverables, milestones, context_usage, drift_declaration})
+note right of eng
+  步骤 5：caller=worker.session_id
+  self_check schema 强校验（≥1 项 pass=true，evidence ≥10 字）
+end note
+eng -> state : worker.events[] += done
+
+' ── 步骤 6：audit_gate pass（caller===audit_session_id，root 信任锚背书） ──
+root -> eng : tree_audit_gate(worker, verdict=pass,\n  audit_session_id=root.session_id)
+note right of eng
+  步骤 6：caller(root) === audit_session_id
+  前置：步骤 4 alignment 留痕 + 步骤 5 done event 留痕
+  否则 E_ALIGNMENT_NOT_VERIFIED / E_AUDIT_PREMATURE
+end note
+eng -> state : worker.audit_gate = {verdict:pass, auditor_session_id:root.session_id}
+
+' ── 步骤 7：set-status done（全 8 道门禁过） ──
+ws -> eng : tree_leaf_set_status(worker, status=done)
+note right of eng
+  步骤 7：caller=worker.session_id（worker 自调）
+  全 8 道门禁一次性校验（详见 02-done-gate.puml）：
+  milestones 非空 / audit_pass / 文件存在 / size>0 /
+  alignment event / done event / audit_gate pass /
+  review_required 时 review_round 收敛
+end note
+eng -> state : worker.status = done（atomic write + file lock）
+eng --> ws : { ok:true }
+
+note over root, state
+  worker done 后即满足 V10-auditor-active
+  ⇒ 树转正常期，后续可派 role=auditor leaf 链式背书（§13.4）
+end note
+
+@enduml
