@@ -731,6 +731,14 @@ async function cmdInit(args) {
 
   const root_brief = parseJsonArg(opts['root-brief'], 'root-brief');
   const root_dod = parseJsonArg(opts['root-dod'], 'root-dod');
+  // v0.7 批次6 (2026-07-15): root_brief.prefix 前置校验 —— 与 LEAF_NAME_RE prefix 段 [a-z][a-z0-9_]{3,7} 一致
+  //   （4-8 字符，小写开头，无连字符）。防 nanju04api 事故：10 字符超长 prefix 潜伏到 leaf_add (L963) 才 E_NAME_INVALID，
+  //   worker 靠 create_session+send 产了文件但 leaf 没入树。前置到 init 即拦。
+  //   防御性校验：prefix 字段存在才校验（root_brief 无 prefix 字段时跳过，兼容现有合法 tree）。
+  const PREFIX_RE = /^[a-z][a-z0-9_]{3,7}$/;
+  if (root_brief.prefix !== undefined && !PREFIX_RE.test(root_brief.prefix)) {
+    throw new TreeStateError(E_NAME_INVALID, 'root_brief.prefix "' + root_brief.prefix + '": prefix must match [a-z][a-z0-9_]{3,7} (4-8 chars, lowercase, no hyphen). 超长(如 nanju04api 10字符)会潜伏到 leaf_add 才炸——前置到 init 即拦。');
+  }
   // v0.7 批次5 (V8+): node_budget 必须是非负有限数（堵字符串/布尔/NaN/负数静默回退默认，审计[2]）
   if (root_dod.node_budget !== undefined && root_dod.node_budget !== null) {
     if (typeof root_dod.node_budget !== 'number' || !Number.isFinite(root_dod.node_budget) || root_dod.node_budget < 0) {
