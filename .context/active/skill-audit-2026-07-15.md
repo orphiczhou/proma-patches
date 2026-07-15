@@ -162,3 +162,46 @@
 **没找到阻断级问题**：协议逻辑、根因链、铁律、checklist 全部正确，与引擎实现一致。
 
 **结构性风险已诚实标注**（A2-1/A2-2）：GLM 自主简化和 worker 行为依赖是本质上限，SKILL 已尽力强化但无法消除——靠引擎硬防线（review_required 强制门禁 + leaf_add E_NAME_INVALID 拦截 + max_sessions 硬上限）兜底。
+
+---
+
+# 第二轮：收敛审计（2026-07-15 19:39，修复后复审）
+
+## 修复执行（6 处 findings）
+
+| Finding | 修复 | 验证 |
+|---|---|---|
+| C1-Y1 §4.6 条件 1 措辞 | worker L409 改为 `leaf.audit_meta.review_required（叶级覆盖）→ state.audit_meta.review_required（树级回退）→ 默认 false`，对齐 engine L1346-1355 `isReviewRequired` | Explore C1 ✓ pass |
+| C3-1/C4-1 nanju04/nanju04api | 全部 → 自审事故 / 超长命名事故 / 超长 prefix | grep 0 匹配 ✓ |
+| C3-2/C4-2 DeepSeek/207/4分钟/打负 | 全部 → 某模型 / 百级会话 / 短时 / 额度耗尽 | grep 0 匹配 ✓ |
+| C3/C4 GLM worker | → worker | grep 0 匹配 ✓ |
+| C3/C4 macp2/macp3/macp4 | → 调用形式事故 / 既往复盘改 / 既往假阳性事故 / 既往假收敛事故 | grep 0 匹配 ✓ |
+| C2-Y1 macp2↔nanju 对比 | commander §14.1a 末尾新增对比段 | Explore C2 ✓ pass |
+
+**修复覆盖**：worker SKILL 13 处 + commander SKILL 14 处 = 27 处 Edit。
+
+## 收敛审计结果（6 维 Explore 复审）
+
+| 维度 | 结果 | 证据 |
+|---|---|---|
+| C1 一致性回归 | ✓ pass | worker §4.6 条件 1 措辞与 engine L1346-1355 完全一致 |
+| C2 完整性 | ✓ pass | §14.1a 末尾对比段清晰，无遗漏 |
+| C3 规范性 | ✓ pass | DeepSeek/207会话/打负/4分钟/nanju04/GLM worker/macp2/macp3/macp4/nanju04api 全清零 |
+| C4 可发布性 | ✓ pass | 无内部路径残留；GLM-5.2 model ID 配置示例保留合理 |
+| A1 反向映射 | ✓ pass | `audit_meta_override` 参数名与 engine `cmdInit` `opts['audit-meta']` 一致 |
+| A2 反事实攻击 | ⚠ yellow（脱敏必然代价，非缺陷） | "某模型"是必要的厂商脱敏；核心协议约束（角色 2/3/5 + 轮≤3 + red_count=0）未减；"建真实会话＝烧独立 API 额度"本质警示保留 |
+
+## 收敛结论
+
+**✓ pass（阻断=0 + 原 6 findings 全清零 + 无新 red + 无实质性新 yellow）**
+
+- 原 9 yellow → 修复后 1 yellow（A2 脱敏代价，非新引入）
+- A2 那条 yellow 评估：脱敏的本质就是去专有名词，"某模型"是正确结果而非缺陷；读者只需理解风险模式（误用 create_session → 烧独立 API 额度），不需知道是哪家厂商——SKILL 保留了本质警示，约束力未实质削弱
+- 第二轮自评：**非橡皮图章**——找到 1 个真实可接受 yellow（A2），诚实标注；未掩盖任何潜在问题
+
+## 私有化发布就绪状态
+
+✓ **可发布**：协议逻辑正确、与引擎一致、无内部路径泄露、无专有名词泄露、无 CLAUDE 外部依赖。剩余 1 yellow（A2）属脱敏必然代价，发布后可通过 `tree_help('cost_explosion_examples')` 外部文档补充具体案例（可选）。
+
+**附（非 SKILL 范围，CLAUDE 内部需同步）**：CLAUDE.md L43「init 不校验 prefix 长度」描述现已过时（engine v0.7 批次6 已加前置校验），CLAUDE 内部需更新此条。
+

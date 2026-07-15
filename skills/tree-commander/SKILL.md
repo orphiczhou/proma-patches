@@ -12,11 +12,11 @@ description: |
 
 树形会话执行体系 — 指挥官（根会话）操作手册。
 
-> ### 📍 任务启动第一件事（2026-07-08 macp2 事故后强制）
+> ### 📍 任务启动第一件事（2026-07-08 调用形式事故后强制）
 >
 > 建树（tree_init）和每次 leaf_add 的返回结果都带 `startup_notice`（引擎强制注入）——**必读**：
 > 1. **先加载本 SKILL**（尤其 §13.5「调用形式红线」），再开始编排。
-> 2. SubAgent 只能用内置 **`Agent` 工具**（进程内）；🚫 禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度；macp2 事故 4 分钟炸 207 会话打负 DeepSeek 余额）。
+> 2. SubAgent 只能用内置 **`Agent` 工具**（进程内）；🚫 禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度；既往调用形式事故短时炸百级会话、某模型额度耗尽）。
 > 3. 撞错修根因，禁换名（v2/b/x）重试新建会话。
 > 4. 预算护栏（引擎硬拦）：active leaf ≤ `root_dod.node_budget`（默认 20）；每 leaf subagent_spawn ≤ `audit_meta.max_subagent_spawn_per_leaf`（默认 15）。
 
@@ -778,13 +778,13 @@ root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 八步
 
 首个 worker done 后，若需长期独立 auditor（复杂树多 worker 并行审查），**用 role='auditor' 创建独立审计 leaf**。
 
-> **P0a 背景**：2026-07-08 前，auditor 用 commander/worker role 假装（macp4-A4 用 commander → C-13/R-03 假阳性 24-38 条；macp4-A3 用 worker → W-AUDIT-WORKER 违规；macp4-W3 §3.5 "需要独立 auditor role 而非复用 worker 靠打补丁"）。P0a 引入 role='auditor'：独立审计 leaf，走简化协议，规则按 role 适配，不再误套 worker/commander 规则。
+> **P0a 背景**：2026-07-08 前，auditor 用 commander/worker role 假装（既往假阳性事故 A4 场景用 commander → C-13/R-03 假阳性 24-38 条；既往假阳性事故 A3 场景用 worker → W-AUDIT-WORKER 违规；既往假收敛事故 W3 场景 §3.5 "需要独立 auditor role 而非复用 worker 靠打补丁"）。P0a 引入 role='auditor'：独立审计 leaf，走简化协议，规则按 role 适配，不再误套 worker/commander 规则。
 
 #### §13.4.1 auditor leaf 创建流程（leaf_add role=auditor）
 
 ```text
 [caller=root]   1. mcp__session__fork_session → 拿到 auditor 独立 session
-                   # 🚫禁 create_session/delegate_agent 当 SubAgent（macp2 红线，§13.5）
+                   # 🚫禁 create_session/delegate_agent 当 SubAgent（调用形式红线，§13.5）
 [caller=root]   2. tree_leaf_add(role='auditor', session_id=<auditor session>, parent=<commander leaf>,
                    added_by=<root.session_id>, path=<大写字母开头段>)
                    # auditor leaf 初始 status='active', audit_gate.verdict='required'（不能自审）
@@ -835,7 +835,7 @@ auditor role 引入后，root 信任锚（§13.2）**仍保留**：冷启动期�
 [caller=root] 1. mcp__session__archive_session(session_id=<卡死的 auditor session>)
                  # Proma 层归档卡死 session（释放侧边栏；session_registry 记录不删——Sprint 5 max_sessions 仍计它）
 [caller=root] 2. mcp__session__fork_session（或 create_session）→ 新 auditor session
-                 # 🚫仍禁 create_session/delegate_agent 当 SubAgent（macp2 红线 §13.5）；这里是建 auditor 真 session，合法
+                 # 🚫仍禁 create_session/delegate_agent 当 SubAgent（调用形式红线 §13.5）；这里是建 auditor 真 session，合法
 [caller=root] 3. tree_leaf_set_session(leaf_id=<auditor leaf>, new_session_id=<新 session>)
                  # caller=root.session_id === leaf.added_by（root 创建了该 auditor leaf，§13.4.1 步骤2 set-session caller-binding 放行）
                  # 把 auditor leaf 的 session 换成新的（保留 leaf_id + 已有 events；新 session 登记 session_registry，Sprint 5 max_sessions）
@@ -844,7 +844,7 @@ auditor role 引入后，root 信任锚（§13.2）**仍保留**：冷启动期�
 
 **约束（红线）**：
 - 🔴 fallback 是**异常恢复**，不是常规路径。同一 auditor leaf 重 fork **≤2 次**；超过 → 停下排查 fork identity 根因（跨仓），勿无限重试（每次重 fork 新增 session_registry 记录，会撞 max_sessions）。
-- 🔴 归档卡死 session **不释放** max_sessions 额度（session_registry 记历史 session 总数防 macp2 型爆炸——归档≠没创建过）。频繁 fallback 本身就是反指标。
+- 🔴 归档卡死 session **不释放** max_sessions 额度（session_registry 记历史 session 总数防调用形式型爆炸——归档≠没创建过）。频繁 fallback 本身就是反指标。
 - 🔴 若 auditor leaf **已 done**（§13.4.1 步骤6 后才卡死，罕见），**不要 fallback**——leaf 状态已完成，session 卡死不影响 leaf。
 - **替代方案**：若 fork 反复卡死（>2 次），回退 §13.4.4 root 信任锚（root 当 auditor），不强制走独立 auditor leaf。root 信任锚不依赖 fork，无 identity timeout 风险。
 
@@ -854,7 +854,7 @@ SDK SubAgent（researcher / code-reviewer / implementer / 任意自定义 role�
 
 🔴 **caller-binding 不变**：SubAgent **永不当 caller / auditor-of-record**（它不是 Proma session）。`audit_gate` / `milestone_set_result` / `audit_append` 的 `audit_session_id` 仍填 `root.session_id`（冷启动，见 §13.2）或独立 auditor leaf session（正常期，见 §13.4）。SubAgent 的劳动通过 `subagent_spawn` 事件归因，不改变 done / audit_gate / milestone 的 caller 校验。
 
-> ### ⚠️ 调用形式红线（2026-07-08 macp2 事故强制；违者＝成本爆炸）
+> ### ⚠️ 调用形式红线（2026-07-08 调用形式事故强制；违者＝成本爆炸）
 >
 > **SubAgent 必须用内置 `Agent` 工具**（进程内 SDK subagent，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启 → 不建独立 Proma 会话、不进侧边栏、只花 token、有专用 subagent 模型路由）：
 >
@@ -862,14 +862,14 @@ SDK SubAgent（researcher / code-reviewer / implementer / 任意自定义 role�
 > Agent(description:"G1 完整性审查", prompt:"<视角专属指令：读 <交付物>，按 G1 标准只提 findings，每条 {item,severity,evidence≥10字}>", subagent_type:"Explore")
 > ```
 >
-> **🚫 严禁**用 `mcp__session__create_session` / `mcp__session__fork_session` / `mcp__collaboration__delegate_agent`(或 delegate_agents) 当 reviewer / SubAgent —— 它们**建真实 Proma 会话**，每个烧独立 API 额度（macp2 事故：DeepSeek 误用，4 分钟炸 207 会话、额度打负）。
+> **🚫 严禁**用 `mcp__session__create_session` / `mcp__session__fork_session` / `mcp__collaboration__delegate_agent`(或 delegate_agents) 当 reviewer / SubAgent —— 它们**建真实 Proma 会话**，每个烧独立 API 额度（既往调用形式事故：某模型误用，短时炸百级会话、额度耗尽）。
 >
-> **撞错（`E_DUPLICATE_SESSION_ID` 等）修根因，禁止换名（v2/b/x）重试新建会话**（macp2 循环放大器）。
+> **撞错（`E_DUPLICATE_SESSION_ID` 等）修根因，禁止换名（v2/b/x）重试新建会话**（换名重试循环放大器）。
 >
-> **收敛条件（成本有界，2026-07-08 macp2 事故强制；细则）**：
+> **收敛条件（成本有界，2026-07-08 调用形式事故强制；细则）**：
 > - **角色数按交付物分档**：2/3/5（**上限 5**）。最小档 ≥2（禁单角色=禁自审自批）。分档对齐 worker SKILL §4.6 字数/复杂度阈值——简单交付物小档、跨文件/架构级交付物大档。
 > - **轮数 ≤3**：末轮 `red_count=0` 即收敛停；3 轮未收敛则**升级（blocked 上行 / commander 接管）而非无限重试**。
-> - **🚫 禁止靠新建会话重试**：未收敛时新建 reviewer session 是 macp2 循环放大器。`total = 角色数 × 轮数`，有界可预算。
+> - **🚫 禁止靠新建会话重试**：未收敛时新建 reviewer session 是换名重试循环放大器。`total = 角色数 × 轮数`，有界可预算。
 >
 > **预算护栏（硬上限，建 tree / brief 时设置）**：
 > - **tree 级**：`audit_meta.max_sessions` —— 单棵 tree 全程 session 总数硬上限（init/add/set-session/register 四路径登记 + patches 旁路登记，超 → `E_MAX_SESSIONS`）。
@@ -969,12 +969,12 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 - 子会话 done 上报后进入 §4 Step 4 质量门
 - 🔴 **重要产出类文档任务**（设计文档 / API 规格 / 架构文档 / PRD / 数据模型等正式交付物）：产出后**必须**按 §14.2 派 auditor 复核一致性 / 完整性，**不能仅靠 worker 自报 done + §4 Step4 单验收 Agent**。此类任务即便 brief 不含"审计"关键词、也不属于"评估已有文档"，**仍属 §14 审计范围**。
 
-#### §14.1a nanju04 教训：brief 审计义务不可标"可选"（2026-07-15）
+#### §14.1a 自审事故教训：brief 审计义务不可标"可选"（2026-07-15）
 
 **事故摘要**：commander 派 4 worker 产细分文档（agent-comm / 前后端 API / 数据模型 / events），4 worker 全 done、产物落盘，但**全程无独立 auditor leaf、worker 无 review_round 自审**。对照同 SKILL 同 commander 的另一组任务（派了完整 auditor），根因是 **brief 配置释放了审计义务**，不是 SKILL 逻辑问题。
 
 **根因链（三条独立，任一即足以击穿质量防线）**：
-- **链 A — worker 无自审**：`audit_meta.review_required=false` → done 门禁不要求 review_round → worker 不跑自审（worker SKILL §4.6 触发条件 = `review_required=true` **或** 自检"设计文档/架构级/跨文件≥1000字"主动开；GLM worker 没主动开）。
+- **链 A — worker 无自审**：`audit_meta.review_required=false` → done 门禁不要求 review_round → worker 不跑自审（worker SKILL §4.6 触发条件 = `review_required=true` **或** 自检"设计文档/架构级/跨文件≥1000字"主动开；worker 没主动开）。
 - **链 B — commander 无 auditor**：`root_dod.self_check` 写 `auditor role审查(可选)一致性pass`——**"（可选）"直接释放了 commander 派 auditor 的义务**。对照组写 `1 auditor status=done 且 audit_log 含 passed/failed 统计`（硬 DoD）→ commander 派了 auditor leaf。
 - **SKILL 盲区（放大器）**：§14 触发词是"文档**审计**/验证/终局审查"+"对**已完成**文档可信度评估"——产出新文档（非审计已有）时 commander 判定 §14 不触发。本节 §14.1 第 4 条即此盲区的修复（强制"产出类文档"也触发）。
 
@@ -987,6 +987,8 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 - [ ] 产出含正式文档/架构级/跨文件交付物？→ `audit_meta.review_required=true`
 - [ ] DoD 里 auditor 是硬条件（非"可选"）？
 - [ ] `root_brief.prefix` ≤8 字符且匹配 `[a-z][a-z0-9_]{3,7}$`？
+
+> **与 §13.5 互补（两类典型事故对照）**：§13.5 = SubAgent **调用形式**必须钉死（防成本爆炸，建真实会话烧独立 API 额度）；本节 = brief **审计义务**不可标可选（防质量防线被一句话释放，worker 无自审 + commander 无 auditor）。两者都是"SKILL/brief 没钉死 → commander/worker 自主简化 → 事故"，发布版用通用术语描述，发布后读者只需理解两类风险模式。
 
 ### §14.2 最小审计树结构（强制执行）
 
@@ -1006,7 +1008,7 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 - C1-C4 和 A1-A2 必须并行启动（相互独立）
 - 修正员（fix）在所有审查员返回后启动
 - 禁止指挥官亲自充当审查员（"自己画靶自己打分"）
-- 🔴 **审查 leaf 用 role=auditor**（P0a，见 §13.4）：C1-C4/A1-A2 用 `leaf_add(role='auditor')` 创建，走简化协议（brief_echo+done+audit_gate，无 milestone）。**禁止用 role=worker/commander 假装 auditor**（macp4-A4 用 commander → C-13/R-03 假阳性 24-38 条；macp4-A3 用 worker → W-AUDIT-WORKER 违规）
+- 🔴 **审查 leaf 用 role=auditor**（P0a，见 §13.4）：C1-C4/A1-A2 用 `leaf_add(role='auditor')` 创建，走简化协议（brief_echo+done+audit_gate，无 milestone）。**禁止用 role=worker/commander 假装 auditor**（既往假阳性事故 A4 场景用 commander → C-13/R-03 假阳性 24-38 条；既往假阳性事故 A3 场景用 worker → W-AUDIT-WORKER 违规）
 
 **SubAgent 放大审查产能（2026-07-07 新增）**：commander 的审计维度 leaf（C1-C4 / A1-A2）可派 SDK SubAgent 做深度审查（如某维度需要逐行核对大量证据 / 多视角交叉验证）。每个 SubAgent 在**它所属的审计 leaf** 上 append 一条 `subagent_spawn` 事件（`subagent_id` 父段 = 该审计 leaf_id），产出落 `deliverables/subagent-outputs/`。SubAgent 永不当该审计 leaf 的 caller / auditor-of-record（caller-binding 不变，见 §13.5）。
 
@@ -1138,7 +1140,7 @@ declare done 前逐项确认：
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
-| 2026-07-08 | v2.5 | **macp2 事故修复**：§13.5 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度，macp2 事故 4 分钟炸 207 会话、DeepSeek 余额打负）；撞错修根因禁换名(v2/b/x)重试；收敛条件（角色 2/3/5 上限 5 + 轮≤3 + red_count=0 停/未收敛升级） |
+| 2026-07-08 | v2.5 | **调用形式事故修复**：§13.5 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度，既往调用形式事故短时炸百级会话、某模型额度耗尽）；撞错修根因禁换名(v2/b/x)重试；收敛条件（角色 2/3/5 上限 5 + 轮≤3 + red_count=0 停/未收敛升级） |
 | 2026-07-07 | v2.4 | SubAgent 入树：§13.5 重写（SubAgent = 父 leaf 上 subagent_spawn 事件溯源的一等劳动单元；caller-binding 不变；新增 §13.5.1 写法示例 + §13.5.2 reviewer_kind:subagent / independence）；§4 Step4 加 independence 双重保险意识（self_delegated 第一道筛 / independent 第二道闸 / commander 抽查重点 + 可派自己 SubAgent 独立复核）；§14 加审计维度 leaf 可派 SubAgent 深度审查；§13.7 错误码速查表加 E_DELIVERABLE_EMPTY + E_REVIEW_FORGERY |
 | 2026-07-04 | v2.3 | ISS-003：§4 Step4 加 review_required=true 验收核查（核 review_round event + 抽查 findings 真实性，引擎只防格式，commander 抽查是内容真实性的真实防线） |
 | 2026-06-19 | v2.2 | 审计驱动修订：requires 中 commander-methodology.md 版本引用从 v1.0 更新为 v1.2 |
