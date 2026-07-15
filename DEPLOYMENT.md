@@ -358,6 +358,60 @@ cp -r proma-patches/skills/* ~/.claude/skills/
 # SKILL 是按需加载的，无需重启实例；下次会话自动读到新版
 ```
 
+### 6.4 v0.17.0 私有化发布升级（2026-07-15）
+
+> 首次正式发布版本。详细发布说明见 [RELEASE_NOTES.md](./RELEASE_NOTES.md)。本节给团队已有 pro 实例的具体升级路径。
+
+**前提**：pro 实例已按 §三 部署好（`D:/Proma-dev` + `~/.proma-dev` 隔离数据）。
+
+**步骤**：
+
+```bash
+# 1. 完全退出 pro（含托盘），避免文件锁冲突
+
+# 2. 备份当前 dist（关键，回滚依赖）
+cd D:/Proma-dev/resources/app/dist
+cp tree-engine.cjs        tree-engine.cjs.bak-pre-v0.17.0
+cp proma-dev-patches.cjs  proma-dev-patches.cjs.bak-pre-v0.17.0
+
+# 3. 部署 v0.17.0 dist（从发布包 cp）
+cp <release-pkg>/dist/tree-engine.cjs        D:/Proma-dev/resources/app/dist/
+cp <release-pkg>/dist/proma-dev-patches.cjs  D:/Proma-dev/resources/app/dist/
+
+# 4. md5 校验（tree-engine 应为 3efe6a2b）
+node -e "console.log(require('crypto').createHash('md5').update(require('fs').readFileSync('D:/Proma-dev/resources/app/dist/tree-engine.cjs')).digest('hex').slice(0,8))"
+# 期望输出：3efe6a2b
+
+# 5. 部署 SKILL（文件级即生效，无需重启）
+cp -r <release-pkg>/skills/* ~/.proma-dev/agent-workspaces/default/skills/
+
+# 6. 启动 pro（patches.cjs 在 Electron 主进程启动时 require，加载新引擎）
+```
+
+**验证**：
+
+```text
+[ ] pro 启动后，agent 调 mcp__tree__tree_help(topic="how_to_init") → 返回 tips.next_steps
+[ ] tree-engine.cjs md5 = 3efe6a2b
+[ ] commander SKILL §14.1a 存在（自审事故教训）
+[ ] worker SKILL §4.6 触发条件含「worker 主动自检触发」
+```
+
+**v0.17.0 关键变更**：
+- 引擎：prefix 前置校验（cmdInit）+ isFlagged dead code 清理 + Sprint 5 max_sessions 硬护栏
+- SKILL：commander §14.1a（自审事故教训）+ §13.5（调用形式事故收敛）+ worker §4.6（主动触发强化）+ 全面脱敏
+- 测试：367/0 全量绿 + prefix-init-test 17/0 新增
+
+**回滚**：
+
+```bash
+cp D:/Proma-dev/resources/app/dist/tree-engine.cjs.bak-pre-v0.17.0 \
+   D:/Proma-dev/resources/app/dist/tree-engine.cjs
+cp D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs.bak-pre-v0.17.0 \
+   D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs
+# 重启 pro（SKILL 无需回滚，文件级即生效）
+```
+
 ---
 
 ## 七、回滚流程

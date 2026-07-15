@@ -7,6 +7,49 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), adheres to [Sem
 
 ---
 
+## [v0.17.0] - 2026-07-15 — 首次私有化发布
+
+> **首次正式发布版本**。包给团队内部使用，不推公开 GitHub。源码闭源（开源做壳，闭源做肉）。发布产物含 SKILL（协议规范 + 既往事故教训脱敏）+ 引擎 dist + 部署文档。
+
+### 引擎（tree-engine.cjs）
+
+- **prefix 前置校验**（cmdInit，v0.7 批次6）：`root_brief.prefix` 字段存在时按 `[a-z][a-z0-9_]{3,7}`（4-8 字符）校验，防超长 prefix（如 10 字符）潜伏到 leaf_add 才 `E_NAME_INVALID`（建 worker 时已产文件但 leaf 没入树的死锁）。防御性校验：prefix 字段不存在则跳过，兼容现有合法 tree。
+- **isFlagged dead code 清理**（e2e04 发现 C 核实）：删除 `isFlagged` 三分支中的 #3（worker 分支，因 worker 不能当 parent 而不可达），零行为变化（dead code 不可达），flagged 拦截机制不变（静态分支 #2 仍是有效路径）。
+- **Sprint 5 max_sessions 硬护栏**：`audit_meta.max_sessions`（默认 50）+ session_registry 四路径登记（init/add/set-session/register）+ patches create_session 旁路根治（findCallerTreesForBypassGuard + 旁路登记）。防多 caller 累积 + SDK 原生 create_session 旁路的总量爆炸。
+
+### SKILL（发布化）
+
+- **commander §14.1/§14.1a**：自审事故根因链（链 A worker 无自审 / 链 B commander 无 auditor / SKILL 盲区放大器）+ 4 铁律 + brief checklist + §13.5↔§14.1a 互补对比段。
+- **commander §13.5**：调用形式事故收敛细则（角色 2/3/5 分档 + 轮≤3 + red_count=0 停 + 禁新建会话重试）+ 预算护栏（max_sessions + max_subagent_spawn）+ 心智模型 + 前置验证降维。
+- **worker §4.6**：自审主动触发条件强化（条件 1 引擎强制 `leaf.audit_meta → state.audit_meta` 措辞精确化 + 条件 2 worker 主动自检"设计文档/跨文件/≥1000 字"）+ 收敛条件 + prefix 上行 blocked 防线。
+- **脱敏 + 收敛审计 pass**：DeepSeek/207会话/4分钟/打负 → 某模型/百级会话/短时/额度耗尽；nanju04/macp2/macp3/macp4 → 自审事故/调用形式事故/既往复盘/既往假阳性；GLM worker → worker。6 维度审计（C1-C4 + A1 + A2）5 pass + 1 yellow（A2 脱敏必然代价），原 9 yellow → 修复后 1 yellow，无新 red，私有化发布就绪。
+
+### 验证
+
+- **e2e03 正向**（pro 端到端，2026-07-14）：commander 完整建树→派 worker→done→audit_gate 全流程跑通，证 tree-system 在真实 pro 实例可用。
+- **e2e04 负面场景**（pro，2026-07-15）：三机制矩阵 8/8（E_MAX_SESSIONS 双层护栏 / drift 三档联动 / flagged 篡改检测），补齐 e2e03 未演练的负面路径。详见下方 [Unreleased] e2e04 条目。
+- **真实项目测试**（pro e2e，2026-07-15）：派 4 worker 产 API 文档，发现 brief 配置释放审计义务的根因（链 A/B），驱动 SKILL §14.1a + §4.6 主动触发强化。
+- **审计补审**（2026-07-15）：6 维度并行审计（C1-C4 + A1 + A2），进程内 Explore subagent 独立验证 + 主审读源交叉核对。报告：`.context/active/skill-audit-2026-07-15.md`。
+
+### 测试
+
+- 全量 **367/0**（含 Sprint 5 max_sessions 34 + patches-bypass 27 + gate-reachability 20 + 历史套件 286）。
+- prefix 前置校验新增 **prefix-init-test 17/0**（合法 4 字符 / 合法 8 字符上限 / 超长 10 字符 E_NAME_INVALID / 大写 / 连字符 / 无 prefix 字段兼容性）。
+- 零回归（前置校验防御性：prefix 字段不存在则跳过，现有合法 tree 不受影响）。
+
+### 部署
+
+- pro dist md5（tree-engine.cjs）：**`3efe6a2b`**（含 prefix 前置校验 + isFlagged dead code 清理）。
+- 升级流程见 [DEPLOYMENT.md §六](./DEPLOYMENT.md)（§6.4 v0.17.0 具体步骤）。
+- SKILL 文件级即生效（cp 到 `~/.proma-dev/agent-workspaces/default/skills/`，无需重启）。
+
+### 发布说明
+
+- 详细发布说明：[RELEASE_NOTES.md](./RELEASE_NOTES.md)
+- 部署指南：[DEPLOYMENT.md](./DEPLOYMENT.md)
+
+---
+
 ## [Unreleased]
 
 ### 2026-07-15 e2e04 负面场景验证✅ + isFlagged dead code 清理（零引擎语义变化）

@@ -3,7 +3,7 @@
 > 基于 Proma 商业版（AGPL-3.0）的多 Agent 树形会话执行体系。
 > **核心策略：开源做壳，闭源做肉。**
 
-[![Version](https://img.shields.io/badge/version-v0.16.5%20%2B%20V10%20Phase%203-blue.svg)](.context/PROJECT-INDEX.md)
+[![Version](https://img.shields.io/badge/version-v0.17.0%20私有化发布-blue.svg)](./RELEASE_NOTES.md)
 [![Layer 1](https://img.shields.io/badge/Layer%201-MCP%20%E5%9F%BA%E7%A1%80%E8%AE%BE%E6%96%BD-brightgreen.svg)](#layer-1--mcp-基础设施)
 [![Layer 2](https://img.shields.io/badge/Layer%202-%E6%A0%91%E5%BD%A2%E4%BC%9A%E8%AF%9D%E6%89%A7%E8%A1%8C%E4%BD%93%E7%B3%BB-orange.svg)](#layer-2--树形会话执行体系)
 [![DbC](https://img.shields.io/badge/DbC-21%20%E6%A0%A1%E9%AA%8C%E7%82%B9%20%2B%20V10%208%20%E5%8A%A0%E5%9B%BA-red.svg)](#21-dbc-校验点速查)
@@ -23,13 +23,53 @@
 
 | 维度 | 状态 |
 |---|---|
-| 当前版本 | **v0.16.5 + V10 Phase 3 + IHL 6 轮迭代加固** |
+| 当前版本 | **v0.17.0 私有化发布（2026-07-15）** — 首次正式发布，包给团队，不推公开 GitHub |
 | Layer 1 — MCP 基础设施 | 完工。22 个 session/remote 工具 + 11 个核心补丁 |
 | Layer 2 — 树形会话执行体系 | 接近完工。27 个 tree 工具 + 21 DbC + V10 八大加固 + IHL 6 轮 |
 | 主代码量 | tree-engine.cjs **5045 行** + proma-dev-patches.cjs **3268 行** + main.cjs sed 补丁 12 处（11 apply-patches.sh A-K + 1 Sprint 4 直编 P2 createAgentSession 白名单）|
 | 部署实例 | Dev `D:\Proma-dev\`（隔离）+ Release `D:\Proma-release\`（共享） |
 | 上游仓库 | [orphiczhou/proma-patches](https://github.com/orphiczhou/proma-patches)（私有） |
 | 测试覆盖 | dbc-spec 39/0 + audit-attacks 18/0 + v10-cleanroom 54/54 + v10-regression 14/0 |
+
+---
+
+## v0.17.0 私有化发布（2026-07-15）
+
+> **首次正式发布版本**。包给团队内部使用，不推公开 GitHub。源码闭源（开源做壳，闭源做肉）。详细发布说明见 [RELEASE_NOTES.md](./RELEASE_NOTES.md)。
+
+### 发布范围
+
+| 含 | 不含 |
+|---|---|
+| ✅ commander/worker SKILL（协议规范 + 既往事故教训脱敏）| ❌ 源码（tree-engine.cjs / proma-dev-patches.cjs 闭源肉）|
+| ✅ 引擎 dist（tree-engine md5 `3efe6a2b` + patches）| ❌ CLAUDE.md（内部记忆，不发布）|
+| ✅ 部署文档（DEPLOYMENT.md / RELEASE_NOTES.md）| ❌ 事故复盘细节（postmortem 文档，内部留痕）|
+| ✅ 升级流程（DEPLOYMENT.md §6.4 v0.17.0 具体步骤）| ❌ 内部测试代号（已脱敏为通用术语）|
+
+### 快速部署（团队已有 pro 实例）
+
+```bash
+# 1. 备份当前 dist
+cp D:/Proma-dev/resources/app/dist/tree-engine.cjs{,.bak-pre-v0.17.0}
+
+# 2. 部署 v0.17.0 dist（tree-engine.cjs md5 应为 3efe6a2b）
+cp <release-pkg>/dist/tree-engine.cjs D:/Proma-dev/resources/app/dist/
+
+# 3. 部署 SKILL（文件级即生效，无需重启）
+cp -r <release-pkg>/skills/* ~/.proma-dev/agent-workspaces/default/skills/
+
+# 4. 重启 pro（patches.cjs 在 Electron 主进程启动时 require，必须重启加载新引擎）
+
+# 5. 验证
+#    mcp__tree__tree_help(topic="how_to_init") 应返回 tips.next_steps
+#    node -e "console.log(require('crypto').createHash('md5').update(require('fs').readFileSync('D:/Proma-dev/resources/app/dist/tree-engine.cjs')).digest('hex').slice(0,8))" 应输出 3efe6a2b
+```
+
+### 使用入口
+
+- **commander**：建树 / 派 worker / 审计工作流（详见 commander SKILL §13 冷启动 + §14 审计工作流）
+- **worker**：5 件套 / §4.6 自审 / done 门禁（详见 worker SKILL §1-§4）
+- **详细发布说明**：[RELEASE_NOTES.md](./RELEASE_NOTES.md)
 
 ---
 
