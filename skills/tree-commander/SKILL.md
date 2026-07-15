@@ -866,7 +866,19 @@ SDK SubAgent（researcher / code-reviewer / implementer / 任意自定义 role�
 >
 > **撞错（`E_DUPLICATE_SESSION_ID` 等）修根因，禁止换名（v2/b/x）重试新建会话**（macp2 循环放大器）。
 >
-> **收敛条件（成本有界）**：角色数按交付物分档 2/3/5（**上限 5**），轮数 **≤3**，末轮 `red_count=0` 即停，未收敛则**升级（blocked 上行）而非无限重试**。总调用 ＝ 角色数 × 轮数，有界可预算。
+> **收敛条件（成本有界，2026-07-08 macp2 事故强制；细则）**：
+> - **角色数按交付物分档**：2/3/5（**上限 5**）。最小档 ≥2（禁单角色=禁自审自批）。分档对齐 worker SKILL §4.6 字数/复杂度阈值——简单交付物小档、跨文件/架构级交付物大档。
+> - **轮数 ≤3**：末轮 `red_count=0` 即收敛停；3 轮未收敛则**升级（blocked 上行 / commander 接管）而非无限重试**。
+> - **🚫 禁止靠新建会话重试**：未收敛时新建 reviewer session 是 macp2 循环放大器。`total = 角色数 × 轮数`，有界可预算。
+>
+> **预算护栏（硬上限，建 tree / brief 时设置）**：
+> - **tree 级**：`audit_meta.max_sessions` —— 单棵 tree 全程 session 总数硬上限（init/add/set-session/register 四路径登记 + patches 旁路登记，超 → `E_MAX_SESSIONS`）。
+> - **worker 级**：`max_subagent_spawn` —— 单 worker 派 SubAgent 次数硬上限。
+> - 撞 `E_MAX_SESSIONS` / `E_DUPLICATE_SESSION_ID` 等预算错 → **修根因（任务范围/分档/未释放的旧 session），禁换名（v2/b/x）重试新建**。
+>
+> **Proma 心智模型**：Proma 原生 spawn（`create_session` / `fork_session` / `delegate_agent`）= 真实会话 = 钱。"廉价 SubAgent" 只存在于进程内 Agent 工具，必须本节红线显式指定。
+>
+> **前置验证（任何 SubAgent 设计前）**：确认目标会话工具集**是否含进程内 Agent 工具**（看 SKILL/工具清单）。若无（如某些第三方模型 runtime 无 SDK subagent）→ 设计降维：单 reviewer 或 commander 自审，**不**假设可无限派 SubAgent。
 
 #### §13.5.1 怎么记：父 leaf 上 append subagent_spawn 事件
 
@@ -955,7 +967,26 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 - 任务 brief 中含 "审计/审查/验证/验收/终局/converge/audit/verify/review" 等关键词
 - 需要对一份已完成文档进行可信度评估
 - 子会话 done 上报后进入 §4 Step 4 质量门
-- 🔴 **重要产出类文档任务**（设计文档 / API 规格 / 架构文档 / PRD / 数据模型等正式交付物）：产出后**必须**按 §14.2 派 auditor 复核一致性 / 完整性，**不能仅靠 worker 自报 done + §4 Step4 单验收 Agent**。此类任务即便 brief 不含"审计"关键词、也不属于"评估已有文档"，**仍属 §14 审计范围**（nanju04 教训 2026-07-15：brief 标 auditor"（可选）"+ audit_meta.review_required=false → 4 worker 产 API 文档全程无 auditor leaf、无 review_round 自审；对照 e2e03 同 SKILL 写硬 DoD → 派了完整 D-auditor）。详见 [CLAUDE.md P0 教训 nanju](../../CLAUDE.md)
+- 🔴 **重要产出类文档任务**（设计文档 / API 规格 / 架构文档 / PRD / 数据模型等正式交付物）：产出后**必须**按 §14.2 派 auditor 复核一致性 / 完整性，**不能仅靠 worker 自报 done + §4 Step4 单验收 Agent**。此类任务即便 brief 不含"审计"关键词、也不属于"评估已有文档"，**仍属 §14 审计范围**。
+
+#### §14.1a nanju04 教训：brief 审计义务不可标"可选"（2026-07-15）
+
+**事故摘要**：commander 派 4 worker 产细分文档（agent-comm / 前后端 API / 数据模型 / events），4 worker 全 done、产物落盘，但**全程无独立 auditor leaf、worker 无 review_round 自审**。对照同 SKILL 同 commander 的另一组任务（派了完整 auditor），根因是 **brief 配置释放了审计义务**，不是 SKILL 逻辑问题。
+
+**根因链（三条独立，任一即足以击穿质量防线）**：
+- **链 A — worker 无自审**：`audit_meta.review_required=false` → done 门禁不要求 review_round → worker 不跑自审（worker SKILL §4.6 触发条件 = `review_required=true` **或** 自检"设计文档/架构级/跨文件≥1000字"主动开；GLM worker 没主动开）。
+- **链 B — commander 无 auditor**：`root_dod.self_check` 写 `auditor role审查(可选)一致性pass`——**"（可选）"直接释放了 commander 派 auditor 的义务**。对照组写 `1 auditor status=done 且 audit_log 含 passed/failed 统计`（硬 DoD）→ commander 派了 auditor leaf。
+- **SKILL 盲区（放大器）**：§14 触发词是"文档**审计**/验证/终局审查"+"对**已完成**文档可信度评估"——产出新文档（非审计已有）时 commander 判定 §14 不触发。本节 §14.1 第 4 条即此盲区的修复（强制"产出类文档"也触发）。
+
+**铁律（写 brief / 建 tree 必须遵守）**：
+1. **产出类文档任务（≥1 份设计文档/API 规格/架构文档/PRD 等正式交付物）默认 `review_required=true`** —— 让引擎 done 门禁强制 worker 跑自审，不靠 worker 自觉。
+2. **auditor 写成硬 DoD，禁止"（可选）"措辞** —— `self_check` 写 `1 auditor status=done 且 audit_log 含 N 条 findings`（参照对照组），不能写"（可选）"。brief 一旦标可选，commander 会自主跳过整条 auditor 链。
+3. **prefix 命名 ≤8 字符**：`root_brief.prefix` 必须匹配 `[a-z][a-z0-9_]{3,7}`（4-8 字符，小写开头，无连字符）。超长名（如 10 字符）会潜伏到 leaf_add 才 `E_NAME_INVALID` 全卡死（worker 靠 create_session+send 产了文件但 leaf 没入树）。引擎 init 已前置校验（建 tree 即拦），命名时仍自查。
+
+**brief checklist（建 tree 前过一遍）**：
+- [ ] 产出含正式文档/架构级/跨文件交付物？→ `audit_meta.review_required=true`
+- [ ] DoD 里 auditor 是硬条件（非"可选"）？
+- [ ] `root_brief.prefix` ≤8 字符且匹配 `[a-z][a-z0-9_]{3,7}$`？
 
 ### §14.2 最小审计树结构（强制执行）
 
