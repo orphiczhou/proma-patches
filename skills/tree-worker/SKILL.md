@@ -405,7 +405,14 @@ dod:
 > 对应引擎硬约束：`cmdLeafSetStatus` done 门禁校验 events[] 须含 ≥1 条 `review_round` 事件（schema + 末轮 red_count===0 + 总轮数≤3）。
 > 2026-07-07 重写（SubAgent 入树）：reviewer 走 `reviewer_kind:subagent` + `reviewer_ref=sub:<本leaf>:<序号>`，由本 leaf 上的 `subagent_spawn` 事件溯源；不再用 `reviewer_session_id` 填假 UUID（旧路径已被引擎 E_REVIEW_FORGERY 拦截，因为 SDK SubAgent 没有 Proma session_id，假 UUID 无法溯源）。与 §4.2 互补：§4.2 是每个 Mi 后的快速单 Agent 对齐自检；§4.6 是全部 Mi 完成后、done 前的多视角内容审查收敛。
 
-**触发条件**：`brief.audit_meta.review_required === true`（commander 下发 brief 时标记），或 worker 自检交付物为设计文档/架构级/跨文件（≥1000 字）时主动开启。
+**触发条件（两个独立条件，满足任一即必须跑 §4.6，不可跳过）**：
+1. `brief.audit_meta.review_required === true`（commander 下发 brief 时标记，引擎 done 门禁强制 review_round）
+2. **worker 主动自检触发**（不等 brief 设 review_required）—— 产出属以下任一即**必须主动**跑 §4.6 自审：
+   - 设计文档 / API 规格 / 架构文档 / PRD / 数据模型等**正式交付物**
+   - 跨文件交付（≥2 文件）
+   - 单文件 ≥1000 字（架构级 / 重要业务逻辑）
+
+> 🔴 **nanju04 教训（2026-07-15 链 A）**：worker 产 API 设计文档（属条件 2"设计文档级"），但 brief `review_required=false`，worker **没主动**开 §4.6 → 全程无自审，4 worker 全 done 但产物无质量防线。**不要等 brief 标 review_required**——产出类型自检命中条件 2 即主动开。条件 2 是 worker 自己的判断（不是 commander 的），是 nanju 防线。
 
 **与 §4.2 的关系**：§4.2 不废弃（仍用于 milestone 级快速自检），但 review_required=true 时 done 前必须**额外**跑 §4.6。审计角色（§10，commander 派 leaf 模式）是另一条独立链，不冲突。
 
@@ -418,7 +425,16 @@ dod:
 > Agent(description:"G1 完整性审查", prompt:"<视角专属指令，读 deliverables/<文件>，返回 findings JSON [{item,severity,evidence≥10字}]>", subagent_type:"Explore")
 > ```
 > **🚫 严禁** `mcp__session__create_session` / `fork_session` / `mcp__collaboration__delegate_agent`(delegate_agents) 当 reviewer —— **建真实会话＝烧独立 API 额度**（macp2 事故：4 分钟炸 207 会话，DeepSeek 余额打负）。
-> **撞错（E_DUPLICATE_SESSION_ID 等）修根因，禁换名（v2/b/x）重试新建会话**。**收敛**：角色分档 2/3/5（上限 5），轮数 ≤3，`red_count=0` 停，未收敛升级（blocked 上行）不重试。
+>
+> **撞错（`E_DUPLICATE_SESSION_ID` / `E_MAX_SESSIONS` 等）修根因，禁换名（v2/b/x）重试新建会话**（macp2 循环放大器）。
+>
+> **收敛条件（成本有界，对齐 commander SKILL §13.5）**：
+> - **角色数按交付物分档**：2/3/5（**上限 5**），最小档 ≥2（禁单角色 = 禁自审自批）。字数/文件数分档细则见下方"执行步骤 1"。
+> - **轮数 ≤3**：末轮 `red_count=0` 即收敛停；3 轮未收敛则**上行 `blocked`（commander 接管）而非无限重试**。
+> - **🚫 禁止靠新建会话重试**：未收敛时新建 reviewer session = 成本爆炸。
+> - `total = 角色数 × 轮数`，有界可预算。
+>
+> **预算护栏（硬上限）**：tree `audit_meta.max_sessions` + worker `max_subagent_spawn`。撞上限 → 修根因（任务范围 / 分档 / 未释放的旧 session），禁换名重试。
 
 **执行步骤**（最多 3 轮，红色归零收敛）：
 
@@ -688,6 +704,8 @@ REST
 **示例**: `nanju-A-eval` = nanju 项目第 1 子（A）执行评测模块；`nanju-B1b-engine` = B 的第 1 孙的第 2 次尝试（评测引擎）。
 
 工人**不需要**记忆完整正则，但必须确保自己的 `leaf_id` 符合上述段约束。`prefix` 由根会话首次激活时生成、Fork 时自动继承，工人无需自行生成。
+
+> 🔴 **prefix 超长会潜伏卡死（nanju04api 教训 2026-07-15）**：commander 建树时若用了 >8 字符 prefix（如 `nanju04api` 10 字符），引擎 init/leaf_add 会 `E_NAME_INVALID` 拦截（worker 进不来 / leaf 不入树，但 send_message 可能已发出 → 产了文件但 leaf 不存在 → 死锁）。worker 收到 send_message 后第一件事是 `tree_leaf_get`，若返回 `E_LEAF_NOT_FOUND` / `E_NAME_INVALID` → **立即上行 `blocked`** 告知 commander "leaf_id prefix 非法，请改 ≤8 字符重建"，不要继续产文件。
 
 ---
 
