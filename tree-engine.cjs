@@ -1768,7 +1768,7 @@ async function cmdLeafSetStatus(args, callerSessionId) {
           (lid) => state.leaves[lid].parent === leaf_id
         );
         const notDone = childIds.filter(
-          (lid) => state.leaves[lid].status !== 'done'
+          (lid) => !['done', 'archived', 'pruned'].includes(state.leaves[lid].status)
         );
         if (notDone.length > 0) {
           throw new TreeStateError(
@@ -1782,6 +1782,7 @@ async function cmdLeafSetStatus(args, callerSessionId) {
         const auditBlocked = childIds.filter((lid) => {
           const cl = state.leaves[lid];
           if (cl.role === 'auditor') return false;
+          if (['archived', 'pruned'].includes(cl.status)) return false;
           const _gv = cl.audit_gate && cl.audit_gate.verdict;
           return _gv === 'required';
         });
