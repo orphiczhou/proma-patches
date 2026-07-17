@@ -63,12 +63,16 @@ v0.17.1「schema 位置红线」纯 SKILL 教化（显眼红线块 + ❌/✅ 对
 
 > 三条 P0 互补：macp2=调用形式钉死（防成本）；nanju=审计义务不可标可选（防质量）；**v0.17.1=教化对 GLM 无效必须引擎硬拦（防伪造）——v0.18 已落地：worker role 禁 review_round session 分支 → `E_REVIEW_SESSION_FORBIDDEN`**。共性"GLM 会自主简化，不可靠信任，防线须沉到引擎层"。
 
+## 🔴 持续迭代 Loop（每个主会话按此工作，2026-07-17 确立）
+
+详见 `.context/active/tree-system-iteration-loop.md`。核心循环：**commit → 派 commander+observer 测试当前改动 → 派 commander+observer 用 nanju S1 真实项目测试 → subAgent 进程内审计+迭代改进 → commit → 回到测试**。每轮填演进记录表。
+
 ## 部署同步口诀（改 engine/SKILL 后）
 > 权威源 = `D:/codes/tree-harness/`（2026-07-09 起）。改完从这里部署到 dist。
 1. `D:/codes/tree-harness/tree-engine.cjs` → `D:/Proma-dev/resources/app/dist/tree-engine.cjs`（pro，cp 后需用户重启 pro app 才加载新引擎）
 2. `D:/codes/tree-harness/proma-dev-patches.cjs` → `D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs`（pro，同上；patches 改动也需重启 pro 才生效）
 3. `skills/*` → `~/.proma-pro/agent-workspaces/default/skills/`（pro commander 真实 workspace；SKILL 文件级即生效）。⚠️ **分离 bug（2026-07-16 发现）**：start-pro.bat `PROMA_INSTANCE_NAME=pro` 让 Proma session/workspace/skills 在 **`.proma-pro/`**（commander 活在这，18 个内置 skill 在此），但 `PROMA_DEV=1` 让 tree-system 的 tree 目录在 **`.proma-dev/`**（v19t 等树在此）——两者分离。**SKILL 部署 .proma-pro，tree 监督读 .proma-dev**。旧口诀"SKILL→.proma-dev"是 bug（把 tree 目录当 skill 目录，e2e 时代埋的）。
-4. 同步前备份 `.bak-pre-<label>-<date>`；md5 校验源=pro（tree-engine 应=3e10bf8e，patches 应=5083480d）。
+4. 同步前备份 `.bak-pre-<label>-<date>`；md5 校验源=pro（tree-engine 应=1f05baa7，patches 应=5083480d）。
 
 ## pro 测试要点（来自历次迭代）
 - pro 用 `.proma-dev` userData（**非** `~/.proma`）。SKILL 同步错路径 = commander 读旧版（曾误判"SKILL 未生效"）。
