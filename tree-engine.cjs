@@ -197,6 +197,12 @@ const E_SESSION_NOT_ALIVE = 'E_SESSION_NOT_ALIVE';
 const E_REVIEW_NOT_CONVERGED = 'E_REVIEW_NOT_CONVERGED';  // worker done 但 review 未收敛/未跑
 const E_REVIEW_FORGERY = 'E_REVIEW_FORGERY';              // review_round schema 伪造/自审
 const E_REVIEW_FLAGGED_BLOCK = 'E_REVIEW_FLAGGED_BLOCK';  // 父链有 flagged leaf, 需先补审
+// v0.18 (2026-07-16): worker role 禁 review_round session 分支。worker 自审必走 subagent 分支（reviewer_ref 溯源
+//   subagent_spawn）。堵 nanju05/v172t 实战：GLM worker 用 session 分支 + 占位/借真合法 v4 UUID 蒙混（0 spawn，自审架空）。
+const E_REVIEW_SESSION_FORBIDDEN = 'E_REVIEW_SESSION_FORBIDDEN';
+// v0.20 (2026-07-17): audit_gate verdict=pass 时，被审 leaf 的 audit_log findings 不能有 red severity
+//   （防 auditor 偏松 pass 严重问题，v20t 教训：GLM auditor 发现 mid 安全问题却 verdict=pass）。
+const E_AUDIT_RED_BLOCKED = 'E_AUDIT_RED_BLOCKED';
 // SubAgent 入树 (2026-07-07): 产物文件存在但 0 字节。BUG-3 修复 — done 门禁 + subagent_spawn 都要查 size>0.
 const E_DELIVERABLE_EMPTY = 'E_DELIVERABLE_EMPTY';
 // 2026-07-08 macp2 事故后预算护栏：单 leaf subagent_spawn 数超 audit_meta.max_subagent_spawn_per_leaf。
@@ -380,6 +386,8 @@ const ERROR_TO_HELP = {
   E_REVIEW_NOT_CONVERGED:     'alignment_workflow',       // worker done 但 review 未收敛
   E_REVIEW_FORGERY:           'alignment_workflow',       // review_round schema 伪造/自审
   E_REVIEW_FLAGGED_BLOCK:     'alignment_workflow',       // 父链 flagged, 需先补审
+  E_REVIEW_SESSION_FORBIDDEN: 'alignment_workflow',       // v0.18: worker 禁 session 分支
+  E_AUDIT_RED_BLOCKED:       'alignment_workflow',       // v0.20: audit_log 有 red 不能 pass
   // ---- SubAgent 入树 ----
   E_DELIVERABLE_EMPTY:        'how_to_worker_lifecycle',  // 产物 0 字节（done 门禁 / subagent_spawn）
   E_SUBAGENT_BUDGET_EXCEEDED:        'how_to_subagent_lifecycle',  // 2026-07-08 macp2 预算护栏：单 leaf subagent_spawn 超限
@@ -1452,6 +1460,13 @@ function validateReviewRoundSchema(meta, leaf, leafId) {
     //       subagent kind 本就无 session_id，强校验误杀合规 worker。内容真实性靠 commander 抽样 + 阶段二 Layer2.
     const rkind = r.reviewer_kind || 'session';
     if (rkind === 'session') {
+      // v0.18 (2026-07-16): worker role 禁 session 分支。worker 是 leaf owner，自审必走 subagent 分支
+      //   （reviewer_kind:subagent + reviewer_ref 溯源 subagent_spawn）。session 分支 = 独立第三方真 session
+      //   他审（commander fork / auditor leaf），worker 无独立他审 session。堵 nanju05/v172t：GLM worker 用
+      //   session 分支 + 占位/借真合法 v4 UUID 蒙混 review_round（0 subagent_spawn，自审架空）。
+      if (leaf.role === 'worker') {
+        throw new TreeStateError(E_REVIEW_SESSION_FORBIDDEN, `review_round on "${leafId}" reviewer "${r.perspective}" uses session branch — worker self-review must use reviewer_kind=subagent + reviewer_ref (session branch is for independent他审 only; nanju05/v172t lesson)`);
+      }
       if (typeof r.reviewer_session_id !== 'string' || !UUID_RE.test(r.reviewer_session_id)) {
         throw new TreeStateError(E_REVIEW_FORGERY, `review_round on "${leafId}" reviewer "${r.perspective}" has invalid reviewer_session_id (UUID required)`);
       }
@@ -1724,7 +1739,7 @@ async function cmdLeafSetStatus(args, callerSessionId) {
       // v0.2.2 (TAO): audit_gate 检查 — 非 skip 的 leaf 必须 verdict=pass 才能 done
       // 阻止 Worker 跳过天道审计直接声明完成
       const gate = leaf.audit_gate;
-      if (gate && gate.verdict !== 'skip' && gate.verdict !== 'pass') {
+      if (gate && gate.verdict !== 'skip' && !isPassVerdict(gate.verdict)) {
         throw new TreeStateError(
           E_GATEKEEPER_REQUIRED,
           `cannot set status=done: audit_gate.verdict="${gate.verdict}" for leaf "${leaf_id}". TAO audit required before done.`
@@ -1747,8 +1762,8 @@ async function cmdLeafSetStatus(args, callerSessionId) {
         }
       }
 
-      // commander 角色额外检查：所有子 leaf 必须 done
-      if (leaf.role === 'commander') {
+      // commander/root 角色额外检查：所有子 leaf 必须 done（v0.19 扩 root，堵 commander root 提前 done 放弃子任务）
+      if (leaf.role === 'commander' || leaf.role === 'root') {
         const childIds = Object.keys(state.leaves).filter(
           (lid) => state.leaves[lid].parent === leaf_id
         );
@@ -1758,7 +1773,7 @@ async function cmdLeafSetStatus(args, callerSessionId) {
         if (notDone.length > 0) {
           throw new TreeStateError(
             E_CHILDREN_NOT_DONE,
-            `cannot set commander status=done: ${notDone.length} child leaf(s) not done: ${notDone.join(', ')}`
+            `cannot set commander/root status=done: ${notDone.length} child leaf(s) not done: ${notDone.join(', ')}`
           );
         }
       }
@@ -2772,8 +2787,8 @@ function resolveAuditorIndep(state, leaf, auditorSessionId) {
     return `auditor leaf "${auditorLeaf.leaf_id}" events empty (no audit work performed; auditor must have ≥1 event before endorsing others)`;
   }
   const ag = auditorLeaf.audit_gate;
-  if (!ag || ag.verdict !== 'pass') {
-    return `auditor leaf "${auditorLeaf.leaf_id}" own audit_gate.verdict="${ag ? ag.verdict : 'undefined'}" (must be pass; auditor cannot endorse others without itself being endorsed)`;
+  if (!ag || !isPassVerdict(ag.verdict)) {
+    return `auditor leaf "${auditorLeaf.leaf_id}" own audit_gate.verdict="${ag ? ag.verdict : 'undefined'}" (must be pass or pass_with_minor; auditor cannot endorse others without itself being endorsed)`;
   }
   return null;
 }
@@ -2967,13 +2982,14 @@ function collectValidateIssues(state) {
   // v0.7 批次4 白名单：auditor 必须是树中真实存在的、独立的 leaf session（堵伪造 UUID）。
   // v0.7 批次5 (CP2) 扩展：原仅查 worker+done，攻击者可给 pending_brief/commander 伪造 pass 蒙混（CP2-direct-forge）。
   //   现 verdict=pass 即查独立性（不限 role/status）。verdict=skip/required/fail 不查（零误伤：commander/root 默认 skip）。
+  //   v0.21: pass_with_minor 同样视为放行，必须查独立性。
   for (const id of leafIds) {
     const leaf = leaves[id];
     const gate = leaf.audit_gate || {};
-    if (gate.verdict === 'pass') {
+    if (isPassVerdict(gate.verdict)) {
       const auditor = gate.auditor_session_id;
       const problem = resolveAuditorIndep(state, leaf, auditor);
-      if (problem) issues.push({ type: 'audit_gate_not_independent', leaf_id: id, detail: `audit_gate(verdict=pass) not independent: ${problem}` });
+      if (problem) issues.push({ type: 'audit_gate_not_independent', leaf_id: id, detail: `audit_gate(verdict=${gate.verdict}) not independent: ${problem}` });
     }
   }
 
@@ -2981,7 +2997,7 @@ function collectValidateIssues(state) {
   for (const id of leafIds) {
     const leaf = leaves[id];
     const gate = leaf.audit_gate || {};
-    if (leaf.role === 'worker' && (leaf.status === 'done' || gate.verdict === 'pass')) {
+    if (leaf.role === 'worker' && (leaf.status === 'done' || isPassVerdict(gate.verdict))) {
       const evs = Array.isArray(leaf.events) ? leaf.events : [];
       const alignmentEcho = evs.find((e) => e && e.type === 'brief_echo' && e.meta && e.meta.alignment !== undefined && e.meta.alignment !== null && e.meta.alignment !== '');
       if (!alignmentEcho) {
@@ -3177,11 +3193,14 @@ function calcCommanderDepth(state, parent_leaf_id) {
 // ============================================================
 // 命令: audit-gate (v0.2.2 TAO) — 天道审计门
 // 控制_leaf 是否可通过 set-status done
-// verdict ∈ {required, pass, fail, skip}
+// verdict ∈ {required, pass, pass_with_minor, fail, skip}   (v0.21 加 pass_with_minor)
 // ============================================================
 
+// v0.21: pass_with_minor 语义=放行（有 minor 问题），所有"放行判断"接受 pass + pass_with_minor
+function isPassVerdict(v) { return v === 'pass' || v === 'pass_with_minor'; }
+
 async function cmdAuditGate(args, callerSessionId) {
-  // audit-gate <tree_id> <leaf_id> --verdict <required|pass|fail|skip>
+  // audit-gate <tree_id> <leaf_id> --verdict <required|pass|pass_with_minor|fail|skip>
   //          [--audit-session-id <uuid>] [--reason <text>]
   // V10-self-audit-forbidden-v2: 新增 callerSessionId 形参 —— MCP wrapper 透传调用方 session_id，
   //   校验 caller 必须等于 audit_session_id（堵 worker 528b0925 借 auditor 404c724f 的 session_id 调接口）。
@@ -3189,10 +3208,10 @@ async function cmdAuditGate(args, callerSessionId) {
   const [tree_id, leaf_id] = positional;
   assertTreeExists(tree_id);
   if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
-  if (!opts.verdict) throw new TreeStateError(E_SCHEMA_INVALID, '--verdict is required (required|pass|fail|skip)');
+  if (!opts.verdict) throw new TreeStateError(E_SCHEMA_INVALID, '--verdict is required (required|pass|pass_with_minor|fail|skip)');
   const verdict = opts.verdict;
-  if (!['required', 'pass', 'fail', 'skip'].includes(verdict)) {
-    throw new TreeStateError(E_SCHEMA_INVALID, `verdict "${verdict}" not in [required, pass, fail, skip]`);
+  if (!['required', 'pass', 'pass_with_minor', 'fail', 'skip'].includes(verdict)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `verdict "${verdict}" not in [required, pass, pass_with_minor, fail, skip]`);
   }
   const audit_session_id = opts['audit-session-id'] || null;
   // V10-uuid-format-strict: 升级 UUID 校验为严格 v4（拒绝全 0/全 f/非 v4/空）。
@@ -3230,7 +3249,7 @@ async function cmdAuditGate(args, callerSessionId) {
     // v0.7 Phase A (A2) + 批次4 (V2): auditor 独立性硬约束 — pass/required 时审计者必须独立于被审计者
     // v0.7 批次4 升级为白名单：auditor 必须是树中真实存在的、独立的 leaf session。
     // 旧黑名单(null/added_by/root)可被任意伪造 UUID 绕过；现要求 auditor 真实存在于树。
-    if (verdict === 'pass' || verdict === 'required') {
+    if (isPassVerdict(verdict) || verdict === 'required') {
       const indepProblem = resolveAuditorIndep(state, leaf, audit_session_id);
       if (indepProblem) {
         throw new TreeStateError(
@@ -3242,7 +3261,8 @@ async function cmdAuditGate(args, callerSessionId) {
 
     // v0.7 Phase A (A7): audit 时序硬约束 — pass 时被审计 leaf 必须已有更早的 done 事件
     // 审计发生在工作完成之后，杜绝"未完工即审计通过"
-    if (verdict === 'pass') {
+    // v0.21: pass_with_minor 同样视为放行，走同一 done event 校验 + v0.20 red 阈值外层
+    if (isPassVerdict(verdict)) {
       const evs = Array.isArray(leaf.events) ? leaf.events : [];
       const doneEvent = evs.find((e) => e && e.type === 'done');
       if (!doneEvent) {
@@ -3283,6 +3303,23 @@ async function cmdAuditGate(args, callerSessionId) {
           );
         }
       }
+      // v0.20 (2026-07-17): audit_gate pass 时，被审 leaf 的 audit_log findings 不能有 red severity
+      //   （防 auditor 偏松 pass 严重问题，v20t 教训：GLM auditor 发现 mid 安全问题却 verdict=pass）。
+      //   注：仅校验 severity=red（critical），yellow（含 mid 安全 pass_with_minor）不阻断 pass——mid 由 SKILL 教化加权，引擎只兜底 red。
+      if (Array.isArray(leaf.audit_log)) {
+        for (const _e of leaf.audit_log) {
+          if (_e && Array.isArray(_e.results)) {
+            for (const _r of _e.results) {
+              if (_r && _r.severity === 'red') {
+                throw new TreeStateError(
+                  E_AUDIT_RED_BLOCKED,
+                  `audit-gate rejected: leaf "${leaf_id}" audit_log has red severity finding "${_r.item}". Cannot pass with unresolved red (critical) issue — auditor must resolve, downgrade with evidence, or escalate. [v0.20 severity threshold, v20t lesson]`
+                );
+              }
+            }
+          }
+        }
+      }
     }
 
     leaf.audit_gate = {
@@ -3317,7 +3354,7 @@ async function cmdAuditAppend(args, callerSessionId) {
   const required = ['auditor_session_id', 'total', 'passed', 'failed', 'results'];
   for (const k of required) {
     if (!(k in entry)) {
-      throw new TreeStateError(E_SCHEMA_INVALID, `audit log entry missing field "${k}"`);
+      throw new TreeStateError(E_SCHEMA_INVALID, `audit log entry missing field "${k}". Required: {auditor_session_id:UUID, total:int, passed:int, failed:int, results:[{item:string, pass:boolean, evidence:string, severity:red|yellow|green}]}. Constraint: passed+failed=total, results.length=total`);
     }
   }
 
@@ -3387,6 +3424,11 @@ async function cmdAuditAppend(args, callerSessionId) {
         typeof r.evidence !== 'string') {
       throw new TreeStateError(E_SCHEMA_INVALID,
         `audit log entry results[${i}] must have {item:string, pass:boolean, evidence:string}`);
+    }
+    // v0.21: results[i].severity 必填 red|yellow|green（v0.20 可选→必填，让 v0.20 red 阈值有效）
+    if (typeof r.severity !== 'string' || !['red', 'yellow', 'green'].includes(r.severity)) {
+      throw new TreeStateError(E_SCHEMA_INVALID,
+        `audit log entry results[${i}].severity must be red|yellow|green (required v0.21), got "${r.severity}"`);
     }
   }
 
@@ -4038,7 +4080,7 @@ auditor 必须先 audit_gate pass 才能给 worker 背书 → 但 auditor 自己
 auditor leaf 担任其他 leaf 的 auditor 时，引擎校验 auditor leaf：
 - status === 'done'
 - events 非空（至少发过一条上行事件）
-- audit_gate.verdict === 'pass'（被 root 或上级 auditor 背书过）
+- audit_gate.verdict === 'pass' 或 'pass_with_minor'（v0.21；被 root 或上级 auditor 背书过）
 缺任一 → E_AUDITOR_NOT_DONE / E_AUDITOR_NO_EVENTS / E_AUDITOR_NOT_VERIFIED
 
 ## auditor 简化协议（P0a，区别于 worker/commander）
@@ -4457,7 +4499,7 @@ review_round meta schema：
   reviewers: [
     {
       perspective:        'G1'|'G2'|'G3'|'G4'|'G5',  // 多视角
-      reviewer_session_id: <UUID v4>,
+      reviewer_session_id: <UUID v4>,  // session 分支字段；worker role 禁用（v0.18 → E_REVIEW_SESSION_FORBIDDEN），仅 commander/auditor 他审用
       findings: [
         { severity: 'red'|'yellow'|'green', item: <string>, evidence: <≥10 chars> }
       ]
@@ -4473,6 +4515,7 @@ review_round meta schema：
 - **E_REVIEW_NOT_CONVERGED** — events 无 review_round / 末轮 red_count>0 / 总轮数>3
 - **E_REVIEW_FORGERY** — reviewer 是 worker 自己（session_id 相同）/ 是 added_by（commander）/ perspective 漏填 / reviewer_session_id 非 UUID v4 / findings 空 / evidence<10 字符 / red_count 与实际不符
 - **E_REVIEW_FLAGGED_BLOCK** — 父链祖先有 review_evidence.flagged=true（pre-ISS-003 done 未补审），须先给 flagged 祖先补 review_round event 再创建下游 leaf
+- **E_REVIEW_SESSION_FORBIDDEN** (v0.18) — **worker role 用 session 分支**（reviewer_kind=session 或缺省走 session）。worker 自审必走 subagent 分支（reviewer_kind:subagent + reviewer_ref 溯源 subagent_spawn）。撞错→改走 subagent 分支 + 真 spawn SubAgent。堵 nanju05/v172t 占位/借真 UUID 蒙混
 
 绕过开关（仅测试用）：\`audit_meta.review_required=false\` 或环境变量 \`PROMA_REVIEW_DISABLE=1\`。
 
@@ -4484,6 +4527,112 @@ worker 可自写一份格式合法的 review_round（全 green 废话）蒙混 d
 ## 关联
 - mcp__tree__tree_help('how_to_register_auditor')
 - mcp__tree__tree_help('error_code_index') — E_REVIEW_*`,
+  },
+
+  audit_append_schema: {
+    title: 'audit_append 完整 schema（v0.21 severity 必填）',
+    related: ['alignment_workflow', 'error_code_index', 'how_to_register_auditor'],
+    content: `# audit_append_schema — audit_log entry 完整 schema (v0.21)
+
+## 必填字段（缺任一 → E_SCHEMA_INVALID，报错一次性列出全部约束）
+\`\`\`
+auditor_session_id : UUID v4 (严格：拒全 0 / 全 f / 非 v4 / 空 / 非法字符；且必须指向树中真实独立 leaf session)
+total              : 非负整数
+passed             : 非负整数
+failed             : 非负整数
+results            : 数组，长度必须 === total
+\`\`\`
+
+## 数值一致性硬约束（V10-numeric-consistency）
+- passed + failed === total  （否则 E_COUNT_MISMATCH）
+- results.length === total    （否则 E_LENGTH_MISMATCH）
+- total / passed / failed 各自非负整数（否则 E_NEGATIVE_COUNT）
+
+## results[i] 三元组 + severity（v0.21 severity 必填）
+每个 results[i] 必须是：
+\`\`\`
+{
+  item:     string  (检查项描述，非空),
+  pass:     boolean (该项是否通过),
+  evidence: string  (客观证据：文件路径/行号/test 输出/命令结果，非空),
+  severity: 'red' | 'yellow' | 'green'   // v0.21 起必填（v0.20 可选→必填）
+}
+\`\`\`
+- severity 缺失或非 red|yellow|green → E_SCHEMA_INVALID（v0.21 必填）
+- red = critical（阻断 audit_gate pass，v0.20 red 阈值）
+- yellow = 含 mid 安全等 minor 问题（可 verdict=pass_with_minor）
+- green = 无问题
+
+## v0.20 red 阈值 + v0.21 pass_with_minor 联动
+audit_gate 设 verdict=pass 或 pass_with_minor 时，引擎扫描该 leaf 全部 audit_log 的 results[].severity：
+- 任一 severity='red' → E_AUDIT_RED_BLOCKED（不允许 pass / pass_with_minor）
+- yellow / green 不阻断（mid 问题由 SKILL 教化加权，引擎只兜底 red）
+- 没标 severity → v0.21 results[].severity 必填直接拦（堵 auditor 漏标 severity 绕过 red 阈值）
+
+## 可复制 JSON 示例（含全部字段 + 可选 severity_counts / verdict / cwe_hits）
+\`\`\`json
+{
+  "auditor_session_id": "4c9e7b21-3a4f-4c2a-9e1b-7d8c6f5a0123",
+  "total": 4,
+  "passed": 3,
+  "failed": 1,
+  "results": [
+    {
+      "item": "delivers[].path 存在且 min_length 达标",
+      "pass": true,
+      "evidence": "src/feat.js 412 行 ≥ root_dod.min_length=200；fs.existsSync=true",
+      "severity": "green"
+    },
+    {
+      "item": "无 SQL 注入（user input 均走 prepared statement）",
+      "pass": true,
+      "evidence": "src/db.js L45-58 全部使用 prepared；grep 'raw sql' 零命中",
+      "severity": "green"
+    },
+    {
+      "item": "mid 安全：error message 泄露内部 stack（非 PII）",
+      "pass": false,
+      "evidence": "src/err.js L30 res.json({stack: err.stack}) 未脱敏",
+      "severity": "yellow"
+    },
+    {
+      "item": "unit test 全绿",
+      "pass": true,
+      "evidence": "npm test 42/42 passed",
+      "severity": "green"
+    }
+  ],
+  "severity_counts": { "red": 0, "yellow": 1, "green": 3 },
+  "verdict": "pass_with_minor",
+  "cwe_hits": [
+    { "cwe": "CWE-209", "item": "error message 泄露 stack", "severity": "yellow" }
+  ]
+}
+\`\`\`
+引擎强校验：auditor_session_id / total / passed / failed / results[]。
+severity_counts / verdict / cwe_hits 是**可选附加字段**（引擎不校验其内部值，供 SKILL / commander 消费）；
+但 results[].severity 必填（v0.21），severity_counts.red 应与 results 中 red 数一致（SKILL 自律，引擎不强制）。
+
+## 调用
+\`\`\`
+mcp__tree__tree_audit_append(tree_id, leaf_id, report={
+  auditor_session_id, total, passed, failed, results, ...
+})
+\`\`\`
+
+## 违反错误码
+- **E_SCHEMA_INVALID** — 必填字段缺失 / results[i] 非对象 / item|pass|evidence 类型错 / severity 非 red|yellow|green 或缺失
+- **E_NEGATIVE_COUNT** — total/passed/failed 非整数或负数
+- **E_COUNT_MISMATCH** — passed + failed ≠ total
+- **E_LENGTH_MISMATCH** — results.length ≠ total
+- **E_INVALID_UUID_STRICT** — auditor_session_id 非严格 UUID v4
+- **E_AUDITOR_NOT_INDEPENDENT** — auditor 不在树 / 是目标 leaf 自身 / role=worker
+- **E_BORROWED_IDENTITY** — caller session_id ≠ auditor_session_id（借身份写 audit_log）
+
+## 关联
+- mcp__tree__tree_help('alignment_workflow') — done event self_check schema（item/pass/evidence，但无 severity）
+- mcp__tree__tree_help('error_code_index') — 全部错误码
+- v0.20 red 阈值：audit_gate verdict=pass|pass_with_minor 时扫 severity=red → E_AUDIT_RED_BLOCKED`,
   },
 
   nudge_escalation: {
@@ -4559,11 +4708,11 @@ Round 2:
   },
 
   error_code_index: {
-    title: '全部错误码索引（42 个）',
+    title: '全部错误码索引（44 个）',
     related: [],
-    content: `# error_code_index — 42 个错误码索引
+    content: `# error_code_index — 44 个错误码索引
 
-> 共 42 个 E_* 错误码定义于 tree-engine.cjs（grep \`const E_\` 校验）。
+> 共 44 个 E_* 错误码定义于 tree-engine.cjs（grep \`const E_\` 校验）。
 > 注：E_NO_OWNERSHIP 属于 session 层 patches.cjs，非 tree 错误码，此处不收录。
 
 ## 基础错误码（自解释，help=null）
@@ -4610,10 +4759,11 @@ Round 2:
 - E_LEAF_AUTO_PRUNED — nudge_count≥7 强制 pruned [help: nudge_escalation]
 - E_STATUS_EVENT_MISMATCH — status/event 不同步 [help: v10_constraints]
 
-## ISS-003 done 门禁 review 收敛错误码（3 个）
+## ISS-003 done 门禁 review 收敛错误码（4 个）
 - E_REVIEW_NOT_CONVERGED — events 无 review_round / 末轮 red_count>0 / 总轮数>3 [help: alignment_workflow]
 - E_REVIEW_FORGERY — reviewer=自己/added_by、perspective 漏填、reviewer_session_id 非 UUID v4、findings 空、evidence<10 字符、red_count 不符 [help: alignment_workflow]
-- E_REVIEW_FLAGGED_BLOCK — 父链祖先 review_evidence.flagged=true（pre-ISS-003 done 未补审），须先补 review_round event [help: alignment_workflow]`,
+- E_REVIEW_FLAGGED_BLOCK — 父链祖先 review_evidence.flagged=true（pre-ISS-003 done 未补审），须先补 review_round event [help: alignment_workflow]
+- E_REVIEW_SESSION_FORBIDDEN — v0.18: worker role 用 session 分支（须改走 subagent 分支 + reviewer_ref 溯源 subagent_spawn）[help: alignment_workflow]`,
   },
 
   session_liveness: {

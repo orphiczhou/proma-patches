@@ -403,7 +403,7 @@ dod:
 ## §4.6 done 前 G1-G5 多子Agent 内容审查（ISS-003，review_required=true 时强制）
 
 > 对应引擎硬约束：`cmdLeafSetStatus` done 门禁校验 events[] 须含 ≥1 条 `review_round` 事件（schema + 末轮 red_count===0 + 总轮数≤3）。
-> 2026-07-07 重写（SubAgent 入树）：reviewer 走 `reviewer_kind:subagent` + `reviewer_ref=sub:<本leaf>:<序号>`，由本 leaf 上的 `subagent_spawn` 事件溯源；不再用 `reviewer_session_id` 填假 UUID（旧路径已被引擎 E_REVIEW_FORGERY 拦截，因为 SDK SubAgent 没有 Proma session_id，假 UUID 无法溯源）。与 §4.2 互补：§4.2 是每个 Mi 后的快速单 Agent 对齐自检；§4.6 是全部 Mi 完成后、done 前的多视角内容审查收敛。
+> 2026-07-07 重写（SubAgent 入树）：reviewer 走 `reviewer_kind:subagent` + `reviewer_ref=sub:<本leaf>:<序号>`，由本 leaf 上的 `subagent_spawn` 事件溯源；不再用 `reviewer_session_id` 填假 UUID（subagent 分支靠 `reviewer_ref` 溯源，不用 session_id；⚠️ 注意：若误把 `reviewer_kind` 写顶层导致缺省走 session 分支，**合法格式的占位 UUID 能过**——见下方 2026-07-16「schema 位置红线」nanju05 事故）。与 §4.2 互补：§4.2 是每个 Mi 后的快速单 Agent 对齐自检；§4.6 是全部 Mi 完成后、done 前的多视角内容审查收敛。
 
 **触发条件（两个独立条件，满足任一即必须跑 §4.6，不可跳过）**：
 1. **引擎强制**（worker 不需自检此字段）：done 门禁读 `leaf.audit_meta.review_required`（叶级覆盖）→ `state.audit_meta.review_required`（树级回退）→ 默认 false。commander 建 tree 时通过 `audit_meta_override` 设 `review_required=true` 让门禁触发 review_round 校验。
@@ -417,6 +417,31 @@ dod:
 **与 §4.2 的关系**：§4.2 不废弃（仍用于 milestone 级快速自检），但 review_required=true 时 done 前必须**额外**跑 §4.6。审计角色（§10，commander 派 leaf 模式）是另一条独立链，不冲突。
 
 **SubAgent 在树体系中的定位**：SubAgent **不是树实体**（无 leaf_id / 无 Proma session_id），是 worker 本 leaf **事件溯源**的劳动单元。worker 永远是自己 leaf 的 actor（caller-binding 不变）；SubAgent 通过 worker 在自己 leaf 上 append 的 `subagent_spawn` 事件被树"看见"。因此 §4.6 的 reviewer 是"worker 自派的代理人"，标注 `independence:self_delegated`（自审 / 第一道筛）。
+
+> ### 🔴 schema 位置红线（2026-07-16 nanju05 事故强制；违者＝自审形同虚设）
+>
+> **`reviewer_kind` 必须写在每个 reviewer 对象内（reviewer 级），不是顶层 meta。** 引擎读的是 `r.reviewer_kind`（r = `reviewers[]` 每一项），**不读** `meta.reviewer_kind`。写错位置的后果链：
+> 1. `reviewer_kind` 写顶层 → 每个 reviewer 的 `r.reviewer_kind`=undefined → 引擎**缺省 `'session'` 分支**
+> 2. session 分支只校验 `reviewer_session_id` 是合法 UUID 格式（8-4-4-4-12 hex，不校验版本位）+ ≠本leaf.session_id + ≠added_by（**by design 不校验存在性**——引擎注释明说"内容真实性靠 commander 抽样"，见 tree-engine L1451）
+> 3. worker 给每个 reviewer 填**任意 8-4-4-4-12 hex 格式的占位 UUID**（如 `11111111-1111-4111-8111-111111111111`；UUID_RE `/^[0-9a-f]{8}-...{12}$/i` **不校验版本位**，全 1 / 全 5 / 任意 hex 均凑过）→ session 分支放行 → done 门禁通过
+> 4. 结果：`review_round` 形式合规，但 **SubAgent 自审根本没被引擎溯源验证**（没走 subagent 分支查 subagent_spawn），自审防线被架空
+>
+> **正确做法**（worker 自审 SubAgent 一律走 subagent 分支）：
+> - 每个 reviewer 写 `reviewer_kind: subagent` + `reviewer_ref: "sub:<本leaf_id>:<序号>"`（**都在 reviewer 对象内**）
+> - **禁用 session 分支**（v0.18 引擎硬拦）：worker 自审**一律走 subagent 分支**，**禁用 `reviewer_kind:session`**——worker 用 session 分支会被引擎抛 **`E_REVIEW_SESSION_FORBIDDEN`**（append 时即时拦 + done 门禁双校验）。无论 `reviewer_session_id` 是占位 UUID 还是**借来的真实 session_id**（来自另一 leaf 的 session，≠本leaf.session_id 且≠added_by，引擎同样放行；且 list_messages 能查到真实对话，伪装比占位 UUID 更深）。session 分支=以 `reviewer_session_id` 标识的他审者（设计意图=独立第三方真 session 复核，如 commander fork 真 session；但引擎 **by design 不校验 session 存在性**，故该分支既能被真他审者用、也能被占位/借真 UUID 蒙混——这正是 worker 须禁用它的原因；注：auditor 的复核走 audit_gate/alignment 独立简化协议，不经 review_round）；worker 是 leaf owner 无独立他审 session，故 session 分支不适用
+> - **禁任何占位 UUID**：哪怕格式合法（引擎只校验格式不校验存在性），填了=伪造审查
+>
+> ❌ **错误写法（nanju05 实证，勿抄）**：
+> ```yaml
+> # 错：reviewer_kind 写顶层 + reviewer 填占位 session_id
+> - type: review_round
+>   meta:
+>     reviewer_kind: subagent          # ← 错！引擎不读顶层，读 reviewer 级
+>     reviewers:
+>       - perspective: G1
+>         reviewer_session_id: "11111111-1111-4111-8111-111111111111"  # ← 占位合法UUID，蒙混 session 分支
+> ```
+> ✅ **正确写法**：reviewer_kind + reviewer_ref 都在每个 reviewer 对象内（见本节末「subagent_spawn + review_round 完整示例」）。
 
 > ### ⚠️ 调用形式红线（2026-07-08 调用形式事故强制；违者＝成本爆炸）
 >
@@ -588,9 +613,9 @@ dod:
 
 **诚实声明（reviewer_kind:subagent + independence:self_delegated 的语义）**：
 
-`reviewer_kind:subagent` 标记的 reviewer 是 **worker 自审 / 第一道筛**——SubAgent 是 worker 自己派的代理人，不是独立第三方。引擎能保证：① reviewer_ref 真能溯源到本 leaf 上的一条 subagent_spawn；② 该 SubAgent 有非空产出（size>0，治 BUG-3）。但引擎**不校验**findings 内容真实性（worker 仍可写全 green 蒙混）。
+`reviewer_kind:subagent` 标记的 reviewer 是 **worker 自审 / 第一道筛**——SubAgent 是 worker 自己派的代理人，不是独立第三方。引擎能保证：① reviewer_ref 真能溯源到本 leaf 上的一条 subagent_spawn；② 该 SubAgent 有非空产出（size>0，治 BUG-3）。但引擎**不校验**findings 内容真实性（worker 仍可写全 green 蒙混）。**引擎硬拦 backlog**（当前靠 commander §4 Step4 他审兜底，未来补引擎校验）：① reviewer_kind 位置错（顶层 vs reviewer 级，引擎缺省 session 不报错）；② session 分支不校验 `reviewer_session_id` 存在性/归属（占位或借真 UUID 均过）；③ findings 内容真实性（全 green 蒙混）。
 
-**真实的内容防线是 commander 他审**（见 tree-commander SKILL §4 Step4）：commander 验收时会把 worker 的 review_round 当作"自审视图"对待，独立判断 findings 是否与产出文件相关；commander 可派自己的 SubAgent（记 commander leaf）做独立复核（independence:independent）。worker 不得用 `reviewer_kind:session` + 假 UUID 冒充独立 reviewer（旧 BUG-1 路径，已被引擎 E_REVIEW_FORGERY 拦截——session 模式要求真 UUID + ≠本leaf.session_id + ≠added_by，worker 没有第二个真 session）。
+**真实的内容防线是 commander 他审**（见 tree-commander SKILL §4 Step4）：commander 验收时会把 worker 的 review_round 当作"自审视图"对待，独立判断 findings 是否与产出文件相关；commander 可派自己的 SubAgent（记 commander leaf）做独立复核（independence:independent）。worker 不得用 `reviewer_kind:session` 冒充独立 reviewer：session 分支引擎**只校验 UUID 格式 + 非自审，不校验存在性**（by design——合法格式的占位 UUID 能过，这正是上方「schema 位置红线」要堵的 nanju05 事故）。worker 没有第二个真实 session，故**必须走 subagent 分支**（`reviewer_ref` 溯源 subagent_spawn），让引擎能验证 SubAgent 确实 spawn 过、确有产出。
 
 **禁止**：
 - `reviewer_kind:subagent` 缺 `reviewer_ref`，或 `reviewer_ref` 父段 ≠ 本 leaf_id（`E_SCHEMA_INVALID` / `E_REVIEW_FORGERY`）
@@ -599,7 +624,8 @@ dod:
 - SubAgent 产出文件缺失（`E_DELIVERABLE_MISSING`）或 0 字节（`E_DELIVERABLE_EMPTY`，治 BUG-3）
 - findings 为空或 evidence < 10 字（`E_REVIEW_FORGERY`）
 - 跳过审查直接 done（`E_REVIEW_NOT_CONVERGED`）
-- 用假 UUID 填 `reviewer_session_id` 冒充独立 reviewer（旧 BUG-1 路径，`E_REVIEW_FORGERY`）
+- 用假 UUID 填 `reviewer_session_id` 冒充独立 reviewer（旧 BUG-1 路径）——⚠️ 引擎只拦**格式非法**的 UUID，**合法格式的占位 UUID（如 `11111111-1111-4111-8111-...`）能过 session 分支**，见上方「schema 位置红线」nanju05 事故；故 worker 自审必须走 subagent 分支
+- `reviewer_kind` 写在顶层 `meta`（必须在每个 reviewer 对象内）——引擎读 `r.reviewer_kind`，顶层不读，缺省走 session 分支架空自审（nanju05 事故）
 
 ---
 
@@ -789,6 +815,7 @@ drift_declaration: false
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-07-16 | v2.6 | **nanju05 schema 位置事故修复**：§4.6 加【schema 位置红线】——`reviewer_kind` 必须写在每个 reviewer 对象内（reviewer 级，对齐引擎 `r.reviewer_kind`），写顶层 meta → 引擎缺省走 session 分支 → 合法格式占位 UUID（`11111111-1111-4111-8111-`）蒙混放行（nanju05 实证，自审形同虚设）；worker 自审必走 subagent 分支（`reviewer_ref` 溯源 subagent_spawn），禁 session 分支/任何占位 UUID；修 §4.6 末尾"session 分支已被引擎拦截"过乐观表述（引擎 by design 只校验格式不校验存在性，内容真实性靠 commander 抽样） |
 | 2026-07-08 | v2.5 | **调用形式事故修复**：§4.6 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（成本爆炸，既往调用形式事故）；撞错禁换名重试；收敛（角色 2/3/5 + 轮≤3 + red_count=0 停） |
 | 2026-07-07 | v2.4 | SubAgent 入树：§4.6 重写——reviewer 走 `reviewer_kind:subagent` + `reviewer_ref=sub:<本leaf>:<序号>`（溯源本 leaf 的 `subagent_spawn` 事件），不再用 `reviewer_session_id` 填假 UUID（旧 BUG-1 路径已被引擎 E_REVIEW_FORGERY 拦截）；标注 `independence:self_delegated`（worker 自审/第一道筛，内容真实性最终靠 commander 他审）。新增 §2.5.1 SubAgent 辅助（implement/research SubAgent 同样走 subagent_spawn）；新增 §2.6 路径语义（治 BUG-2：expect_outputs / output_ref 均相对 deliverables 根，禁带 `deliverables/` 前缀）；§3.1 加 SubAgent 诚实性提醒；引擎新错误码 `E_DELIVERABLE_EMPTY`（治 BUG-3：0 字节产物）。 |
 | 2026-07-04 | v2.3 | ISS-003：新增 §4.6 done 前 G1-G5 多子Agent 内容审查（review_required=true 时强制，含分档/红色归零/最多3轮/已知局限诚实标注）。与 §4.2 milestone 级自检互补不冲突 |

@@ -340,6 +340,27 @@ self_audit:
 
 > 依据：设计文档 §4.2 事件通道 + §4.3 心跳通道 + §6.1 brief_echo。
 
+### 🔴 监督判活红线（2026-07-16 v0.17.0 验证教训；长轮误判 3 次强制）
+
+**长轮监督 worker / auditor 进度时，ground truth = events，不是 `leaf.status` / `tree.write_count`。** 这两者是"假信号"：
+
+| 假信号 | 为什么不可靠 |
+|---|---|
+| `leaf.status` | worker 发了 `done` event 后 status 可能仍是 `active`（要等 commander 派 auditor 调 audit_gate 才闭环）；status ≠ leaf 真正完成 |
+| `tree.write_count` | worker 发 done/blocked/brief_echo 都是 write，count 涨不代表 leaf 推进；commander 自己长轮处理（派 auditor / 回填 alignment / 调 milestone）也在写 tree，count 涨可能是 commander 在动而非 worker |
+
+**正确姿势（长轮判活三步）**：
+1. `mcp__tree__tree_event_list(tree_id, leaf_id=<目标>)` 拉该 leaf 的 events 数组（**不传 `type` 参数**，留空拉所有类型，只看末尾即可）
+2. 看 **events 数组末尾事件**（类型 + meta）；该末尾类型应与 `leaf.last_event_type` 字段一致（tree-engine 每次 event append 自动 `set_last_event` 同步，二者是同一事实的两面，即"双确认"）：
+   - `done`（self_check 全过）→ worker 自审完，**在等** commander 派 auditor / 调 audit_gate
+   - `blocked`（如 `E_BORROWED_IDENTITY`）→ worker 卡在门禁，**在等** commander 调 audit_gate
+   - `brief_echo`（meta 含 alignment）→ commander 已回填对齐评估
+3. 末尾事件 + `last_event_type` **双确认**都停滞才算真卡死：**两次轮询间隔 ≥15 分钟**（对齐 GLM-5.2 单轮思考时长下限）都不变 → 卡死；任一推进就继续等（GLM-5.2 单个长未提交轮内可完成多步 tree write，10-15 分钟不写 tree 仍可能在读/分析/思考，非卡）
+
+**反例（v0.17.0 验证 4.1/4.2）**：nanju05 worker 17:47:40 已发 `done`，但 status 仍 `active`、write_count 继续涨（commander 在派 auditor / 回填 alignment）——只看 status/write_count 会误判"worker 卡住"，实际 worker 早 done 在等闭环。
+
+> 与 tree-engine 每次 tool call 原子落盘一致；与 CLAUDE.md pro 测试要点（监督读 tree-state events，禁用 API `list_messages` 消息数判进度）一致；哨兵心跳（§8）同样以 `last_event_type` 为判活输入。**判活（§6，事件是否停滞）→ 路由（§4 Step3，事件如何处理）是上下游两步，勿混**。
+
 | 事件 | 触发 | 指挥官动作 | mcp__tree__* 工具 |
 |------|------|-----------|------------------|
 | **done** | 子会话完成上报 | ① 登记事件 ② 派验收 Agent（§9）③ 按 verdict 执行：pass → set-status done；不通过 → 走 §7 纠偏 | `tree_event_append(type=done)` → `tree_leaf_set_status(status=done)` 或 `tree_drift_append` |
@@ -783,8 +804,9 @@ root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 八步
 #### §13.4.1 auditor leaf 创建流程（leaf_add role=auditor）
 
 ```text
-[caller=root]   1. mcp__session__fork_session → 拿到 auditor 独立 session
-                   # 🚫禁 create_session/delegate_agent 当 SubAgent（调用形式红线，§13.5）
+[caller=root]   1. mcp__session__create_session(channel_id=<不同 channel>, model_id=<与 commander 不同模型>, workspace_id=<本工作区>) → auditor 独立 session
+                   # ⚠️ v0.20（v20t 教训）：独立 auditor 用 create_session **显式选不同模型**（如 GLM commander → DeepSeek auditor），避免 fork 继承同模型导致同款推理偏差（v20t: GLM auditor 同 GLM commander → mid 安全偏松 pass）。详见 tree-auditor SKILL §7 多模型交叉。
+                   # 🚫仍禁 create_session/delegate_agent 当 SubAgent（调用形式红线 §13.5）；建 auditor 真 session 用 create_session 合法（§13.4.5 L859 同义）
 [caller=root]   2. tree_leaf_add(role='auditor', session_id=<auditor session>, parent=<commander leaf>,
                    added_by=<root.session_id>, path=<大写字母开头段>)
                    # auditor leaf 初始 status='active', audit_gate.verdict='required'（不能自审）
@@ -918,7 +940,7 @@ mcp__tree__tree_event_append(
 
 SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `reviewer_kind: subagent` 登记（而非 `reviewer_kind: session`）：
 
-- `reviewer_kind: session`（缺省，向后兼容老 review_round）：真实 UUID 路径——`reviewer_session_id` 是独立 session 的真实 UUID，引擎校验 `≠ leaf.session_id`、`≠ leaf.added_by`。
+- `reviewer_kind: session`（缺省）：真实 UUID 路径——`reviewer_session_id` 是独立 session 的真实 UUID，引擎校验 `≠ leaf.session_id`、`≠ leaf.added_by`。**仅 commander/auditor 他审可用；worker role 禁（v0.18 → `E_REVIEW_SESSION_FORBIDDEN`，worker 自审走 subagent 分支）**。
 - `reviewer_kind: subagent`：用 `reviewer_ref = sub:<本 leaf_id>:<序号>`，**禁止** 给 `reviewer_session_id`；引擎溯源同 leaf 必须有匹配的 `subagent_spawn` 事件（`meta.subagent_id === reviewer_ref`），否则 `E_REVIEW_FORGERY`（防伪 SubAgent）。
 
 `review_round.meta.independence`（可选，引擎只记录不强制）：
@@ -1140,6 +1162,7 @@ declare done 前逐项确认：
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-07-16 | v2.6 | **v0.17.0 验证教训**：§6 加【监督判活红线】——长轮监督 worker/auditor 的 ground truth = events，不是 `leaf.status`/`tree.write_count`（假信号：worker done 后 status 仍 active / commander 自己写 tree 也涨 write_count）；判活三步（tree_event_list 拉 events → 看末尾 last_event_type + meta → 双确认停滞才算卡死）；nanju05 worker done 后 status=active 误判反例 |
 | 2026-07-08 | v2.5 | **调用形式事故修复**：§13.5 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度，既往调用形式事故短时炸百级会话、某模型额度耗尽）；撞错修根因禁换名(v2/b/x)重试；收敛条件（角色 2/3/5 上限 5 + 轮≤3 + red_count=0 停/未收敛升级） |
 | 2026-07-07 | v2.4 | SubAgent 入树：§13.5 重写（SubAgent = 父 leaf 上 subagent_spawn 事件溯源的一等劳动单元；caller-binding 不变；新增 §13.5.1 写法示例 + §13.5.2 reviewer_kind:subagent / independence）；§4 Step4 加 independence 双重保险意识（self_delegated 第一道筛 / independent 第二道闸 / commander 抽查重点 + 可派自己 SubAgent 独立复核）；§14 加审计维度 leaf 可派 SubAgent 深度审查；§13.7 错误码速查表加 E_DELIVERABLE_EMPTY + E_REVIEW_FORGERY |
 | 2026-07-04 | v2.3 | ISS-003：§4 Step4 加 review_required=true 验收核查（核 review_round event + 抽查 findings 真实性，引擎只防格式，commander 抽查是内容真实性的真实防线） |

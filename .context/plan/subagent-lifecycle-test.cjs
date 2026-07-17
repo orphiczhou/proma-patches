@@ -253,14 +253,18 @@ async function case4_failed_no_output() {
     ['event', 'append', tid, leafId, '--type', 'subagent_spawn', '--json', JSON.stringify(meta)]);
 }
 
-// Case 5: review_round reviewer_kind=session 向后兼容
-//   旧式 review_round (只带 reviewer_session_id 真实 UUID, 无 reviewer_kind) → ok (缺省 session)
+// Case 5: v0.18 worker role 禁 session 分支 (reviewer_kind=session 缺省)
+//   历史 (v0.17): 旧式 review_round (只带 reviewer_session_id 真实 UUID, 无 reviewer_kind) → ok (缺省 session, 向后兼容)
+//   v0.18 (2026-07-16): leaf.role==='worker' 用 session 分支 (reviewer_kind='session' 或缺省) → 抛 E_REVIEW_SESSION_FORBIDDEN.
+//     worker 自审必走 subagent 分支 (reviewer_kind:subagent + reviewer_ref 溯源 subagent_spawn).
+//     session 分支仅 commander/auditor 他审用. 堵 nanju05/v172t (GLM worker 用 session + 占位 UUID 蒙混).
+//   构造保留 (session 分支 review_round), 期望改 E_REVIEW_SESSION_FORBIDDEN.
 async function case5_session_reviewer_compat() {
-  console.log('\n[5] review_round reviewer_kind=session 向后兼容');
+  console.log('\n[5] v0.18 worker session 分支禁 → E_REVIEW_SESSION_FORBIDDEN');
   const tid = freshTreeId();
   await initTree(tid);
   const leafId = await addWorker(tid, 'C5');
-  // 注入旧式 review_round event (EVENT_TYPE_ENUM 含 review_round, 但 cmdEventAppend 可能不认 — 用 tamperLeaf 注入更稳)
+  // 注入旧式 review_round event (session 分支: 无 reviewer_kind, 缺省 session)
   tamperLeaf(tid, leafId, (l) => {
     if (!Array.isArray(l.events)) l.events = [];
     l.events.push({
@@ -270,7 +274,7 @@ async function case5_session_reviewer_compat() {
         round_no: 1,
         reviewers: [{
           perspective: 'G1-correctness',
-          // 无 reviewer_kind 字段 → 缺省 session
+          // 无 reviewer_kind 字段 → 缺省 session → v0.18 worker 拦
           reviewer_session_id: UUID.rev1,  // 独立 reviewer, ≠owner≠added_by
           findings: [{ severity: 'green', item: 'logic', evidence: 'all paths verified correct' }],
         }],
@@ -279,29 +283,35 @@ async function case5_session_reviewer_compat() {
       },
     });
   });
-  // 验证 schema 合法: 通过 cmdLeafSetStatus done 间接走 validateReviewRoundSchema
-  //   但 done 门禁要 milestone+audit_gate+brief_echo+done event, 太重. 直接调纯函数更干净.
+  // 验证 v0.18 worker session 分支被拦: 直接调纯函数更干净 (省去 done 门禁配套前置).
   if (typeof engine.validateReviewRoundSchema === 'function') {
     try {
       const leaf = JSON.parse(fs.readFileSync(path.join(SANDBOX, tid, 'tree-state.json'), 'utf8')).leaves[leafId];
       const meta = leaf.events[leaf.events.length - 1].meta;
       engine.validateReviewRoundSchema(meta, leaf, leafId);
-      pass('5 旧式 review_round (reviewer_session_id only) → 缺省 session 放行', 'validateReviewRoundSchema ok');
+      fail('5 worker session 分支 → 应拦 E_REVIEW_SESSION_FORBIDDEN', 'validateReviewRoundSchema 通过了 (v0.18 未生效?)');
     } catch (e) {
-      fail('5 旧式 review_round → 缺省 session 放行',
-        `抛 ${e && e.code ? e.code : '?'}: ${(e && e.message || String(e)).slice(0, 160)}`);
+      const code = e && e.code;
+      if (code === 'E_REVIEW_SESSION_FORBIDDEN') {
+        pass('5 worker session 分支 → E_REVIEW_SESSION_FORBIDDEN (v0.18 禁)', code);
+      } else {
+        fail('5 worker session 分支 → 应拦 E_REVIEW_SESSION_FORBIDDEN',
+          `抛 ${code || '?'}: ${(e && e.message || String(e)).slice(0, 160)}`);
+      }
     }
   } else {
-    // 降级: 走 done 门禁路径 (需配齐前置). 这里 skip, 因为上面 case 已验证引擎行为.
-    skip_or_pass_fallback('5 [降级] validateReviewRoundSchema 未导出, 走 done 门禁路径',
-      '需配套前置, 见 case5_full_done');
+    // 降级: 走 done 门禁路径 (由 case5b 覆盖 done 门禁下的同一断言)
+    skip_or_pass_fallback('5 [降级] validateReviewRoundSchema 未导出, 由 case5b done 门禁覆盖',
+      'see case5b');
   }
 }
 
-// Case 5b: 完整 done 路径验证旧式 review_round 通过 (若纯函数未导出时的兜底)
-//   配齐 worker done 前置 + leaf.audit_meta.review_required=true + 旧式 review_round → done ok
+// Case 5b: 完整 done 门禁验证 v0.18 worker session 分支被拦
+//   历史 (v0.17): 配齐 worker done 前置 + review_required=true + 旧式 review_round (session 缺省) → done ok
+//   v0.18 (2026-07-16): worker session 分支 → validateReviewRoundSchema 抛 E_REVIEW_SESSION_FORBIDDEN → done 拒.
+//     worker 自审须走 subagent 分支 (见 case6/14a). session 分支仅 commander/auditor.
 async function case5b_session_reviewer_full_done() {
-  console.log('\n[5b] 旧式 review_round 走完整 done 门禁 → 放行');
+  console.log('\n[5b] v0.18 worker session 分支 → done 门禁拒 E_REVIEW_SESSION_FORBIDDEN');
   // 先建 auditor-commander 互背书环 (audit_gate pass 可用)
   const tid = freshTreeId();
   await initTree(tid);
@@ -352,9 +362,9 @@ async function case5b_session_reviewer_full_done() {
       },
     });
   });
-  // done 应放行 (旧式 review_round 通过 session 缺省分支)
-  await expectOk('5b 旧式 review_round (无 reviewer_kind) → done 放行',
-    ['leaf', 'set-status', tid, leafId, 'done']);
+  // done 应拒: v0.18 worker session 分支被拦, validateReviewRoundSchema 抛 E_REVIEW_SESSION_FORBIDDEN
+  await expectFail('5b worker session 分支 → done 门禁拒 E_REVIEW_SESSION_FORBIDDEN (v0.18 禁)',
+    ['leaf', 'set-status', tid, leafId, 'done'], 'E_REVIEW_SESSION_FORBIDDEN');
 }
 
 // Case 6: review_round reviewer_kind=subagent 溯源
@@ -464,55 +474,77 @@ async function case8_reviewer_ref_wrong_parent() {
 }
 
 // Case 9: independence 非法值 → 拒; 合法 (self_delegated/independent) → ok
+//   v0.18: worker role 禁 session 分支 → independence 测试改走 **subagent 分支**.
+//   independence 校验 (L1541) 在 reviewer_kind 分支之后共用, 用 subagent 分支同样能测到.
+//   构造模式参照 case6: 先 append subagent_spawn (落 output_ref 文件), 再 review_round 用
+//   reviewer_kind:'subagent' + reviewer_ref=sm.subagent_id (去 reviewer_session_id), 加 independence 字段.
 async function case9_independence() {
-  console.log('\n[9] independence 非法值 → 拒; 合法 → ok');
-  const tid = freshTreeId();
-  await initTree(tid);
-  const leafId = await addWorker(tid, 'C9');
+  console.log('\n[9] independence (subagent 分支) 非法值 → 拒; 合法 → ok');
 
-  // (a) 非法值
+  // (a) 非法值 → E_REVIEW_FORGERY (independence 校验 L1541 共用)
   {
+    const tid = freshTreeId();
+    await initTree(tid);
+    const leafId = await addWorker(tid, 'C9a');
+    const sm = spawnMeta(leafId, 1);
+    createDeliverable(tid, sm.output_ref, 'c9a subagent review report\n');
+    await run(['event', 'append', tid, leafId, '--type', 'subagent_spawn', '--json', JSON.stringify(sm)]);
     const rrMeta = {
       round_no: 1,
       reviewers: [{
         perspective: 'G1-correctness',
-        reviewer_session_id: UUID.rev1,
+        reviewer_kind: 'subagent',
+        reviewer_ref: sm.subagent_id,  // sub:<leafId>:1, 与 spawn 匹配
         findings: [{ severity: 'green', item: 'logic', evidence: 'independence illegal value test' }],
       }],
       red_count: 0, converged: true,
       independence: 'bogus',  // 非法
     };
-    await validateRRviaFunction(tid, leafId, rrMeta, '9a independence 非法值 → 拒', 'E_REVIEW_FORGERY');
+    await validateRRviaFunction(tid, leafId, rrMeta, '9a independence 非法值 → 拒 (subagent 分支, L1541 共用)', 'E_REVIEW_FORGERY');
   }
 
-  // (b) 合法 self_delegated
+  // (b) 合法 self_delegated → ok
   {
+    const tid = freshTreeId();
+    await initTree(tid);
+    const leafId = await addWorker(tid, 'C9b');
+    const sm = spawnMeta(leafId, 1);
+    createDeliverable(tid, sm.output_ref, 'c9b subagent review report\n');
+    await run(['event', 'append', tid, leafId, '--type', 'subagent_spawn', '--json', JSON.stringify(sm)]);
     const rrMeta = {
       round_no: 1,
       reviewers: [{
         perspective: 'G1-correctness',
-        reviewer_session_id: UUID.rev1,
+        reviewer_kind: 'subagent',
+        reviewer_ref: sm.subagent_id,
         findings: [{ severity: 'green', item: 'logic', evidence: 'independence self delegated ok' }],
       }],
       red_count: 0, converged: true,
       independence: 'self_delegated',
     };
-    await validateRRviaFunction(tid, leafId, rrMeta, '9b independence=self_delegated → ok');
+    await validateRRviaFunction(tid, leafId, rrMeta, '9b independence=self_delegated → ok (subagent 分支)');
   }
 
-  // (c) 合法 independent
+  // (c) 合法 independent → ok
   {
+    const tid = freshTreeId();
+    await initTree(tid);
+    const leafId = await addWorker(tid, 'C9c');
+    const sm = spawnMeta(leafId, 1);
+    createDeliverable(tid, sm.output_ref, 'c9c subagent review report\n');
+    await run(['event', 'append', tid, leafId, '--type', 'subagent_spawn', '--json', JSON.stringify(sm)]);
     const rrMeta = {
       round_no: 1,
       reviewers: [{
         perspective: 'G1-correctness',
-        reviewer_session_id: UUID.rev1,
+        reviewer_kind: 'subagent',
+        reviewer_ref: sm.subagent_id,
         findings: [{ severity: 'green', item: 'logic', evidence: 'independence independent value ok' }],
       }],
       red_count: 0, converged: true,
       independence: 'independent',
     };
-    await validateRRviaFunction(tid, leafId, rrMeta, '9c independence=independent → ok');
+    await validateRRviaFunction(tid, leafId, rrMeta, '9c independence=independent → ok (subagent 分支)');
   }
 }
 
@@ -545,41 +577,39 @@ async function case10_bug3_empty_deliverable() {
   }
 }
 
-// Case 11: BUG-1 residual-risk 固化 (A3 审计 P2-3)
-//   设计取舍: reviewer_kind=session (或缺省) + 格式合法的"假" UUID (≠owner, ≠added_by,
-//   但实际无对应 Proma session / session 已死) → 引擎**故意放行**.
-//   原因: SDK SubAgent 没有真 Proma session_id, 强 checkSessionAlive 会误杀合法用法.
-//   兜底: worker 自审必须走 reviewer_kind:subagent (诚实路径, 溯源 subagent_spawn);
-//         commander 他审会 list_messages 抽查 reviewer_session_id 真实性 (§4 Step4).
-//   本 case 锁定此"故意放行"行为, 防回归时被误判为 bug.
-//   断言: (1) validateReviewRoundSchema 纯函数对 session+假 UUID 放行;
-//         (2) 完整 done 门禁对 session+假 UUID review_round 放行 (review_required=true).
+// Case 11: v0.18 worker session 分支禁 — BUG-1 "假 UUID 蒙混" 取舍已被覆盖
+//   历史 (v0.17, BUG-1 设计取舍): reviewer_kind=session (或缺省) + 格式合法的"假" UUID
+//     (≠owner, ≠added_by, 但实际无对应 Proma session / session 已死) → 引擎**故意放行**.
+//     原因: SDK SubAgent 没有真 Proma session_id, 强 checkSessionAlive 会误杀合法用法.
+//     兜底: worker 自审必须走 reviewer_kind:subagent (诚实路径, 溯源 subagent_spawn).
+//   v0.18 (2026-07-16): leaf.role==='worker' 用 session 分支直接抛 E_REVIEW_SESSION_FORBIDDEN
+//     (在 UUID 校验之前), v0.17 BUG-1 的"假 UUID 取舍放行"已不再适用 — worker 根本进不了 session 分支.
+//     留此 case 锁定 v0.18 新行为: worker session 分支被硬拦, 不再取舍放行.
+//   断言: (1) validateReviewRoundSchema 纯函数对 worker session+假 UUID 抛 E_REVIEW_SESSION_FORBIDDEN;
+//         (2) 完整 done 门禁对 worker session+假 UUID review_round 拒 E_REVIEW_SESSION_FORBIDDEN.
 async function case11_session_fake_uuid_accepted() {
-  console.log('\n[11] BUG-1 取舍: reviewer_kind=session + 格式合法假 UUID → 引擎故意放行');
-  // (a) 纯函数路径: validateReviewRoundSchema 放行 session + 假 UUID
+  console.log('\n[11] v0.18 worker session 分支禁: 假 UUID 不再取舍放行 → E_REVIEW_SESSION_FORBIDDEN');
+  // (a) 纯函数路径: validateReviewRoundSchema 对 worker session + 假 UUID 抛 E_REVIEW_SESSION_FORBIDDEN
   {
     const tid = freshTreeId();
     await initTree(tid);
     const leafId = await addWorker(tid, 'C11a');
-    // 假 UUID: 格式合法 (匹配 UUID_RE), ≠ owner(UUID.worker), ≠ added_by(UUID.root),
-    //          但对应 session 不存在 (mock verifier 只放行 00000000-0000-0000-0000-[12位数字],
-    //          这个尾部 0011 在 verifier 范围内会"碰巧"放行 — 改用尾部字母段确保 verifier 拒,
-    //          但引擎 session 路径根本不调 verifier, 所以仍应放行).
-    // 用 UUID.rev1 (尾部 0011) 即可: 它在 verifier 放行范围内, 但即使拿一个 verifier 拒的假 UUID,
-    // session 路径也不查 liveness — 为演示取舍, 这里用 rev1 (格式合法).
+    // 假 UUID: 格式合法 (匹配 UUID_RE), ≠ owner(UUID.worker), ≠ added_by(UUID.root).
+    //   v0.18 worker session 分支在 UUID 校验之前就拦, 假 UUID 是否合法已无关紧要.
     const fakeReviewerUUID = UUID.rev1;
     const rrMeta = {
       round_no: 1,
       reviewers: [{
         perspective: 'G1-correctness',
-        // 无 reviewer_kind → 缺省 session
+        // 无 reviewer_kind → 缺省 session → v0.18 worker 拦
         reviewer_session_id: fakeReviewerUUID,
-        findings: [{ severity: 'green', item: 'logic', evidence: 'session-kind fake-uuid path accepted by design' }],
+        findings: [{ severity: 'green', item: 'logic', evidence: 'session-kind fake-uuid path now blocked by v0.18' }],
       }],
       red_count: 0, converged: true,
     };
     const ok11a = await validateRRviaFunction(tid, leafId, rrMeta,
-      '11a session+格式合法假UUID → validateReviewRoundSchema 放行 (不查 liveness)');
+      '11a session+格式合法假UUID → validateReviewRoundSchema 拒 E_REVIEW_SESSION_FORBIDDEN (v0.18 覆盖 BUG-1 取舍)',
+      'E_REVIEW_SESSION_FORBIDDEN');
     // 纯函数未导出时降级到 (b) 的 done 门禁路径覆盖该断言
     if (!ok11a) {
       skip_or_pass_fallback('11a [降级] validateReviewRoundSchema 未导出, 由 11b done 门禁覆盖',
@@ -587,7 +617,7 @@ async function case11_session_fake_uuid_accepted() {
     }
   }
 
-  // (b) 完整 done 门禁: 配齐前置 + review_required=true + session+假UUID review_round → done 放行
+  // (b) 完整 done 门禁: 配齐前置 + review_required=true + worker session+假UUID review_round → done 拒
   {
     const tid = freshTreeId();
     await initTree(tid);
@@ -609,15 +639,15 @@ async function case11_session_fake_uuid_accepted() {
           reviewers: [{
             perspective: 'G1-correctness',
             reviewer_session_id: UUID.rev1,  // 格式合法假 UUID, ≠owner≠added_by
-            findings: [{ severity: 'green', item: 'logic', evidence: 'session-kind fake-uuid accepted by design (BUG-1 tradeoff)' }],
+            findings: [{ severity: 'green', item: 'logic', evidence: 'session-kind fake-uuid now blocked by v0.18 worker-session ban' }],
           }],
           red_count: 0, converged: true,
         },
       });
     });
-    // done 应放行: session 路径不查 liveness, 假 UUID 蒙过 — 这是 BUG-1 故意取舍
-    await expectOk('11b session+格式合法假UUID → done 门禁放行 (BUG-1 故意取舍)',
-      ['leaf', 'set-status', tid, leafId, 'done']);
+    // done 应拒: v0.18 worker session 分支被拦, 假 UUID 不再蒙混 — BUG-1 取舍被覆盖
+    await expectFail('11b worker session+假UUID → done 门禁拒 E_REVIEW_SESSION_FORBIDDEN (v0.18 覆盖 BUG-1 取舍)',
+      ['leaf', 'set-status', tid, leafId, 'done'], 'E_REVIEW_SESSION_FORBIDDEN');
   }
 }
 
@@ -785,8 +815,11 @@ async function case14_review_round_append_validation() {
       'E_REVIEW_FORGERY');
   }
 
-  // 14c: malformed (无 reviewer_kind + reviewer_session_id 非 UUID 乱串) → E_REVIEW_FORGERY 或 E_SCHEMA_INVALID
-  //   宽松匹配: expectFail 只接单 code, 这里改用直接断言 !ok 且 error.code 含 REVIEW 或 SCHEMA.
+  // 14c: v0.18 worker session 分支 (无 reviewer_kind) → 在 malformed UUID 校验之前就拦.
+  //   历史 (v0.17): 无 reviewer_kind + reviewer_session_id 非 UUID 乱串 → E_REVIEW_FORGERY 或 E_SCHEMA_INVALID (宽松匹配).
+  //   v0.18 (2026-07-16): leaf.role==='worker' 用 session 分支, 在 UUID 校验 (L1466) 之前先抛
+  //     E_REVIEW_SESSION_FORBIDDEN (L1463-1464). malformed UUID 永远走不到.
+  //   断言: expectFail E_REVIEW_SESSION_FORBIDDEN.
   {
     const tid = freshTreeId();
     await initTree(tid);
@@ -795,22 +828,16 @@ async function case14_review_round_append_validation() {
       round_no: 1,
       reviewers: [{
         perspective: 'G1-correctness',
-        // 无 reviewer_kind → 缺省 session → 走 session 分支需合法 UUID
-        reviewer_session_id: 'abc-not-uuid',  // 非 UUID 乱串
+        // 无 reviewer_kind → 缺省 session → v0.18 worker 先拦, 走不到 UUID 校验
+        reviewer_session_id: 'abc-not-uuid',  // 非 UUID 乱串 (v0.18 下无关紧要)
         findings: [{ severity: 'green', item: 'logic', evidence: 'c14c non-uuid junk session' }],
       }],
       red_count: 0,
       converged: true,
     };
-    const r = await run(['event', 'append', tid, leafId, '--type', 'review_round', '--json', JSON.stringify(rrMeta)]);
-    if (r.ok) {
-      fail('14c append malformed (非 UUID 乱串) → 拒', '命令成功了 (append 即校验未生效)');
-    } else if (r.error && (r.error.code === 'E_REVIEW_FORGERY' || r.error.code === 'E_SCHEMA_INVALID')) {
-      pass('14c append malformed (非 UUID 乱串) → 拒 (REVIEW 或 SCHEMA)', r.error.code);
-    } else {
-      fail('14c append malformed (非 UUID 乱串) → 拒',
-        `实际 ${r.error ? r.error.code : '?'}: ${(r.error && r.error.msg || '').slice(0, 160)}`);
-    }
+    await expectFail('14c append worker session 分支 → E_REVIEW_SESSION_FORBIDDEN (v0.18 先于 malformed 校验)',
+      ['event', 'append', tid, leafId, '--type', 'review_round', '--json', JSON.stringify(rrMeta)],
+      'E_REVIEW_SESSION_FORBIDDEN');
   }
 
   // 14d: reviewer_kind:subagent + reviewer_ref 无对应 subagent_spawn (没先 spawn) → E_REVIEW_FORGERY

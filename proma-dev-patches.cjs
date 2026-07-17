@@ -293,7 +293,9 @@ function findCallerTreesForBypassGuard(sourceSessionId) {
   const os = require("os");
   const home = os.homedir();
   const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
-  const base = isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces");
+  // v0.19 修复分离 bug：base 跟 PROMA_INSTANCE_NAME（对齐 Proma app 的 .proma-<instance>），不再把"隔离实例"硬编码当 dev
+  const _treeInst = process.env.PROMA_INSTANCE_NAME;
+  const base = _treeInst ? path.join(home, `.proma-${_treeInst}`, "agent-workspaces") : (isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces"));
   const results = [];
   let wsEntries = [];
   try { wsEntries = fs.readdirSync(base); } catch (_) { return results; }
@@ -1683,9 +1685,11 @@ function createExternalHttpBridge() {
     const os = require("os");
     const home = os.homedir();
     const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
-    const base = isIsolated
-      ? path.join(home, ".proma-dev", "agent-workspaces")
-      : path.join(home, ".proma", "agent-workspaces");
+    // v0.19 修复分离 bug：base 跟 PROMA_INSTANCE_NAME（对齐 Proma app）
+    const _treeInst = process.env.PROMA_INSTANCE_NAME;
+    const base = _treeInst
+      ? path.join(home, `.proma-${_treeInst}`, "agent-workspaces")
+      : (isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces"));
     const wsRoot = path.join(base, workspaceSlug);
     try { if (!fs.existsSync(wsRoot) || !fs.statSync(wsRoot).isDirectory()) return null; } catch (_) { return null; }
     const candidates = [
@@ -1828,9 +1832,9 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
     const os = require("os");
     const home = os.homedir();
     const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
-    const bases = isIsolated
-      ? [path.join(home, ".proma-dev", "agent-workspaces")]
-      : [path.join(home, ".proma", "agent-workspaces")];
+    // v0.19 修复分离 bug：bases 跟 PROMA_INSTANCE_NAME（对齐 Proma app）
+    const _treeInst = process.env.PROMA_INSTANCE_NAME;
+    const bases = [_treeInst ? path.join(home, `.proma-${_treeInst}`, "agent-workspaces") : (isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces"))];
     const found = [];
     for (const base of bases) {
       if (!fs.existsSync(base)) continue;
@@ -2331,9 +2335,9 @@ function discoverWorkspaces() {
   const os = require("os");
   const home = os.homedir();
   const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
-  const candidates = isIsolated
-    ? [path.join(home, ".proma-dev", "agent-workspaces")]
-    : [path.join(home, ".proma", "agent-workspaces")];
+  // v0.19 修复分离 bug：candidates 跟 PROMA_INSTANCE_NAME（对齐 Proma app）
+  const _treeInst = process.env.PROMA_INSTANCE_NAME;
+  const candidates = [_treeInst ? path.join(home, `.proma-${_treeInst}`, "agent-workspaces") : (isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces"))];
   const found = [];
   for (const base of candidates) {
     if (!fs.existsSync(base)) continue;

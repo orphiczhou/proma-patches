@@ -26,18 +26,25 @@
  *
  * 测试场景 (11):
  *   1. review_required=true + 无 review_round event → E_REVIEW_NOT_CONVERGED
- *   2. review_required=true + 合法 review_round(末轮 red=0) → 通过 review 门禁 (done 成功)
- *   3. review_required=true + reviewer_session_id=leaf.session_id → E_REVIEW_FORGERY
- *   4. review_required=true + reviewer_session_id=added_by → E_REVIEW_FORGERY
- *   5. review_required=true + evidence <10 字 → E_REVIEW_FORGERY
- *   6. review_required=true + 末轮 red_count>0 → E_REVIEW_NOT_CONVERGED
+ *   2. review_required=true + 合法 review_round(末轮 red=0, subagent 分支) → 通过 review 门禁 (done 成功)
+ *   3. review_required=true + worker session 分支(reviewer_session_id=leaf.session_id) → E_REVIEW_SESSION_FORBIDDEN (v0.18)
+ *   4. review_required=true + worker session 分支(reviewer_session_id=added_by) → E_REVIEW_SESSION_FORBIDDEN (v0.18)
+ *   5. review_required=true + subagent 分支 + evidence <10 字 → E_REVIEW_FORGERY
+ *   6. review_required=true + subagent 分支 + 末轮 red_count>0 → E_REVIEW_NOT_CONVERGED
  *   7. review_required=false (默认) → 不要求 review, done 通过
  *   8. PROMA_REVIEW_DISABLE=1 → 不要求 review, done 通过
- *   9. 【已知局限】worker 自写格式合法的 review_round (5 个合法 UUID reviewer, red=0, converged=true)
+ *   9. 【已知局限】worker 自写格式合法的 review_round (5 个 subagent reviewer, red=0, converged=true)
  *      → 期望通过门禁 (内容伪造阶段一不拦, 靠 commander 抽样 + 阶段二 Layer2)
  *   10. cmdMigrate 规则 11: done worker leaf → review_evidence.grandfathered=true + flagged=true
  *   11. cmdLeafAdd 父链 flagged: flagged 祖先下创建子 leaf → E_REVIEW_FLAGGED_BLOCK;
  *       给祖先补 review_round event 后 → 放行
+ *
+ * v0.18 (2026-07-16) 引擎变更:
+ *   - worker role 用 review_round session 分支 (reviewer_kind=session 或缺省) → E_REVIEW_SESSION_FORBIDDEN.
+ *     worker 自审必走 subagent 分支: reviewer_kind:'subagent' + reviewer_ref:`sub:<leafId>:<seq>`,
+ *     且 leaf.events 须有匹配的 subagent_spawn event (引擎 L1488 溯源, 无则 E_REVIEW_FORGERY).
+ *     subagent 分支禁 reviewer_session_id. commander/auditor 不受影响 (session 分支仍合法).
+ *   - 测试机制: injectSubagentSpawn (tamperLeaf push subagent_spawn) + injectReviewRound + leaf set-status done.
  */
 'use strict';
 
@@ -213,11 +220,15 @@ async function prepareWorkerForDone(tid, leafId, opts) {
 }
 
 // 构造一条合法 review_round event meta (red=0, converged=true)
-// reviewers 默认 1 个 [G1 perspective, UUID.rev1]. 可定制.
-function goodReviewRoundMeta(reviewerOverrides) {
+// v0.18 (2026-07-16): worker role 禁 session 分支, 默认改走 subagent 分支.
+//   默认 reviewer = subagent 分支: reviewer_kind=subagent + reviewer_ref=`sub:${leafId}:01`
+//   (调用方须先 injectSubagentSpawn 让 reviewer_ref 可溯源, 否则 E_REVIEW_FORGERY).
+//   leafId 必传 (reviewer_ref 父段须 = 本 leaf). reviewerOverrides 可定制 (覆盖默认 reviewers).
+function goodReviewRoundMeta(leafId, reviewerOverrides) {
   const reviewers = reviewerOverrides || [{
     perspective: 'G1-correctness',
-    reviewer_session_id: UUID.rev1,
+    reviewer_kind: 'subagent',
+    reviewer_ref: `sub:${leafId}:01`,
     findings: [{ severity: 'green', item: 'logic', evidence: 'all paths verified correct' }],
   }];
   return {
@@ -236,6 +247,28 @@ function injectReviewRound(tree_id, leaf_id, meta, roundNo) {
       type: 'review_round',
       ts: '2026-07-04T01:00:00Z',
       meta: Object.assign({ round_no: roundNo || 1 }, meta),
+    });
+  });
+}
+
+// 注入一条 subagent_spawn event 到 leaf.events (用 tamperLeaf, 同 injectReviewRound 模式).
+// v0.18: done 门禁 validateReviewRoundSchema L1488 会找 type=subagent_spawn 且
+//   meta.subagent_id === reviewer_ref 做溯源 (无匹配 → E_REVIEW_FORGERY).
+//   subId 形如 `sub:<leafId>:01`, 须与 review_round reviewer.reviewer_ref 一致.
+function injectSubagentSpawn(tree_id, leaf_id, subId) {
+  tamperLeaf(tree_id, leaf_id, (l) => {
+    if (!Array.isArray(l.events)) l.events = [];
+    l.events.push({
+      type: 'subagent_spawn',
+      ts: '2026-07-04T00:59:00Z',
+      meta: {
+        subagent_id: subId,
+        role: 'review',
+        perspective: 'G1-correctness',
+        purpose: 'review',
+        output_ref: 'subagent-outputs/x.md',
+        status: 'done',
+      },
     });
   });
 }
@@ -260,77 +293,88 @@ async function case2() {
   const { tid, auditorSession } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'C2');
   await prepareWorkerForDone(tid, leafId, { reviewRequired: true, auditorSession });
-  injectReviewRound(tid, leafId, goodReviewRoundMeta());
+  // v0.18: worker 自审走 subagent 分支, 先 spawn SubAgent 再写 review_round
+  injectSubagentSpawn(tid, leafId, `sub:${leafId}:01`);
+  injectReviewRound(tid, leafId, goodReviewRoundMeta(leafId));
   // 期望完全通过 (audit_gate 也已配齐) → done ok
   await expectOk('2 合法 review_round → done 成功',
     ['leaf', 'set-status', tid, leafId, 'done']);
 }
 
-// 场景 3: reviewer_session_id=leaf.session_id (自审) → E_REVIEW_FORGERY
+// 场景 3: worker 用 session 分支 (reviewer_session_id=leaf.session_id 自审) → E_REVIEW_SESSION_FORBIDDEN
+//   v0.18 (2026-07-16): worker role 禁 session 分支 (无论是否自审), 统一 E_REVIEW_SESSION_FORBIDDEN.
+//   自审场景 (reviewer=leaf session) 被 worker session 全禁覆盖, 错码由 E_REVIEW_FORGERY → E_REVIEW_SESSION_FORBIDDEN.
 async function case3() {
-  console.log('\n[3] reviewer_session_id=leaf.session_id (自审) → E_REVIEW_FORGERY');
+  console.log('\n[3] worker session 分支 (reviewer=leaf.session_id 自审) → E_REVIEW_SESSION_FORBIDDEN');
   const { tid, auditorSession } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'C3');
   await prepareWorkerForDone(tid, leafId, { reviewRequired: true, auditorSession });
-  // reviewer = worker 自己 session → 自审
-  const meta = goodReviewRoundMeta([{
+  // reviewer = worker 自己 session → session 分支 (缺省 reviewer_kind=session), worker role 必被 v0.18 拦
+  const meta = goodReviewRoundMeta(leafId, [{
     perspective: 'G1-correctness',
     reviewer_session_id: UUID.worker,  // leaf owner session
     findings: [{ severity: 'green', item: 'x', evidence: 'self review evidence' }],
   }]);
   injectReviewRound(tid, leafId, meta);
-  await expectFail('3 reviewer=leaf session (自审) 拦截',
-    ['leaf', 'set-status', tid, leafId, 'done'], 'E_REVIEW_FORGERY');
+  await expectFail('3 worker session 分支 (reviewer=leaf session) 拦截',
+    ['leaf', 'set-status', tid, leafId, 'done'], 'E_REVIEW_SESSION_FORBIDDEN');
 }
 
-// 场景 4: reviewer_session_id=added_by (commander 自审自己的 worker) → E_REVIEW_FORGERY
+// 场景 4: worker 用 session 分支 (reviewer_session_id=added_by) → E_REVIEW_SESSION_FORBIDDEN
+//   v0.18: worker role 禁 session 分支, reviewer=added_by 同样撞 worker session 全禁 (E_REVIEW_FORGERY → E_REVIEW_SESSION_FORBIDDEN).
 async function case4() {
-  console.log('\n[4] reviewer_session_id=added_by → E_REVIEW_FORGERY');
+  console.log('\n[4] worker session 分支 (reviewer=added_by) → E_REVIEW_SESSION_FORBIDDEN');
   const { tid, auditorSession } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'C4');
   await prepareWorkerForDone(tid, leafId, { reviewRequired: true, auditorSession });
-  // added_by = UUID.root (addWorker 默认). reviewer=root → commander 自审
-  const meta = goodReviewRoundMeta([{
+  // added_by = UUID.root (addWorker 默认). reviewer=root → session 分支, worker role 必被 v0.18 拦
+  const meta = goodReviewRoundMeta(leafId, [{
     perspective: 'G1-correctness',
     reviewer_session_id: UUID.root,  // = added_by
     findings: [{ severity: 'green', item: 'x', evidence: 'commander self review' }],
   }]);
   injectReviewRound(tid, leafId, meta);
-  await expectFail('4 reviewer=added_by (commander 自审) 拦截',
-    ['leaf', 'set-status', tid, leafId, 'done'], 'E_REVIEW_FORGERY');
+  await expectFail('4 worker session 分支 (reviewer=added_by) 拦截',
+    ['leaf', 'set-status', tid, leafId, 'done'], 'E_REVIEW_SESSION_FORBIDDEN');
 }
 
-// 场景 5: evidence <10 字 → E_REVIEW_FORGERY
+// 场景 5: subagent 分支 + evidence <10 字 → E_REVIEW_FORGERY
+//   v0.18: evidence<10 校验 (L1500) 在 subagent/session 分支后共用, subagent 分支也触发.
 async function case5() {
-  console.log('\n[5] evidence <10 字 → E_REVIEW_FORGERY');
+  console.log('\n[5] subagent 分支 + evidence <10 字 → E_REVIEW_FORGERY');
   const { tid, auditorSession } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'C5');
   await prepareWorkerForDone(tid, leafId, { reviewRequired: true, auditorSession });
-  const meta = goodReviewRoundMeta([{
+  injectSubagentSpawn(tid, leafId, `sub:${leafId}:01`);
+  const meta = goodReviewRoundMeta(leafId, [{
     perspective: 'G1-correctness',
-    reviewer_session_id: UUID.rev1,
+    reviewer_kind: 'subagent',
+    reviewer_ref: `sub:${leafId}:01`,
     findings: [{ severity: 'green', item: 'x', evidence: 'short' }],  // 5 字 < 10
   }]);
   injectReviewRound(tid, leafId, meta);
-  await expectFail('5 evidence 太短拦截',
+  await expectFail('5 subagent 分支 evidence 太短拦截',
     ['leaf', 'set-status', tid, leafId, 'done'], 'E_REVIEW_FORGERY');
 }
 
-// 场景 6: 末轮 red_count>0 → E_REVIEW_NOT_CONVERGED
+// 场景 6: subagent 分支 + 末轮 red_count>0 → E_REVIEW_NOT_CONVERGED
+//   v0.18: schema 校验放行 (subagent 分支合法), 但 done 门禁收敛校验 (末轮 red>0) 仍拦.
 async function case6() {
-  console.log('\n[6] 末轮 red_count>0 → E_REVIEW_NOT_CONVERGED');
+  console.log('\n[6] subagent 分支 + 末轮 red_count>0 → E_REVIEW_NOT_CONVERGED');
   const { tid, auditorSession } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'C6');
   await prepareWorkerForDone(tid, leafId, { reviewRequired: true, auditorSession });
-  const meta = goodReviewRoundMeta([{
+  injectSubagentSpawn(tid, leafId, `sub:${leafId}:01`);
+  const meta = goodReviewRoundMeta(leafId, [{
     perspective: 'G1-correctness',
-    reviewer_session_id: UUID.rev1,
+    reviewer_kind: 'subagent',
+    reviewer_ref: `sub:${leafId}:01`,
     findings: [{ severity: 'red', item: 'critical bug', evidence: 'found a critical defect here' }],
   }]);
   meta.red_count = 1;
   meta.converged = false;
   injectReviewRound(tid, leafId, meta);
-  await expectFail('6 末轮 red_count>0 拦截',
+  await expectFail('6 subagent 分支末轮 red_count>0 拦截',
     ['leaf', 'set-status', tid, leafId, 'done'], 'E_REVIEW_NOT_CONVERGED');
 }
 
@@ -364,25 +408,30 @@ async function case8() {
   }
 }
 
-// 场景 9: 【已知局限】worker 自写格式完全合法的 review_round (5 个合法 UUID reviewer, red=0, converged=true)
+// 场景 9: 【已知局限】worker 自写格式完全合法的 review_round (5 个 subagent reviewer, red=0, converged=true)
 //   → 期望通过门禁. 内容伪造阶段一不拦, 靠 commander 抽样 + 阶段二 Layer2.
+//   v0.18: worker session 分支全禁, 改走 subagent 分支 (每个 reviewer 溯源到一条 subagent_spawn).
 async function case9() {
-  console.log('\n[9] 【已知局限】worker 自写合法 review_round (5 reviewer, red=0) → 通过门禁');
+  console.log('\n[9] 【已知局限】worker 自写合法 review_round (5 subagent reviewer, red=0) → 通过门禁');
   console.log('    注: 内容伪造阶段一不拦, 靠 commander 抽样 + 阶段二 Layer2 (findings-文件相关性).');
   const { tid, auditorSession } = await setupTreeWithAuditor();
   const leafId = await addWorker(tid, 'C9');
   await prepareWorkerForDone(tid, leafId, { reviewRequired: true, auditorSession });
-  // 5 个合法独立 reviewer, 全 green 废话 findings, red=0, converged=true
+  // 5 个合法 SubAgent reviewer, 全 green 废话 findings, red=0, converged=true
+  const refs = ['01', '02', '03', '04', '05'];
+  for (const seq of refs) {
+    injectSubagentSpawn(tid, leafId, `sub:${leafId}:${seq}`);
+  }
   const reviewers = [
-    { perspective: 'G1-correctness',  reviewer_session_id: UUID.rev1,
+    { perspective: 'G1-correctness',  reviewer_kind: 'subagent', reviewer_ref: `sub:${leafId}:01`,
       findings: [{ severity: 'green', item: 'logic', evidence: 'everything looks fine to me here' }] },
-    { perspective: 'G2-security',     reviewer_session_id: UUID.rev2,
+    { perspective: 'G2-security',     reviewer_kind: 'subagent', reviewer_ref: `sub:${leafId}:02`,
       findings: [{ severity: 'green', item: 'sec',   evidence: 'no obvious security issues spotted' }] },
-    { perspective: 'G3-performance',  reviewer_session_id: UUID.rev3,
+    { perspective: 'G3-performance',  reviewer_kind: 'subagent', reviewer_ref: `sub:${leafId}:03`,
       findings: [{ severity: 'green', item: 'perf',  evidence: 'performance seems acceptable overall' }] },
-    { perspective: 'G4-readability',  reviewer_session_id: UUID.rev4,
+    { perspective: 'G4-readability',  reviewer_kind: 'subagent', reviewer_ref: `sub:${leafId}:04`,
       findings: [{ severity: 'green', item: 'read',  evidence: 'code is reasonably readable to me' }] },
-    { perspective: 'G5-edge-case',    reviewer_session_id: UUID.rev5,
+    { perspective: 'G5-edge-case',    reviewer_kind: 'subagent', reviewer_ref: `sub:${leafId}:05`,
       findings: [{ severity: 'green', item: 'edge',  evidence: 'edge cases handled as far as checked' }] },
   ];
   const meta = { round_no: 1, reviewers, red_count: 0, converged: true };

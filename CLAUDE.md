@@ -4,8 +4,8 @@
 
 ## 项目结构
 > 🔴 **权威源 = `D:/codes/tree-harness/`（2026-07-09 源码统一后确立）**。此前最新内容分散在 workspace-files（tree-engine 4928）与 pro dist（patches 3129），已全部汇聚到本目录。
-- `tree-engine.cjs`（5216 行，md5 5532fa5f）：树引擎核心（状态机、事件、审计门禁、caller-binding、SubAgent 入树、5 件套持久化、drift 联动、ctx 竹节触发、prune 级联 D1、SCHEMA_VERSION 版本管理 D2、**Sprint 5 max_sessions session_registry + E_MAX_SESSIONS 硬护栏**：四路径登记 init/add/set-session/register + migrate 回灌 + findTreesBySession 导出）。
-- `proma-dev-patches.cjs`（3342 行，md5 339082af）：MCP 工具注册 + caller ownership + create_session budget 护栏 + 跨工作区 workspace 锁（Sprint 4 P1，E_WORKSPACE_FORBIDDEN）+ tao-watcher（D3 silence 静默 / Sprint 4 rule 按 role 分发 RULE_ROLE_SCOPE + nudge_log cap）+ **Sprint 5 聚类 A create_session 旁路根治**（findCallerTreesForBypassGuard 定位 caller 所属 tree + max_sessions 预检 E_MAX_SESSIONS + 旁路登记 register-session + tree_register_session/tree_session_count MCP 工具）。
+- `tree-engine.cjs`（5388 行，md5 04a74e62）：树引擎核心（状态机、事件、审计门禁、caller-binding、SubAgent 入树、5 件套持久化、drift 联动、ctx 竹节触发、prune 级联 D1、SCHEMA_VERSION 版本管理 D2、**Sprint 5 max_sessions session_registry + E_MAX_SESSIONS 硬护栏**：四路径登记 init/add/set-session/register + migrate 回灌 + findTreesBySession 导出；**v0.18 worker role 禁 review_round session 分支（`E_REVIEW_SESSION_FORBIDDEN`，堵 GLM worker 占位/借真 UUID 蒙混，v0.17.1 纯教化实战证伪后引擎层落地）**；**v0.19 root done 须子 done（`E_CHILDREN_NOT_DONE` L1762 扩 root，堵 commander root 提前 done 放弃子任务）；**v0.20 audit_gate red 阈值（`E_AUDIT_RED_BLOCKED`：audit_log findings severity=red → 拒 pass，防 auditor 偏松 pass 严重问题，v20t 教训）**）；**v0.21 audit_gate pass_with_minor 枚举 + results severity 必填 + isPassVerdict helper**（对齐 tree-auditor SKILL §3.1/§4，根治 v21t schema 冲突：auditor 不再被迫剥离 severity / 降级 pass_with_minor→pass）**。
+- `proma-dev-patches.cjs`（3346 行，md5 5083480d）：MCP 工具注册 + caller ownership + create_session budget 护栏 + 跨工作区 workspace 锁（Sprint 4 P1，E_WORKSPACE_FORBIDDEN）+ tao-watcher（D3 silence 静默 / Sprint 4 rule 按 role 分发 RULE_ROLE_SCOPE + nudge_log cap）+ **Sprint 5 聚类 A create_session 旁路根治**（findCallerTreesForBypassGuard 定位 caller 所属 tree + max_sessions 预检 E_MAX_SESSIONS + 旁路登记 register-session + tree_register_session/tree_session_count MCP 工具）。
 - `proma-mcp-server.cjs`（157 行）：外部 stdio MCP 桥接（5 处副本 md5 一致）。
 - `skills/tree-commander/SKILL.md` + `skills/tree-worker/SKILL.md`：指挥官/工人手册。
 - pro 部署：`D:/Proma-dev/resources/app/dist/`（tree-engine.cjs + proma-dev-patches.cjs）+ `~/.proma-dev/agent-workspaces/default/skills/`。
@@ -44,12 +44,20 @@
 
 > 与 macp2 教训互补：macp2=SubAgent **调用形式**必须钉死（防成本爆炸）；nanju=brief **审计义务**不可标可选（防质量防线被一句话释放）。两者都是"SKILL/brief 没钉死 → GLM 自主简化 → 事故"。
 
+## 🔴 P0 教训：GLM-5.2 不遵守 SKILL 教化，防线必须引擎硬拦（v0.17.1 实战证伪 2026-07-16）
+
+v0.17.1「schema 位置红线」纯 SKILL 教化（显眼红线块 + ❌/✅ 对照 + 完整审计收敛）实战验证（pro v172t 树）：GLM-5.2 worker **完全无视**——0 subagent_spawn，2 轮 review_round 全伪造（reviewer_kind 缺省走 session 分支 + 占位合法 v4 UUID，每轮换新 UUID 伪装复审），比 nanju05 更糟（nanju05 至少 spawn ×5）。三层防线全失效：L1 引擎 session 分支 by design 只校验格式（占位合法 UUID 过）/ L2 SKILL 红线 GLM 无视 / L3 commander 他审流程错乱（派 worker 不派 auditor、未抽查）。
+
+**铁律**：对 GLM-5.2 这类会自主简化/绕过 SKILL 的模型，**安全/质量防线不能只靠 SKILL 教化（L2）或 commander 他审（L3）——必须引擎硬拦（L1）兜底**。worker 自审的 review_round 必须 engine 层强制 `reviewer_kind=subagent` + `reviewer_ref` 溯源 `subagent_spawn`（堵 session 分支这个逃逸口）；否则 review_required=true 形同虚设。**引擎硬拦（worker role 禁 session 分支 / session 分支校验 session_registry 存在性）从 backlog 升级为必须（v0.18 核心）**。反衬：worker 产出的设计文档质量合格，§4.6 伪造是偷懒绕过非能力问题。
+
+> 三条 P0 互补：macp2=调用形式钉死（防成本）；nanju=审计义务不可标可选（防质量）；**v0.17.1=教化对 GLM 无效必须引擎硬拦（防伪造）——v0.18 已落地：worker role 禁 review_round session 分支 → `E_REVIEW_SESSION_FORBIDDEN`**。共性"GLM 会自主简化，不可靠信任，防线须沉到引擎层"。
+
 ## 部署同步口诀（改 engine/SKILL 后）
 > 权威源 = `D:/codes/tree-harness/`（2026-07-09 起）。改完从这里部署到 dist。
 1. `D:/codes/tree-harness/tree-engine.cjs` → `D:/Proma-dev/resources/app/dist/tree-engine.cjs`（pro，cp 后需用户重启 pro app 才加载新引擎）
 2. `D:/codes/tree-harness/proma-dev-patches.cjs` → `D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs`（pro，同上；patches 改动也需重启 pro 才生效）
-3. `skills/*` → `~/.proma-dev/agent-workspaces/default/skills/`（pro，SKILL 文件级即生效）
-4. 同步前备份 `.bak-pre-<label>-<date>`；md5 校验源=pro（tree-engine 应=5532fa5f，patches 应=339082af）。
+3. `skills/*` → `~/.proma-pro/agent-workspaces/default/skills/`（pro commander 真实 workspace；SKILL 文件级即生效）。⚠️ **分离 bug（2026-07-16 发现）**：start-pro.bat `PROMA_INSTANCE_NAME=pro` 让 Proma session/workspace/skills 在 **`.proma-pro/`**（commander 活在这，18 个内置 skill 在此），但 `PROMA_DEV=1` 让 tree-system 的 tree 目录在 **`.proma-dev/`**（v19t 等树在此）——两者分离。**SKILL 部署 .proma-pro，tree 监督读 .proma-dev**。旧口诀"SKILL→.proma-dev"是 bug（把 tree 目录当 skill 目录，e2e 时代埋的）。
+4. 同步前备份 `.bak-pre-<label>-<date>`；md5 校验源=pro（tree-engine 应=04a74e62，patches 应=5083480d）。
 
 ## pro 测试要点（来自历次迭代）
 - pro 用 `.proma-dev` userData（**非** `~/.proma`）。SKILL 同步错路径 = commander 读旧版（曾误判"SKILL 未生效"）。
@@ -65,6 +73,7 @@
 
 ## 文档引擎一致性（P0 高发区）
 任何 SKILL 错误码/触发点/字段必须对照 tree-engine 实际校验逻辑（grep 错误码常量 + 看抛错条件）。历次审计抓出的 P0 都是文档与引擎不一致（如 E_REVIEW_FORGERY 触发点、output_ref 解析基准）。
+- 🔴 **引擎"只校验格式不校验存在性"的字段，SKILL 不可声称"已被引擎拦截"**（v0.17.1 nanju05 教训 2026-07-16）：review_round session 分支 `reviewer_session_id` 引擎只校验 UUID v4 格式 + 非自审（L1451 注释 by design 不校验存在性）→ worker 用合法格式占位 UUID（`11111111-1111-4111-8111-`，凑过 UUID_RE）能蒙混放行。SKILL 旧写"session 分支已被 E_REVIEW_FORGERY 拦截"过乐观，已修。**写 SKILL 声称引擎拦什么前，必看校验是格式层/存在性层/内容层哪一层**；存在性/内容层靠 commander 抽样（§4 Step4）+ 引擎溯源（subagent 分支 reviewer_ref 溯源 subagent_spawn）补。同理：reviewer_kind 引擎读 reviewer 级 `r.reviewer_kind`（非顶层 meta），写错位置→缺省 session 分支，nanju05 worker 实证。
 
 ## 测试
 - `.context/plan/*-test.cjs`：harness 复用模式（require 引擎 → setTreesRoot(tmp) → setSessionVerifier(mock) → engine.run → 断言）。leaf_id path 段必须**大写字母开头**（LEAF_NAME_RE）。

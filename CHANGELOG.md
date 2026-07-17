@@ -52,6 +52,51 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), adheres to [Sem
 
 ## [Unreleased]
 
+### 2026-07-17 v0.21 engine audit_gate pass_with_minor + severity 必填（根治 SKILL↔engine schema 冲突）
+
+v21t 实战 + 特派员报告暴露 tree-auditor SKILL §3.1/§6.3（`results:[{item,severity,evidence}]`，subAgent 起草的 review_round 风格）与 engine audit_log schema（`{item,pass,evidence}`）**冲突**——auditor（DeepSeek A2）读了 SKILL 按 §3/§4 首次提交，被 engine schema 拒：① results 强制 pass 字段（SKILL 给 severity 无 pass）→ 7 次试错（48 轮卡 schema）→ 妥协剥离 severity；② audit_gate verdict 枚举缺 pass_with_minor（SKILL §4.1 给 pass_with_minor）→ 被迫 pass_with_minor→pass。auditor 没橡皮图章（顶层 audit_log 有 `severity_counts` + `verdict:pass_with_minor` + `cwe_hits`），橡皮图章在 engine 层。**双管齐下根治**：SKILL v1.1（对齐 engine）+ engine v0.21（根治）。
+
+**engine v0.21 四项修复**：
+1. **audit_gate verdict 加 `pass_with_minor` 枚举**（对齐 SKILL §4.1，auditor 不再被迫降级）。
+2. **`isPassVerdict` helper**（pass + pass_with_minor 放行，统一放行判定逻辑）。
+3. **results[] severity 必填**（v0.20 可选 red/yellow/green → 必填；auditor 必标 severity，引擎 red 阈值才有效，根治 v21t "11 findings 全无 severity → red 阈值没法触发"）。
+4. **audit_append 报错一次性 schema**（非逐字段挤牙膏，auditor 试错成本骤降）+ 新增 help topic `audit_append_schema`。
+
+- tree-engine.cjs md5 `41c08f89`→`04a74e62`，5279→5388 行
+- 测试：sprint-v021 **4/0** + 全量 **0 回归**
+- SKILL：tree-auditor v1.1 修订（§3.1/§6.3 schema 对齐 engine + §4.1 engine 枚举警告）+ engine v0.21（根治）双管齐下
+- 演进链（"GLM/DeepSeek 不可靠 → 引擎硬拦"第四个候选落地）：v0.18 worker session 禁 → v0.19 root done 须子 → v0.20 red 阈值 → **v0.21 pass_with_minor + severity 必填**
+
+### 2026-07-17 v0.20 auditor 审计防线三改进（不同模型 + 方法论 SKILL + 引擎 red 阈值）
+
+v20t 实战 + DeepSeek 特派员交叉审暴露 auditor 偏松（GLM auditor 发现 mid 安全 CWE-204 鉴权缺失却 verdict=pass）。三改进堵审计防线 gap：
+
+1. **commander SKILL §13.4.1**：auditor 用 `create_session` 选**不同模型**（非 fork 继承同模型），破同款推理偏差（如 GLM commander → DeepSeek auditor）。
+2. **tree-auditor 独立方法论 SKILL**（skills/tree-auditor/SKILL.md，478 行 v1.0）：审什么（G1-G5 + G5 安全 CWE 分类 10 项）/ verdict 阈值表（red→required / mid 安全→pass_with_minor / 禁橡皮图章）/ 多模型交叉分档（普通/安全敏感/§14 审计树）/ §14 审计任务。
+3. **引擎 audit_gate red 阈值**（tree-engine）：cmdAuditAppend results 加 severity（可选 red/yellow/green，向后兼容）+ cmdAuditGate verdict=pass 时扫描 audit_log，有 red → `E_AUDIT_RED_BLOCKED`（防 auditor 偏松 pass critical，v20t 教训）。
+
+- 新错误码 `E_AUDIT_RED_BLOCKED`（engine 错误码 44→45）
+- tree-engine.cjs md5 `51888140`→`41c08f89`，5251→5279 行
+- 测试：sprint-v020-audit-red-test.cjs **4/0**（red 拦 / yellow 放行 / 无 severity 兼容 / 非法 severity 拦）+ 全量 0 回归
+- SKILL：commander §13.4.1 改 + tree-auditor 新
+
+### 2026-07-16 v0.19 commander 编排 Gap1：root done 须子 done
+
+v0.18 实战（v18t 树）暴露 commander（role=root）提前 root done 放弃子任务（子 worker/auditor 没 done）。根因：`E_CHILDREN_NOT_DONE`（L1762）只校验 commander 不校验 root。修复：扩到 `|| role==='root'`（无子 root 放行，不误伤单 root 树）。
+
+- tree-engine.cjs L1762 一行 + 错误消息，md5 `e10f93b2`→`51888140`（行数 5251 不变）
+- 测试：sprint-v019-root-children-test.cjs **3/0**（root 有子未 done 拦 / 有子 done 放行 / 无子放行）+ 全量 0 回归
+- Gap2/3（auditor 时机 / worker 状态）Phase 3 发现复杂（误伤 §14 审计任务 / 破坏 pending_brief→done）记 backlog
+
+### 2026-07-16 v0.18 引擎硬拦：worker role 禁 review_round session 分支
+
+v0.17.1 纯 SKILL 教化实战证伪（v172t + nanju05：GLM worker 用 session 分支 + 占位/借真合法 v4 UUID 蒙混 review_round，0 subagent_spawn）后，**引擎层硬拦落地**。tree-engine validateReviewRoundSchema：`leaf.role==='worker'` 用 session 分支 → `E_REVIEW_SESSION_FORBIDDEN`（worker 自审必须 subagent 分支 + reviewer_ref 溯源 subagent_spawn）。append 时（L2266）+ done 门禁（L1706）双校验点。commander/auditor 不受影响。
+
+- 新错误码 `E_REVIEW_SESSION_FORBIDDEN`（engine 错误码 43→44）
+- tree-engine.cjs md5 `5532fa5f`→`e10f93b2`，5216→5251 行
+- 测试：sprint-v018-worker-session-test.cjs **8/0**（worker session 拦 / 缺省走 session 拦 / subagent 放行 / commander 放行 / 撞错恢复）+ iss003/subagent-lifecycle 测试迁 subagent 分支，**全量 0 回归**
+- SKILL：worker §4.6 + commander §13.5.2 补 v0.18 引擎硬拦说明
+
 ### 2026-07-15 e2e04 负面场景验证✅ + isFlagged dead code 清理（零引擎语义变化）
 
 e2e03 之后的**负面场景机制验证**。在 pro（引擎 `5532fa5f` + patches `339082af` + SKILL `8b2d20f2`）由 GLM-5.2 commander + 编排方精确驱动三棵小树，补齐 e2e03 未演练的三机制。完整报告 [.context/active/e2e04-verification-2026-07-15.md](./.context/active/e2e04-verification-2026-07-15.md)。

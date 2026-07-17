@@ -54,7 +54,7 @@
 | `E_SELFCHECK_INVALID` | done event 的 self_check schema 无效 | L147 |
 | `E_AUDITOR_NOT_DONE` | V10-auditor-active：auditor leaf status≠done | L155 |
 | `E_AUDITOR_NO_EVENTS` | V10-auditor-active：auditor leaf events 为空 | L156 |
-| `E_AUDITOR_NOT_VERIFIED` | V10-auditor-active：auditor 自己的 audit_gate.verdict≠pass | L157 |
+| `E_AUDITOR_NOT_VERIFIED` | V10-auditor-active：auditor 自己的 audit_gate.verdict 非 pass（v0.21：`isPassVerdict` helper 放行 pass + pass_with_minor，verdict∈{pass,pass_with_minor} 视为 verified） | L157 |
 
 ## 四、review 门禁（engine，ISS-003 / P1b）
 
@@ -63,6 +63,8 @@
 | `E_REVIEW_NOT_CONVERGED` | worker done 但 review_round 未收敛/未跑 | L173 |
 | `E_REVIEW_FORGERY` | review_round schema 伪造/自审（非法自写） | L174 |
 | `E_REVIEW_FLAGGED_BLOCK` | 父链有 flagged leaf，需先补审 | L175 |
+| `E_REVIEW_SESSION_FORBIDDEN` | worker role 用 review_round session 分支（v0.18，worker 自审必须 subagent 分支） | L202 |
+| `E_AUDIT_RED_BLOCKED` | audit_gate pass 时 audit_log findings 有 red severity（v0.20，防 auditor 偏松 pass critical）。**v0.21 更新**：verdict 枚举加 `pass_with_minor`，red 阈值经 `isPassVerdict` helper 同时覆盖 `pass` + `pass_with_minor`（两 verdict 都放行但都受 red 阈值拦）；results[] severity v0.21 起必填 red\|yellow\|green（v0.20 可选→必填，auditor 必标 severity，red 阈值才有效） | ~L3300 |
 
 ## 五、V10 加固（engine，八大加固点）
 

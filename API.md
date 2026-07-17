@@ -527,13 +527,15 @@ nudge_escalation | audit_tree_structure | error_code_index | full_guide
 |---|---|---|---|
 | `tree_id` | string | 是 | - |
 | `leaf_id` | string | 是 | - |
-| `verdict` | string | 是 | `pass|required|skip` |
+| `verdict` | string | 是 | `pass|required|skip`（v0.21：加 `pass_with_minor`，完整枚举 `pass|pass_with_minor|required|skip`） |
 | `audit_session_id` | string | pass/required 时必填 | 独立 auditor session |
 | `reason` | string | 否 | - |
 
 **Bug A-2 修复**（IHL V10 P3）：`caller === audit_session_id` 校验（堵 auditor #2 发现的 hasDone 漏洞）。
 
 **C5 修复**：root 自审必须显式传 `audit_session_id === leaf.session_id`，**不允许 null**。
+
+**v0.21 更新**：verdict 枚举加 `pass_with_minor`（对齐 tree-auditor SKILL §4.1，auditor 不再被迫降级 pass_with_minor→pass）。引擎 `isPassVerdict` helper：`pass` + `pass_with_minor` 均放行；red 阈值（`E_AUDIT_RED_BLOCKED`）同时覆盖两 verdict。
 
 **错误码**：
 - `E_AUDITOR_NOT_INDEPENDENT` — auditor 不在白名单（resolveAuditorIndep L1897）
@@ -544,7 +546,7 @@ nudge_escalation | audit_tree_structure | error_code_index | full_guide
 
 #### tree_audit_append
 
-追加审计报告条目。R2-T7 + M2：`results[i]` 必须是 `{item, pass, evidence}` 三元组；`total/passed/failed` 必须是整数。
+追加审计报告条目。R2-T7 + M2：`results[i]` 必须是 `{item, pass, evidence, severity}` 四元组；`total/passed/failed` 必须是整数。
 
 **参数**：
 
@@ -552,10 +554,12 @@ nudge_escalation | audit_tree_structure | error_code_index | full_guide
 |---|---|---|---|
 | `tree_id` | string | 是 | - |
 | `leaf_id` | string | 是 | - |
-| `report` | object | 是 | `{ auditor, ts, total, passed, failed, results: [{item, pass, evidence}] }` |
+| `report` | object | 是 | `{ auditor, ts, total, passed, failed, results: [{item, pass, evidence, severity}] }` |
+
+**v0.21 更新**：`results[].severity` 从可选（v0.20）改为**必填** `red|yellow|green`（auditor 必标 severity，引擎 red 阈值 `E_AUDIT_RED_BLOCKED` 才有效，根治 v21t "11 findings 全无 severity → red 阈值没法触发"）。`audit_append` 报错一次性列完整 schema（非逐字段挤牙膏，试错成本骤降），新增 help topic `audit_append_schema`。
 
 **错误码**：
-- `E_SCHEMA_INVALID` — results 非数组 / 元素非对象 / 字段类型错（R2-T7）
+- `E_SCHEMA_INVALID` — results 非数组 / 元素非对象 / 字段类型错（R2-T7）/ v0.21 results[].severity 缺失或非法值
 - `E_NEGATIVE_COUNT` — total/passed/failed < 0
 - `E_COUNT_MISMATCH` — passed + failed ≠ total
 - `E_LENGTH_MISMATCH` — results.length ≠ total
@@ -667,6 +671,8 @@ Tail 心跳日志。**只读**。
 | `E_REVIEW_NOT_CONVERGED` | review 未收敛 | ISS-003：worker done 但 review_round 未收敛/未跑 |
 | `E_REVIEW_FORGERY` | review 伪造 | ISS-003：review_round schema 伪造/非法自写 |
 | `E_REVIEW_FLAGGED_BLOCK` | 父链有 flagged | 父链存在 flagged leaf，需先补审 |
+| `E_REVIEW_SESSION_FORBIDDEN` | worker 禁 session 分支 | v0.18：worker role 用 review_round session 分支（须 subagent 分支） |
+| `E_AUDIT_RED_BLOCKED` | audit red 阻断 | v0.20：audit_gate pass 时 audit_log findings 有 red severity（防 auditor 偏松 pass critical） |
 
 ### 5.3 V10 八大加固错误（V10 Phase 1-2）
 
@@ -812,8 +818,9 @@ await mcp__tree__tree_help({ topic: "v10_constraints" })
 
 ### 7.5 VERDICT_ENUM
 ```
-['pass', 'required', 'skip']
+['pass', 'pass_with_minor', 'required', 'skip']
 ```
+> v0.21：加 `pass_with_minor`（对齐 tree-auditor SKILL §4.1）。引擎 `isPassVerdict` helper：`pass` + `pass_with_minor` 均视为放行（red 阈值 `E_AUDIT_RED_BLOCKED` 同时覆盖两 verdict）。
 
 ### 7.6 默认配置
 - `max_depth`: 3
