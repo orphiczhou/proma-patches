@@ -870,6 +870,26 @@ auditor role 引入后，root 信任锚（§13.2）**仍保留**：冷启动期�
 - 🔴 若 auditor leaf **已 done**（§13.4.1 步骤6 后才卡死，罕见），**不要 fallback**——leaf 状态已完成，session 卡死不影响 leaf。
 - **替代方案**：若 fork 反复卡死（>2 次），回退 §13.4.4 root 信任锚（root 当 auditor），不强制走独立 auditor leaf。root 信任锚不依赖 fork，无 identity timeout 风险。
 
+#### §13.4.6 fix leaf 反馈闭环（Gap B, v0.22）
+
+> **场景**：auditor 完成 audit_append（leaf.audit_log 含 findings）后，severity≠green 的 findings 需要修复闭环——worker "非 red 不修" + auditor findings 无 fixer 回修 = nanjuS1 实战暴露的系统 gap（9 yellow 进"已知但未修复"真空）。
+
+**闭环流程**（commander 编排）：
+1. auditor 完成 audit_append → leaf.audit_log 含 findings（severity red/yellow/green + item/evidence）
+2. commander 读 audit_log → 过滤 severity≠green 的 findings → 生成 fix_brief
+3. **派 fix leaf**（create_session，role=worker，brief 含 audit_log findings + 原始 worker deliverables 路径）：
+   - fix leaf 修每项 finding → edit_file（改产物）/ downgrade（降级附理由）/ deferred（推迟到 S2）
+   - fix leaf done event meta 含 `fixes_resolved`：`[{finding_ref, fix_method: edit_file|downgrade|deferred, fix_evidence ≥20字}]`
+4. **auditor 复审 fix leaf**（audit_gate + audit_append，确认修复有效）
+5. fix leaf done（auditor 复审 pass）
+
+**关键约束**：
+- fix leaf 是 role=worker（不是 auditor），走完整 worker 协议
+- fixes_resolved 必须覆盖 audit_log 中所有 severity≠green 的 findings
+- 与 §14.2 fix 区别：§14.2 fix 是审计任务批量修正（审被审文档）；§13.4.6 fix 是独立审 worker 产物的反馈闭环
+
+**与 Gap A（yellow_findings_resolved）协同**：worker 自己 review_round 的 yellow → yellow_findings_resolved（worker done event）；auditor 发现的 yellow/red → fix leaf 闭环（§13.4.6）。两层闭环。
+
 ### §13.5 SDK SubAgent 的位置（2026-07-07 重写：SubAgent 入树）
 
 SDK SubAgent（researcher / code-reviewer / implementer / 任意自定义 role）是**父 leaf 上 `subagent_spawn` 事件溯源的一等劳动单元**。commander / commander-下任意级 leaf 都鼓励用 SubAgent 放大产能：调研、审查（G1-G5 维度）、实现、审计维度，均可派 SubAgent 干活，再把劳动记录挂在自己 leaf 上。
@@ -1162,6 +1182,7 @@ declare done 前逐项确认：
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-07-17 | v2.7 | **Gap B（auditor→worker 反馈闭环）**：§13.4.6 新增 fix leaf 反馈闭环——auditor audit_append 含 severity≠green findings 后，commander 派 role=worker fix leaf（fix_brief 含 audit_log findings + 原始 worker deliverables），fix leaf done meta 含 `fixes_resolved`（覆盖所有 severity≠green findings，fix_method=edit_file/downgrade/deferred + fix_evidence≥20字），auditor 复审 fix leaf（audit_gate+audit_append）闭环；nanjuS1 实战 9 yellow 进"已知但未修复"真空根因；与 Gap A（yellow_findings_resolved）两层闭环协同；engine 校验 v0.23 再加 |
 | 2026-07-16 | v2.6 | **v0.17.0 验证教训**：§6 加【监督判活红线】——长轮监督 worker/auditor 的 ground truth = events，不是 `leaf.status`/`tree.write_count`（假信号：worker done 后 status 仍 active / commander 自己写 tree 也涨 write_count）；判活三步（tree_event_list 拉 events → 看末尾 last_event_type + meta → 双确认停滞才算卡死）；nanju05 worker done 后 status=active 误判反例 |
 | 2026-07-08 | v2.5 | **调用形式事故修复**：§13.5 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度，既往调用形式事故短时炸百级会话、某模型额度耗尽）；撞错修根因禁换名(v2/b/x)重试；收敛条件（角色 2/3/5 上限 5 + 轮≤3 + red_count=0 停/未收敛升级） |
 | 2026-07-07 | v2.4 | SubAgent 入树：§13.5 重写（SubAgent = 父 leaf 上 subagent_spawn 事件溯源的一等劳动单元；caller-binding 不变；新增 §13.5.1 写法示例 + §13.5.2 reviewer_kind:subagent / independence）；§4 Step4 加 independence 双重保险意识（self_delegated 第一道筛 / independent 第二道闸 / commander 抽查重点 + 可派自己 SubAgent 独立复核）；§14 加审计维度 leaf 可派 SubAgent 深度审查；§13.7 错误码速查表加 E_DELIVERABLE_EMPTY + E_REVIEW_FORGERY |

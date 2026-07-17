@@ -4,6 +4,142 @@
 
 新条目追加在顶部。
 
+## 🔖 2026-07-17 特派员 ns1b 回收：A1 3 red 全真（tsc 验证），v0.20 E_AUDIT_RED_BLOCKED 累积检查死锁（旧 red 无 resolve API），v0.22 yellow 门禁成/fix leaf 败
+
+派 DeepSeek 特派员独立分析 ns1b（4 worker 多路并行 + DeepSeek auditor）。
+
+**A1 3 red 全真**（auditor 通过 `npx tsc --noEmit --strict` 实际编译发现 GLM worker 自审漏掉的 bug）：
+- R1: snapshot-manager.ts L204 多余 `});` → TS1068 编译失败 + 30 级联错误（真实 bug，createSnapshotUnlocked 提取重构遗留 withLock 回调闭合）
+- R2: DoD quality_gate 只跑 types.ts，主文件 snapshot-manager.ts 未覆盖（流程缺陷）
+- R3: G3 的 5 subagent 全部声称 red_count=0 但代码有 tsc 错误（worker §4.6 自审形式合规实质无效）
+- **多模型交叉价值再次验证**：DeepSeek auditor 通过 tsc 编译客观验证发现 GLM worker 全员漏检
+
+**v0.20 E_AUDIT_RED_BLOCKED 累积检查死锁（设计缺陷，false positive）**：
+- Round1 auditor required（有 red ✓）→ commander 修 L204 tsc 通过 → Round2 auditor pass（0 red ✓）
+- 但 `tree_audit_gate(pass)` 仍被引擎拒——v0.20 扫描**所有历史 audit_log**（不只最新），旧 Round1 red 不可变（append-only）→ **引擎要求解决旧 red 但不提供 resolve 接口** → 死锁
+- **修复（P0）**：方案 A——`tree_audit_gate` 只检查**最新一条** audit_log（复审追加新条目 = resolve 旧 red）；方案 B——新增 `tree_audit_resolve` 显式标记旧 red resolved
+
+**v0.22 实战一成一败**：
+- ✅ **Gap A（yellow_findings_resolved）：成**——4/4 worker 合规（每条 yellow 有 fix_method + fix_evidence≥20字；v0.22 教化生效因为 tree-worker SKILL done event 模板直接教填）
+- ❌ **Gap B（fix leaf 闭环 §13.4.6）：败**——0/1 触发（commander 人类/GLM 都没用 fix leaf；即使触发也撞 E_AUDIT_RED_BLOCKED 死锁）
+
+**改进建议**：
+- **P0 修死锁**（v0.20 累积检查 false positive）：tree_audit_gate 只看最新 audit_log / 或新增 tree_audit_resolve
+- **P1 fix leaf 引擎化**（**第六个硬拦候选**）：auditor required → 引擎 fix_required=true → root done gate 检查所有 fix_required 必须清除
+- P2 audit_gate required 返回消息附 fix leaf 操作指南（引擎推送）
+- P3 root done gate 增强（检查子 audit_gate 全 pass）+ tree_validate 检查 root status 与子 audit_gate 一致性
+
+**一句话总评**：ns1b 多路并行 + 多模型交叉成功捕获 GLM 全员漏检编译错误（tsc 客观验证价值大），v0.22 yellow 门禁教化生效，但暴露 tree-system 两个真问题——E_AUDIT_RED_BLOCKED 累积检查无 resolve API 死锁（设计缺陷）+ fix leaf 纯教化对人类/GLM 双双失效（需引擎化，第六硬拦候选）。
+
+## 🔖 2026-07-17 v0.22 两个闭环 gap 修复：done event `yellow_findings_resolved`（照搬 P1b red 模式）+ commander §13.4.6 fix leaf 反馈闭环
+
+nanjuS1 实战（v0.21 真实项目代码闭环，9 yellow findings 带 finding_id 但 worker "非 red 不修"）暴露 v0.21 仍有两个闭环缺口。v0.22 把这两跳接上，**yellow 不再进"已知但未修复"真空**。
+
+**Gap A — done event `yellow_findings_resolved`（引擎硬拦）**：
+- 照搬 P1b `red_findings_resolved` 跨事件校验模式（P1b 治 macp4-W3 假收敛"red 降 yellow 但文档没改"，v0.22 把同机制扩到 yellow）。
+- 触发条件：worker review_round findings 含 `severity=yellow` 且带 `finding_id` → done event `meta.yellow_findings_resolved` 必填。
+- 每项结构：`{finding_id, fix_method: edit_file|fixed|downgrade|deferred|accepted, fix_evidence≥20字}`。
+- 缺字段 / finding_id 不匹配 / fix_evidence<20 字 → `E_SELFCHECK_INVALID`。
+- **治 nanjuS1 实战 9 yellow 真空**：worker 必须对每条 yellow 明确处置（改文件 / 已修 / 降级 / 延后 / 接受）+ ≥20 字证据，闭环最后跳。nanjuS1 特派员报告改进方向①"yellow 修复驱动力不足"（建议 DoD 加 `yellow_count=0 或有 S2 修复计划`）→ v0.22 用引擎硬拦实现等价约束（更强：每条 yellow 必须明确 fix_method + 证据，不许只"计划修"）。
+
+**Gap B — commander SKILL §13.4.6 fix leaf 反馈闭环**：
+- nanjuS1 特派员报告改进方向②"auditor→worker 反馈闭环缺失"（建议加 post-audit fixer 角色）→ v0.22 落地。
+- 结构化路径：auditor findings（red/yellow）→ commander 建 fix leaf（或复用 worker）按 findings 修复 → auditor 复审（重跑 audit_gate）→ 确认修复才 done。
+- 补 auditor→fixer→复审闭环（之前 auditor 产出 findings 后无强制回流，worker 可"非 red 不修"）。
+
+**P1b 照搬一致性**：`yellow_findings_resolved` 完全对齐 `red_findings_resolved`（同 schema、同跨事件校验、同 `E_SELFCHECK_INVALID` 错误码、同 finding_id 溯源）。差别仅在触发 severity（red→yellow）+ fix_method 枚举扩（yellow 比 red 多 `accepted`/`deferred` 合理项，因 yellow 非 critical 可接受/延后）。
+
+**演进链第五候选落地**（v0.18→v0.22 "GLM/DeepSeek 不可靠 → 引擎硬拦"第五跳）：
+| 版本 | 改动 | 实战暴露 |
+|---|---|---|
+| v0.17.1 | 纯 SKILL 教化 | v172t 证伪（0 spawn 伪造） |
+| v0.18 | worker session 禁 | v18t+ spawn 5 ✓ |
+| v0.19 | root done 须子 | v20t/v22t root 正确顺序 ✓ |
+| v0.20 | red 阈值 | v21t auditor 不同模型 ✓ |
+| v0.21 | pass_with_minor + severity 必填 | v22t 一次提交 + severity 全标 ✓ |
+| **v0.22** | **yellow_findings_resolved（yellow 闭环）** | **nanjuS1 9 yellow 真空暴露 → 引擎硬拦** |
+
+- tree-engine.cjs md5 `04a74e62`→`3e10bf8e`，5388→5425 行
+- 测试：sprint-v022 **4/0** + 全量 **0 回归**
+- 配套：commander SKILL §13.4.6 fix leaf 反馈闭环
+
+**与第一性原理对齐**（CLAUDE.md §第一性原理）：v0.22 是把 nanjuS1 暴露的"yellow 这一跳闭环断"接上——worker review_round 产 yellow 是动作，done event `yellow_findings_resolved` 是动作后果回灌（即时 + 可定位：缺哪条 finding_id / fix_evidence 不够字数都报具体错）；§13.4.6 是把 auditor findings 这一跳闭环接上。**闭环断一段，Agent 盲跑一段**——v0.22 堵的是 yellow + auditor→fixer 这两段。
+
+## 🔖 2026-07-17 特派员 nanjuS1 回收：tree-system v0.21 代码任务是甜点场景（33min/3session/零干预 ~45KB TS 闭环，多模型交叉捞 4 条单模型漏审）
+
+派 DeepSeek 特派员独立分析 nanjuS1 实战经验（读 tree-state + 4 TS 代码 + audit_log 24 findings）。
+
+**核心结论**：tree-system v0.21 在代码任务上是**甜点场景**——33min / 3 session（37.5% 预算）/ 零人工干预完成 ~45KB TS 代码"GLM 实施 + DeepSeek 审计"全自动闭环。
+
+**五维评估**：
+1. **代码质量**：worker 4 TS 文件依赖 DAG 单向无环，`tsc --strict` 零类型错误，架构对齐 architecture.md，可运行可扩展。亮点：字面量联合代替 enum / 字段全 readonly / 依赖注入便于 S2。
+2. **审计质量**：24 findings（15 green + 9 yellow + 0 red），G1-G5 全维度 + 10 CWE。**多模型交叉价值证实**：DeepSeek 独立捞出 **4 条 GLM 自审全漏**（README 方法名 confirm→confirmUnderstanding / MODE_KEYWORDS 非 export 列导出 / 'go ' 尾空格漏 Go / review_round 选择性收录 finding）。
+3. **组织效率**：3/8 session，worker 19min + auditor 5min，drift/nudge/escalation 全 0，零干预。**代码任务比文档任务更适合 tree-system**（tsc 编译客观 G3 门，auditor-worker 争议压缩）。
+4. **v0.21 表现**：9 大特性全验证（severity 必填 24/24 / 多模型交叉 / E_GATEKEEPER / root done 子 / 分离 .proma-pro / auto_upgrade / alignment 0.95-0.96 / review_round 收敛 / subagent_spawn）。唯一遗憾 pass_with_minor 未触发（9 yellow 全非安全）。
+5. **改进方向**：① **yellow 修复驱动力不足**（worker "非 red 不修"系统问题，建议 DoD 加 `yellow_count=0 或有 S2 修复计划`）② **auditor→worker 反馈闭环缺失**（建议加 post-audit fixer 角色）③ review_round 透明度校验 ④ README 元数据 auto_test grep。nanju 集成：修 9 yellow → PR / S2 替换 stub 真实 LLM。
+
+**方法论**：特派员（DeepSeek）独立读代码 + audit_log，客观评估（不依赖 commander/auditor 自报）。**多模型交叉双层价值**：auditor 层（DeepSeek 审 GLM worker，捞 4 条盲区）+ 特派员层（DeepSeek 审整个树，独立客观）。
+
+## 🔖 2026-07-17 nanju S1 实战✅：tree-system v0.21 首次跑真实项目代码实现完整闭环
+
+用 tree-system v0.21 跑 nanju 项目 Sprint S1【向导Agent引擎基础】实现。三 leaf 全 done + audit_gate pass。**首次真实项目代码实现闭环（非测试文档）**——tree-system 从"测试文档验证"升级到"真实项目代码实现 + 审计"。
+
+**成果**：
+- worker 产真实 TypeScript 代码 4 文件（~45KB）：`mode-selector.ts`（8582B）/ `requirement-collector.ts`（12800B）/ `types.ts`（9599B）/ `wizard-engine.ts`（14492B）—— 模式选择 + 需求收集 + 类型 + 向导引擎主
+- worker §4.6 自审（spawn 4 + 2 轮 review_round 收敛 red→0）
+- **DeepSeek auditor（不同模型）审真实代码**：24 findings（15 green + 9 yellow），**severity 全标**（v0.21 必填），verdict=**pass**（red=0，9 yellow 非安全建议 → pass 合理），cwe=[]（向导引擎基础无安全维度）
+- commander root done（v0.19 子 done 正确顺序）
+
+**v0.21 全链路真实项目验证**：
+
+| 环节 | 结果 |
+|---|---|
+| worker 产代码（非文档） | ✅ 4 TS 文件 ~45KB（向导引擎基础） |
+| §4.6 自审 | ✅ spawn 4 + 2 轮收敛 red→0 |
+| DeepSeek auditor 审代码 | ✅ 24 findings severity 全标（v0.21 一次提交） |
+| verdict 阈值 | ✅ pass（9 yellow 非安全 → pass，red=0） |
+| severity 必填（v0.21） | ✅ per-finding {green:15,yellow:9} 全标 |
+| root done 子（v0.19） | ✅ worker+auditor done 后 root done |
+| 分离 bug | ✅ tree 落 .proma-pro |
+
+**tree-system 演进里程碑**：v0.17.1 纯教化证伪 → v0.18-v0.21 四引擎硬拦 → **首次真实项目（nanju）代码实现完整闭环**。worker 产真实 TS 代码（不是测试文档），DeepSeek auditor 审代码质量，全 v0.21 链路生效。tree-system 从"协议验证"升级到"真实项目实现 + 审计"。
+
+**nanju S1 状态**：向导Agent引擎基础代码产出（deliverables/src/ 4 文件），可集成 nanju src（D:\Codes\multi-agent-collab-platform\src\）后续。
+
+## 🔖 2026-07-17 v0.22 实战 v22t✅：v0.21 完美闭环（auditor 一次提交 + severity 必填 + pass_with_minor 不降级 + CWE 安全维度）
+
+派 commander（GLM）建 v22t，DeepSeek auditor（不同模型 §13.4.1）审。三 leaf 全 done + audit_gate pass。**v0.21 修复 v21t 全部问题**。
+
+**v0.21 vs v0.20（v22t vs v21t）对比**：
+
+| 维度 | v21t（v0.20） | v22t（v0.21） |
+|---|---|---|
+| auditor 试错 | 7 次（48 轮卡 schema） | **events=2（一次成功）** ✅ |
+| per-finding severity | 全无（被迫剥离） | **{yellow:5, green:10}** ✅ |
+| verdict | pass（pass_with_minor 降级） | **pass_with_minor** ✅ |
+| cwe_hits | 无 | **5 个 CWE（285/287/522/204/307）** ✅ |
+
+**worker audit_log**：`verdict=pass_with_minor`（不降级）/ `severity_counts:{red:0,yellow:5,green:10}` / `cwe_hits:[CWE-285,CWE-204,CWE-307,CWE-522,CWE-287]` / per-finding `{yellow:5,green:10}`（全标 severity）。
+
+**v0.21 四项修复实战全验证**：
+1. ✅ **pass_with_minor 枚举**（verdict 不降级 pass，正确判 mid 安全）
+2. ✅ **severity 必填**（per-finding 全标 yellow/green，v0.20 全无 → v0.21 全有）
+3. ✅ **isPassVerdict**（pass_with_minor done 门禁放行，三 leaf 全 done）
+4. ✅ **报错一次性 schema + SKILL §6.3 engine 模板**（auditor events=2 一次提交，不再 7 试错）
+
+**DeepSeek auditor（不同模型）发现 5 yellow（5 CWE：鉴权 285/287/522 + 信息泄露 204 + 限流 307）→ pass_with_minor**（mid 安全加权，正确阈值 red→required / mid 安全 yellow→pass_with_minor / green→pass）。多模型交叉（DeepSeek vs GLM）+ 安全维度 CWE + verdict 阈值全正确。
+
+**双管齐下闭环**：SKILL v1.1（§3.1 加 pass + §6.3 engine 模板 + §4.1 pass_with_minor + §6.1 五步 root 背书）+ engine v0.21（pass_with_minor 枚举 + severity 必填 + isPassVerdict + 报错 schema + help topic）—— auditor 按 SKILL 一次提交（含 severity + pass + pass_with_minor）→ engine 接受 + red 阈值就绪 + 不降级。tree-system 审计防线（worker §4.6 + auditor 独立审 + severity 阈值 + 多模型交叉）全闭环。
+
+**演进总览**（v0.17.1 纯教化证伪 → 四引擎硬拦 + 双管齐下）：
+| 版本 | 改动 | 实战验证 |
+|---|---|---|
+| v0.17.1 | 纯 SKILL 教化 | v172t 证伪（0 spawn 伪造） |
+| v0.18 | worker session 禁 | v18t/v20t/v21t/v22t spawn 5 ✓ |
+| v0.19 | root done 子 | v20t/v22t root 正确顺序 done ✓ |
+| v0.20 | auditor 不同模型 + red 阈值 | v21t auditor 不同模型 ✓（red 阈值未触发，severity 可选） |
+| **v0.21** | **pass_with_minor + severity 必填** | **v22t 一次提交 + severity 全标 + pass_with_minor + CWE ✓** |
+
 ## 🔖 2026-07-17 v0.21 engine 根治：audit_gate pass_with_minor + results severity 必填（SKILL v1.1 + engine v0.21 双管齐下闭环）
 
 紧接上一条（特派员报告纠正：auditor 没摸索，是 SKILL §3.1/§6.3 schema 与 engine 冲突）。**双管齐下根治落地**：tree-auditor SKILL v1.1 修订（对齐 engine schema）+ engine v0.21（根治枚举/必填）。

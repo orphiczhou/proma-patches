@@ -52,6 +52,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), adheres to [Sem
 
 ## [Unreleased]
 
+### 2026-07-17 v0.22 engine done event `yellow_findings_resolved` + commander §13.4.6 fix leaf 反馈闭环（补 yellow 闭环 / auditor→fixer 复审）
+
+nanjuS1 实战（v0.21 真实项目代码闭环）暴露两个 gap：① **Gap A — yellow 闭环缺失**：worker review_round 产 9 yellow findings（带 finding_id）但 worker "非 red 不修"，done event 也无字段约束 yellow 处置 → 9 yellow 进"已知但未修复"真空（red 有 P1b `red_findings_resolved` 跨事件校验兜底，yellow 无对应机制）。② **Gap B — auditor→worker 反馈闭环缺**：auditor findings 没有结构化路径回流到 fix leaf 修复 + auditor 复审。两 gap 都属"闭环断一段"——v0.22 把这两跳接上。
+
+**engine v0.22 两项修复**：
+1. **Gap A — done event `yellow_findings_resolved`**（照搬 P1b `red_findings_resolved` 模式）：worker review_round findings 含 `severity=yellow` 且带 `finding_id` → done event `meta.yellow_findings_resolved` 必填数组，每项 `{finding_id, fix_method: edit_file|fixed|downgrade|deferred|accepted, fix_evidence≥20字}`。缺字段 / finding_id 不匹配 / fix_evidence 太短 → `E_SELFCHECK_INVALID`。治 nanjuS1 实战 9 yellow 真空：worker 必须对每条 yellow 明确处置（改文件 / 已修 / 降级 / 延后 / 接受），并给≥20字证据，闭环最后跳。
+2. **Gap B — commander SKILL §13.4.6 fix leaf 反馈闭环**：auditor findings（red/yellow）→ commander 建 fix leaf（或复用 worker）按 findings 修复 → auditor 复审（重跑 audit_gate）→ 确认修复才 done。补 auditor→fixer→复审结构化反馈路径（之前 auditor 产出 findings 后无强制回流）。
+
+- tree-engine.cjs md5 `04a74e62`→`3e10bf8e`，5388→5425 行
+- 测试：sprint-v022 **4/0** + 全量 **0 回归**
+- 演进链（"GLM/DeepSeek 不可靠 → 引擎硬拦"第五个候选"yellow 闭环"落地）：v0.18 worker session 禁 → v0.19 root done 须子 → v0.20 red 阈值 → v0.21 pass_with_minor + severity 必填 → **v0.22 yellow_findings_resolved（yellow 闭环）**
+
 ### 2026-07-17 v0.21 engine audit_gate pass_with_minor + severity 必填（根治 SKILL↔engine schema 冲突）
 
 v21t 实战 + 特派员报告暴露 tree-auditor SKILL §3.1/§6.3（`results:[{item,severity,evidence}]`，subAgent 起草的 review_round 风格）与 engine audit_log schema（`{item,pass,evidence}`）**冲突**——auditor（DeepSeek A2）读了 SKILL 按 §3/§4 首次提交，被 engine schema 拒：① results 强制 pass 字段（SKILL 给 severity 无 pass）→ 7 次试错（48 轮卡 schema）→ 妥协剥离 severity；② audit_gate verdict 枚举缺 pass_with_minor（SKILL §4.1 给 pass_with_minor）→ 被迫 pass_with_minor→pass。auditor 没橡皮图章（顶层 audit_log 有 `severity_counts` + `verdict:pass_with_minor` + `cwe_hits`），橡皮图章在 engine 层。**双管齐下根治**：SKILL v1.1（对齐 engine）+ engine v0.21（根治）。

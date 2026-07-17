@@ -2376,6 +2376,43 @@ async function cmdEventAppend(args, callerSessionId) {
           );
         }
       }
+      // v0.22 Gap A: yellow_findings_resolved（照搬 P1b red 模式，治 yellow 进"已知但未修复"真空）
+      //   若 leaf 历史 review_round 有 yellow findings（带 finding_id），done event 必须在 meta.yellow_findings_resolved
+      //   声明每条 yellow 怎么处理。fix_method: edit_file=改了/fixed=已修/downgrade=降级/deferred=推迟/accepted=接受不修。
+      //   fix_evidence ≥20 字。向后兼容：无 yellow findings 或无 finding_id → yellow_findings_resolved 可省略。
+      const _yellowIds = new Set();
+      for (const _e of _rrEvs) {
+        if (!_e || (_e.type !== 'review_round' && _e.event_type !== 'review_round')) continue;
+        const _rm = _e.meta || _e;
+        const _rvs = Array.isArray(_rm.reviewers) ? _rm.reviewers : [];
+        for (const _rv of _rvs) {
+          const _fs = Array.isArray(_rv.findings) ? _rv.findings : [];
+          for (const _f of _fs) {
+            if (_f && _f.severity === 'yellow' && typeof _f.finding_id === 'string' && _f.finding_id.length > 0) {
+              _yellowIds.add(_f.finding_id);
+            }
+          }
+        }
+      }
+      if (_yellowIds.size > 0) {
+        const yfr = meta.yellow_findings_resolved;
+        if (!Array.isArray(yfr)) {
+          throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: leaf "${leaf_id}" has ${_yellowIds.size} yellow finding(s) with finding_id in history review_round, but meta.yellow_findings_resolved is missing or not an array. Must declare how each yellow finding was resolved (v0.22: fix/defer/accept). yellow finding_ids: ${Array.from(_yellowIds).join(', ')}`);
+        }
+        const _yResolvedIds = new Set();
+        for (let _yi = 0; _yi < yfr.length; _yi++) {
+          const _yt = yfr[_yi];
+          if (!_yt || typeof _yt !== 'object') throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: yellow_findings_resolved[${_yi}] is not an object on "${leaf_id}"`);
+          if (typeof _yt.finding_id !== 'string' || _yt.finding_id.length === 0) throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: yellow_findings_resolved[${_yi}].finding_id is missing or not a string on "${leaf_id}"`);
+          if (!['edit_file', 'fixed', 'downgrade', 'deferred', 'accepted'].includes(_yt.fix_method)) throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: yellow_findings_resolved[${_yi}] (finding_id=${_yt.finding_id}) has invalid fix_method (must be edit_file|fixed|downgrade|deferred|accepted) on "${leaf_id}"`);
+          if (typeof _yt.fix_evidence !== 'string' || _yt.fix_evidence.length < 20) throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: yellow_findings_resolved[${_yi}] (finding_id=${_yt.finding_id}) fix_evidence too thin (≥20 chars required) on "${leaf_id}"`);
+          _yResolvedIds.add(_yt.finding_id);
+        }
+        const _yUnresolved = Array.from(_yellowIds).filter((id) => !_yResolvedIds.has(id));
+        if (_yUnresolved.length > 0) {
+          throw new TreeStateError(E_SELFCHECK_INVALID, `done event rejected: ${_yUnresolved.length} yellow finding(s) not resolved in yellow_findings_resolved on "${leaf_id}": ${_yUnresolved.join(', ')}. Each yellow finding must be declared (fix_method + fix_evidence ≥20 chars).`);
+        }
+      }
     }
 
     const ev = { type: opts.type, ts, meta };
@@ -3304,18 +3341,20 @@ async function cmdAuditGate(args, callerSessionId) {
         }
       }
       // v0.20 (2026-07-17): audit_gate pass 时，被审 leaf 的 audit_log findings 不能有 red severity
-      //   （防 auditor 偏松 pass 严重问题，v20t 教训：GLM auditor 发现 mid 安全问题却 verdict=pass）。
+      //   （防 auditor 偏松 pass 严重问题，v20t 教训）。
+      //   v0.23 修复死锁（ns1b 特派员报告）：只检查最新一条 audit_log（复审追加新条目 = resolve 旧 red）。
+      //   v0.20 扫描所有历史 audit_log → 旧 red append-only 不可清除 → 真实修复后复审仍被拦（false positive）。
+      //   修复：只看 leaf.audit_log 最后一个 entry（最新复审结果）。auditor 复审追加新 entry（无 red）= resolve 旧 red。
       //   注：仅校验 severity=red（critical），yellow（含 mid 安全 pass_with_minor）不阻断 pass——mid 由 SKILL 教化加权，引擎只兜底 red。
-      if (Array.isArray(leaf.audit_log)) {
-        for (const _e of leaf.audit_log) {
-          if (_e && Array.isArray(_e.results)) {
-            for (const _r of _e.results) {
-              if (_r && _r.severity === 'red') {
-                throw new TreeStateError(
-                  E_AUDIT_RED_BLOCKED,
-                  `audit-gate rejected: leaf "${leaf_id}" audit_log has red severity finding "${_r.item}". Cannot pass with unresolved red (critical) issue — auditor must resolve, downgrade with evidence, or escalate. [v0.20 severity threshold, v20t lesson]`
-                );
-              }
+      if (Array.isArray(leaf.audit_log) && leaf.audit_log.length > 0) {
+        const _latestAudit = leaf.audit_log[leaf.audit_log.length - 1];
+        if (_latestAudit && Array.isArray(_latestAudit.results)) {
+          for (const _r of _latestAudit.results) {
+            if (_r && _r.severity === 'red') {
+              throw new TreeStateError(
+                E_AUDIT_RED_BLOCKED,
+                `audit-gate rejected: leaf "${leaf_id}" latest audit_log has red severity finding "${_r.item}". Cannot pass with unresolved red (critical) in latest audit. Auditor must resolve then re-audit (new audit_log entry with 0 red). [v0.20 threshold + v0.23 fix: only check latest audit_log entry]`
+              );
             }
           }
         }

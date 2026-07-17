@@ -1,7 +1,7 @@
 {
   "tree_id": "tdb21",
   "version": "1.1",
-  "created_at": "2026-07-17T10:18:32.742+08:00",
+  "created_at": "2026-07-17T13:49:15.667+08:00",
   "last_heartbeat": null,
   "root_brief": {
     "parent_intent": "dbc unit test"
@@ -21,7 +21,7 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "active",
-      "created_at": "2026-07-17T10:18:32.742+08:00",
+      "created_at": "2026-07-17T13:49:15.667+08:00",
       "added_by": null,
       "last_event_ts": null,
       "last_event_type": null,
@@ -60,7 +60,7 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "pending_brief",
-      "created_at": "2026-07-17T10:18:32.746+08:00",
+      "created_at": "2026-07-17T13:49:15.672+08:00",
       "added_by": "00000000-0000-0000-0000-000000000001",
       "last_event_ts": null,
       "last_event_type": null,
@@ -114,13 +114,13 @@
   "session_registry": {
     "00000000-0000-0000-0000-000000000001": {
       "leaf_id": "tdb21-root",
-      "registered_at": "2026-07-17T10:18:32.742+08:00",
+      "registered_at": "2026-07-17T13:49:15.667+08:00",
       "source": "leaf_add",
       "caller": null
     },
     "00000000-0000-0000-0000-000000000002": {
       "leaf_id": "tdb21-Cp2-worker",
-      "registered_at": "2026-07-17T10:18:32.746+08:00",
+      "registered_at": "2026-07-17T13:49:15.672+08:00",
       "source": "leaf_add",
       "caller": "00000000-0000-0000-0000-000000000001"
     }

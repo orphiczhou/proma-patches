@@ -2,9 +2,20 @@
 
 > 项目知识库。每条都是"删掉后未来 Agent 会犯错"的内容。保持精简。
 
+## 🔴 第一性原理：Agent 工程即闭环工程
+
+Agent 只有一条文字通道（输入输出皆文字，无视觉/听觉/触觉/本体感觉），等于"感觉剥夺"的操作者——能发指令，默认看不见指令后果。**搭 Agent 系统，第一件事是给它闭环：把每个操作动作的后果，翻译成它唯一能读的文字，回灌给它。**（精髓不是给 Agent 装眼睛，是承认它永远不会有眼睛——工程职责是把一切非文字后果持续翻译成文字喂回去。）
+
+闭环三要件（缺一即事故）：
+1. **即时**——动作当下就反馈，不等终点（引擎 append 即校验，非 done 才校验；延迟反馈=没反馈，Agent 早跑远）。
+2. **可定位**——反馈精确到"哪里错、怎么改"（错误码带修复路径，非空泛"失败"）。
+3. **人验证最后一跳**——Agent 自报"完成"永远不可信（commander 两次"虚假 done"被编排方核 tree-state 戳穿）；闭环最后一跳必须人核 ground truth。
+
+**本项目所有事故 = 某一跳闭环断**：macp2（调用形式没钉死→4 分钟炸 207 会话）/ nanju（审计义务标"可选"→无 auditor）/ v0.17.1（纯教化无引擎即时反馈→worker 伪造 review_round，四层防线全失效）/ skill 反馈闭环没完成（盲跑一周）。**所有可靠机制 = 把那一跳接上**：tree-state events 回灌 / 引擎 append 即校验错误码 / v0.18 worker session 禁即时拦。**闭环断一段，Agent 盲跑一段。** 越是硬件/物理世界（后果不可逆、不在文字通道），闭环越是唯一可靠前提，人验证不可省——这不是不信任 Agent，是承认文字通道承载不了物理世界的全部真相。
+
 ## 项目结构
 > 🔴 **权威源 = `D:/codes/tree-harness/`（2026-07-09 源码统一后确立）**。此前最新内容分散在 workspace-files（tree-engine 4928）与 pro dist（patches 3129），已全部汇聚到本目录。
-- `tree-engine.cjs`（5388 行，md5 04a74e62）：树引擎核心（状态机、事件、审计门禁、caller-binding、SubAgent 入树、5 件套持久化、drift 联动、ctx 竹节触发、prune 级联 D1、SCHEMA_VERSION 版本管理 D2、**Sprint 5 max_sessions session_registry + E_MAX_SESSIONS 硬护栏**：四路径登记 init/add/set-session/register + migrate 回灌 + findTreesBySession 导出；**v0.18 worker role 禁 review_round session 分支（`E_REVIEW_SESSION_FORBIDDEN`，堵 GLM worker 占位/借真 UUID 蒙混，v0.17.1 纯教化实战证伪后引擎层落地）**；**v0.19 root done 须子 done（`E_CHILDREN_NOT_DONE` L1762 扩 root，堵 commander root 提前 done 放弃子任务）；**v0.20 audit_gate red 阈值（`E_AUDIT_RED_BLOCKED`：audit_log findings severity=red → 拒 pass，防 auditor 偏松 pass 严重问题，v20t 教训）**）；**v0.21 audit_gate pass_with_minor 枚举 + results severity 必填 + isPassVerdict helper**（对齐 tree-auditor SKILL §3.1/§4，根治 v21t schema 冲突：auditor 不再被迫剥离 severity / 降级 pass_with_minor→pass）**。
+- `tree-engine.cjs`（5425 行，md5 3e10bf8e）：树引擎核心（状态机、事件、审计门禁、caller-binding、SubAgent 入树、5 件套持久化、drift 联动、ctx 竹节触发、prune 级联 D1、SCHEMA_VERSION 版本管理 D2、**Sprint 5 max_sessions session_registry + E_MAX_SESSIONS 硬护栏**：四路径登记 init/add/set-session/register + migrate 回灌 + findTreesBySession 导出；**v0.18 worker role 禁 review_round session 分支（`E_REVIEW_SESSION_FORBIDDEN`，堵 GLM worker 占位/借真 UUID 蒙混，v0.17.1 纯教化实战证伪后引擎层落地）**；**v0.19 root done 须子 done（`E_CHILDREN_NOT_DONE` L1762 扩 root，堵 commander root 提前 done 放弃子任务）；**v0.20 audit_gate red 阈值（`E_AUDIT_RED_BLOCKED`：audit_log findings severity=red → 拒 pass，防 auditor 偏松 pass 严重问题，v20t 教训）**）；**v0.21 audit_gate pass_with_minor 枚举 + results severity 必填 + isPassVerdict helper**（对齐 tree-auditor SKILL §3.1/§4，根治 v21t schema 冲突：auditor 不再被迫剥离 severity / 降级 pass_with_minor→pass）**；**v0.22 done event `yellow_findings_resolved` 闭环（照搬 P1b `red_findings_resolved` 模式：review_round 有 yellow findings 带 finding_id → done event meta.yellow_findings_resolved 必填 `[{finding_id, fix_method: edit_file|fixed|downgrade|deferred|accepted, fix_evidence≥20字}]`，缺→`E_SELFCHECK_INVALID`，治 nanjuS1 实战 9 yellow 进"已知但未修复"真空）+ commander SKILL §13.4.6 fix leaf 反馈闭环（auditor findings → fix leaf 修 → auditor 复审）**。
 - `proma-dev-patches.cjs`（3346 行，md5 5083480d）：MCP 工具注册 + caller ownership + create_session budget 护栏 + 跨工作区 workspace 锁（Sprint 4 P1，E_WORKSPACE_FORBIDDEN）+ tao-watcher（D3 silence 静默 / Sprint 4 rule 按 role 分发 RULE_ROLE_SCOPE + nudge_log cap）+ **Sprint 5 聚类 A create_session 旁路根治**（findCallerTreesForBypassGuard 定位 caller 所属 tree + max_sessions 预检 E_MAX_SESSIONS + 旁路登记 register-session + tree_register_session/tree_session_count MCP 工具）。
 - `proma-mcp-server.cjs`（157 行）：外部 stdio MCP 桥接（5 处副本 md5 一致）。
 - `skills/tree-commander/SKILL.md` + `skills/tree-worker/SKILL.md`：指挥官/工人手册。
@@ -57,7 +68,7 @@ v0.17.1「schema 位置红线」纯 SKILL 教化（显眼红线块 + ❌/✅ 对
 1. `D:/codes/tree-harness/tree-engine.cjs` → `D:/Proma-dev/resources/app/dist/tree-engine.cjs`（pro，cp 后需用户重启 pro app 才加载新引擎）
 2. `D:/codes/tree-harness/proma-dev-patches.cjs` → `D:/Proma-dev/resources/app/dist/proma-dev-patches.cjs`（pro，同上；patches 改动也需重启 pro 才生效）
 3. `skills/*` → `~/.proma-pro/agent-workspaces/default/skills/`（pro commander 真实 workspace；SKILL 文件级即生效）。⚠️ **分离 bug（2026-07-16 发现）**：start-pro.bat `PROMA_INSTANCE_NAME=pro` 让 Proma session/workspace/skills 在 **`.proma-pro/`**（commander 活在这，18 个内置 skill 在此），但 `PROMA_DEV=1` 让 tree-system 的 tree 目录在 **`.proma-dev/`**（v19t 等树在此）——两者分离。**SKILL 部署 .proma-pro，tree 监督读 .proma-dev**。旧口诀"SKILL→.proma-dev"是 bug（把 tree 目录当 skill 目录，e2e 时代埋的）。
-4. 同步前备份 `.bak-pre-<label>-<date>`；md5 校验源=pro（tree-engine 应=04a74e62，patches 应=5083480d）。
+4. 同步前备份 `.bak-pre-<label>-<date>`；md5 校验源=pro（tree-engine 应=3e10bf8e，patches 应=5083480d）。
 
 ## pro 测试要点（来自历次迭代）
 - pro 用 `.proma-dev` userData（**非** `~/.proma`）。SKILL 同步错路径 = commander 读旧版（曾误判"SKILL 未生效"）。
