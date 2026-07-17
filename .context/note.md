@@ -4,6 +4,41 @@
 
 新条目追加在顶部。
 
+## 🔖 2026-07-17 v0.24 P1 完美闭环✅：fix leaf 闭环首次完整实战验证（v0.23+v0.24 协同：auditor red → root 硬拦 → fix → 复审 pass → root done）
+
+Loop ② l24t 测试 v0.24 P1（root done gate 查子 audit_gate=required 硬拦）。三 leaf 全 done + audit_gate pass。
+
+**fix leaf 闭环首次完整实战验证**：
+1. auditor 发现 2 red → worker audit_gate=required
+2. **v0.24 P1：root done 被硬拦**（worker audit_gate=required → root 不能 done）
+3. commander **被迫推进 fix**（worker 修 red）—— 不再靠 SKILL 教化 fix leaf（GLM 不遵守），引擎硬拦强制
+4. auditor 复审（追加新 audit_log [1], verdict=pass, red=0）
+5. **v0.23 死锁修复**：audit_gate 只看最新 audit_log [1]（pass, 0 red）→ audit_gate pass
+6. worker done + audit_gate pass → root done 放行 ✓
+
+**对比三次实战**（fix leaf 闭环演进）：
+| 版本 | auditor required 后 | 结果 |
+|---|---|---|
+| ns1b（v0.22） | commander 不推进（fix leaf §13.4.6 教化失效） | root 卡 |
+| l2t1（v0.22+v0.23） | 同上 | root 卡 |
+| **l24t（v0.24）** | **v0.24 P1 root 硬拦 → commander 被迫 fix+复审 → root done** ✓ | **完整闭环** |
+
+**v0.23 + v0.24 协同 = fix leaf 闭环完整**：
+- v0.23 死锁修复（audit_gate 只看最新 audit_log）→ 复审追加新 entry = resolve 旧 red
+- v0.24 P1（root done 查子 audit_gate=required）→ auditor required → root 硬拦 → 强制 fix+复审
+- 两者协同：auditor 发现 red → root 硬拦 → commander 推进 fix → auditor 复审 pass → root done
+
+**tree-system 审计防线全闭环**（v0.18→v0.24 六个引擎硬拦 + 死锁修复）：
+1. v0.18 worker session 禁（防 worker 伪造 review_round）
+2. v0.19 root done 子 status=done（防 root 提前 done 放弃子）
+3. v0.20 red 阈值（防 auditor 偏松 pass red）
+4. v0.21 pass_with_minor + severity 必填（对齐 SKILL + 防 auditor 漏标）
+5. v0.22 yellow_findings_resolved（防 yellow 进真空）
+6. v0.23 red 死锁修复（只看最新 audit_log，复审 = resolve）
+7. **v0.24 root done 子 audit_gate=required（第六硬拦，防 commander 不 fix）**
+
+审计闭环：worker 自审（v0.18）→ auditor 独立审（v0.20 不同模型 + red 阈值 + v0.21 severity）→ fix+复审（v0.23 死锁修复 + v0.24 root 硬拦强制）→ yellow 闭环（v0.22）。
+
 ## 🔖 2026-07-17 特派员 ns1b 回收：A1 3 red 全真（tsc 验证），v0.20 E_AUDIT_RED_BLOCKED 累积检查死锁（旧 red 无 resolve API），v0.22 yellow 门禁成/fix leaf 败
 
 派 DeepSeek 特派员独立分析 ns1b（4 worker 多路并行 + DeepSeek auditor）。
