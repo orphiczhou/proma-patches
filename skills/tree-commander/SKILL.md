@@ -26,7 +26,7 @@ description: |
 
 ```yaml
 skill_name: tree-commander
-version: 2.5
+version: 2.8
 target: 根会话（指挥官）
 requires:
   - tree-state.js (v0.7+ 已内联进 mcp__tree__* MCP，工作区不再有源码)
@@ -887,6 +887,8 @@ auditor role 引入后，root 信任锚（§13.2）**仍保留**：冷启动期�
 - fix leaf 是 role=worker（不是 auditor），走完整 worker 协议
 - fixes_resolved 必须覆盖 audit_log 中所有 severity≠green 的 findings
 - 与 §14.2 fix 区别：§14.2 fix 是审计任务批量修正（审被审文档）；§13.4.6 fix 是独立审 worker 产物的反馈闭环
+- 🔴 **v0.26 G1：fix leaf 派出后立即回填 alignment=1.0**（njs1 实证：C1 原版 brief_echo 后等 commander 回填 alignment，但 commander 没回填 → 2.5h V5b 死锁；C1-i2 靠预设 milestone + 即时 alignment 成功）。**fix leaf 是修正任务（edit/downgrade/defer），不需要重评对齐度——commander 派 fix leaf 后立即 `tree_event_append(type=brief_echo, meta={alignment:"1.0", auditor_session_id=root.session_id})` 到 fix leaf**，不等 fix leaf 自己 brief_echo。
+- 🔴 **v0.26 G4：状态机 gap 应急——上行 blocked，不直改 JSON**（njs1 实证：commander 被迫直改 tree-state.json 绕过门禁 → 违规被叫停回滚）。如果 root done 被引擎拦（archived 子 / audit_gate 问题 / 其他状态机 gap），**commander 上行 `blocked` 请示编排方**（send_message 给编排方 + tree_event_append type=blocked），由编排方判断（引擎升级 / prune 子 / force 命令 v0.27）。**绝对不要直改 tree-state.json 文件**——那是引擎独管的状态，绕过门禁=破坏审计链。
 
 **与 Gap A（yellow_findings_resolved）协同**：worker 自己 review_round 的 yellow → yellow_findings_resolved（worker done event）；auditor 发现的 yellow/red → fix leaf 闭环（§13.4.6）。两层闭环。
 
