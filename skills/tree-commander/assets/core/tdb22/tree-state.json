@@ -1,7 +1,7 @@
 {
   "tree_id": "tdb22",
   "version": "1.1",
-  "created_at": "2026-07-17T13:49:15.679+08:00",
+  "created_at": "2026-07-17T15:53:26.195+08:00",
   "last_heartbeat": null,
   "root_brief": {
     "parent_intent": "dbc unit test"
@@ -21,9 +21,9 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "active",
-      "created_at": "2026-07-17T13:49:15.679+08:00",
+      "created_at": "2026-07-17T15:53:26.195+08:00",
       "added_by": null,
-      "last_event_ts": "2026-07-17T13:49:15.685+08:00",
+      "last_event_ts": "2026-07-17T15:53:26.202+08:00",
       "last_event_type": "brief_echo",
       "context_usage_pct": 0,
       "drift_history": [],
@@ -43,7 +43,7 @@
       "events": [
         {
           "type": "brief_echo",
-          "ts": "2026-07-17T13:49:15.685+08:00",
+          "ts": "2026-07-17T15:53:26.202+08:00",
           "meta": {
             "ack": "root_anchor"
           }
@@ -68,9 +68,9 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "done",
-      "created_at": "2026-07-17T13:49:15.682+08:00",
+      "created_at": "2026-07-17T15:53:26.199+08:00",
       "added_by": "00000000-0000-0000-0000-000000000001",
-      "last_event_ts": "2026-07-17T05:49:15.689Z",
+      "last_event_ts": "2026-07-17T07:53:26.205Z",
       "last_event_type": "done",
       "context_usage_pct": 0,
       "drift_history": [],
@@ -84,14 +84,14 @@
       "events": [
         {
           "type": "brief_echo",
-          "ts": "2026-07-17T05:49:15.689Z",
+          "ts": "2026-07-17T07:53:26.205Z",
           "meta": {
             "ack": "auditor_bootstrap"
           }
         },
         {
           "type": "done",
-          "ts": "2026-07-17T05:49:15.689Z",
+          "ts": "2026-07-17T07:53:26.205Z",
           "meta": {
             "self_check": [
               {
@@ -106,7 +106,7 @@
       "audit_gate": {
         "verdict": "pass",
         "auditor_session_id": "00000000-0000-0000-0000-000000000001",
-        "ts": "2026-07-17T05:49:15.689Z"
+        "ts": "2026-07-17T07:53:26.205Z"
       },
       "nudge_count": 0,
       "nudge_log": [],
@@ -121,7 +121,7 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "pending_brief",
-      "created_at": "2026-07-17T13:49:15.691+08:00",
+      "created_at": "2026-07-17T15:53:26.208+08:00",
       "added_by": "00000000-0000-0000-0000-000000000001",
       "last_event_ts": null,
       "last_event_type": null,
@@ -175,19 +175,19 @@
   "session_registry": {
     "00000000-0000-0000-0000-000000000001": {
       "leaf_id": "tdb22-root",
-      "registered_at": "2026-07-17T13:49:15.679+08:00",
+      "registered_at": "2026-07-17T15:53:26.195+08:00",
       "source": "leaf_add",
       "caller": null
     },
     "00000000-0000-0000-0000-000000000003": {
       "leaf_id": "tdb22-Aud-commander",
-      "registered_at": "2026-07-17T13:49:15.682+08:00",
+      "registered_at": "2026-07-17T15:53:26.199+08:00",
       "source": "leaf_add",
       "caller": "00000000-0000-0000-0000-000000000001"
     },
     "00000000-0000-0000-0000-000000000002": {
       "leaf_id": "tdb22-Cq2-worker",
-      "registered_at": "2026-07-17T13:49:15.691+08:00",
+      "registered_at": "2026-07-17T15:53:26.208+08:00",
       "source": "leaf_add",
       "caller": "00000000-0000-0000-0000-000000000001"
     }

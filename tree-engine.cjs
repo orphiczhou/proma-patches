@@ -1776,6 +1776,21 @@ async function cmdLeafSetStatus(args, callerSessionId) {
             `cannot set commander/root status=done: ${notDone.length} child leaf(s) not done: ${notDone.join(', ')}`
           );
         }
+        // v0.24 P1: root done 还须子 audit_gate≠required（auditor 审了发现问题未修 → root 不能 done → 强制 commander 推进 fix+复审）
+        //   堵 fix leaf 教化失效（ns1b + l2t1 实证：commander 不用 §13.4.6 fix leaf，auditor required 后卡 root）
+        //   只拦 verdict=required（auditor 审了发现 red 未修）；pass/pass_with_minor/skip/null 放行
+        const auditBlocked = childIds.filter((lid) => {
+          const cl = state.leaves[lid];
+          if (cl.role === 'auditor') return false;
+          const _gv = cl.audit_gate && cl.audit_gate.verdict;
+          return _gv === 'required';
+        });
+        if (auditBlocked.length > 0) {
+          throw new TreeStateError(
+            E_CHILDREN_NOT_DONE,
+            `cannot set commander/root status=done: ${auditBlocked.length} child leaf(s) audit_gate=required (auditor found issues, must fix + re-audit): ${auditBlocked.map((lid) => `${lid}(gate=${state.leaves[lid].audit_gate.verdict})`).join(', ')}. [v0.24 fix_required gate]`
+          );
+        }
       }
     }
 

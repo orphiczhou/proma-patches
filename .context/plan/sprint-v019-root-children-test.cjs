@@ -109,12 +109,13 @@ async function main() {
       () => rootSetDone(t));
   }
 
-  // T2: root 有子 worker(done) → root set-status done → 放行
+  // T2: root 有子 worker(done + audit_gate=pass) → root set-status done → 放行（v0.24 加 audit_gate=pass）
   {
     const t = freshTid();
     await initTree(t);
     await addWorker(t, 'W1', UUID.w1);
     setWorkerDone(t, 'W1');               // worker done（tamper 构造）
+    tamperLeaf(t, `${t}-W1-worker`, (l) => { l.audit_gate = { verdict: 'pass', auditor_session_id: UUID.root, ts: '2026-07-17T00:00:00Z' }; }); // v0.24: worker audit_gate=pass
     await rootDoneEvent(t);
     setRootMilestone(t);
     await expectOk('T2 root 有子 done → 放行', () => rootSetDone(t));

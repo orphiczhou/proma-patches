@@ -1,7 +1,7 @@
 {
   "tree_id": "tdb24",
   "version": "1.1",
-  "created_at": "2026-07-17T13:49:15.721+08:00",
+  "created_at": "2026-07-17T15:53:26.237+08:00",
   "last_heartbeat": null,
   "root_brief": {
     "parent_intent": "dbc unit test"
@@ -21,9 +21,9 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "active",
-      "created_at": "2026-07-17T13:49:15.721+08:00",
+      "created_at": "2026-07-17T15:53:26.237+08:00",
       "added_by": null,
-      "last_event_ts": "2026-07-17T13:49:15.728+08:00",
+      "last_event_ts": "2026-07-17T15:53:26.242+08:00",
       "last_event_type": "brief_echo",
       "context_usage_pct": 0,
       "drift_history": [],
@@ -43,7 +43,7 @@
       "events": [
         {
           "type": "brief_echo",
-          "ts": "2026-07-17T13:49:15.728+08:00",
+          "ts": "2026-07-17T15:53:26.242+08:00",
           "meta": {
             "ack": "root_anchor"
           }
@@ -68,9 +68,9 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "done",
-      "created_at": "2026-07-17T13:49:15.725+08:00",
+      "created_at": "2026-07-17T15:53:26.240+08:00",
       "added_by": "00000000-0000-0000-0000-000000000001",
-      "last_event_ts": "2026-07-17T05:49:15.732Z",
+      "last_event_ts": "2026-07-17T07:53:26.246Z",
       "last_event_type": "done",
       "context_usage_pct": 0,
       "drift_history": [],
@@ -84,14 +84,14 @@
       "events": [
         {
           "type": "brief_echo",
-          "ts": "2026-07-17T05:49:15.732Z",
+          "ts": "2026-07-17T07:53:26.246Z",
           "meta": {
             "ack": "auditor_bootstrap"
           }
         },
         {
           "type": "done",
-          "ts": "2026-07-17T05:49:15.732Z",
+          "ts": "2026-07-17T07:53:26.246Z",
           "meta": {
             "self_check": [
               {
@@ -106,7 +106,7 @@
       "audit_gate": {
         "verdict": "pass",
         "auditor_session_id": "00000000-0000-0000-0000-000000000001",
-        "ts": "2026-07-17T05:49:15.732Z"
+        "ts": "2026-07-17T07:53:26.246Z"
       },
       "nudge_count": 0,
       "nudge_log": [],
@@ -121,9 +121,9 @@
       "model": "claude-sonnet-4-6",
       "channel": "anthropic",
       "status": "pending_brief",
-      "created_at": "2026-07-17T13:49:15.736+08:00",
+      "created_at": "2026-07-17T15:53:26.248+08:00",
       "added_by": "00000000-0000-0000-0000-000000000001",
-      "last_event_ts": "2026-07-17T13:49:15.742+08:00",
+      "last_event_ts": "2026-07-17T15:53:26.255+08:00",
       "last_event_type": "done",
       "context_usage_pct": 0,
       "drift_history": [],
@@ -137,14 +137,14 @@
       "events": [
         {
           "type": "brief_echo",
-          "ts": "2026-07-17T13:49:15.738+08:00",
+          "ts": "2026-07-17T15:53:26.252+08:00",
           "meta": {
             "ack": "ok"
           }
         },
         {
           "type": "done",
-          "ts": "2026-07-17T13:49:15.742+08:00",
+          "ts": "2026-07-17T15:53:26.255+08:00",
           "meta": {
             "self_check": [
               {
@@ -197,19 +197,19 @@
   "session_registry": {
     "00000000-0000-0000-0000-000000000001": {
       "leaf_id": "tdb24-root",
-      "registered_at": "2026-07-17T13:49:15.721+08:00",
+      "registered_at": "2026-07-17T15:53:26.237+08:00",
       "source": "leaf_add",
       "caller": null
     },
     "00000000-0000-0000-0000-000000000003": {
       "leaf_id": "tdb24-Aud-commander",
-      "registered_at": "2026-07-17T13:49:15.725+08:00",
+      "registered_at": "2026-07-17T15:53:26.240+08:00",
       "source": "leaf_add",
       "caller": "00000000-0000-0000-0000-000000000001"
     },
     "00000000-0000-0000-0000-000000000002": {
       "leaf_id": "tdb24-V5t-worker",
-      "registered_at": "2026-07-17T13:49:15.735+08:00",
+      "registered_at": "2026-07-17T15:53:26.248+08:00",
       "source": "leaf_add",
       "caller": "00000000-0000-0000-0000-000000000001"
     }
