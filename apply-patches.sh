@@ -1,8 +1,9 @@
 #!/bin/bash
-# Proma 会话管理补丁 — 一键安装脚本 (v0.16.6)
-# 用法: bash apply-patches.sh
-# 在 Proma 商业版 v0.12.x 上创建 Dev 版并打上全部补丁 A-K + 动态托盘图标
+# Proma 会话管理补丁 — 一键安装脚本 (v0.17)
+# 用法: bash apply-patches.sh  （多目标用 apply-patches-multi.sh --target=dev|release|all --rebuild）
+# 在 Proma 商业版 v0.15.7 上创建 Dev/Release 版并打补丁（v0.17 适配 minified main.cjs + 上游已实现项废弃）
 #
+# v0.17 补丁清单（A-K + 补丁3）：保留 A/B/E/I/J/K；废弃 C/D/F/G/H/补丁3（上游 v0.15.7 已实现 或 前提失效）
 # v0.16.6 单目录多实例: 同一份 D:\Proma-dev\ 代码，不同 BAT 文件 → 不同实例
 # 两变量体系:
 #   PROMA_INSTANCE_NAME     — 实例身份标识（remote-session 发现、AppUserModelId、托盘图标）
@@ -75,51 +76,53 @@ sed -i 's|          const dynamicCtx = buildDynamicContext({|if(typeof global.__
 echo "  补丁 B: API 桥接..."
 sed -i 's|^init_index();$|init_index();\nglobal.__proma__={createAgentSession,forkAgentSession,listAgentSessions,getAgentSessionMeta,updateAgentSessionMeta,deleteAgentSession,listChannels,getChannelById,getAgentWorkspace,listAgentWorkspaces,getAgentSessionSDKMessages,runAgentHeadless};\ntry{require("./proma-dev-patches.cjs");}catch(e){console.error("[Plugin] load failed:",e);}|' "$TMPDIR/main-patched.cjs"
 
-# 补丁 C1-5: 频道+模型元数据覆盖
-echo "  补丁 C: 频道/模型元数据覆盖..."
-sed -i 's@const channel = getChannelById(channelId);@const __effChannelId = getAgentSessionMeta(sessionId)?.channelId || channelId;\n        const channel = getChannelById(__effChannelId);@' "$TMPDIR/main-patched.cjs"
-sed -i '405686,405695{s@apiKey = decryptApiKey(channelId);@apiKey = decryptApiKey(__effChannelId);@}' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (C2 行号可能漂移，跳过)"
-sed -i '405150,406160{s@this.autoGenerateTitle(sessionId, userMessage, channelId,@this.autoGenerateTitle(sessionId, userMessage, __effChannelId,@}' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (C3 行号可能漂移，跳过)"
-sed -i 's@let resolvedModel = modelId || DEFAULT_MODEL_ID;@let resolvedModel = getAgentSessionMeta(sessionId)?.modelId || modelId || DEFAULT_MODEL_ID;@' "$TMPDIR/main-patched.cjs"
-sed -i 's@model: modelId || DEFAULT_MODEL_ID,@model: resolvedModel,@' "$TMPDIR/main-patched.cjs"
+# 补丁 C: [v0.17 废弃] 频道/模型元数据覆盖 — 上游 v0.15.7 渲染层 AgentView.tsx:485-486 已 sessionMeta 优先 + IPC 透传
+#   主进程 10 处 sed 冗余；插件走 getAgentSessionMeta 独立链路，不依赖 __effChannelId/resolvedModel
+echo "  补丁 C: 跳过（上游 v0.15.7 渲染层已 sessionMeta 优先，废弃）"
 
-# 补丁 D: DeepSeek 子Agent → V4 Pro (可选)
-echo "  补丁 D: DeepSeek 子Agent → V4 Pro..."
-sed -i 's/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-flash"/DEEPSEEK_SUBAGENT_MODEL_ID = "deepseek-v4-pro"/g' "$TMPDIR/main-patched.cjs"
+# 补丁 D: [v0.17 废弃] DeepSeek 子Agent → V4 Pro — DEEPSEEK_SUBAGENT_MODEL_ID 是幽灵常量(全仓0命中)
+#   main.cjs 的 deepseek-v4-flash(2处) 是频道模型注册表(channel-manager.ts)，sed 会改坏频道配置
+echo "  补丁 D: 跳过（幽灵常量，sed 会改坏频道注册表，废弃）"
 
 # 补丁 E: 实例隔离 — userData 路径（v0.16.5 两变量体系）
 echo "  补丁 E: userData 隔离..."
 sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged) {/if (!\1.app.isPackaged || process.env.PROMA_INSTANCE_ISOLATED === "1") {/g' "$TMPDIR/main-patched.cjs"
 
-# 补丁 F: 跨频道 sdkSessionId 断裂防护
-echo "  补丁 F: 跨频道防护..."
-sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId\\&\\&sessionMeta?.channelId\\&\\&channelId!==sessionMeta.channelId){existingSdkSessionId=void 0;}@' "$TMPDIR/main-patched.cjs"
+# 补丁 F: [v0.17 废弃] 跨频道 sdkSessionId 断裂防护 — 上游 v0.15.7 已原生实现
+#   见 ipc.ts:2449 (切内核) + agent-orchestrator.ts:728/1002/1979/2360 (sdkSessionId=undefined)
+#   旧 sed 在 minified 单行 main.cjs 上匹配多处+\\&转义产生 \let 非法码，破坏语法
+echo "  补丁 F: 跳过（上游 v0.15.7 已实现 sdkSessionId 跨内核/频道清理，废弃）"
 
-# 补丁 G: CLAUDE_CONFIG_DIR 无条件覆盖（修复 fork 失败 0/3 → 3/3）
-echo "  补丁 G: CLAUDE_CONFIG_DIR 无条件覆盖..."
-sed -i 's@if (!\(import_electron[0-9]*\)\.app\.isPackaged || process.env.PROMA_DEV === "1") {@if (!\1.app.isPackaged || process.env.PROMA_DEV === "1" || true) {@g' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (补丁 G 模式可能漂移，需手动 Edit 工具修复，见 wiki §5 补丁 G)"
+# 补丁 G: [v0.17 废弃] CLAUDE_CONFIG_DIR 无条件覆盖 — 上游 v0.15.7 已无条件化
+#   main.cjs 3处 CLAUDE_CONFIG_DIR 全无 PROMA_DEV 守卫(agent-session-manager.ts:28-30 + spawn env)，fork 0/3→3/3 已原生修复
+echo "  补丁 G: 跳过（上游 v0.15.7 已无条件覆盖 CLAUDE_CONFIG_DIR，废弃）"
 
-# 补丁 H: 跨频道/模型切换全清 sdkSessionId + 同步 meta（v2）
-echo "  补丁 H: 跨频道换模型全清..."
-sed -i 's@let existingSdkSessionId = sessionMeta?.sdkSessionId;@let existingSdkSessionId = sessionMeta?.sdkSessionId;if(existingSdkSessionId\\&\\&sessionMeta?.channelId\\&\\&channelId\\&\\&(channelId!==sessionMeta.channelId||(modelId\\&\\&modelId!==sessionMeta.modelId))){existingSdkSessionId=void 0;try{updateAgentSessionMeta(sessionId,{channelId,sdkSessionId:void 0,...(modelId?{modelId}:{})});}catch(_){}}@' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (补丁 H 行号可能漂移，需手动 Edit 修复，见 wiki §5 补丁 H)"
+# 补丁 H: [v0.17 废弃] 跨频道/模型切换全清 sdkSessionId — 上游 v0.15.7 已原生实现
+#   见 agent-orchestrator.ts:1002/1979/2360 (sdkSessionId: undefined)。废弃理由同补丁 F
+echo "  补丁 H: 跳过（上游 v0.15.7 已实现，废弃）"
 
-# 补丁 I: 禁用更新检查
-echo "  补丁 I: 禁用更新检查..."
-sed -i 's/function initAutoUpdater(mainWindow2) {\n  win = mainWindow2;/function initAutoUpdater(mainWindow2) {\n  return;\n  win = mainWindow2;/' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (补丁 I 模式可能漂移，需手动 Edit)"
+# 补丁 I: 禁用更新检查（v0.17 单行版 — 上游无开关，autoDownload=true 硬编码，必须补丁）
+#   main.cjs 里 function initAutoUpdater(mainWindow2) { 唯一匹配，{ 后即换行，函数体非深度 minify
+echo "  补丁 I: 禁用更新检查（单行注入 return）..."
+sed -i 's/function initAutoUpdater(mainWindow2) {/function initAutoUpdater(mainWindow2) {return;/' "$TMPDIR/main-patched.cjs" && echo "    (补丁 I 已打)" || echo "    (补丁 I 未匹配，需手动 Edit)"
 
-# 补丁 J: AppUserModelId 动态隔离
-echo "  补丁 J: AppUserModelId 动态隔离..."
-sed -i 's/if (!\(import_electron[0-9]*\)\.app\.requestSingleInstanceLock())/if (process.env.PROMA_INSTANCE_NAME) {\n      \1.app.setAppUserModelId(`com.proma.$${process.env.PROMA_INSTANCE_NAME}`);\n    }\n    if (!\1.app.requestSingleInstanceLock())/' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (补丁 J 模式可能漂移，需手动 Edit)"
+# 补丁 J: AppUserModelId 动态隔离（v0.17 修复 $$ bug — 模板串应为 ${...} 非 $${...}）
+#   旧 sed 实际已成功应用(requestSingleInstanceLock 区域保留换行)，但注入的 com.proma.$${...} 多了一个 $
+#   运行时 AUMID 成 com.proma.$dev(多前导$)，功能上仍区分实例但不规范；本次修正为单 $
+echo "  补丁 J: AppUserModelId 动态隔离（修复 $$ → $）..."
+sed -i 's/if (!\(import_electron[0-9]*\)\.app\.requestSingleInstanceLock())/if (process.env.PROMA_INSTANCE_NAME) {\n      \1.app.setAppUserModelId(`com.proma.${process.env.PROMA_INSTANCE_NAME}`);\n    }\n    if (!\1.app.requestSingleInstanceLock())/' "$TMPDIR/main-patched.cjs" && echo "    (补丁 J 已打)" || echo "    (补丁 J 未匹配，需手动 Edit)"
 
-# 补丁 K: userData 路径动态化（v0.16.5 修正版 — 双条件检查）
+# 补丁 K: userData 路径动态化（v0.17 单行版 — 适配 minified main.cjs）
+#   旧多行版用 \n 匹配，但 main.cjs 是单行 minified，永远不匹配。改为单行字符串替换。
 echo "  补丁 K: userData 路径动态化..."
-sed -i 's/if (!\(import_electron[0-9]*\)\.app\.isPackaged || process.env.PROMA_INSTANCE_ISOLATED === "1") {\n      \1\.app\.setPath("userData", (0, import_path[0-9]*\.join)(\1\.app\.getPath("appData"), "@proma\/electron-dev"));\n    }/if (process.env.PROMA_INSTANCE_ISOLATED === "1" \&\& process.env.PROMA_INSTANCE_NAME) {\n      \1.app.setPath("userData", (0, import_path10.join)(\1.app.getPath("appData"), `@proma\\/electron-$${process.env.PROMA_INSTANCE_NAME}`));\n    }/' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (补丁 K 模式可能漂移，需手动 Edit 修复，见 wiki §5 补丁 K)"
+sed -i 's/"@proma\/electron-dev"/"@proma\/electron-"+(process.env.PROMA_INSTANCE_NAME||"dev")/g' "$TMPDIR/main-patched.cjs" && echo "    (补丁 K 已打)" || echo "    (补丁 K 未匹配，需手动 Edit)"
 
-echo "  补丁 A-K 全部完成"
+echo "  补丁 A-K 处理完成（保留 A/B/E/I/J/K；C/D/F/G/H/补丁3 已废弃）"
 
-# 补丁 3: 托盘图标动态选择（v0.16.6）
-echo "  补丁 3: 托盘图标动态选择..."
-sed -i 's@return (0, import_path[0-9]*\.join)(resourcesDir, "proma-white\.png");@const __trayIconMap={dev:"proma-white.png",release:"proma-coral.png",pro:"proma-emerald.png"};return (0, import_path9.join)(resourcesDir, __trayIconMap[process.env.PROMA_INSTANCE_NAME]||"proma-white.png");@' "$TMPDIR/main-patched.cjs" 2>/dev/null || echo "    (补丁 3 模式可能漂移，需手动 Edit 修复，见 wiki §5 补丁 3)"
+# 补丁 3: [v0.17 废弃] 托盘图标动态选择 — 上游 v0.15.7 改用 iconTemplate.png(macOS Template 机制)
+#   proma-white.png 计数0(已不存在)；setTemplateImage(true) 与彩色映射冲突；多语句注入单行sed做不到
+#   实例区分若需要，改走 tray.SetToolTip/window title(单行 sed 可行)，不改图标颜色
+echo "  补丁 3: 跳过（上游改 iconTemplate.png Template 机制，彩色映射不可行，废弃）"
 
 # ---- 步骤 4: 部署 ----
 echo ""
@@ -128,6 +131,7 @@ mkdir -p "$PROMA_DEV/resources/app/dist"
 cp "$TMPDIR/main-patched.cjs" "$PROMA_DEV/resources/app/dist/main.cjs"
 cp "$SCRIPT_DIR/proma-dev-patches.cjs" "$PROMA_DEV/resources/app/dist/"
 cp "$SCRIPT_DIR/proma-mcp-server.cjs" "$PROMA_DEV/resources/app/dist/"
+cp "$SCRIPT_DIR/tree-engine.cjs" "$PROMA_DEV/resources/app/dist/"
 echo "  文件已部署到 $PROMA_DEV/resources/app/dist/"
 
 # 同步 renderer
@@ -149,7 +153,7 @@ cat > "$PROMA_DEV/start-dev.bat" << 'BATEOF'
 set PROMA_INSTANCE_NAME=dev
 set PROMA_INSTANCE_ISOLATED=1
 set PROMA_DEV=1
-start "PromaDev" "D:\Proma-dev\Proma-white.exe"
+start "PromaDev" "%~dp0Proma-white.exe"
 exit
 BATEOF
 echo "  已创建 $PROMA_DEV/start-dev.bat"
@@ -159,7 +163,7 @@ cat > "$PROMA_DEV/start-pro.bat" << 'BATEOF'
 set PROMA_INSTANCE_NAME=pro
 set PROMA_INSTANCE_ISOLATED=1
 set PROMA_DEV=1
-start "PromaPro" "D:\Proma-dev\Proma-green.exe"
+start "PromaPro" "%~dp0Proma-green.exe"
 exit
 BATEOF
 echo "  已创建 $PROMA_DEV/start-pro.bat"
@@ -172,7 +176,7 @@ rm -rf "$TMPDIR"
 # ---- 完成 ----
 echo ""
 echo "============================================"
-echo " 安装完成！(v0.16.6, 11 个补丁 A-K + 动态托盘图标, 22 个 MCP 工具)"
+echo " 安装完成！(v0.17, 保留 6 补丁 A/B/E/I/J/K + 插件, 上游已实现项 C/D/G/补丁3 已废弃)"
 echo ""
 echo " 启动方式（单目录多实例）:"
 echo "   Dev:     双击 D:\\Proma-dev\\start-dev.bat"
