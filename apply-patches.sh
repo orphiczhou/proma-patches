@@ -117,12 +117,12 @@ sed -i 's/if (!\(import_electron[0-9]*\)\.app\.requestSingleInstanceLock())/if (
 echo "  补丁 K: userData 路径动态化..."
 sed -i 's/"@proma\/electron-dev"/"@proma\/electron-"+(process.env.PROMA_INSTANCE_NAME||"dev")/g' "$TMPDIR/main-patched.cjs" && echo "    (补丁 K 已打)" || echo "    (补丁 K 未匹配，需手动 Edit)"
 
-# 补丁 L: pro 独立 profile（~/.proma-pro）— 用户要 pro 独立数据 + 能和 dev 同时跑
-#   getConfigDirName 开头加 pro 检查：PROMA_INSTANCE_NAME=pro → .proma-pro（优先于 PROMA_DEV）
-#   dev 保持 ~/.proma-dev（PROMA_DEV=1），release 保持 ~/.proma（A方案无 PROMA_DEV），正式版 ~/.proma
-#   pro 独立后需在 pro 实例重新配置 channels/API Key（pro 自己 safeStorage 加密）
-echo "  补丁 L: pro 独立 profile（pro → ~/.proma-pro）..."
-sed -i 's/function getConfigDirName() {/function getConfigDirName() {if(process.env.PROMA_INSTANCE_NAME==="pro")return ".proma-pro";/' "$TMPDIR/main-patched.cjs" && echo "    (补丁 L 已打)" || echo "    (补丁 L 未匹配，需手动 Edit)"
+# 补丁 L: 独立 profile 通用标识（PROMA_INDEPENDENT_PROFILE=1 → .proma-<INSTANCE_NAME>）
+#   bat 设 PROMA_INDEPENDENT_PROFILE=1 时，profile 按 PROMA_INSTANCE_NAME 建立（dev→.proma-dev / pro→.proma-pro）
+#   不设则走原逻辑（release ~/.proma A方案 / 正式版 ~/.proma）
+#   通用机制：任何实例设此标识即独立 profile（不只 pro）；pro 独立后需重新配置 channels/API Key
+echo "  补丁 L: 独立 profile 标识（PROMA_INDEPENDENT_PROFILE=1 → .proma-<INSTANCE>）..."
+sed -i 's/function getConfigDirName() {/function getConfigDirName() {if(process.env.PROMA_INDEPENDENT_PROFILE==="1"\&\&process.env.PROMA_INSTANCE_NAME)return ".proma-"+process.env.PROMA_INSTANCE_NAME;/' "$TMPDIR/main-patched.cjs" && echo "    (补丁 L 已打)" || echo "    (补丁 L 未匹配，需手动 Edit)"
 
 echo "  补丁 A-K + 补丁3 + 补丁L 处理完成（保留 A/B/E/I/J/K/补丁3/补丁L；C/D/F/G/H 已废弃）"
 
@@ -196,6 +196,7 @@ cat > "$PROMA_DEV/start-dev.bat" << 'BATEOF'
 set PROMA_INSTANCE_NAME=dev
 set PROMA_INSTANCE_ISOLATED=1
 set PROMA_DEV=1
+set PROMA_INDEPENDENT_PROFILE=1
 start "PromaDev" "%~dp0Proma-white.exe"
 exit
 BATEOF
@@ -206,6 +207,7 @@ cat > "$PROMA_DEV/start-pro.bat" << 'BATEOF'
 set PROMA_INSTANCE_NAME=pro
 set PROMA_INSTANCE_ISOLATED=1
 set PROMA_DEV=1
+set PROMA_INDEPENDENT_PROFILE=1
 start "PromaPro" "%~dp0Proma-green.exe"
 exit
 BATEOF
