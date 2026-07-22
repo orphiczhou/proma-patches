@@ -171,6 +171,19 @@ else
   echo "  ⚠ Tree 面板源缺失（$_TREE_VIEW_SRC/proma-tree-view.js），跳过"
 fi
 
+# 部署 Tree 面板 preload 桥接（promaTreeIpc 追加到商业 preload 末尾，幂等）
+# 根因：商业 preload.cjs 只 exposeInMainWorld("electronAPI")，未暴露 window.promaTreeIpc
+# → proma-tree-view.js getIpc() 返回 null → "IPC不可用"。此处追加 patch-l 的 promaTreeIpc 块。
+echo "  部署 Tree 面板 preload 桥接（promaTreeIpc）..."
+_PRELOAD="$PROMA_DEV/resources/app/dist/preload.cjs"
+if [ -f "$SCRIPT_DIR/proma-tree-preload-snippet.js" ]; then
+  # 前置换行防合并（printf '\n' 始终安全，即使 preload 已带尾换行也只多一空行）
+  grep -q 'promaTreeIpc' "$_PRELOAD" 2>/dev/null || { printf '\n'; cat "$SCRIPT_DIR/proma-tree-preload-snippet.js"; } >> "$_PRELOAD"
+  echo "    (preload promaTreeIpc 桥接已追加，幂等)"
+else
+  echo "  ⚠ proma-tree-preload-snippet.js 缺失，Tree 面板 IPC 将不可用"
+fi
+
 # 对齐版本号
 echo "  对齐版本号..."
 VERSION=$(grep -o '"version": "[0-9.]*"' "$PROMA_DEV/package.json" 2>/dev/null | head -1 | grep -o '[0-9.]*' || echo "0.12.23")
