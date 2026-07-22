@@ -55,7 +55,13 @@ for t in "${TARGETS[@]}"; do
   echo " 源商业版: $PROMA_SRC"
   echo "============================================"
   if [[ $REBUILD -eq 1 && -d "$t" ]]; then
-    echo "  --rebuild: 删除现有 $t 重建..."
+    echo "  --rebuild: 预清理 $t 的 Proma 进程（按路径精确，避文件锁）..."
+    _win_t="$(echo "$t" | sed 's|/|\\|g')"
+    # fail-closed：路径转换异常(空串)时绝不 kill，避免 -like '*' 误杀全系统（含本会话宿主 release）
+    if [[ -n "$_win_t" ]]; then
+      /c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -Command "Get-Process | Where-Object {\$_.Path -like '${_win_t}*'} | Stop-Process -Force" 2>/dev/null || true
+    fi
+    sleep 2
     rm -rf "$t"
   fi
   PROMA_SRC="$PROMA_SRC" PROMA_DEV="$t" bash apply-patches.sh

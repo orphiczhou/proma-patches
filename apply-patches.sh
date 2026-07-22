@@ -49,12 +49,14 @@ if [ -d app.asar.unpacked/node_modules ]; then
   echo "  原生模块已合并"
 fi
 
-# 同步认证数据
-echo "  同步认证数据..."
-mkdir -p ~/.proma-dev
-cp ~/.proma/cloud-auth.json ~/.proma-dev/ 2>/dev/null || echo "   (无 cloud-auth.json)"
-cp ~/.proma/channels.json ~/.proma-dev/ 2>/dev/null || echo "   (无 channels.json)"
-cp ~/.proma/user-profile.json ~/.proma-dev/ 2>/dev/null || echo "   (无 user-profile.json)"
+# 同步非加密配置到独立 profile（dev/pro；release 公用正式版 ~/.proma 不需同步）
+# 注：cloud-auth.json 含 safeStorage 加密 token，跨实例(userData)无法解密，不同步——dev/pro 需各自登录配置 API Key
+for _p in dev pro; do
+  mkdir -p "$HOME/.proma-$_p"
+  cp "$HOME/.proma/channels.json" "$HOME/.proma-$_p/" 2>/dev/null || true
+  cp "$HOME/.proma/user-profile.json" "$HOME/.proma-$_p/" 2>/dev/null || true
+done
+echo "  已同步 channels/user-profile 到 ~/.proma-dev + ~/.proma-pro（cloud-auth/API Key 各实例单独登录）"
 
 # ---- 步骤 2: 提取 main.cjs ----
 echo ""
@@ -71,10 +73,12 @@ echo "[3/6] 打 sed 补丁..."
 # 补丁 A: MCP 钩子
 echo "  补丁 A: MCP 钩子..."
 sed -i 's|          const dynamicCtx = buildDynamicContext({|if(typeof global.__proma_getMcpServers__==="function"){const __h=global.__proma_getMcpServers__(sessionId,workspaceSlug,sdk);if(__h)Object.assign(mcpServers,__h);}\n          const dynamicCtx = buildDynamicContext({|' "$TMPDIR/main-patched.cjs"
+grep -q '__proma_getMcpServers__' "$TMPDIR/main-patched.cjs" && echo "    (补丁 A 已打)" || { echo "    (补丁 A 未匹配!!! P0 地基)"; }
 
 # 补丁 B: API 桥接 + 插件加载
 echo "  补丁 B: API 桥接..."
-sed -i 's|^init_index();$|init_index();\nglobal.__proma__={createAgentSession,forkAgentSession,listAgentSessions,getAgentSessionMeta,updateAgentSessionMeta,deleteAgentSession,listChannels,getChannelById,getAgentWorkspace,listAgentWorkspaces,getAgentSessionSDKMessages,runAgentHeadless};\ntry{require("./proma-dev-patches.cjs");}catch(e){console.error("[Plugin] load failed:",e);}|' "$TMPDIR/main-patched.cjs"
+sed -i 's|^init_index();$|init_index();\ntry{global.__proma__={createAgentSession,forkAgentSession,listAgentSessions,getAgentSessionMeta,updateAgentSessionMeta,deleteAgentSession,listChannels,getChannelById,getAgentWorkspace,listAgentWorkspaces,getAgentSessionSDKMessages,runAgentHeadless};require("./proma-dev-patches.cjs");}catch(e){console.error("[Plugin] load failed:",e);}|' "$TMPDIR/main-patched.cjs"
+grep -q 'global.__proma__=' "$TMPDIR/main-patched.cjs" && grep -q 'require("./proma-dev-patches.cjs")' "$TMPDIR/main-patched.cjs" && echo "    (补丁 B 已打)" || { echo "    (补丁 B 未匹配!!! P0 地基)"; }
 
 # 补丁 C: [v0.17 废弃] 频道/模型元数据覆盖 — 上游 v0.15.7 渲染层 AgentView.tsx:485-486 已 sessionMeta 优先 + IPC 透传
 #   主进程 10 处 sed 冗余；插件走 getAgentSessionMeta 独立链路，不依赖 __effChannelId/resolvedModel
@@ -104,32 +108,37 @@ echo "  补丁 H: 跳过（上游 v0.15.7 已实现，废弃）"
 # 补丁 I: 禁用更新检查（v0.17 单行版 — 上游无开关，autoDownload=true 硬编码，必须补丁）
 #   main.cjs 里 function initAutoUpdater(mainWindow2) { 唯一匹配，{ 后即换行，函数体非深度 minify
 echo "  补丁 I: 禁用更新检查（单行注入 return）..."
-sed -i 's/function initAutoUpdater(mainWindow2) {/function initAutoUpdater(mainWindow2) {return;/' "$TMPDIR/main-patched.cjs" && echo "    (补丁 I 已打)" || echo "    (补丁 I 未匹配，需手动 Edit)"
+sed -i 's/function initAutoUpdater(mainWindow2) {/function initAutoUpdater(mainWindow2) {return;/' "$TMPDIR/main-patched.cjs"
+grep -q 'function initAutoUpdater(mainWindow2) {return;' "$TMPDIR/main-patched.cjs" && echo "    (补丁 I 已打)" || echo "    (补丁 I 未匹配!!!)"
 
 # 补丁 J: AppUserModelId 动态隔离（v0.17 修复 $$ bug — 模板串应为 ${...} 非 $${...}）
 #   旧 sed 实际已成功应用(requestSingleInstanceLock 区域保留换行)，但注入的 com.proma.$${...} 多了一个 $
 #   运行时 AUMID 成 com.proma.$dev(多前导$)，功能上仍区分实例但不规范；本次修正为单 $
 echo "  补丁 J: AppUserModelId 动态隔离（修复 $$ → $）..."
-sed -i 's/if (!\(import_electron[0-9]*\)\.app\.requestSingleInstanceLock())/if (process.env.PROMA_INSTANCE_NAME) {\n      \1.app.setAppUserModelId(`com.proma.${process.env.PROMA_INSTANCE_NAME}`);\n    }\n    if (!\1.app.requestSingleInstanceLock())/' "$TMPDIR/main-patched.cjs" && echo "    (补丁 J 已打)" || echo "    (补丁 J 未匹配，需手动 Edit)"
+sed -i 's/if (!\(import_electron[0-9]*\)\.app\.requestSingleInstanceLock())/if (process.env.PROMA_INSTANCE_NAME) {\n      \1.app.setAppUserModelId(`com.proma.${process.env.PROMA_INSTANCE_NAME}`);\n    }\n    if (!\1.app.requestSingleInstanceLock())/' "$TMPDIR/main-patched.cjs"
+grep -q 'com\.proma\.\${process.env.PROMA_INSTANCE_NAME}' "$TMPDIR/main-patched.cjs" && echo "    (补丁 J 已打)" || echo "    (补丁 J 未匹配!!!)"
 
 # 补丁 K: userData 路径动态化（v0.17 单行版 — 适配 minified main.cjs）
 #   旧多行版用 \n 匹配，但 main.cjs 是单行 minified，永远不匹配。改为单行字符串替换。
 echo "  补丁 K: userData 路径动态化..."
-sed -i 's/"@proma\/electron-dev"/"@proma\/electron-"+(process.env.PROMA_INSTANCE_NAME||"dev")/g' "$TMPDIR/main-patched.cjs" && echo "    (补丁 K 已打)" || echo "    (补丁 K 未匹配，需手动 Edit)"
+sed -i 's/"@proma\/electron-dev"/"@proma\/electron-"+(process.env.PROMA_INSTANCE_NAME||"dev")/g' "$TMPDIR/main-patched.cjs"
+grep -q '@proma/electron-"+(process.env.PROMA_INSTANCE_NAME' "$TMPDIR/main-patched.cjs" && echo "    (补丁 K 已打)" || echo "    (补丁 K 未匹配!!!)"
 
 # 补丁 L: 独立 profile 通用标识（PROMA_INDEPENDENT_PROFILE=1 → .proma-<INSTANCE_NAME>）
 #   bat 设 PROMA_INDEPENDENT_PROFILE=1 时，profile 按 PROMA_INSTANCE_NAME 建立（dev→.proma-dev / pro→.proma-pro）
 #   不设则走原逻辑（release ~/.proma A方案 / 正式版 ~/.proma）
 #   通用机制：任何实例设此标识即独立 profile（不只 pro）；pro 独立后需重新配置 channels/API Key
 echo "  补丁 L: 独立 profile 标识（PROMA_INDEPENDENT_PROFILE=1 → .proma-<INSTANCE>）..."
-sed -i 's/function getConfigDirName() {/function getConfigDirName() {if(process.env.PROMA_INDEPENDENT_PROFILE==="1"\&\&process.env.PROMA_INSTANCE_NAME)return ".proma-"+process.env.PROMA_INSTANCE_NAME;/' "$TMPDIR/main-patched.cjs" && echo "    (补丁 L 已打)" || echo "    (补丁 L 未匹配，需手动 Edit)"
+sed -i 's/function getConfigDirName() {/function getConfigDirName() {if(process.env.PROMA_INDEPENDENT_PROFILE==="1"\&\&process.env.PROMA_INSTANCE_NAME)return ".proma-"+process.env.PROMA_INSTANCE_NAME;/' "$TMPDIR/main-patched.cjs"
+grep -q 'PROMA_INDEPENDENT_PROFILE' "$TMPDIR/main-patched.cjs" && echo "    (补丁 L 已打)" || echo "    (补丁 L 未匹配!!!)"
 
 echo "  补丁 A-K + 补丁3 + 补丁L 处理完成（保留 A/B/E/I/J/K/补丁3/补丁L；C/D/F/G/H 已废弃）"
 
 # 补丁 3: 托盘图标颜色化（v0.17 重新实现 — 用户要实例颜色对应；上游 iconTemplate.png 是 macOS Template 单色，Windows 渲染黑）
 #   按 PROMA_INSTANCE_NAME 映射 proma-logos 彩色 png（dev=白/pro=绿/release=蓝），Electron Tray 自动缩放
 echo "  补丁 3: 托盘图标颜色化（iconTemplate.png → 按 INSTANCE 彩色 png）..."
-sed -i 's#"iconTemplate\.png"#{dev:"proma-white.png",pro:"proma-emerald.png",release:"proma-blue.png"}[process.env.PROMA_INSTANCE_NAME]||"proma-white.png"#' "$TMPDIR/main-patched.cjs" && echo "    (补丁 3 已打)" || echo "    (补丁 3 未匹配，需手动 Edit)"
+sed -i 's#"iconTemplate\.png"#{dev:"proma-white.png",pro:"proma-emerald.png",release:"proma-blue.png"}[process.env.PROMA_INSTANCE_NAME]||"proma-white.png"#' "$TMPDIR/main-patched.cjs"
+grep -q '{dev:"proma-white.png",pro:"proma-emerald.png",release:"proma-blue.png"}' "$TMPDIR/main-patched.cjs" && echo "    (补丁 3 已打)" || echo "    (补丁 3 未匹配!!!)"
 
 # ---- 步骤 4: 部署 ----
 echo ""
