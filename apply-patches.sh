@@ -145,6 +145,42 @@ echo "  对齐版本号..."
 VERSION=$(grep -o '"version": "[0-9.]*"' "$PROMA_DEV/package.json" 2>/dev/null | head -1 | grep -o '[0-9.]*' || echo "0.12.23")
 sed -i "s/\"version\": \"0.12.X\"/\"version\": \"$VERSION\"/g" "$PROMA_DEV/resources/app/package.json" 2>/dev/null || true
 
+# ---- 步骤 4.5: exe 副本 + rcedit 染色图标（dev=白/pro=绿/release=蓝）----
+echo ""
+echo "[4.5/6] 复制 exe 副本 + rcedit 染色图标..."
+ICO_ASSETS="$SCRIPT_DIR/assets"
+ICO_DIR="$ICO_ASSETS/ico"
+mkdir -p "$ICO_DIR"
+
+# 首次安装 npm 工具（rcedit@5.0.2 + jimp@0.22.10 + png-to-ico）
+# ⚠️ jimp 必须 pin 0.22.10（latest 1.6.1 破坏 jimp.read API）
+if [ ! -d "$ICO_ASSETS/node_modules/rcedit" ]; then
+  echo "  首次安装 rcedit@5.0.2 + jimp@0.22.10 + png-to-ico..."
+  (cd "$ICO_ASSETS" && { [ -f package.json ] || npm init -y >/dev/null 2>&1; } && \
+   npm install rcedit@5.0.2 jimp@0.22.10 png-to-ico --no-audit --no-fund 2>&1 | tail -2) \
+    || echo "    (npm install 失败，exe 染色将跳过)"
+fi
+
+if [ -d "$ICO_ASSETS/node_modules/rcedit" ] && [ -f "$SCRIPT_DIR/scripts/build-ico.cjs" ]; then
+  # 生成三色多尺寸 ico（含 16x16 状态栏小图标；源 PNG 全部来自商业版 proma-logos，无需染色）
+  [ -f "$ICO_DIR/dev.ico" ]     || node "$SCRIPT_DIR/scripts/build-ico.cjs" "$PROMA_SRC/resources/proma-logos/proma-white.png"    "$ICO_DIR/dev.ico"     || echo "    (dev.ico 生成失败)"
+  [ -f "$ICO_DIR/pro.ico" ]     || node "$SCRIPT_DIR/scripts/build-ico.cjs" "$PROMA_SRC/resources/proma-logos/proma-emerald.png"  "$ICO_DIR/pro.ico"     || echo "    (pro.ico 生成失败)"
+  [ -f "$ICO_DIR/release.ico" ] || node "$SCRIPT_DIR/scripts/build-ico.cjs" "$PROMA_SRC/resources/proma-logos/proma-blue.png"     "$ICO_DIR/release.ico" || echo "    (release.ico 生成失败)"
+  # 复制三份 exe 副本 + rcedit 注入对应图标（rcedit 改副本，原 Proma.exe 不动 — 进程锁保护）
+  cp "$PROMA_DEV/Proma.exe" "$PROMA_DEV/Proma-white.exe"
+  cp "$PROMA_DEV/Proma.exe" "$PROMA_DEV/Proma-green.exe"
+  cp "$PROMA_DEV/Proma.exe" "$PROMA_DEV/Proma-blue.exe"
+  node "$SCRIPT_DIR/scripts/set-exe-icon.cjs" "$PROMA_DEV/Proma-white.exe" "$ICO_DIR/dev.ico"     || echo "    (Proma-white.exe 染色失败)"
+  node "$SCRIPT_DIR/scripts/set-exe-icon.cjs" "$PROMA_DEV/Proma-green.exe" "$ICO_DIR/pro.ico"     || echo "    (Proma-green.exe 染色失败)"
+  node "$SCRIPT_DIR/scripts/set-exe-icon.cjs" "$PROMA_DEV/Proma-blue.exe"  "$ICO_DIR/release.ico" || echo "    (Proma-blue.exe 染色失败)"
+  echo "  exe 副本染色完成: Proma-white.exe(白) / Proma-green.exe(绿) / Proma-blue.exe(蓝)"
+else
+  echo "  ⚠ rcedit/build-ico 未就绪，仅复制未染色副本（bat 仍可启动，但图标是默认色）"
+  cp "$PROMA_DEV/Proma.exe" "$PROMA_DEV/Proma-white.exe" 2>/dev/null
+  cp "$PROMA_DEV/Proma.exe" "$PROMA_DEV/Proma-green.exe" 2>/dev/null
+  cp "$PROMA_DEV/Proma.exe" "$PROMA_DEV/Proma-blue.exe" 2>/dev/null
+fi
+
 # ---- 步骤 5: 创建启动脚本 ----
 echo ""
 echo "[5/6] 创建启动脚本..."
@@ -168,6 +204,16 @@ exit
 BATEOF
 echo "  已创建 $PROMA_DEV/start-pro.bat"
 
+cat > "$PROMA_DEV/start-release.bat" << 'BATEOF'
+@echo off
+set PROMA_INSTANCE_NAME=release
+set PROMA_INSTANCE_ISOLATED=1
+set PROMA_DEV=1
+start "PromaRelease" "%~dp0Proma-blue.exe"
+exit
+BATEOF
+echo "  已创建 $PROMA_DEV/start-release.bat"
+
 # ---- 步骤 6: 清理 ----
 echo ""
 echo "[6/6] 清理临时文件..."
@@ -178,13 +224,13 @@ echo ""
 echo "============================================"
 echo " 安装完成！(v0.17, 保留 6 补丁 A/B/E/I/J/K + 插件, 上游已实现项 C/D/G/补丁3 已废弃)"
 echo ""
-echo " 启动方式（单目录多实例）:"
-echo "   Dev:     双击 D:\\Proma-dev\\start-dev.bat"
-echo "   Pro:     双击 D:\\Proma-dev\\start-pro.bat"
-echo "   Release: D:\\Proma-release\\start-release.bat (或 D:\\Proma-dev\\Proma-coral.exe)"
+echo " 启动方式（单目录多实例，每个实例独立 exe + 颜色图标）:"
+echo "   Dev:     双击 start-dev.bat     → Proma-white.exe  (白)"
+echo "   Pro:     双击 start-pro.bat     → Proma-green.exe  (绿)"
+echo "   Release: 双击 start-release.bat → Proma-blue.exe   (蓝)"
 echo ""
-echo " 图标映射: Dev=白 / Pro=绿 / Release=珊瑚"
-echo " 托盘图标: 动态选择（按 PROMA_INSTANCE_NAME 映射）"
+echo " 实例隔离: PROMA_INSTANCE_NAME + PROMA_INSTANCE_ISOLATED + userData 动态路径（补丁 E/K）"
+echo " 图标: rcedit 嵌多尺寸 .ico（窗口+任务栏+状态栏小图标）到各 exe 副本"
 echo ""
 echo " 验证方式:"
 echo "   1. 确认 D:\\Proma-dev\\resources\\app\\dist\\proma-dev-patches.cjs 存在"
