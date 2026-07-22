@@ -156,6 +156,21 @@ cp -r "$TMPDIR/app/dist/renderer/"* "$PROMA_DEV/resources/app/dist/renderer/" 2>
 # 移除 hydration 幂等守卫（补丁 E renderer）
 sed -i 's/if(qe.has(e))return qe;//g' "$PROMA_DEV/resources/app/dist/renderer/assets/index-"*.js 2>/dev/null || echo "   (renderer 补丁跳过)"
 
+# 部署 Tree 面板 UI（tree-harness 自定义文件，不在商业版 asar；renderer 同步带不过来）
+echo "  部署 Tree 面板 UI（proma-tree-view）..."
+_TREE_VIEW_SRC="$SCRIPT_DIR/release/tree-system-v0.2.2/patch-l"
+if [ -f "$_TREE_VIEW_SRC/proma-tree-view.js" ]; then
+  cp "$_TREE_VIEW_SRC/proma-tree-view.js" "$PROMA_DEV/resources/app/dist/renderer/assets/" && echo "    (proma-tree-view.js 已部署)"
+  cp "$_TREE_VIEW_SRC/proma-tree-view.css" "$PROMA_DEV/resources/app/dist/renderer/assets/" 2>/dev/null || true
+  # 往 index.html 注入 link + script（幂等：grep -q 守卫，重复 rebuild 不双重注入）
+  _IDX="$PROMA_DEV/resources/app/dist/renderer/index.html"
+  grep -q 'proma-tree-view.css' "$_IDX" 2>/dev/null || sed -i 's#</head>#<link rel="stylesheet" href="./assets/proma-tree-view.css">\n  </head>#' "$_IDX" 2>/dev/null
+  grep -q 'proma-tree-view.js' "$_IDX" 2>/dev/null || sed -i 's#</body>#<script src="./assets/proma-tree-view.js"></script>\n  </body>#' "$_IDX" 2>/dev/null
+  echo "    (index.html 注入 link+script，幂等)"
+else
+  echo "  ⚠ Tree 面板源缺失（$_TREE_VIEW_SRC/proma-tree-view.js），跳过"
+fi
+
 # 对齐版本号
 echo "  对齐版本号..."
 VERSION=$(grep -o '"version": "[0-9.]*"' "$PROMA_DEV/package.json" 2>/dev/null | head -1 | grep -o '[0-9.]*' || echo "0.12.23")
