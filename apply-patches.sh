@@ -3,7 +3,7 @@
 # 用法: bash apply-patches.sh  （多目标用 apply-patches-multi.sh --target=dev|release|all --rebuild）
 # 在 Proma 商业版 v0.15.7 上创建 Dev/Release 版并打补丁（v0.17 适配 minified main.cjs + 上游已实现项废弃）
 #
-# v0.17 补丁清单（A-K + 补丁3）：保留 A/B/E/I/J/K；废弃 C/D/F/G/H/补丁3（上游 v0.15.7 已实现 或 前提失效）
+# v0.17 补丁清单（A-K + 补丁3）：保留 A/B/E/I/J/K/补丁3；废弃 C/D/F/G/H（上游 v0.15.7 已实现）
 # v0.16.6 单目录多实例: 同一份 D:\Proma-dev\ 代码，不同 BAT 文件 → 不同实例
 # 两变量体系:
 #   PROMA_INSTANCE_NAME     — 实例身份标识（remote-session 发现、AppUserModelId、托盘图标）
@@ -117,12 +117,12 @@ sed -i 's/if (!\(import_electron[0-9]*\)\.app\.requestSingleInstanceLock())/if (
 echo "  补丁 K: userData 路径动态化..."
 sed -i 's/"@proma\/electron-dev"/"@proma\/electron-"+(process.env.PROMA_INSTANCE_NAME||"dev")/g' "$TMPDIR/main-patched.cjs" && echo "    (补丁 K 已打)" || echo "    (补丁 K 未匹配，需手动 Edit)"
 
-echo "  补丁 A-K 处理完成（保留 A/B/E/I/J/K；C/D/F/G/H/补丁3 已废弃）"
+echo "  补丁 A-K + 补丁3 处理完成（保留 A/B/E/I/J/K/补丁3；C/D/F/G/H 已废弃）"
 
-# 补丁 3: [v0.17 废弃] 托盘图标动态选择 — 上游 v0.15.7 改用 iconTemplate.png(macOS Template 机制)
-#   proma-white.png 计数0(已不存在)；setTemplateImage(true) 与彩色映射冲突；多语句注入单行sed做不到
-#   实例区分若需要，改走 tray.SetToolTip/window title(单行 sed 可行)，不改图标颜色
-echo "  补丁 3: 跳过（上游改 iconTemplate.png Template 机制，彩色映射不可行，废弃）"
+# 补丁 3: 托盘图标颜色化（v0.17 重新实现 — 用户要实例颜色对应；上游 iconTemplate.png 是 macOS Template 单色，Windows 渲染黑）
+#   按 PROMA_INSTANCE_NAME 映射 proma-logos 彩色 png（dev=白/pro=绿/release=蓝），Electron Tray 自动缩放
+echo "  补丁 3: 托盘图标颜色化（iconTemplate.png → 按 INSTANCE 彩色 png）..."
+sed -i 's#"iconTemplate\.png"#{dev:"proma-white.png",pro:"proma-emerald.png",release:"proma-blue.png"}[process.env.PROMA_INSTANCE_NAME]||"proma-white.png"#' "$TMPDIR/main-patched.cjs" && echo "    (补丁 3 已打)" || echo "    (补丁 3 未匹配，需手动 Edit)"
 
 # ---- 步骤 4: 部署 ----
 echo ""
@@ -206,9 +206,9 @@ echo "  已创建 $PROMA_DEV/start-pro.bat"
 
 cat > "$PROMA_DEV/start-release.bat" << 'BATEOF'
 @echo off
+REM release 实例公用正式版 profile（~/.proma + userData @proma/electron）：不设 PROMA_DEV/ISOLATED
+REM 仅 PROMA_INSTANCE_NAME=release 用于 AUMID 区分单实例锁（数据公用正式版，请勿同时运行）
 set PROMA_INSTANCE_NAME=release
-set PROMA_INSTANCE_ISOLATED=1
-set PROMA_DEV=1
 start "PromaRelease" "%~dp0Proma-blue.exe"
 exit
 BATEOF
