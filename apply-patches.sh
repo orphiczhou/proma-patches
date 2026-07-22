@@ -3,7 +3,7 @@
 # 用法: bash apply-patches.sh  （多目标用 apply-patches-multi.sh --target=dev|release|all --rebuild）
 # 在 Proma 商业版 v0.15.7 上创建 Dev/Release 版并打补丁（v0.17 适配 minified main.cjs + 上游已实现项废弃）
 #
-# v0.17 补丁清单（A-K + 补丁3）：保留 A/B/E/I/J/K/补丁3；废弃 C/D/F/G/H（上游 v0.15.7 已实现）
+# v0.17 补丁清单（A-K + 补丁3 + 补丁L）：保留 A/B/E/I/J/K/补丁3/补丁L；废弃 C/D/F/G/H（上游 v0.15.7 已实现）
 # v0.16.6 单目录多实例: 同一份 D:\Proma-dev\ 代码，不同 BAT 文件 → 不同实例
 # 两变量体系:
 #   PROMA_INSTANCE_NAME     — 实例身份标识（remote-session 发现、AppUserModelId、托盘图标）
@@ -117,7 +117,14 @@ sed -i 's/if (!\(import_electron[0-9]*\)\.app\.requestSingleInstanceLock())/if (
 echo "  补丁 K: userData 路径动态化..."
 sed -i 's/"@proma\/electron-dev"/"@proma\/electron-"+(process.env.PROMA_INSTANCE_NAME||"dev")/g' "$TMPDIR/main-patched.cjs" && echo "    (补丁 K 已打)" || echo "    (补丁 K 未匹配，需手动 Edit)"
 
-echo "  补丁 A-K + 补丁3 处理完成（保留 A/B/E/I/J/K/补丁3；C/D/F/G/H 已废弃）"
+# 补丁 L: pro 独立 profile（~/.proma-pro）— 用户要 pro 独立数据 + 能和 dev 同时跑
+#   getConfigDirName 开头加 pro 检查：PROMA_INSTANCE_NAME=pro → .proma-pro（优先于 PROMA_DEV）
+#   dev 保持 ~/.proma-dev（PROMA_DEV=1），release 保持 ~/.proma（A方案无 PROMA_DEV），正式版 ~/.proma
+#   pro 独立后需在 pro 实例重新配置 channels/API Key（pro 自己 safeStorage 加密）
+echo "  补丁 L: pro 独立 profile（pro → ~/.proma-pro）..."
+sed -i 's/function getConfigDirName() {/function getConfigDirName() {if(process.env.PROMA_INSTANCE_NAME==="pro")return ".proma-pro";/' "$TMPDIR/main-patched.cjs" && echo "    (补丁 L 已打)" || echo "    (补丁 L 未匹配，需手动 Edit)"
+
+echo "  补丁 A-K + 补丁3 + 补丁L 处理完成（保留 A/B/E/I/J/K/补丁3/补丁L；C/D/F/G/H 已废弃）"
 
 # 补丁 3: 托盘图标颜色化（v0.17 重新实现 — 用户要实例颜色对应；上游 iconTemplate.png 是 macOS Template 单色，Windows 渲染黑）
 #   按 PROMA_INSTANCE_NAME 映射 proma-logos 彩色 png（dev=白/pro=绿/release=蓝），Electron Tray 自动缩放
