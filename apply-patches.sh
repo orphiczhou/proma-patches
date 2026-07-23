@@ -17,7 +17,7 @@ TMPDIR="/tmp/proma-patch-$$"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "============================================"
-echo " Proma 会话管理补丁 — 一键安装 (v0.16.6)"
+echo " Proma 会话管理补丁 — 一键安装 (v0.17)"
 echo " 源: $PROMA_SRC"
 echo " 目标: $PROMA_DEV"
 echo "============================================"
@@ -74,6 +74,13 @@ echo "[3/6] 打 sed 补丁..."
 echo "  补丁 A: MCP 钩子..."
 sed -i 's|          const dynamicCtx = buildDynamicContext({|if(typeof global.__proma_getMcpServers__==="function"){const __h=global.__proma_getMcpServers__(sessionId,workspaceSlug,sdk);if(__h)Object.assign(mcpServers,__h);}\n          const dynamicCtx = buildDynamicContext({|' "$TMPDIR/main-patched.cjs"
 grep -q '__proma_getMcpServers__' "$TMPDIR/main-patched.cjs" && echo "    (补丁 A 已打)" || { echo "    (补丁 A 未匹配!!! P0 地基)"; }
+
+# 补丁 P (v0.20): pi 运行时注入 tree/session/remote-session customTools
+#   pi 分支 buildPiBuiltinTools 之后，调 patches 的 __proma_getPiCustomTools__ 把三组工具作为 customTools 注入
+#   （补丁 A 只覆盖 claude 运行时；pi 用 customTools，需独立钩子）。锚点 piBuiltinTools = result2.tools; (12 空格, pi IIFE 内唯一)
+echo "  补丁 P: pi customTools 注入..."
+sed -i 's|            piBuiltinTools = result2.tools;|            piBuiltinTools = result2.tools;\n            if(typeof global.__proma_getPiCustomTools__==="function"){try{piBuiltinTools.push(...await global.__proma_getPiCustomTools__(piSdk,{sessionId,workspaceSlug,channelId,modelId,workspaceId,agentRuntime,agentCwd,sessionMeta}));}catch(e){console.warn("[Proma] pi custom tools load failed:",e);}}|' "$TMPDIR/main-patched.cjs"
+grep -q '__proma_getPiCustomTools__' "$TMPDIR/main-patched.cjs" && echo "    (补丁 P 已打)" || { echo "    (补丁 P 未匹配!!! pi MCP 兼容)"; }
 
 # 补丁 B: API 桥接 + 插件加载
 echo "  补丁 B: API 桥接..."
@@ -268,7 +275,7 @@ rm -rf "$TMPDIR"
 # ---- 完成 ----
 echo ""
 echo "============================================"
-echo " 安装完成！(v0.17, 保留 6 补丁 A/B/E/I/J/K + 插件, 上游已实现项 C/D/G/补丁3 已废弃)"
+echo " 安装完成！(v0.17, 保留 8 补丁 A/B/E/I/J/K/补丁3/补丁L + 插件, 废弃 C/D/F/G/H（上游 v0.15.7 已实现）)"
 echo ""
 echo " 启动方式（单目录多实例，每个实例独立 exe + 颜色图标）:"
 echo "   Dev:     双击 start-dev.bat     → Proma-white.exe  (白)"
@@ -285,3 +292,25 @@ echo "   3. 启动后打开 Proma Agent 会话"
 echo "   4. 输入: 用 list_channels 列出可用的 AI 渠道"
 echo "   5. 外部 MCP: node proma-mcp-server.cjs --dev 测试自动发现"
 echo "============================================"
+
+# ====================================================================
+# 注：tree skill（tree-commander / tree-worker / tree-auditor）在 **profile workspace 级**，
+#     不在代码目录。
+#     ~/.proma-dev/agent-workspaces/default/skills/   (dev)
+#     ~/.proma-pro/agent-workspaces/default/skills/   (pro)
+#     ~/.proma/agent-workspaces/default/skills/       (release 正式版 profile)
+#
+# apply-patches.sh 只操作 D:/Proma-dev 代码目录（辅助组件层 tree-engine.cjs /
+# proma-dev-patches.cjs / proma-mcp-server.cjs 等 dist 补丁），**不部署 skill**。
+# v0.2.2 打包也已剥离 skills 目录，故 skill 必须从源工作区手动 cp。
+#
+# 手动部署 skill（三实例对齐 commander v2.8 / worker v2.5 / auditor v1.0）：
+#   SRC="$SCRIPT_DIR/skills"
+#   for profile in "$HOME/.proma-dev" "$HOME/.proma-pro" "$HOME/.proma"; do
+#     DST="$profile/agent-workspaces/default/skills"
+#     [ -d "$DST" ] || mkdir -p "$DST"
+#     cp -r "$SRC/tree-commander" "$SRC/tree-worker" "$SRC/tree-auditor" "$DST/"
+#   done
+#
+# 详见 ~/.proma/agent-workspaces/proma/workspace-files/.context/v0.17-skill-check.md
+# ====================================================================

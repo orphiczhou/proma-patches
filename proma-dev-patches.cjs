@@ -177,8 +177,347 @@ function log(msg) {
 }
 
 // ---- 辅助 ----
+// MCP content 包装（claude 侧）。handler 现在返回 raw data，由 renderClaude 在 sdk.tool 外层调此函数包装。
 function jsonResult(data) {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+}
+
+// pi customTool 的结构化结果格式（对齐 main.cjs jsonToolResult: content + details）。
+// 多出的 details 让 Proma UI 直接读结构化结果（与 mcp__automation__* / mcp__session__* 一致）。
+// handler 返回 raw data，由 renderPi 在 execute 外层调此函数包装。
+function piJsonToolResult(payload) {
+  return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], details: payload };
+}
+
+// ============================================================
+// v0.20: pi 运行时 MCP 工具兼容（设计文档 .context/pi-runtime-mcp-design.md）
+// 把 session / remote-session / tree 三组工具抽成运行时无关的纯数据表 {serverName, tools:[...]}，
+// 两个渲染器分别产出 claude SDK 工具（renderClaude，行为与原 sdk.tool 路径完全一致）和
+// pi customTool（renderPi，用 zod v4 原生 toJSONSchema 转 JSON Schema + piJsonToolResult 包装）。
+// handler 一律返回 raw data（jsonResult/piJsonToolResult 包装移到渲染器）。
+//
+// 关键事实修正（实测 2026-07-23，覆盖设计文档前提）：
+//   1. `zod-to-json-schema` 3.25.2 与 zod v4.4.3 不兼容（输出空 properties），且其导出是 object 不是 function。
+//      → 改用 zod v4 自带的 `require("zod").toJSONSchema`，该 API 输出标准 JSON Schema
+//      （含 properties/required/type/description），pi-ai 可直接读 .properties/.required。
+//   2. pi defineTool 是 identity，pi-ai 只读 tool.parameters 的 .properties/.required，
+//      传纯 JSON Schema 对象即可（Type.Unsafe 仅作防御性 TypeBox 标记包裹，零成本）。
+// ============================================================
+
+// ---- B. 渲染器 ----
+// renderClaude: 行为与原 sdk.tool 路径完全一致（handler raw → jsonResult 包装 → sdk.tool）。
+function renderClaude(table, sdk, ctx) {
+  const RO = { annotations: { readOnlyHint: true } };
+  return table.tools.map((t) => sdk.tool(
+    t.name,
+    t.description,
+    t.schema,
+    async (args) => jsonResult(await t.handler(args, ctx)),
+    t.readOnly ? RO : undefined
+  ));
+}
+
+// renderPi: pi customTool 不走 MCP server 封装，工具名必须自带 mcp__<server>__ 前缀。
+//   parameters 用 zod v4 原生 toJSONSchema(z.object(shape)) + Type.Unsafe 防御性包裹；
+//   execute 签名 (toolCallId, params, signal)，把 params 当 args 透传给 handler，piJsonToolResult 包装。
+function renderPi(table, piSdk, ctx) {
+  let zodMod;
+  try { zodMod = require("zod"); } catch (_) { zodMod = null; }
+  if (!zodMod || typeof zodMod.toJSONSchema !== "function") {
+    throw new Error("zod.toJSONSchema unavailable (need zod v4) — skip " + table.serverName);
+  }
+  const z = zodMod.z || zodMod;
+  const toParams = (shape) => {
+    const json = zodMod.toJSONSchema(z.object(shape || {}));
+    return piSdk && piSdk.Type && typeof piSdk.Type.Unsafe === "function" ? piSdk.Type.Unsafe(json) : json;
+  };
+  return table.tools.map((t) => piSdk.defineTool({
+    name: `mcp__${table.serverName}__${t.name}`,
+    description: t.description,
+    parameters: toParams(t.schema),
+    async execute(_toolCallId, params, _signal) {
+      return piJsonToolResult(await t.handler(params, ctx));
+    },
+  }));
+}
+
+// ---- A. 三组工具纯数据表（运行时无关；handler 返回 raw data，由渲染器包装）----
+//   每个 buildXxxTable 自行 require zod 构建 schema，故可被 claude 工厂（renderClaude）
+//   和 pi 钩子（renderPi）在任意运行时调用。ctx = { sessionId, workspaceSlug, ... }。
+
+// session 表 — handler 绑 ctx.sessionId（经 createToolHandlers 闭包注入，语义同原工厂）。
+function buildSessionTable(ctx) {
+  const z = (require("zod").z || require("zod"));
+  const h = createToolHandlers(ctx.sessionId);
+  return {
+    serverName: "session",
+    tools: [
+      { name: "get_my_session_id",
+        description: "Get YOUR CURRENT session ID. Use this whenever you need to reference yourself — checking your own context usage, listing your own messages, or passing your ID to other sessions for async callbacks.",
+        schema: {}, handler: h.get_my_session_id, readOnly: true },
+      { name: "list_channels",
+        description: "List all configured AI channels and their available agent models. Use this FIRST before creating a session to find valid channel_id and model_id values.",
+        schema: {}, handler: h.list_channels, readOnly: true },
+      { name: "list_workspaces",
+        description: "List all agent workspaces. Use this to find workspace IDs for create_session / fork_session / list_sessions filtering.",
+        schema: {}, handler: h.list_workspaces, readOnly: true },
+      { name: "list_sessions",
+        description: "List all agent sessions with their metadata (title, channel, model, workspace name/ID, archived status).",
+        schema: { include_archived: z.boolean().optional().describe("Include archived sessions (default: false)"),
+                  workspace_id: z.string().optional().describe("Filter by workspace ID (from list_workspaces). Omit to see all workspaces."),
+                  limit: z.number().min(1).max(200).optional().describe("Max results to return (default: 50)") },
+        handler: h.list_sessions, readOnly: true },
+      { name: "get_session_info",
+        description: "Get detailed information about a specific agent session, including its channel name, provider, and workspace.",
+        schema: { session_id: z.string().describe("The session ID to look up") },
+        handler: h.get_session_info, readOnly: true },
+      { name: "get_session_context",
+        description: "Get the CURRENT context/token usage of an agent session. Returns input tokens, output tokens, total tokens, and context window size from the latest message.",
+        schema: { session_id: z.string().describe("The session ID to check context usage for.") },
+        handler: h.get_session_context, readOnly: true },
+      { name: "list_messages",
+        description: "List messages (conversation history) for an agent session. Each message includes its UUID (use with fork_session), role, timestamp, and text content. Use this to inspect what a session has done and find the right message UUID to fork at.",
+        schema: { session_id: z.string().describe("The session ID to list messages for."),
+                  limit: z.number().min(1).max(200).optional().describe("Max messages to return (default: 50)"),
+                  offset: z.number().min(0).optional().describe("Skip first N messages for pagination (default: 0)") },
+        handler: h.list_messages, readOnly: true },
+      { name: "create_session",
+        description: "Create a NEW agent session with specified channel and model. The session will appear in the Proma sidebar after manual refresh. Use list_channels first to get valid channel/model IDs.",
+        schema: { channel_id: z.string().describe("Channel ID (from list_channels). Determines which AI provider/API to use."),
+                  model_id: z.string().optional().describe("Model ID within the channel. If omitted, the first enabled agent model is used."),
+                  title: z.string().optional().describe("Session display title. Auto-generated if omitted."),
+                  workspace_id: z.string().optional().describe("Workspace ID to associate. Uses current workspace if omitted.") },
+        handler: h.create_session },
+      { name: "fork_session",
+        description: "FORK (clone) an existing agent session, preserving all conversation context up to the specified point. The forked session retains the source's workspace files and message history. Use list_sessions first to find the source session ID.",
+        schema: { source_session_id: z.string().describe("ID of the source session to fork (from list_sessions)."),
+                  up_to_message_uuid: z.string().optional().describe("SDK message UUID to fork at (inclusive). Omit to fork at the latest message (full copy)."),
+                  title: z.string().optional().describe("Custom title for the forked session. Default: '<original title> (fork)'"),
+                  new_channel_id: z.string().optional().describe("Override: use a different channel for the forked session."),
+                  new_model_id: z.string().optional().describe("Override: use a different model for the forked session."),
+                  new_workspace_id: z.string().optional().describe("Override: use a different workspace for the forked session.") },
+        handler: h.fork_session },
+      { name: "send_message",
+        description: "Send a user message to an EXISTING agent session for autonomous processing. Three modes:\n- wait=true (default): blocks until target completes, returns result with \"reply\" field containing the assistant's final response text.\n- notify=true: fire-and-forget, but when target finishes, pushes a notification message back to the calling session (async callback). Not supported from external MCP.\n- neither: pure fire-and-forget, no notification.",
+        schema: { session_id: z.string().describe("Target session ID to send the message to."),
+                  message: z.string().describe("The user message / task to send to the session."),
+                  wait: z.boolean().optional().describe("Wait for target to complete before returning (default: true)."),
+                  notify: z.boolean().optional().describe("When target completes, push a notification back to the calling session (async callback). Only meaningful when wait=false."),
+                  model_id: z.string().optional().describe("Model ID override."),
+                  channel_id: z.string().optional().describe("Channel ID override.") },
+        handler: h.send_message },
+      { name: "archive_session",
+        description: "Archive (or unarchive) an agent session. Archived sessions are hidden from default list_sessions. Use include_archived=true to see them.",
+        schema: { session_id: z.string().describe("The session ID to archive/unarchive."),
+                  archived: z.boolean().optional().describe("Set to false to unarchive. Default: true (archive).") },
+        handler: h.archive_session },
+      { name: "discover_instances",
+        description: "Scan and discover Proma instances on localhost and LAN. Returns cached results (60s TTL) unless refresh=true. Use hosts parameter to probe specific LAN IPs.",
+        schema: { refresh: z.boolean().optional().describe("Force re-scan instead of using cache (default: false)"),
+                  hosts: z.array(z.string()).optional().describe("LAN host IPs to probe, e.g. ['192.168.1.100']. Each is scanned on ports 19876-19895.") },
+        handler: h.discover_instances, readOnly: true },
+    ],
+  };
+}
+
+// remote-session 表 — handler 静态（无 ctx 依赖，通过 HTTP 代理到远端实例）。
+function buildRemoteSessionTable() {
+  const z = (require("zod").z || require("zod"));
+  const h = createRemoteToolHandlers();
+  return {
+    serverName: "remote-session",
+    tools: [
+      { name: "remote_list_channels",
+        description: "List all channels on a REMOTE Proma instance. Use this FIRST before creating a remote session.",
+        schema: { instance: z.string().describe("Instance name (e.g. 'dev', 'release')") },
+        handler: h.remote_list_channels, readOnly: true },
+      { name: "remote_list_workspaces",
+        description: "List all workspaces on a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name (e.g. 'dev', 'release')") },
+        handler: h.remote_list_workspaces, readOnly: true },
+      { name: "remote_list_sessions",
+        description: "List sessions on a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name"), include_archived: z.boolean().optional(), workspace_id: z.string().optional(), limit: z.number().min(1).max(200).optional() },
+        handler: h.remote_list_sessions, readOnly: true },
+      { name: "remote_get_session_info",
+        description: "Get session info from a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name"), session_id: z.string().describe("Session ID on the remote instance") },
+        handler: h.remote_get_session_info, readOnly: true },
+      { name: "remote_get_session_context",
+        description: "Get token usage from a session on a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name"), session_id: z.string() },
+        handler: h.remote_get_session_context, readOnly: true },
+      { name: "remote_list_messages",
+        description: "List messages from a session on a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name"), session_id: z.string(), limit: z.number().min(1).max(200).optional(), offset: z.number().min(0).optional() },
+        handler: h.remote_list_messages, readOnly: true },
+      { name: "remote_create_session",
+        description: "Create a new session on a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name (e.g. 'dev', 'release')"), channel_id: z.string().describe("Channel ID on the remote instance"), model_id: z.string().optional(), title: z.string().optional(), workspace_id: z.string().optional() },
+        handler: h.remote_create_session },
+      { name: "remote_fork_session",
+        description: "Fork a session on a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name"), source_session_id: z.string(), up_to_message_uuid: z.string().optional(), title: z.string().optional(), new_channel_id: z.string().optional(), new_model_id: z.string().optional(), new_workspace_id: z.string().optional() },
+        handler: h.remote_fork_session },
+      { name: "remote_send_message",
+        description: "Send a message to a session on a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name"), session_id: z.string(), message: z.string(), wait: z.boolean().optional(), model_id: z.string().optional(), channel_id: z.string().optional() },
+        handler: h.remote_send_message },
+      { name: "remote_archive_session",
+        description: "Archive/unarchive a session on a REMOTE Proma instance.",
+        schema: { instance: z.string().describe("Instance name"), session_id: z.string(), archived: z.boolean().optional() },
+        handler: h.remote_archive_session },
+      { name: "remote_get_my_session_id",
+        description: "Get instance info for a REMOTE Proma instance. Always returns null session_id since you are not in that instance.",
+        schema: { instance: z.string().describe("Instance name") },
+        handler: h.remote_get_my_session_id, readOnly: true },
+      { name: "remote_discover_instances",
+        description: "Scan and discover Proma instances on localhost and LAN. Returns cached results unless refresh=true.",
+        schema: { refresh: z.boolean().optional().describe("Force re-scan (default false, uses 60s cache)"), hosts: z.array(z.string()).optional().describe("LAN host IPs to probe, e.g. ['192.168.1.100', '192.168.1.101']") },
+        handler: h.remote_discover_instances, readOnly: true },
+    ],
+  };
+}
+
+// tree 表 — handler 内联 argBuilder（原 tt 第 4 参 args→CLI argv），闭包绑 ctx.workspaceSlug/callerSessionId。
+//   callTreeState 本就返回 raw {ok,...}，无需 jsonResult 包装（由 renderClaude/renderPi 包）。
+function buildTreeTable(ctx) {
+  const z = (require("zod").z || require("zod"));
+  const J = JSON.stringify;
+  const call = (argv) => callTreeState(ctx.workspaceSlug, argv, ctx.sessionId);
+  return {
+    serverName: "tree",
+    tools: [
+      // ---- V10-helper (D4 Layer 1): 自助文档元工具 ----
+      { name: "tree_help",
+        description: "Get help on a tree-system topic. 13 topics available: how_to_init | how_to_register_auditor | role_semantics | v10_constraints | self_audit_forbidden | borrowed_identity | naming_convention | common_mistakes | alignment_workflow | nudge_escalation | audit_tree_structure | error_code_index | full_guide. Call this BEFORE guessing how a tool works. Also: when other mcp__tree__* tools return errors with help_topic, follow the help_hint and call this with that topic.",
+        schema: { topic: z.string() }, readOnly: true,
+        handler: async (a) => call(["help", a.topic]) },
+      // ---- Maintain ----
+      { name: "tree_init",
+        description: "Initialize a new tree (creates tree dir + root leaf). Returns tips.next_steps — follow them to register auditor and avoid common mistakes.",
+        schema: { tree_id: z.string(), root_brief: z.record(z.any()), root_dod: z.record(z.any()), session_id: z.string().optional(), model: z.string().optional(), channel: z.string().optional(), audit_meta: z.record(z.any()).optional() },
+        handler: async (a) => call(["init", a.tree_id, "--root-brief", J(a.root_brief), "--root-dod", J(a.root_dod), ...(a.session_id ? ["--session-id", a.session_id] : []), ...(a.model ? ["--model", a.model] : []), ...(a.channel ? ["--channel", a.channel] : []), ...(a.audit_meta ? ["--audit-meta", J(a.audit_meta)] : [])]) },
+      { name: "tree_validate",
+        description: "Run all tree invariants (parent links, session_id uniqueness, path, done-worker independent audit_gate, context overflow). Returns {ok, issues}.",
+        schema: { tree_id: z.string() }, readOnly: true,
+        handler: async (a) => call(["validate", a.tree_id]) },
+      { name: "tree_backup",
+        description: "Create a timestamped backup of tree-state.json.",
+        schema: { tree_id: z.string(), label: z.string().optional() },
+        handler: async (a) => call(["backup", a.tree_id, ...(a.label ? ["--label", a.label] : [])]) },
+      { name: "tree_restore",
+        description: "Restore tree-state.json from a backup file (basename in tree dir, or absolute path). Refuses non-compliant backups (v0.7 V1).",
+        schema: { tree_id: z.string(), backup_file: z.string() },
+        handler: async (a) => call(["restore", a.tree_id, a.backup_file]) },
+      { name: "tree_migrate",
+        description: "Run schema migration for a tree.",
+        schema: { tree_id: z.string(), dry_run: z.boolean().optional() },
+        handler: async (a) => call(["migrate", a.tree_id, ...(a.dry_run ? ["--dry-run"] : [])]) },
+      // ---- Add ----
+      { name: "tree_leaf_add",
+        description: "Add a leaf node. worker leaves can't have children; commander nesting depth <=3 enforced.",
+        schema: { tree_id: z.string(), leaf: z.record(z.any()).describe('Full leaf json: {leaf_id,session_id,parent,path,role,model,channel,added_by}') },
+        handler: async (a) => call(["leaf", "add", a.tree_id, "--json", J(a.leaf)]) },
+      { name: "tree_milestone_add",
+        description: "Add a milestone to a leaf (expect_outputs must be non-empty per v0.7 V3).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), milestone: z.record(z.any()) },
+        handler: async (a) => call(["milestone", "add", a.tree_id, a.leaf_id, "--json", J(a.milestone)]) },
+      // ---- Update ----
+      { name: "tree_leaf_set_status",
+        description: "Set leaf status (active|done|pruned|archived|segment_pending|pending_brief). done/archived trigger DbC hard gates (v0.7 Phase A).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), status: z.string() },
+        handler: async (a) => call(["leaf", "set-status", a.tree_id, a.leaf_id, a.status]) },
+      { name: "tree_leaf_set_context",
+        description: "Update leaf context_usage_pct (0-100+).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), context_pct: z.number() },
+        handler: async (a) => call(["leaf", "set-context", a.tree_id, a.leaf_id, String(a.context_pct)]) },
+      { name: "tree_leaf_set_last_event",
+        description: "Update leaf last_event_type/ts.",
+        schema: { tree_id: z.string(), leaf_id: z.string(), event_type: z.string(), ts: z.string().optional() },
+        handler: async (a) => call(["leaf", "set-last-event", a.tree_id, a.leaf_id, a.event_type, ...(a.ts ? ["--ts", a.ts] : [])]) },
+      { name: "tree_leaf_set_session",
+        description: "Update leaf session_id (e.g. fix PENDING_ROOT root).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), session_id: z.string() },
+        handler: async (a) => call(["leaf", "set-session", a.tree_id, a.leaf_id, a.session_id]) },
+      { name: "tree_milestone_set_result",
+        description: "Set milestone audit result. V4 (v0.7 批次5): audit_pass=true requires independent --audit-session-id (real independent leaf session in tree).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), milestone_id: z.string(), audit_pass: z.boolean(), audit_session_id: z.string().optional(), note_path: z.string().optional() },
+        handler: async (a) => call(["milestone", "set-result", a.tree_id, a.leaf_id, a.milestone_id, "--audit-pass", String(a.audit_pass), ...(a.audit_session_id ? ["--audit-session-id", a.audit_session_id] : []), ...(a.note_path ? ["--note-path", a.note_path] : [])]) },
+      // ---- Append ----
+      { name: "tree_event_append",
+        description: "Append an event (done/blocked/plan/brief_echo/heartbeat_reply/nudge/limit/status_check). done requires self_check schema; brief_echo+alignment requires independent auditor (v0.7).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), type: z.string(), meta: z.record(z.any()) },
+        handler: async (a) => call(["event", "append", a.tree_id, a.leaf_id, "--type", a.type, "--json", J(a.meta)]) },
+      { name: "tree_drift_append",
+        description: "Append a drift (3-tier correction).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), kind: z.string(), severity: z.string(), action: z.string(), fork_to: z.string().optional(), reason: z.string().optional() },
+        handler: async (a) => call(["drift", "append", a.tree_id, a.leaf_id, "--kind", a.kind, "--severity", a.severity, "--action", a.action, ...(a.fork_to ? ["--fork-to", a.fork_to] : []), ...(a.reason ? ["--reason", a.reason] : [])]) },
+      { name: "tree_heartbeat_append",
+        description: "Append a heartbeat (sentinel agent patrol).",
+        schema: { tree_id: z.string(), heartbeat: z.record(z.any()) },
+        handler: async (a) => call(["heartbeat", "append", a.tree_id, "--json", J(a.heartbeat)]) },
+      { name: "tree_segment_append",
+        description: "Append a segment (bamboo-joint handoff).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), new_session_id: z.string() },
+        handler: async (a) => call(["segment", "append", a.tree_id, a.leaf_id, a.new_session_id]) },
+      { name: "tree_nudge_append",
+        description: "Append a nudge (TAO Watcher).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), rule_id: z.string(), severity: z.string().optional() },
+        handler: async (a) => call(["nudge", "append", a.tree_id, a.leaf_id, "--rule-id", a.rule_id, ...(a.severity ? ["--severity", a.severity] : [])]) },
+      { name: "tree_nudge_reset",
+        description: "Reset leaf nudge_count + nudge_log.",
+        schema: { tree_id: z.string(), leaf_id: z.string() },
+        handler: async (a) => call(["nudge", "reset", a.tree_id, a.leaf_id]) },
+      // ---- TAO ----
+      { name: "tree_audit_gate",
+        description: "Set audit_gate verdict. pass/required requires independent auditor session (whitelist, v0.7 V2); pass requires a prior done event (v0.7 A7).",
+        schema: { tree_id: z.string(), leaf_id: z.string(), verdict: z.string(), audit_session_id: z.string().optional(), reason: z.string().optional() },
+        handler: async (a) => call(["audit", "gate", a.tree_id, a.leaf_id, "--verdict", a.verdict, ...(a.audit_session_id ? ["--audit-session-id", a.audit_session_id] : []), ...(a.reason ? ["--reason", a.reason] : [])]) },
+      { name: "tree_audit_append",
+        description: "Append an audit report entry.",
+        schema: { tree_id: z.string(), leaf_id: z.string(), report: z.record(z.any()) },
+        handler: async (a) => call(["audit", "append", a.tree_id, a.leaf_id, "--json", J(a.report)]) },
+      // ---- Query ----
+      { name: "tree_leaf_get",
+        description: "Get a leaf by id.",
+        schema: { tree_id: z.string(), leaf_id: z.string() }, readOnly: true,
+        handler: async (a) => call(["leaf", "get", a.tree_id, a.leaf_id]) },
+      { name: "tree_leaf_list_active",
+        description: "List active (non-archived) leaves.",
+        schema: { tree_id: z.string() }, readOnly: true,
+        handler: async (a) => call(["leaf", "list-active", a.tree_id]) },
+      { name: "tree_leaf_list_all",
+        description: "List all leaves (including archived).",
+        schema: { tree_id: z.string() }, readOnly: true,
+        handler: async (a) => call(["leaf", "list-all", a.tree_id]) },
+      { name: "tree_tree_dump",
+        description: "Dump full tree state as JSON.",
+        schema: { tree_id: z.string() }, readOnly: true,
+        handler: async (a) => call(["tree", "dump", a.tree_id]) },
+      // Sprint 5 (聚类 A/E, 2026-07-14): session_registry 维护 — max_sessions 硬护栏（防 macp2 型会话爆炸）。
+      { name: "tree_register_session",
+        description: "Register a bypass session_id (from create_session, not leaf_add) into the tree session_registry. Makes SDK-native create_session visible to the engine so the max_sessions guard + audit cover bypass sessions. Idempotent (dedup — already-registered sessions don't double-count). Throws E_MAX_SESSIONS if tree session count would exceed audit_meta.max_sessions.",
+        schema: { tree_id: z.string(), session_id: z.string(), source: z.string().optional(), caller: z.string().optional() },
+        handler: async (a) => call(["tree", "register-session", a.tree_id, "--session-id", a.session_id, ...(a.source ? ["--source", a.source] : []), ...(a.caller ? ["--caller", a.caller] : [])]) },
+      { name: "tree_session_count",
+        description: "Get tree session count vs max_sessions (read-only budget precheck). Returns { count, max, reached }. reached=true means max_sessions hit — next session registration (leaf_add / register-session / set-session) will be rejected with E_MAX_SESSIONS.",
+        schema: { tree_id: z.string() }, readOnly: true,
+        handler: async (a) => call(["tree", "session-count", a.tree_id]) },
+      { name: "tree_drift_list",
+        description: "List drift entries.",
+        schema: { tree_id: z.string(), leaf_id: z.string().optional(), since: z.string().optional() }, readOnly: true,
+        handler: async (a) => call(["drift", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.since ? ["--since", a.since] : [])]) },
+      { name: "tree_heartbeat_tail",
+        description: "Tail heartbeat log.",
+        schema: { tree_id: z.string(), leaf_id: z.string().optional(), n: z.number().optional() }, readOnly: true,
+        handler: async (a) => call(["heartbeat", "tail", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.n ? ["-n", String(a.n)] : [])]) },
+      { name: "tree_event_list",
+        description: "List events.",
+        schema: { tree_id: z.string(), leaf_id: z.string().optional(), type: z.string().optional() }, readOnly: true,
+        handler: async (a) => call(["event", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.type ? ["--type", a.type] : [])]) },
+    ],
+  };
 }
 
 function api() {
@@ -456,17 +795,17 @@ function createToolHandlers(sourceSessionId) {
   return {
 
     get_my_session_id: async (_args) => {
-      return jsonResult({
+      return {
         session_id: sourceSessionId || null,
         is_external: !sourceSessionId,
         hint: sourceSessionId ? "This is your own session ID. Use it with get_session_context, list_messages, etc." : "No session ID available (external MCP caller).",
-      });
+      };
     },
 
     list_channels: async (_args) => {
       const a = api();
       const channels = a.listChannels();
-      return jsonResult({
+      return {
         channels: channels.map(c => ({
           id: c.id,
           name: c.name,
@@ -477,13 +816,13 @@ function createToolHandlers(sourceSessionId) {
             name: m.name,
           })),
         })),
-      });
+      };
     },
 
     list_workspaces: async (_args) => {
       const a = api();
       const workspaces = a.listAgentWorkspaces();
-      return jsonResult({
+      return {
         workspaces: workspaces.map(w => ({
           id: w.id,
           name: w.name,
@@ -491,7 +830,7 @@ function createToolHandlers(sourceSessionId) {
           created_at: w.createdAt,
           updated_at: w.updatedAt,
         })),
-      });
+      };
     },
 
     list_sessions: async (args) => {
@@ -508,7 +847,7 @@ function createToolHandlers(sourceSessionId) {
         wss.forEach(w => { wsNames[w.id] = w.name; });
       } catch (_) { /* best-effort */ }
 
-      return jsonResult({
+      return {
         count: limited.length,
         total: all.length,
         sessions: limited.map(s => ({
@@ -524,13 +863,13 @@ function createToolHandlers(sourceSessionId) {
           created_at: s.createdAt,
           updated_at: s.updatedAt,
         })),
-      });
+      };
     },
 
     get_session_info: async (args) => {
       const a = api();
       const meta = a.getAgentSessionMeta(args.session_id);
-      if (!meta) return jsonResult({ error: `Session not found: ${args.session_id}` });
+      if (!meta) return { error: `Session not found: ${args.session_id}` };
 
       let channelInfo = null;
       if (meta.channelId) {
@@ -544,7 +883,7 @@ function createToolHandlers(sourceSessionId) {
         if (ws) workspaceInfo = { id: ws.id, name: ws.name, slug: ws.slug };
       }
 
-      return jsonResult({
+      return {
         id: meta.id,
         title: meta.title,
         channel_id: meta.channelId,
@@ -558,13 +897,13 @@ function createToolHandlers(sourceSessionId) {
         attached_files: meta.attachedFiles || [],
         created_at: meta.createdAt,
         updated_at: meta.updatedAt,
-      });
+      };
     },
 
     get_session_context: async (args) => {
       const a = api();
       const meta = a.getAgentSessionMeta(args.session_id);
-      if (!meta) return jsonResult({ error: `Session not found: ${args.session_id}` });
+      if (!meta) return { error: `Session not found: ${args.session_id}` };
 
       // 从渠道配置中查模型的上下文窗口（作为 fallback）
       let configContextWindow = null;
@@ -614,13 +953,13 @@ function createToolHandlers(sourceSessionId) {
       if (!lastModel) lastModel = configModelName || meta.modelId;
 
       if (!usage) {
-        return jsonResult({
+        return {
           session_id: args.session_id,
           title: meta.title,
           model: lastModel || null,
           context_window: contextWindow,
           message: fallbackMsg || "No usage data yet. Send a message and wait for it to complete.",
-        });
+        };
       }
 
         const input = usage.input_tokens || 0;
@@ -628,7 +967,7 @@ function createToolHandlers(sourceSessionId) {
         const cache = (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
         const pct = contextWindow ? ((input + output + cache) / contextWindow * 100).toFixed(1) + '%' : null;
 
-        return jsonResult({
+        return {
           session_id: args.session_id,
           title: meta.title,
           model: lastModel,
@@ -640,18 +979,18 @@ function createToolHandlers(sourceSessionId) {
             total: input + output + cache,
             usage_pct: pct,
           },
-        });
+        };
     },
 
     list_messages: async (args) => {
       const a = api();
       const meta = a.getAgentSessionMeta(args.session_id);
-      if (!meta) return jsonResult({ error: `Session not found: ${args.session_id}` });
+      if (!meta) return { error: `Session not found: ${args.session_id}` };
 
       try {
         const msgs = a.getAgentSessionSDKMessages(args.session_id);
         if (!msgs || msgs.length === 0) {
-          return jsonResult({ session_id: args.session_id, messages: [], count: 0, total: 0 });
+          return { session_id: args.session_id, messages: [], count: 0, total: 0 };
         }
 
         const offset = args.offset ?? 0;
@@ -692,15 +1031,15 @@ function createToolHandlers(sourceSessionId) {
           return entry;
         });
 
-        return jsonResult({
+        return {
           session_id: args.session_id,
           count: result.length,
           total: msgs.length,
           offset,
           messages: result,
-        });
+        };
       } catch (err) {
-        return jsonResult({ error: `Read failed: ${err instanceof Error ? err.message : String(err)}` });
+        return { error: `Read failed: ${err instanceof Error ? err.message : String(err)}` };
       }
     },
 
@@ -709,7 +1048,7 @@ function createToolHandlers(sourceSessionId) {
 
       const channel = a.getChannelById(args.channel_id);
       if (!channel) {
-        return jsonResult({ error: `Channel not found: "${args.channel_id}". Use list_channels to see available channels.` });
+        return { error: `Channel not found: "${args.channel_id}". Use list_channels to see available channels.` };
       }
 
       let modelId = args.model_id;
@@ -718,7 +1057,7 @@ function createToolHandlers(sourceSessionId) {
         const first = models.find(m => m.enabled !== false);
         if (first) modelId = first.id;
         if (!modelId) {
-          return jsonResult({ error: `No enabled models found for channel "${channel.name}". Check channel configuration.` });
+          return { error: `No enabled models found for channel "${channel.name}". Check channel configuration.` };
         }
       }
 
@@ -727,7 +1066,7 @@ function createToolHandlers(sourceSessionId) {
       // commander 跨工作区建 session → slug "undefined" bug 孤儿 / 跨工作区漂移 /
       // mcp__tree__* 工具失败. 运行时再现: GLM-5.2 v1 落 "undefined" slug → E_NO_TREES_DIR.
       const wsCheck = validateWorkspaceId(args.workspace_id);
-      if (!wsCheck.ok) return jsonResult({ ok: false, error: wsCheck.error });
+      if (!wsCheck.ok) return { ok: false, error: wsCheck.error };
       let workspaceId = wsCheck.normalized || args.workspace_id;
       // 未指定 workspace_id 时不强制, createAgentSession 内部有 fallback, 加上
       // findTreesDirForWorkspace 的 slug "undefined" fallback 保护 (V10 已修).
@@ -747,7 +1086,7 @@ function createToolHandlers(sourceSessionId) {
           const _callerWs = _callerMeta && _callerMeta.workspaceId;
           if (_callerWs) {
             if (workspaceId && workspaceId !== _callerWs) {
-              return jsonResult({ ok: false, error: { code: 'E_WORKSPACE_FORBIDDEN', msg: `create_session rejected: agent caller ${sourceSessionId.slice(0, 8)} is in workspace ${_callerWs.slice(0, 8)} but requested workspace ${workspaceId.slice(0, 8)}. Agents cannot cross workspaces (cross-workspace-tree-issue §五 P1). Cross-workspace creation is an admin/user operation, not an agent operation.` } });
+              return { ok: false, error: { code: 'E_WORKSPACE_FORBIDDEN', msg: `create_session rejected: agent caller ${sourceSessionId.slice(0, 8)} is in workspace ${_callerWs.slice(0, 8)} but requested workspace ${workspaceId.slice(0, 8)}. Agents cannot cross workspaces (cross-workspace-tree-issue §五 P1). Cross-workspace creation is an admin/user operation, not an agent operation.` } };
             }
             if (!workspaceId) {
               // 未显式指定 → 强制到调用方 workspace (防 workspaceId=undefined 漂移 + 子树同工作区)
@@ -760,7 +1099,7 @@ function createToolHandlers(sourceSessionId) {
       // macp2 爆炸护栏 (2026-07-09): create_session 数量预算（在 delegationDepth 前, 成本低先拦）
       const _budgetHit = checkCreateSessionBudget(sourceSessionId);
       if (_budgetHit) {
-        return jsonResult({ ok: false, error: { code: _budgetHit.code, msg: `create_session rejected: caller ${sourceSessionId ? sourceSessionId.slice(0, 8) : '(no-caller)'} created ${_budgetHit.count} sessions in last ${CREATE_SESSION_BUDGET_WINDOW_MS / 1000}s (max ${CREATE_SESSION_BUDGET_MAX}). Possible session-splosion (macp2 pattern: create_session used as reviewer, bypassing tree budget). Converge review, reuse sessions, or use in-process SubAgent (CLAUDE.md P0 红线).` } });
+        return { ok: false, error: { code: _budgetHit.code, msg: `create_session rejected: caller ${sourceSessionId ? sourceSessionId.slice(0, 8) : '(no-caller)'} created ${_budgetHit.count} sessions in last ${CREATE_SESSION_BUDGET_WINDOW_MS / 1000}s (max ${CREATE_SESSION_BUDGET_MAX}). Possible session-splosion (macp2 pattern: create_session used as reviewer, bypassing tree budget). Converge review, reuse sessions, or use in-process SubAgent (CLAUDE.md P0 红线).` } };
       }
 
       // Sprint 5 (聚类 A, improvement P0-S01 单边方案, 2026-07-14): create_session 旁路根治 — max_sessions 预检。
@@ -778,7 +1117,7 @@ function createToolHandlers(sourceSessionId) {
               for (const _tid of _ot.tree_ids) {
                 const _sc = await _eng.run('tree', ['session-count', _tid], _ot.trees_dir);
                 if (_sc && _sc.ok && _sc.reached) {
-                  return jsonResult({ ok: false, error: { code: 'E_MAX_SESSIONS', msg: `create_session rejected: caller ${sourceSessionId.slice(0, 8)}'s tree "${_tid}" has ${_sc.count} sessions (max ${_sc.max}, reached). macp2-style session-splosion guard (聚类A 旁路根治). Archive sessions, reuse via segment handoff, or raise audit_meta.max_sessions.` } });
+                  return { ok: false, error: { code: 'E_MAX_SESSIONS', msg: `create_session rejected: caller ${sourceSessionId.slice(0, 8)}'s tree "${_tid}" has ${_sc.count} sessions (max ${_sc.max}, reached). macp2-style session-splosion guard (聚类A 旁路根治). Archive sessions, reuse via segment handoff, or raise audit_meta.max_sessions.` } };
                 }
               }
             }
@@ -795,11 +1134,29 @@ function createToolHandlers(sourceSessionId) {
         const _srcDepth = (_srcMeta && typeof _srcMeta.delegationDepth === 'number') ? _srcMeta.delegationDepth : 0;
         _newDepth = _srcDepth + 1;
         if (_newDepth > MAX_DELEGATION_DEPTH) {
-          return jsonResult({ ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `create denied: delegation depth ${_newDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${sourceSessionId.slice(0, 8)} already at depth ${_srcDepth}.` } });
+          return { ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `create denied: delegation depth ${_newDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${sourceSessionId.slice(0, 8)} already at depth ${_srcDepth}.` } };
         }
       }
+      // v0.18 补丁 (2026-07-23): create_session 运行时推断 —— 对 claude 兼容 provider 默认建 claude
+      //   运行时会话。根因：create_session 原只传 4 参 → createAgentSession 默认 agentRuntime="pi"，
+      //   导致 remote_create_session / MCP 建的会话恒为 pi，拿不到 mcp__tree__*/session__/remote-session__*
+      //   （补丁A 仅 claude 运行时注入，详见 memory tree-mcp-pi-runtime-incompat）。
+      //   镜像 sendMessage preflight（main.cjs:484361 model-level + 484395 provider-level）：
+      //   兼容 provider 且 model 未显式要求 pi → claude；否则 pi（保守默认）。非致命，推断失败回退 pi。
+      let _inferRuntime = "pi";
       try {
-        const meta = a.createAgentSession(args.title, args.channel_id, workspaceId, modelId);
+        const _AGENT_COMPATIBLE = new Set(["proma","anthropic","anthropic-compatible","deepseek","kimi-api","kimi-coding","zhipu-coding","zhipu-coding-team","ark-coding-plan","minimax","xiaomi","xiaomi-token-plan","qwen-anthropic","qwen-token-plan"]);
+        const _ch = a.getChannelById(args.channel_id);
+        if (_ch && _ch.provider && _AGENT_COMPATIBLE.has(_ch.provider)) {
+          _inferRuntime = "claude";
+          // model 显式要求 pi（openai-responses）→ 仍 pi。对所有渠道查（比 sendMessage 484361 proma-only 更保守）
+          const _models = (_ch.agentModels || _ch.models) || [];
+          const _m = _models.find((m) => m.id === modelId);
+          if (_m && (_m.agentRuntime === "pi" || _m.apiProtocol === "openai-responses")) _inferRuntime = "pi";
+        }
+      } catch (_) { /* 推断失败保守 pi */ }
+      try {
+        const meta = a.createAgentSession(args.title, args.channel_id, workspaceId, modelId, _inferRuntime);
         // 层1加固 K1: 补写 agentSession 级血缘 (commander 建的 worker 必须能被 ownership R2 认领,
         //   否则 tree 下发/开小弟全断). 命名铁律: 绝不写 source_session_id/forked_from (C-15 在用).
         try {
@@ -828,7 +1185,7 @@ function createToolHandlers(sourceSessionId) {
           }
         }
         log(`Session created: ${meta.id.slice(0, 8)} "${meta.title}" channel=${args.channel_id} workspace=${workspaceId || '(default)'} model=${modelId}`);
-        return jsonResult({
+        return {
           session: {
             id: meta.id,
             title: meta.title,
@@ -838,9 +1195,9 @@ function createToolHandlers(sourceSessionId) {
             created_at: meta.createdAt,
           },
           message: `Session created: ${meta.title} (${meta.id.slice(0, 8)}). Open the Proma sidebar (manual refresh) to see and switch to this session.`,
-        });
+        };
       } catch (err) {
-        return jsonResult({ error: `Failed to create session: ${err instanceof Error ? err.message : String(err)}` });
+        return { error: `Failed to create session: ${err instanceof Error ? err.message : String(err)}` };
       }
     },
 
@@ -849,14 +1206,14 @@ function createToolHandlers(sourceSessionId) {
 
       const source = a.getAgentSessionMeta(args.source_session_id);
       if (!source) {
-        return jsonResult({ error: `Source session not found: "${args.source_session_id}". Use list_sessions to find valid session IDs.` });
+        return { error: `Source session not found: "${args.source_session_id}". Use list_sessions to find valid session IDs.` };
       }
 
       // 层1加固: caller 必须拥有 source 才能 fork (防任意 agent fork 他人 session 窃取完整上下文, 修 L693 区域漏洞)
       const _forkOwn = assertOwnership(sourceSessionId, args.source_session_id, 'fork');
       if (!_forkOwn.allow) {
         logOwnership('fork', sourceSessionId, args.source_session_id, _forkOwn);
-        return jsonResult({ ok: false, error: { code: _forkOwn.rule, msg: `fork_session denied: ${_forkOwn.reason}` } });
+        return { ok: false, error: { code: _forkOwn.rule, msg: `fork_session denied: ${_forkOwn.reason}` } };
       }
       if (_forkOwn.audit) logOwnership('fork', sourceSessionId, args.source_session_id, _forkOwn);
 
@@ -864,11 +1221,11 @@ function createToolHandlers(sourceSessionId) {
       const _forkSrcDepth = (typeof source.delegationDepth === 'number') ? source.delegationDepth : 0;
       const _forkNewDepth = _forkSrcDepth + 1;
       if (_forkNewDepth > MAX_DELEGATION_DEPTH) {
-        return jsonResult({ ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `fork denied: delegation depth ${_forkNewDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${args.source_session_id.slice(0, 8)} already at depth ${_forkSrcDepth}.` } });
+        return { ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `fork denied: delegation depth ${_forkNewDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${args.source_session_id.slice(0, 8)} already at depth ${_forkSrcDepth}.` } };
       }
 
       if (!source.sdkSessionId) {
-        return jsonResult({ error: `Cannot fork: source session "${source.title}" has no SDK session yet. Send at least one message in the session first.` });
+        return { error: `Cannot fork: source session "${source.title}" has no SDK session yet. Send at least one message in the session first.` };
       }
 
       try {
@@ -939,7 +1296,7 @@ function createToolHandlers(sourceSessionId) {
         // 最直接绕过途径 (代码审计 SubAgent 发现). 共享 validateWorkspaceId helper.
         if (args.new_workspace_id) {
           const wsCheck = validateWorkspaceId(args.new_workspace_id);
-          if (!wsCheck.ok) return jsonResult({ ok: false, error: wsCheck.error });
+          if (!wsCheck.ok) return { ok: false, error: wsCheck.error };
           // Sprint 4 跨工作区 P1 Part B (fork_session 同类漏洞): agent 调用方不能把 fork
           //   落到别的 workspace (堵 create_session 同源的跨工作区漂移). Part A 只校验存在.
           if (sourceSessionId) {
@@ -947,7 +1304,7 @@ function createToolHandlers(sourceSessionId) {
               const _callerMeta = a.getAgentSessionMeta(sourceSessionId);
               const _callerWs = _callerMeta && _callerMeta.workspaceId;
               if (_callerWs && wsCheck.normalized && wsCheck.normalized !== _callerWs) {
-                return jsonResult({ ok: false, error: { code: 'E_WORKSPACE_FORBIDDEN', msg: `fork_session rejected: agent caller ${sourceSessionId.slice(0, 8)} is in workspace ${_callerWs.slice(0, 8)} but requested new_workspace_id ${wsCheck.normalized.slice(0, 8)}. Agents cannot cross workspaces (cross-workspace-tree-issue §五 P1).` } });
+                return { ok: false, error: { code: 'E_WORKSPACE_FORBIDDEN', msg: `fork_session rejected: agent caller ${sourceSessionId.slice(0, 8)} is in workspace ${_callerWs.slice(0, 8)} but requested new_workspace_id ${wsCheck.normalized.slice(0, 8)}. Agents cannot cross workspaces (cross-workspace-tree-issue §五 P1).` } };
               }
             } catch (e) { log(`[fork_session] caller-workspace lock check skipped (non-fatal): ${e && e.message ? e.message : String(e)}`); }
           }
@@ -1057,7 +1414,7 @@ function createToolHandlers(sourceSessionId) {
         }
 
         log(`Session forked: ${forked.id.slice(0, 8)} from ${args.source_session_id.slice(0, 8)} (identity: ${identityStatus})`);
-        return jsonResult({
+        return {
           session: {
             id: forked.id,
             title: forked.title,
@@ -1070,13 +1427,13 @@ function createToolHandlers(sourceSessionId) {
             fork_identity_status: identityStatus,  // injected / timeout / failed
           },
           message: `Session forked: ${forked.title} (${forked.id.slice(0, 8)}) from "${source.title}". Fork 身份提示状态: ${identityStatus}（V9+ Phase 4 R2 P1）。Open the Proma sidebar to see and switch to the forked session.`,
-        });
+        };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("没有 SDK session") || msg.includes("session not found") || (msg.includes("Session") && msg.includes("not found"))) {
-          return jsonResult({ error: `Fork failed: SDK runtime GC'd (PROMA_DEV mode headless sessions are short-lived). Workaround: use remote-session tools to fork on a non-dev instance, or create the source session via the UI for a persistent runtime.` });
+          return { error: `Fork failed: SDK runtime GC'd (PROMA_DEV mode headless sessions are short-lived). Workaround: use remote-session tools to fork on a non-dev instance, or create the source session via the UI for a persistent runtime.` };
         }
-        return jsonResult({ error: `Fork failed: ${msg}` });
+        return { error: `Fork failed: ${msg}` };
       }
     },
 
@@ -1085,7 +1442,7 @@ function createToolHandlers(sourceSessionId) {
 
       const meta = a.getAgentSessionMeta(args.session_id);
       if (!meta) {
-        return jsonResult({ error: `Target session not found: "${args.session_id}".` });
+        return { error: `Target session not found: "${args.session_id}".` };
       }
 
       // 层1加固: caller ownership 校验 (堵身份冒用核心漏洞 L712)。
@@ -1095,13 +1452,13 @@ function createToolHandlers(sourceSessionId) {
       const _sendOwn = assertOwnership(sourceSessionId, args.session_id, 'send');
       if (!_sendOwn.allow) {
         logOwnership('send', sourceSessionId, args.session_id, _sendOwn);
-        return jsonResult({ ok: false, error: { code: _sendOwn.rule, msg: `send_message denied: ${_sendOwn.reason}` } });
+        return { ok: false, error: { code: _sendOwn.rule, msg: `send_message denied: ${_sendOwn.reason}` } };
       }
       if (_sendOwn.audit) logOwnership('send', sourceSessionId, args.session_id, _sendOwn);
 
       const channelId = args.channel_id || meta.channelId;
       if (!channelId) {
-        return jsonResult({ error: "No channel available for this session." });
+        return { error: "No channel available for this session." };
       }
 
       const modelId = args.model_id || meta.modelId;
@@ -1128,7 +1485,7 @@ function createToolHandlers(sourceSessionId) {
 
       // 外部调用（无 sourceSessionId）不允许 notify 模式
       if (shouldNotify && !sourceSessionId) {
-        return jsonResult({ error: "notify=true is not supported from external MCP (no source session). Use wait=true (default) or wait=false without notify." });
+        return { error: "notify=true is not supported from external MCP (no source session). Use wait=true (default) or wait=false without notify." };
       }
 
       let sourceChannelId = null;
@@ -1141,12 +1498,12 @@ function createToolHandlers(sourceSessionId) {
       // main.cjs orchestrator.sendMessage 入口有 activeSessions 守卫，命中时会静默丢弃
       // 用户消息（在 appendSDKMessages 之前 return）。预检能避免调用方被骗成 "started"。
       if (typeof a.isAgentSessionActive === "function" && a.isAgentSessionActive(args.session_id)) {
-        return jsonResult({
+        return {
           session_id: args.session_id,
           status: "busy",
           error: `Session "${meta.title}" is currently processing another message. Wait for it to complete, or use a different session.`,
           hint: "For concurrent work, use multiple sessions instead of sending multiple messages to the same session in parallel.",
-        });
+        };
       }
 
       try {
@@ -1198,14 +1555,14 @@ function createToolHandlers(sourceSessionId) {
         });
 
         if (result.status === "started") {
-          return jsonResult({
+          return {
             session_id: args.session_id,
             status: "started",
             notify: shouldNotify,
             message: shouldNotify
               ? `Fire-and-forget + async notify: message sent to "${meta.title}". When it completes, this session will receive a system notification.`
               : `Fire-and-forget: message sent to "${meta.title}".`,
-          });
+          };
         }
 
         // wait=true 完成：读取最终输出
@@ -1229,43 +1586,43 @@ function createToolHandlers(sourceSessionId) {
           }
         } catch (_) { /* best-effort */ }
 
-        return jsonResult({
+        return {
           session_id: args.session_id,
           status: "completed",
           reply: replyText,
           message: replyText
             ? `Target session "${meta.title}" completed. See "reply" field for output.`
             : `Target session "${meta.title}" has finished processing (no text output captured).`,
-        });
+        };
       } catch (err) {
-        return jsonResult({
+        return {
           session_id: args.session_id,
           status: "error",
           error: err instanceof Error ? err.message : String(err),
-        });
+        };
       }
     },
 
     archive_session: async (args) => {
       const a = api();
       const meta = a.getAgentSessionMeta(args.session_id);
-      if (!meta) return jsonResult({ error: `Session not found: ${args.session_id}` });
+      if (!meta) return { error: `Session not found: ${args.session_id}` };
       // 层1加固: caller ownership 校验 (防任意 agent 归档他人 session → DoS / 破坏协作链)。
       //   注意 R5 isSystemPrivileged 只允许 action='send', 故 automation 不能 archive (符合预期: 心跳不应归档他人)。
       const _archOwn = assertOwnership(sourceSessionId, args.session_id, 'archive');
       if (!_archOwn.allow) {
         logOwnership('archive', sourceSessionId, args.session_id, _archOwn);
-        return jsonResult({ ok: false, error: { code: _archOwn.rule, msg: `archive_session denied: ${_archOwn.reason}` } });
+        return { ok: false, error: { code: _archOwn.rule, msg: `archive_session denied: ${_archOwn.reason}` } };
       }
       if (_archOwn.audit) logOwnership('archive', sourceSessionId, args.session_id, _archOwn);
       const archived = args.archived !== false; // default true
       a.updateAgentSessionMeta(args.session_id, { archived });
       log(`Session ${archived ? "archived" : "unarchived"}: ${args.session_id.slice(0, 8)} "${meta.title}"`);
-      return jsonResult({ session_id: args.session_id, title: meta.title, archived });
+      return { session_id: args.session_id, title: meta.title, archived };
     },
 
     discover_instances: async (args) => {
-      return jsonResult(await discoverInstances(args));
+      return await discoverInstances(args);
     },
 
   };
@@ -1280,27 +1637,27 @@ function createRemoteToolHandlers() {
   return {
     remote_list_channels: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "list_channels", {}, host));
+      return await remoteHttpPost(port, "list_channels", {}, host);
     },
     remote_list_workspaces: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "list_workspaces", {}, host));
+      return await remoteHttpPost(port, "list_workspaces", {}, host);
     },
     remote_list_sessions: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "list_sessions", args, host));
+      return await remoteHttpPost(port, "list_sessions", args, host);
     },
     remote_get_session_info: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "get_session_info", args, host));
+      return await remoteHttpPost(port, "get_session_info", args, host);
     },
     remote_get_session_context: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "get_session_context", args, host));
+      return await remoteHttpPost(port, "get_session_context", args, host);
     },
     remote_list_messages: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "list_messages", args, host));
+      return await remoteHttpPost(port, "list_messages", args, host);
     },
     remote_create_session: async (args) => {
       const {host, port} = await resolve(args);
@@ -1332,211 +1689,68 @@ function createRemoteToolHandlers() {
         if (resolved) {
           payload.workspace_id = resolved;
         } else {
-          return jsonResult({ ok: false, error: { code: 'E_WORKSPACE_REQUIRED', msg: 'remote_create_session: workspace_id could not be auto-resolved on target instance (no "default" workspace found, or list_workspaces failed). Pass workspace_id explicitly.', help_hint: 'Call mcp__remote-session__remote_list_workspaces with the same instance to list valid workspace ids.' } });
+          return { ok: false, error: { code: 'E_WORKSPACE_REQUIRED', msg: 'remote_create_session: workspace_id could not be auto-resolved on target instance (no "default" workspace found, or list_workspaces failed). Pass workspace_id explicitly.', help_hint: 'Call mcp__remote-session__remote_list_workspaces with the same instance to list valid workspace ids.' } };
         }
       }
-      return jsonResult(await remoteHttpPost(port, "create_session", payload, host));
+      return await remoteHttpPost(port, "create_session", payload, host);
     },
     remote_fork_session: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "fork_session", {
+      return await remoteHttpPost(port, "fork_session", {
         source_session_id: args.source_session_id,
         up_to_message_uuid: args.up_to_message_uuid,
         title: args.title,
         new_channel_id: args.new_channel_id,
         new_model_id: args.new_model_id,
         new_workspace_id: args.new_workspace_id,
-      }, host));
+      }, host);
     },
     remote_send_message: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "send_message", {
+      return await remoteHttpPost(port, "send_message", {
         session_id: args.session_id,
         message: args.message,
         wait: args.wait !== false,
         model_id: args.model_id,
         channel_id: args.channel_id,
-      }, host));
+      }, host);
     },
     remote_archive_session: async (args) => {
       const {host, port} = await resolve(args);
-      return jsonResult(await remoteHttpPost(port, "archive_session", args, host));
+      return await remoteHttpPost(port, "archive_session", args, host);
     },
     remote_get_my_session_id: async (args) => {
-      return jsonResult({
+      return {
         session_id: null,
         is_remote: true,
         instance: args.instance,
         hint: "This is a remote instance call. session_id is always null for remote operations.",
-      });
+      };
     },
     remote_discover_instances: async (args) => {
-      return jsonResult(await discoverInstances(args));
+      return await discoverInstances(args);
     },
   };
 }
 
 function createRemoteSessionMcpServer(sdk, z) {
-  const h = createRemoteToolHandlers();
-  const server = sdk.createSdkMcpServer({
+  const table = buildRemoteSessionTable();
+  return sdk.createSdkMcpServer({
     name: "remote-session",
     version: "1.0.0",
-    tools: [
-      sdk.tool("remote_list_channels", "List all channels on a REMOTE Proma instance. Use this FIRST before creating a remote session.", { instance: z.string().describe("Instance name (e.g. 'dev', 'release')") }, h.remote_list_channels, { annotations: { readOnlyHint: true } }),
-      sdk.tool("remote_list_workspaces", "List all workspaces on a REMOTE Proma instance.", { instance: z.string().describe("Instance name (e.g. 'dev', 'release')") }, h.remote_list_workspaces, { annotations: { readOnlyHint: true } }),
-      sdk.tool("remote_list_sessions", "List sessions on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), include_archived: z.boolean().optional(), workspace_id: z.string().optional(), limit: z.number().min(1).max(200).optional() }, h.remote_list_sessions, { annotations: { readOnlyHint: true } }),
-      sdk.tool("remote_get_session_info", "Get session info from a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string().describe("Session ID on the remote instance") }, h.remote_get_session_info, { annotations: { readOnlyHint: true } }),
-      sdk.tool("remote_get_session_context", "Get token usage from a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string() }, h.remote_get_session_context, { annotations: { readOnlyHint: true } }),
-      sdk.tool("remote_list_messages", "List messages from a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string(), limit: z.number().min(1).max(200).optional(), offset: z.number().min(0).optional() }, h.remote_list_messages, { annotations: { readOnlyHint: true } }),
-      sdk.tool("remote_create_session", "Create a new session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name (e.g. 'dev', 'release')"), channel_id: z.string().describe("Channel ID on the remote instance"), model_id: z.string().optional(), title: z.string().optional(), workspace_id: z.string().optional() }, h.remote_create_session),
-      sdk.tool("remote_fork_session", "Fork a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), source_session_id: z.string(), up_to_message_uuid: z.string().optional(), title: z.string().optional(), new_channel_id: z.string().optional(), new_model_id: z.string().optional(), new_workspace_id: z.string().optional() }, h.remote_fork_session),
-      sdk.tool("remote_send_message", "Send a message to a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string(), message: z.string(), wait: z.boolean().optional(), model_id: z.string().optional(), channel_id: z.string().optional() }, h.remote_send_message),
-      sdk.tool("remote_archive_session", "Archive/unarchive a session on a REMOTE Proma instance.", { instance: z.string().describe("Instance name"), session_id: z.string(), archived: z.boolean().optional() }, h.remote_archive_session),
-      sdk.tool("remote_get_my_session_id", "Get instance info for a REMOTE Proma instance. Always returns null session_id since you are not in that instance.", { instance: z.string().describe("Instance name") }, h.remote_get_my_session_id, { annotations: { readOnlyHint: true } }),
-      sdk.tool("remote_discover_instances", "Scan and discover Proma instances on localhost and LAN. Returns cached results unless refresh=true.", { refresh: z.boolean().optional().describe("Force re-scan (default false, uses 60s cache)"), hosts: z.array(z.string()).optional().describe("LAN host IPs to probe, e.g. ['192.168.1.100', '192.168.1.101']") }, h.remote_discover_instances, { annotations: { readOnlyHint: true } }),
-    ],
+    tools: renderClaude(table, sdk, {}),
   });
-  return server;
 }
 
 // ---- 内部 MCP Server（Agent 内部使用）----
 function createSessionMcpServer(sdk, z, sourceSessionId) {
-  const h = createToolHandlers(sourceSessionId);
-
-  const server = sdk.createSdkMcpServer({
+  const ctx = { sessionId: sourceSessionId };
+  const table = buildSessionTable(ctx);
+  return sdk.createSdkMcpServer({
     name: "session",
     version: "1.0.0",
-    tools: [
-
-      sdk.tool(
-        "get_my_session_id",
-        "Get YOUR CURRENT session ID. Use this whenever you need to reference yourself — checking your own context usage, listing your own messages, or passing your ID to other sessions for async callbacks.",
-        {},
-        h.get_my_session_id,
-        { annotations: { readOnlyHint: true } }
-      ),
-
-      sdk.tool(
-        "list_channels",
-        "List all configured AI channels and their available agent models. Use this FIRST before creating a session to find valid channel_id and model_id values.",
-        {},
-        h.list_channels,
-        { annotations: { readOnlyHint: true } }
-      ),
-
-      sdk.tool(
-        "list_workspaces",
-        "List all agent workspaces. Use this to find workspace IDs for create_session / fork_session / list_sessions filtering.",
-        {},
-        h.list_workspaces,
-        { annotations: { readOnlyHint: true } }
-      ),
-
-      sdk.tool(
-        "list_sessions",
-        "List all agent sessions with their metadata (title, channel, model, workspace name/ID, archived status).",
-        {
-          include_archived: z.boolean().optional().describe("Include archived sessions (default: false)"),
-          workspace_id: z.string().optional().describe("Filter by workspace ID (from list_workspaces). Omit to see all workspaces."),
-          limit: z.number().min(1).max(200).optional().describe("Max results to return (default: 50)"),
-        },
-        h.list_sessions,
-        { annotations: { readOnlyHint: true } }
-      ),
-
-      sdk.tool(
-        "get_session_info",
-        "Get detailed information about a specific agent session, including its channel name, provider, and workspace.",
-        { session_id: z.string().describe("The session ID to look up") },
-        h.get_session_info,
-        { annotations: { readOnlyHint: true } }
-      ),
-
-      sdk.tool(
-        "get_session_context",
-        "Get the CURRENT context/token usage of an agent session. Returns input tokens, output tokens, total tokens, and context window size from the latest message.",
-        { session_id: z.string().describe("The session ID to check context usage for.") },
-        h.get_session_context,
-        { annotations: { readOnlyHint: true } }
-      ),
-
-      sdk.tool(
-        "list_messages",
-        "List messages (conversation history) for an agent session. Each message includes its UUID (use with fork_session), role, timestamp, and text content. Use this to inspect what a session has done and find the right message UUID to fork at.",
-        {
-          session_id: z.string().describe("The session ID to list messages for."),
-          limit: z.number().min(1).max(200).optional().describe("Max messages to return (default: 50)"),
-          offset: z.number().min(0).optional().describe("Skip first N messages for pagination (default: 0)"),
-        },
-        h.list_messages,
-        { annotations: { readOnlyHint: true } }
-      ),
-
-      sdk.tool(
-        "create_session",
-        "Create a NEW agent session with specified channel and model. The session will appear in the Proma sidebar after manual refresh. Use list_channels first to get valid channel/model IDs.",
-        {
-          channel_id: z.string().describe("Channel ID (from list_channels). Determines which AI provider/API to use."),
-          model_id: z.string().optional().describe("Model ID within the channel. If omitted, the first enabled agent model is used."),
-          title: z.string().optional().describe("Session display title. Auto-generated if omitted."),
-          workspace_id: z.string().optional().describe("Workspace ID to associate. Uses current workspace if omitted."),
-        },
-        h.create_session
-      ),
-
-      sdk.tool(
-        "fork_session",
-        "FORK (clone) an existing agent session, preserving all conversation context up to the specified point. The forked session retains the source's workspace files and message history. Use list_sessions first to find the source session ID.",
-        {
-          source_session_id: z.string().describe("ID of the source session to fork (from list_sessions)."),
-          up_to_message_uuid: z.string().optional().describe("SDK message UUID to fork at (inclusive). Omit to fork at the latest message (full copy)."),
-          title: z.string().optional().describe("Custom title for the forked session. Default: '<original title> (fork)'"),
-          new_channel_id: z.string().optional().describe("Override: use a different channel for the forked session."),
-          new_model_id: z.string().optional().describe("Override: use a different model for the forked session."),
-          new_workspace_id: z.string().optional().describe("Override: use a different workspace for the forked session."),
-        },
-        h.fork_session
-      ),
-
-      sdk.tool(
-        "send_message",
-        "Send a user message to an EXISTING agent session for autonomous processing. Three modes:\n- wait=true (default): blocks until target completes, returns result with \"reply\" field containing the assistant's final response text.\n- notify=true: fire-and-forget, but when target finishes, pushes a notification message back to the calling session (async callback). Not supported from external MCP.\n- neither: pure fire-and-forget, no notification.",
-        {
-          session_id: z.string().describe("Target session ID to send the message to."),
-          message: z.string().describe("The user message / task to send to the session."),
-          wait: z.boolean().optional().describe("Wait for target to complete before returning (default: true)."),
-          notify: z.boolean().optional().describe("When target completes, push a notification back to the calling session (async callback). Only meaningful when wait=false."),
-          model_id: z.string().optional().describe("Model ID override."),
-          channel_id: z.string().optional().describe("Channel ID override."),
-        },
-        h.send_message
-      ),
-
-      sdk.tool(
-        "archive_session",
-        "Archive (or unarchive) an agent session. Archived sessions are hidden from default list_sessions. Use include_archived=true to see them.",
-        {
-          session_id: z.string().describe("The session ID to archive/unarchive."),
-          archived: z.boolean().optional().describe("Set to false to unarchive. Default: true (archive)."),
-        },
-        h.archive_session
-      ),
-
-      sdk.tool(
-        "discover_instances",
-        "Scan and discover Proma instances on localhost and LAN. Returns cached results (60s TTL) unless refresh=true. Use hosts parameter to probe specific LAN IPs.",
-        {
-          refresh: z.boolean().optional().describe("Force re-scan instead of using cache (default: false)"),
-          hosts: z.array(z.string()).optional().describe("LAN host IPs to probe, e.g. ['192.168.1.100']. Each is scanned on ports 19876-19895."),
-        },
-        h.discover_instances,
-        { annotations: { readOnlyHint: true } }
-      ),
-
-    ],
+    tools: renderClaude(table, sdk, ctx),
   });
-
-  return server;
 }
 
 // ---- 外部 MCP HTTP Bridge（让外部 stdio MCP server 能调用 7 个工具）----
@@ -1652,135 +1866,90 @@ function createExternalHttpBridge() {
 // TREES_ROOT 由 callTreeState 按 workspace 注入（treeEngine.setTreesRoot），不再依赖 __dirname。
 // 工作区无需 tree-state.js 源码 —— 引擎代码内联在 dist/，agent 看不到。
 // ============================================================
-(function registerTreeMcpServer() {
-  // v0.7+: 引擎内联 —— 直接 require tree-engine.cjs（同目录），调 engine.run。
-  // 不再 spawn node tree-state.js：工作区无需 tree-state.js 源码，agent 看不到引擎代码。
-  const treeEngine = require("./tree-engine.cjs");
+// ============================================================
+// 补丁 v0.7+: Tree 体系 MCP Server（mcp__tree__* — 30 工具直接调内联引擎）
+// 引擎 tree-engine.cjs（同目录，从 tree-state.js 改造）导出 run(cmd,args)→{ok,error?,...result}。
+// v0.20: treeEngine / findTreesDirForWorkspace / callTreeState 从 IIFE 提到模块作用域，
+//   供 buildTreeTable（pi 钩子 __proma_getPiCustomTools__ 也复用）共享。claude 工厂改用
+//   buildTreeTable + renderClaude（与 session / remote-session 统一）。
+// ============================================================
+// v0.7+: 引擎内联 —— 直接 require tree-engine.cjs（同目录），调 engine.run。
+// 不再 spawn node tree-state.js：工作区无需 tree-state.js 源码，agent 看不到引擎代码。
+const treeEngine = require("./tree-engine.cjs");
 
-  // L2-root-cause (层2 身份校验根治，方案A): 注入 session 真实性 verifier。
-  //   调 global.__proma__.getAgentSessionMeta 判断 session 是否真实存在（根因A根治：堵任意合规格式 UUID 注册）。
-  //   __proma__ 未就绪 → null（bypass，同 Patch M 哲学，best-effort 不阻断）；
-  //   session 真实存在 → true；不存在 → false（engine 据此 throw E_SESSION_NOT_ALIVE）。
-  //   verifier 是无状态函数，require 后注入一次即可（与 callerSessionId 透传互补；详见设计文档 §三方案A）。
-  treeEngine.setSessionVerifier((sid) => {
-    if (!sid) return false;
+// L2-root-cause (层2 身份校验根治，方案A): 注入 session 真实性 verifier。
+//   调 global.__proma__.getAgentSessionMeta 判断 session 是否真实存在（根因A根治：堵任意合规格式 UUID 注册）。
+//   __proma__ 未就绪 → null（bypass，同 Patch M 哲学，best-effort 不阻断）；
+//   session 真实存在 → true；不存在 → false（engine 据此 throw E_SESSION_NOT_ALIVE）。
+//   verifier 是无状态函数，require 后注入一次即可（与 callerSessionId 透传互补；详见设计文档 §三方案A）。
+treeEngine.setSessionVerifier((sid) => {
+  if (!sid) return false;
+  try {
+    const a = global.__proma__;
+    if (!a || typeof a.getAgentSessionMeta !== 'function') return null; // __proma__ 未就绪 → bypass
+    const meta = a.getAgentSessionMeta(sid);
+    return !!meta;                                    // session 真实存在 = true
+  } catch (_) { return null; }                        // 异常不阻断（bypass）
+});
+
+// workspace → trees_dir 定位（复制 registerTreePanelIpc 内 discoverAllWorkspacesWithTrees 的核心；
+//   后者是另一 IIFE 局部函数，本模块级 callTreeState 无法访问，故独立实现一份）
+// V10-workspace-canonical: slug "undefined"/null/"" → fallback "default"（堵 JSON.stringify(undefined)→"undefined" 字符串）
+//   失守案例 532465c5：调用方传 workspace_id=undefined，被序列化成 "undefined" 字符串当 slug 用，
+//   findTreesDirForWorkspace 直接返回 null，引擎层完全不知道是 fallback 失败。
+function findTreesDirForWorkspace(workspaceSlug) {
+  // V10-workspace-canonical: fallback —— 空值或字符串 "undefined" 都视为缺失，尝试 "default"。
+  if (!workspaceSlug || workspaceSlug === 'undefined' || workspaceSlug === 'null') {
+    workspaceSlug = 'default';
+  }
+  const os = require("os");
+  const home = os.homedir();
+  const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
+  // v0.19 修复分离 bug：base 跟 PROMA_INSTANCE_NAME（对齐 Proma app）
+  const _treeInst = process.env.PROMA_INSTANCE_NAME;
+  const base = _treeInst
+    ? path.join(home, `.proma-${_treeInst}`, "agent-workspaces")
+    : (isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces"));
+  const wsRoot = path.join(base, workspaceSlug);
+  try { if (!fs.existsSync(wsRoot) || !fs.statSync(wsRoot).isDirectory()) return null; } catch (_) { return null; }
+  const candidates = [
+    path.join(wsRoot, "workspace-files", ".context", "trees"),
+    path.join(wsRoot, ".context", "trees"),
+  ];
+  for (const dir of candidates) {
     try {
-      const a = global.__proma__;
-      if (!a || typeof a.getAgentSessionMeta !== 'function') return null; // __proma__ 未就绪 → bypass
-      const meta = a.getAgentSessionMeta(sid);
-      return !!meta;                                    // session 真实存在 = true
-    } catch (_) { return null; }                        // 异常不阻断（bypass）
-  });
-
-  // workspace → trees_dir 定位（复制 registerTreePanelIpc 内 discoverAllWorkspacesWithTrees 的核心；
-  // 后者是 IIFE 局部函数，本模块级 createTreeMcpServer 无法访问，故独立实现一份）
-  // V10-workspace-canonical: slug "undefined"/null/"" → fallback "default"（堵 JSON.stringify(undefined)→"undefined" 字符串）
-  //   失守案例 532465c5：调用方传 workspace_id=undefined，被序列化成 "undefined" 字符串当 slug 用，
-  //   findTreesDirForWorkspace 直接返回 null，引擎层完全不知道是 fallback 失败。
-  function findTreesDirForWorkspace(workspaceSlug) {
-    // V10-workspace-canonical: fallback —— 空值或字符串 "undefined" 都视为缺失，尝试 "default"。
-    if (!workspaceSlug || workspaceSlug === 'undefined' || workspaceSlug === 'null') {
-      workspaceSlug = 'default';
-    }
-    const os = require("os");
-    const home = os.homedir();
-    const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
-    // v0.19 修复分离 bug：base 跟 PROMA_INSTANCE_NAME（对齐 Proma app）
-    const _treeInst = process.env.PROMA_INSTANCE_NAME;
-    const base = _treeInst
-      ? path.join(home, `.proma-${_treeInst}`, "agent-workspaces")
-      : (isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces"));
-    const wsRoot = path.join(base, workspaceSlug);
-    try { if (!fs.existsSync(wsRoot) || !fs.statSync(wsRoot).isDirectory()) return null; } catch (_) { return null; }
-    const candidates = [
-      path.join(wsRoot, "workspace-files", ".context", "trees"),
-      path.join(wsRoot, ".context", "trees"),
-    ];
-    for (const dir of candidates) {
-      try {
-        if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
-          return { trees_dir: dir, workspace_root: wsRoot };
-        }
-      } catch (_) {}
-    }
-    return null;
+      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+        return { trees_dir: dir, workspace_root: wsRoot };
+      }
+    } catch (_) {}
   }
+  return null;
+}
 
-  // 调内联引擎 engine.run(cmd, args)。返回 {ok,error?,...result}，与原 CLI stdout 一致。
-  // 每次 call 前按 workspace 重设 TREES_ROOT（engine 模块级可变状态；Electron 主进程 JS 单线程，
-  // MCP 调用串行，无竞态；dbc-spec 等独立进程各设各的）。
-  // V10-self-audit-forbidden-v2: 新增 callerSessionId 透传到 engine.run（cmdAuditGate 校验 caller==audit_session_id）。
-  async function callTreeState(workspaceSlug, args, callerSessionId) {
-    const ws = findTreesDirForWorkspace(workspaceSlug);
-    if (!ws) return { ok: false, error: { code: "E_NO_TREES_DIR", msg: `workspace "${workspaceSlug}" has no .context/trees/. Looked under ~/.proma[-dev]/agent-workspaces/${workspaceSlug}/{,workspace-files/}.context/trees/. Deploy tree-system to this workspace first.` } };
-    const [cmd, ...rest] = Array.isArray(args) ? args : [];
-    if (!cmd) return { ok: false, error: { code: "E_SCHEMA_INVALID", msg: "no tree command given" } };
-    // per-call treesRoot: 显式安全，不依赖模块级共享 TREES_ROOT（多 workspace 并发场景防覆盖）
-    return await treeEngine.run(cmd, rest, ws.trees_dir, callerSessionId);
-  }
+// 调内联引擎 engine.run(cmd, args)。返回 {ok,error?,...result}，与原 CLI stdout 一致。
+// 每次 call 前按 workspace 重设 TREES_ROOT（engine 模块级可变状态；Electron 主进程 JS 单线程，
+// MCP 调用串行，无竞态；dbc-spec 等独立进程各设各的）。
+// V10-self-audit-forbidden-v2: 新增 callerSessionId 透传到 engine.run（cmdAuditGate 校验 caller==audit_session_id）。
+async function callTreeState(workspaceSlug, args, callerSessionId) {
+  const ws = findTreesDirForWorkspace(workspaceSlug);
+  if (!ws) return { ok: false, error: { code: "E_NO_TREES_DIR", msg: `workspace "${workspaceSlug}" has no .context/trees/. Looked under ~/.proma[-dev]/agent-workspaces/${workspaceSlug}/{,workspace-files/}.context/trees/. Deploy tree-system to this workspace first.` } };
+  const [cmd, ...rest] = Array.isArray(args) ? args : [];
+  if (!cmd) return { ok: false, error: { code: "E_SCHEMA_INVALID", msg: "no tree command given" } };
+  // per-call treesRoot: 显式安全，不依赖模块级共享 TREES_ROOT（多 workspace 并发场景防覆盖）
+  return await treeEngine.run(cmd, rest, ws.trees_dir, callerSessionId);
+}
 
-  global.__proma_createTreeMcpServer__ = function (sdk, z, workspaceSlug, callerSessionId) {
-    const RO = { annotations: { readOnlyHint: true } };
-    // V10-self-audit-forbidden-v2: callerSessionId 由 __proma_getMcpServers__(sessionId,...) 注入，
-    //   透传到 callTreeState → engine.run → cmdAuditGate（校验 caller==audit_session_id，堵借身份）。
-    //   失守案例：worker 528b0925 借 auditor 404c724f 的 session_id 调 audit_gate pass。
-    const tt = (name, desc, schema, argBuilder, readOnly) => sdk.tool(
-      name, desc, schema,
-      async (args) => jsonResult(await callTreeState(workspaceSlug, argBuilder(args), callerSessionId)),
-      readOnly ? RO : undefined
-    );
-    const J = JSON.stringify;
-    return sdk.createSdkMcpServer({
-      name: "tree",
-      version: "0.7.0",
-      tools: [
-        // ---- V10-helper (D4 Layer 1): 自助文档元工具 ----
-        // 任何 mcp__tree__* 调用前如果不确定用法，先 tree_help 拿 topic。
-        // 13 个 topic 覆盖：建树 / auditor 注册 / V10 加固 / 错误码 / 常见错误 / 完整指南。
-        // 错误返回也会自动附 help_topic 引用（run() catch 块）。
-        tt("tree_help", "Get help on a tree-system topic. 13 topics available: how_to_init | how_to_register_auditor | role_semantics | v10_constraints | self_audit_forbidden | borrowed_identity | naming_convention | common_mistakes | alignment_workflow | nudge_escalation | audit_tree_structure | error_code_index | full_guide. Call this BEFORE guessing how a tool works. Also: when other mcp__tree__* tools return errors with help_topic, follow the help_hint and call this with that topic.", { topic: z.string() }, (a) => ["help", a.topic], true),
-        // ---- Maintain ----
-        tt("tree_init", "Initialize a new tree (creates tree dir + root leaf). Returns tips.next_steps — follow them to register auditor and avoid common mistakes.", { tree_id: z.string(), root_brief: z.record(z.any()), root_dod: z.record(z.any()), session_id: z.string().optional(), model: z.string().optional(), channel: z.string().optional(), audit_meta: z.record(z.any()).optional() }, (a) => ["init", a.tree_id, "--root-brief", J(a.root_brief), "--root-dod", J(a.root_dod), ...(a.session_id ? ["--session-id", a.session_id] : []), ...(a.model ? ["--model", a.model] : []), ...(a.channel ? ["--channel", a.channel] : []), ...(a.audit_meta ? ["--audit-meta", J(a.audit_meta)] : [])]),
-        tt("tree_validate", "Run all tree invariants (parent links, session_id uniqueness, path, done-worker independent audit_gate, context overflow). Returns {ok, issues}.", { tree_id: z.string() }, (a) => ["validate", a.tree_id], true),
-        tt("tree_backup", "Create a timestamped backup of tree-state.json.", { tree_id: z.string(), label: z.string().optional() }, (a) => ["backup", a.tree_id, ...(a.label ? ["--label", a.label] : [])]),
-        tt("tree_restore", "Restore tree-state.json from a backup file (basename in tree dir, or absolute path). Refuses non-compliant backups (v0.7 V1).", { tree_id: z.string(), backup_file: z.string() }, (a) => ["restore", a.tree_id, a.backup_file]),
-        tt("tree_migrate", "Run schema migration for a tree.", { tree_id: z.string(), dry_run: z.boolean().optional() }, (a) => ["migrate", a.tree_id, ...(a.dry_run ? ["--dry-run"] : [])]),
-        // ---- Add ----
-        tt("tree_leaf_add", "Add a leaf node. worker leaves can't have children; commander nesting depth <=3 enforced.", { tree_id: z.string(), leaf: z.record(z.any()).describe('Full leaf json: {leaf_id,session_id,parent,path,role,model,channel,added_by}') }, (a) => ["leaf", "add", a.tree_id, "--json", J(a.leaf)]),
-        tt("tree_milestone_add", "Add a milestone to a leaf (expect_outputs must be non-empty per v0.7 V3).", { tree_id: z.string(), leaf_id: z.string(), milestone: z.record(z.any()) }, (a) => ["milestone", "add", a.tree_id, a.leaf_id, "--json", J(a.milestone)]),
-        // ---- Update ----
-        tt("tree_leaf_set_status", "Set leaf status (active|done|pruned|archived|segment_pending|pending_brief). done/archived trigger DbC hard gates (v0.7 Phase A).", { tree_id: z.string(), leaf_id: z.string(), status: z.string() }, (a) => ["leaf", "set-status", a.tree_id, a.leaf_id, a.status]),
-        tt("tree_leaf_set_context", "Update leaf context_usage_pct (0-100+).", { tree_id: z.string(), leaf_id: z.string(), context_pct: z.number() }, (a) => ["leaf", "set-context", a.tree_id, a.leaf_id, String(a.context_pct)]),
-        tt("tree_leaf_set_last_event", "Update leaf last_event_type/ts.", { tree_id: z.string(), leaf_id: z.string(), event_type: z.string(), ts: z.string().optional() }, (a) => ["leaf", "set-last-event", a.tree_id, a.leaf_id, a.event_type, ...(a.ts ? ["--ts", a.ts] : [])]),
-        tt("tree_leaf_set_session", "Update leaf session_id (e.g. fix PENDING_ROOT root).", { tree_id: z.string(), leaf_id: z.string(), session_id: z.string() }, (a) => ["leaf", "set-session", a.tree_id, a.leaf_id, a.session_id]),
-        tt("tree_milestone_set_result", "Set milestone audit result. V4 (v0.7 批次5): audit_pass=true requires independent --audit-session-id (real independent leaf session in tree).", { tree_id: z.string(), leaf_id: z.string(), milestone_id: z.string(), audit_pass: z.boolean(), audit_session_id: z.string().optional(), note_path: z.string().optional() }, (a) => ["milestone", "set-result", a.tree_id, a.leaf_id, a.milestone_id, "--audit-pass", String(a.audit_pass), ...(a.audit_session_id ? ["--audit-session-id", a.audit_session_id] : []), ...(a.note_path ? ["--note-path", a.note_path] : [])]),
-        // ---- Append ----
-        tt("tree_event_append", "Append an event (done/blocked/plan/brief_echo/heartbeat_reply/nudge/limit/status_check). done requires self_check schema; brief_echo+alignment requires independent auditor (v0.7).", { tree_id: z.string(), leaf_id: z.string(), type: z.string(), meta: z.record(z.any()) }, (a) => ["event", "append", a.tree_id, a.leaf_id, "--type", a.type, "--json", J(a.meta)]),
-        tt("tree_drift_append", "Append a drift (3-tier correction).", { tree_id: z.string(), leaf_id: z.string(), kind: z.string(), severity: z.string(), action: z.string(), fork_to: z.string().optional(), reason: z.string().optional() }, (a) => ["drift", "append", a.tree_id, a.leaf_id, "--kind", a.kind, "--severity", a.severity, "--action", a.action, ...(a.fork_to ? ["--fork-to", a.fork_to] : []), ...(a.reason ? ["--reason", a.reason] : [])]),
-        tt("tree_heartbeat_append", "Append a heartbeat (sentinel agent patrol).", { tree_id: z.string(), heartbeat: z.record(z.any()) }, (a) => ["heartbeat", "append", a.tree_id, "--json", J(a.heartbeat)]),
-        tt("tree_segment_append", "Append a segment (bamboo-joint handoff).", { tree_id: z.string(), leaf_id: z.string(), new_session_id: z.string() }, (a) => ["segment", "append", a.tree_id, a.leaf_id, a.new_session_id]),
-        tt("tree_nudge_append", "Append a nudge (TAO Watcher).", { tree_id: z.string(), leaf_id: z.string(), rule_id: z.string(), severity: z.string().optional() }, (a) => ["nudge", "append", a.tree_id, a.leaf_id, "--rule-id", a.rule_id, ...(a.severity ? ["--severity", a.severity] : [])]),
-        tt("tree_nudge_reset", "Reset leaf nudge_count + nudge_log.", { tree_id: z.string(), leaf_id: z.string() }, (a) => ["nudge", "reset", a.tree_id, a.leaf_id]),
-        // ---- TAO ----
-        tt("tree_audit_gate", "Set audit_gate verdict. pass/required requires independent auditor session (whitelist, v0.7 V2); pass requires a prior done event (v0.7 A7).", { tree_id: z.string(), leaf_id: z.string(), verdict: z.string(), audit_session_id: z.string().optional(), reason: z.string().optional() }, (a) => ["audit", "gate", a.tree_id, a.leaf_id, "--verdict", a.verdict, ...(a.audit_session_id ? ["--audit-session-id", a.audit_session_id] : []), ...(a.reason ? ["--reason", a.reason] : [])]),
-        tt("tree_audit_append", "Append an audit report entry.", { tree_id: z.string(), leaf_id: z.string(), report: z.record(z.any()) }, (a) => ["audit", "append", a.tree_id, a.leaf_id, "--json", J(a.report)]),
-        // ---- Query ----
-        tt("tree_leaf_get", "Get a leaf by id.", { tree_id: z.string(), leaf_id: z.string() }, (a) => ["leaf", "get", a.tree_id, a.leaf_id], true),
-        tt("tree_leaf_list_active", "List active (non-archived) leaves.", { tree_id: z.string() }, (a) => ["leaf", "list-active", a.tree_id], true),
-        tt("tree_leaf_list_all", "List all leaves (including archived).", { tree_id: z.string() }, (a) => ["leaf", "list-all", a.tree_id], true),
-        tt("tree_tree_dump", "Dump full tree state as JSON.", { tree_id: z.string() }, (a) => ["tree", "dump", a.tree_id], true),
-        // Sprint 5 (聚类 A/E, 2026-07-14): session_registry 维护 — max_sessions 硬护栏（防 macp2 型会话爆炸）。
-        tt("tree_register_session", "Register a bypass session_id (from create_session, not leaf_add) into the tree session_registry. Makes SDK-native create_session visible to the engine so the max_sessions guard + audit cover bypass sessions. Idempotent (dedup — already-registered sessions don't double-count). Throws E_MAX_SESSIONS if tree session count would exceed audit_meta.max_sessions.", { tree_id: z.string(), session_id: z.string(), source: z.string().optional(), caller: z.string().optional() }, (a) => ["tree", "register-session", a.tree_id, "--session-id", a.session_id, ...(a.source ? ["--source", a.source] : []), ...(a.caller ? ["--caller", a.caller] : [])]),
-        tt("tree_session_count", "Get tree session count vs max_sessions (read-only budget precheck). Returns { count, max, reached }. reached=true means max_sessions hit — next session registration (leaf_add / register-session / set-session) will be rejected with E_MAX_SESSIONS.", { tree_id: z.string() }, (a) => ["tree", "session-count", a.tree_id], true),
-        tt("tree_drift_list", "List drift entries.", { tree_id: z.string(), leaf_id: z.string().optional(), since: z.string().optional() }, (a) => ["drift", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.since ? ["--since", a.since] : [])], true),
-        tt("tree_heartbeat_tail", "Tail heartbeat log.", { tree_id: z.string(), leaf_id: z.string().optional(), n: z.number().optional() }, (a) => ["heartbeat", "tail", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.n ? ["-n", String(a.n)] : [])], true),
-        tt("tree_event_list", "List events.", { tree_id: z.string(), leaf_id: z.string().optional(), type: z.string().optional() }, (a) => ["event", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.type ? ["--type", a.type] : [])], true),
-      ],
-    });
-  };
+global.__proma_createTreeMcpServer__ = function (sdk, z, workspaceSlug, callerSessionId) {
+  // V10-self-audit-forbidden-v2: callerSessionId 由 __proma_getMcpServers__(sessionId,...) 注入，
+  //   透传到 buildTreeTable.handler → callTreeState → engine.run → cmdAuditGate（校验 caller==audit_session_id，堵借身份）。
+  //   失守案例：worker 528b0925 借 auditor 404c724f 的 session_id 调 audit_gate pass。
+  // v0.20: 改用 buildTreeTable + renderClaude（与 session/remote-session 统一；pi 钩子复用同表）。
+  const ctx = { workspaceSlug, sessionId: callerSessionId };
+  const table = buildTreeTable(ctx);
+  return sdk.createSdkMcpServer({ name: "tree", version: "0.7.0", tools: renderClaude(table, sdk, ctx) });
+};
 
-  log("[Patch v0.7+] Tree MCP server factory registered (mcp__tree__* — 28 tools: 27 wrapping tree-state.js + 1 tree_help meta-tool [V10-helper D4])");
-})();
+log("[Patch v0.7+/v0.20] Tree MCP server factory registered (mcp__tree__* — 30 tools: 29 wrapping tree-engine + 1 tree_help meta-tool [V10-helper D4]; v0.20 buildTreeTable + renderClaude，pi 钩子复用)");
 
 
 // ---- 注册全局钩子（内部 Agent MCP server）----
@@ -1801,6 +1970,44 @@ global.__proma_getMcpServers__ = function (sessionId, workspaceSlug, sdk) {
     log(`ERROR creating MCP server: ${err instanceof Error ? err.message : String(err)}`);
     console.error(err);
     return undefined;
+  }
+};
+
+// ============================================================
+// v0.20 补丁 P 配套: pi 运行时 customTools 钩子（让 deepseek 等 pi 会话也能拿到三组工具）
+//   main.cjs 在 pi IIFE 内 `piBuiltinTools = result2.tools;` 后注入对它的调用（补丁 P，父会话负责）：
+//     piBuiltinTools.push(...await global.__proma_getPiCustomTools__(piSdk, {sessionId, workspaceSlug, ...}));
+//   返回 mcp__session__* / mcp__remote-session__* / mcp__tree__* 共 ~54 个 customTool（带全名前缀，pi 不走 MCP server 封装）。
+//   三组各 try/catch 失败隔离（一组渲染失败不拖垮其他组，对齐 buildPiBuiltinTools 容错风格）。
+//   callerSessionId/workspaceSlug 从 ctx 取（替代 claude 工厂闭包参数，语义不变 —— pi 会话调 tree_audit_gate 时
+//   callerSessionId = 该 pi 会话自身 sessionId）。
+// ============================================================
+global.__proma_getPiCustomTools__ = function (piSdk, ctx) {
+  try {
+    // zod 兜底：pi 运行时上下文 require("zod") 应可得（与 claude 钩子同源）；得不到就返回 []（不阻断 pi 主流程）。
+    let z;
+    try { z = require("zod").z || require("zod"); } catch (_) { z = null; }
+    if (!z || typeof z.object !== "function") return [];
+    const safeCtx = {
+      sessionId: ctx && ctx.sessionId,
+      workspaceSlug: ctx && ctx.workspaceSlug,
+      channelId: ctx && ctx.channelId,
+      modelId: ctx && ctx.modelId,
+      workspaceId: ctx && ctx.workspaceId,
+      agentRuntime: ctx && ctx.agentRuntime,
+    };
+    const tools = [];
+    try { tools.push(...renderPi(buildRemoteSessionTable(), piSdk, safeCtx)); }
+    catch (e) { log("pi remote-session render failed: " + (e && e.message ? e.message : String(e))); }
+    try { tools.push(...renderPi(buildSessionTable(safeCtx), piSdk, safeCtx)); }
+    catch (e) { log("pi session render failed: " + (e && e.message ? e.message : String(e))); }
+    try { tools.push(...renderPi(buildTreeTable(safeCtx), piSdk, safeCtx)); }
+    catch (e) { log("pi tree render failed: " + (e && e.message ? e.message : String(e))); }
+    log("[Patch v0.20] pi customTools injected: " + tools.length + " (session/remote-session/tree via __proma_getPiCustomTools__)");
+    return tools;
+  } catch (err) {
+    log("ERROR __proma_getPiCustomTools__: " + (err && err.message ? err.message : String(err)));
+    return [];
   }
 };
 
