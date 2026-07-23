@@ -2065,6 +2065,12 @@ async function cmdMilestoneAdd(args, callerSessionId) {
   if (input.expect_outputs !== undefined && !Array.isArray(input.expect_outputs)) {
     throw new TreeStateError(E_SCHEMA_INVALID, 'milestone.expect_outputs must be an array');
   }
+  // V3 expect_outputs 非空校验 (2026-07-23 加固): 空数组 milestone = 无交付物声明，
+  //   可绕过 done 门禁语义。每个 milestone 必须至少声明一个 deliverable。
+  if (Array.isArray(input.expect_outputs) && input.expect_outputs.length === 0) {
+    throw new TreeStateError(E_DELIVERABLE_MISSING,
+      `milestone_add "${input.id}": expect_outputs must not be empty — every milestone must declare at least one deliverable`);
+  }
   // V9+ Phase 4 (R2 P0 / B12 修复): milestone add 时即时校验 expect_outputs 路径安全。
   //   失守根因：V9 守卫只在 set-status=done 时校验，攻击者可先 add 恶意路径再触发 done
   //   才被拦截，但恶意路径已持久化。修复：在 add 入口即时拦截绝对路径 + 路径遍历。
@@ -2154,6 +2160,15 @@ async function cmdMilestoneSetResult(args, callerSessionId) {
     if (!target) {
       throw new TreeStateError(E_LEAF_NOT_FOUND, `milestone "${milestone_id}" not found in leaf "${leaf_id}"`);
     }
+    // V3 expect_outputs 非空校验 (2026-07-23 加固): audit_pass=true 时拒绝空 expect_outputs milestone。
+    //   防止对无交付物声明的 milestone 赋予审计通过。
+    if (audit_pass === true) {
+      const outs = Array.isArray(target.expect_outputs) ? target.expect_outputs : [];
+      if (outs.length === 0) {
+        throw new TreeStateError(E_DELIVERABLE_MISSING,
+          `milestone set-result rejected: milestone "${milestone_id}" has empty expect_outputs — cannot audit-pass a milestone with no declared deliverables`);
+      }
+    }
     // v0.7 批次5 (V4): audit_pass=true 必须由独立 auditor 背书（self-approving forbidden）。
     //   audit_pass=false 免校验（失败声明无需独立背书，且 failed milestone 也无法满足 done 前置）。
     if (audit_pass === true) {
@@ -2179,6 +2194,95 @@ async function cmdMilestoneSetResult(args, callerSessionId) {
     target.audit_pass = audit_pass;
     target.status = audit_pass ? 'done' : 'failed';
     if (note_path !== null) target.note_path = note_path;
+    writeState(tree_id, state);
+    result = { milestone: target };
+  });
+  return result;
+}
+
+// ============================================================
+// 命令: milestone update (2026-07-23 加固 C — 补合法修复路径)
+//   背景：引擎原本无 milestone 更新命令，agent 只能直接改 tree-state.json——正是漏洞根源。
+//   本命令提供合法入口：可改 desc / expect_outputs，但受多重安全约束。
+// ============================================================
+
+async function cmdMilestoneUpdate(args, callerSessionId) {
+  const { positional, opts } = parseArgs(args);
+  const [tree_id, leaf_id, milestone_id] = positional;
+  assertTreeExists(tree_id);
+  if (!leaf_id) throw new TreeStateError(E_SCHEMA_INVALID, 'leaf_id is required');
+  if (!milestone_id) throw new TreeStateError(E_SCHEMA_INVALID, 'milestone_id is required');
+
+  const hasDesc = opts['desc'] !== undefined;
+  const hasExpectOutputs = opts['expect-outputs'] !== undefined;
+  if (!hasDesc && !hasExpectOutputs) {
+    throw new TreeStateError(E_SCHEMA_INVALID,
+      `milestone_update: at least one of --desc or --expect-outputs is required (no-op update rejected)`);
+  }
+
+  let newDesc = undefined;
+  let newExpectOutputs = undefined;
+  if (hasDesc) {
+    newDesc = opts['desc'];
+    if (typeof newDesc !== 'string') {
+      throw new TreeStateError(E_SCHEMA_INVALID, '--desc must be a string');
+    }
+  }
+  if (hasExpectOutputs) {
+    newExpectOutputs = parseJsonArg(opts['expect-outputs'], 'expect_outputs json');
+    if (!Array.isArray(newExpectOutputs)) {
+      throw new TreeStateError(E_SCHEMA_INVALID, 'milestone.expect_outputs must be an array');
+    }
+    // V3 expect_outputs 非空校验：空数组 = 无交付物声明，不能入库。
+    if (newExpectOutputs.length === 0) {
+      throw new TreeStateError(E_DELIVERABLE_MISSING,
+        `milestone_update "${milestone_id}": expect_outputs must not be empty — every milestone must declare at least one deliverable`);
+    }
+    // V9+ Phase 4: 路径安全校验（拒绝对路径 + 路径遍历）。
+    assertSafeExpectOutputs(newExpectOutputs, `milestone_update "${milestone_id}"`);
+  }
+
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    if (!state.leaves[leaf_id]) {
+      throw new TreeStateError(E_LEAF_NOT_FOUND, `leaf "${leaf_id}" not found`);
+    }
+    const leaf = state.leaves[leaf_id];
+    // P1 防借身份 (cmdMilestoneUpdate caller-binding): 校验 caller 是 owner/creator/root-self。
+    //   与 cmdMilestoneAdd 同范式。CLI 不传 caller 跳过。
+    if (callerSessionId) {
+      const _isOwner = callerSessionId === leaf.session_id;
+      const _isCreator = leaf.added_by != null && callerSessionId === leaf.added_by;
+      const _isRootSelf = leaf.role === 'root' && callerSessionId === leaf.session_id;
+      if (!_isOwner && !_isCreator && !_isRootSelf) {
+        throw new TreeStateError(
+          E_BORROWED_IDENTITY,
+          `milestone_update rejected: caller "${callerSessionId}" is not owner/creator/root-self of leaf "${leaf_id}". Cannot modify another's milestone. CLI omits caller for backward compat. [P1-cmdMilestoneUpdate-caller-binding]`
+        );
+      }
+    }
+    if (!Array.isArray(leaf.milestones)) {
+      throw new TreeStateError(E_LEAF_NOT_FOUND, `milestone "${milestone_id}" not found in leaf "${leaf_id}"`);
+    }
+    let target = null;
+    for (const m of leaf.milestones) {
+      if (m.id === milestone_id) { target = m; break; }
+    }
+    if (!target) {
+      throw new TreeStateError(E_LEAF_NOT_FOUND, `milestone "${milestone_id}" not found in leaf "${leaf_id}"`);
+    }
+    // 拒绝修改已 audit_pass 的 milestone（防篡改审计结果）。
+    //   audit_pass=true 的 milestone 已被独立 auditor 背书，不允许事后改 desc/expect_outputs。
+    if (target.audit_pass === true) {
+      throw new TreeStateError(
+        E_AUDITOR_NOT_INDEPENDENT,
+        `milestone_update rejected: milestone "${milestone_id}" has already been audit-passed (audit_pass=true). Modifying an audited milestone is forbidden — fork or re-create instead. [C-anti-tamper]`
+      );
+    }
+    // 执行更新（只改 desc / expect_outputs，不碰 id/status/audit_pass/note_path）。
+    if (newDesc !== undefined) target.desc = newDesc;
+    if (newExpectOutputs !== undefined) target.expect_outputs = newExpectOutputs;
     writeState(tree_id, state);
     result = { milestone: target };
   });
@@ -5071,13 +5175,14 @@ async function dispatchLeaf(args, callerSessionId) {
 
 async function dispatchMilestone(args, callerSessionId) {
   if (args.length === 0) {
-    throw new TreeStateError(E_SCHEMA_INVALID, 'milestone requires a subcommand: add | set-result');
+    throw new TreeStateError(E_SCHEMA_INVALID, 'milestone requires a subcommand: add | set-result | update');
   }
   const [sub, ...rest] = args;
   switch (sub) {
     // P1 防借身份: add 透传 callerSessionId（cmdMilestoneAdd 校验 caller 是 owner/creator/root-self，堵跨身份注入 milestone）
     case 'add': return await cmdMilestoneAdd(rest, callerSessionId);
     case 'set-result': return await cmdMilestoneSetResult(rest, callerSessionId);
+    case 'update': return await cmdMilestoneUpdate(rest, callerSessionId);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown milestone subcommand "${sub}"`);
   }

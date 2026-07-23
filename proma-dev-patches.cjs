@@ -423,6 +423,13 @@ function buildTreeTable(ctx) {
         description: "Add a milestone to a leaf (expect_outputs must be non-empty per v0.7 V3).",
         schema: { tree_id: z.string(), leaf_id: z.string(), milestone: z.record(z.any()) },
         handler: async (a) => call(["milestone", "add", a.tree_id, a.leaf_id, "--json", J(a.milestone)]) },
+      { name: "tree_milestone_update",
+        description: "Update a milestone's desc or expect_outputs. Cannot modify audit_pass/status. Rejects already-audited milestones. V3: expect_outputs must be non-empty. Use this to fix empty expect_outputs WITHOUT file surgery.",
+        schema: { tree_id: z.string(), leaf_id: z.string(), milestone_id: z.string(),
+                  desc: z.string().optional(), expect_outputs: z.array(z.string()).optional() },
+        handler: async (a) => call(["milestone", "update", a.tree_id, a.leaf_id, a.milestone_id,
+                      ...(a.desc !== undefined ? ["--desc", a.desc] : []),
+                      ...(a.expect_outputs ? ["--expect-outputs", J(a.expect_outputs)] : [])]) },
       // ---- Update ----
       { name: "tree_leaf_set_status",
         description: "Set leaf status (active|done|pruned|archived|segment_pending|pending_brief). done/archived trigger DbC hard gates (v0.7 Phase A).",
