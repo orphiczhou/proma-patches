@@ -76,7 +76,7 @@ const STATUS_TRANSITIONS = {
   archived:         ['archived'],
   segment_pending:  ['active', 'segment_pending'],
 };
-const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round', 'subagent_spawn'];
+const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round', 'subagent_spawn', 'progress'];
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
@@ -2653,6 +2653,14 @@ async function cmdEventAppend(args, callerSessionId) {
     leaf.events.push(ev);
     leaf.last_event_type = opts.type;
     leaf.last_event_ts = ts;
+    // P1-1 (2026-07-24 macp 实战): brief_echo 自动转 active —— worker 写首条 brief_echo 时
+    //   status: pending_brief → active。解决 macp 实战"worker 已回应 brief 但 tree 仍显示
+    //   pending_brief"的状态滞后（commander 心跳误判 worker 没动）。commander/auditor 初始即
+    //   active 不受影响；只在 pending_brief 触发保证幂等。不改 done 路径（status=done 由
+    //   cmdLeafSetStatus 唯一入口，见 L2656 注释）。
+    if (opts.type === 'brief_echo' && leaf.role === 'worker' && leaf.status === 'pending_brief') {
+      leaf.status = 'active';
+    }
     // P0-1 修复 (2026-07-04, tree-harness-midterm-review §二):
     //   删除原 V10-status-event-sync 的"done event 自动同步 status=done"逻辑（原 line 1945-1953）。
     //   原逻辑 leaf.status='done' 架空 cmdLeafSetStatus 的 8 道 done 门禁——worker 写 done event 即拿 done,
@@ -5119,7 +5127,7 @@ review_round.meta 可带 \`independence: 'self_delegated' | 'independent'\`（�
 - §3 5 件套契约模板（brief/dod/report/autonomy/self_audit）
 - §4 工作流程 5 步法
 - §5 mcp__tree__* 工具速查（28 个工具）
-- §6 事件路由表（EVENT_TYPE_ENUM 共 10 种：done / blocked / plan / brief_echo / heartbeat_reply / nudge / limit / status_check / review_round / subagent_spawn）
+- §6 事件路由表（EVENT_TYPE_ENUM 共 11 种：done / blocked / plan / brief_echo / heartbeat_reply / nudge / limit / status_check / review_round / subagent_spawn / progress）
 - §7 三档纠偏决策树（low/mid/high）
 - §8 心跳通道
 - §9 验收 Agent prompt 模板
