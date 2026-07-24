@@ -1355,6 +1355,78 @@ async function cmdDriftList(args) {
   return { drifts: filtered };
 }
 
+// ============================================================
+// 命令: communication log/list (P1-2, 2026-07-24 macp 实战后)
+// ============================================================
+//   macp 实战暴露 send_message 外部通信 tree 不可见——root 驱动 worker 的指令流动
+//   不入 tree call-log，commander 心跳误判 worker 冻结。本命令让 root 主动记录外部
+//   通信（不截内容），并自动更新 target leaf 的 last_event（心跳可感知通信活动）。
+async function cmdCommunicationLog(args, callerSessionId) {
+  const { positional, opts } = parseArgs(args);
+  const [tree_id] = positional;
+  assertTreeExists(tree_id);
+  if (!opts.target) throw new TreeStateError(E_SCHEMA_INVALID, '--target is required (target session_id)');
+  const direction = opts.direction || 'out';
+  if (!['in', 'out'].includes(direction)) {
+    throw new TreeStateError(E_SCHEMA_INVALID, `--direction must be "in" or "out", got "${direction}"`);
+  }
+  const note = opts.note || '';
+  const caller = callerSessionId || opts.caller || null;
+  const ts = nowIso();
+  let result = null;
+  await withLock(tree_id, () => {
+    const state = readState(tree_id);
+    if (!Array.isArray(state.communication_log)) state.communication_log = [];
+    // 自动定位 target leaf（按 session_id 匹配树内 leaf）
+    const targetLeaf = Object.values(state.leaves).find((l) => l && l.session_id === opts.target) || null;
+    const entry = {
+      ts,
+      caller_session_id: caller,
+      target_session_id: opts.target,
+      target_leaf_id: targetLeaf ? targetLeaf.leaf_id : null,
+      direction,
+      note,
+    };
+    state.communication_log.push(entry);
+    // 更新 target leaf last_event（心跳巡检据此感知通信活动，不误判冻结）
+    if (targetLeaf) {
+      targetLeaf.last_event_type = `communication_${direction}`;
+      targetLeaf.last_event_ts = ts;
+    }
+    writeState(tree_id, state);
+    result = { communication: entry };
+  });
+  return result;
+}
+
+async function cmdCommunicationList(args) {
+  const { positional, opts } = parseArgs(args);
+  const [tree_id] = positional;
+  assertTreeExists(tree_id);
+  const state = readState(tree_id);
+  const all = Array.isArray(state.communication_log) ? state.communication_log : [];
+  const leafFilter = opts.leaf || null;
+  const targetFilter = opts.target || null;
+  const since = opts.since || null;
+  let sinceMs = -Infinity;
+  if (since) {
+    const d = new Date(since);
+    if (isNaN(d.getTime())) throw new TreeStateError(E_SCHEMA_INVALID, `--since "${since}" is not a valid ISO date`);
+    sinceMs = d.getTime();
+  }
+  const filtered = all.filter((c) => {
+    if (!c) return false;
+    if (leafFilter && c.target_leaf_id !== leafFilter) return false;
+    if (targetFilter && c.target_session_id !== targetFilter) return false;
+    if (since && c.ts) {
+      const t = new Date(c.ts).getTime();
+      if (!isNaN(t) && t < sinceMs) return false;
+    }
+    return true;
+  });
+  return { communications: filtered };
+}
+
 async function cmdHeartbeatTail(args) {
   const { positional, opts } = parseArgs(args);
   const [tree_id] = positional;
@@ -5214,6 +5286,8 @@ async function dispatch(cmd, args, callerSessionId) {
       return await dispatchHeartbeat(args);
     case 'segment':
       return await dispatchSegment(args);
+    case 'communication':
+      return await dispatchCommunication(args, callerSessionId);
 
     // TAO (v0.2.2) — 天道审计门 + 鞭策
     // V10-self-audit-forbidden-v2: dispatchAudit 透传 callerSessionId 给 cmdAuditGate（其他子命令忽略）
@@ -5231,7 +5305,7 @@ async function dispatch(cmd, args, callerSessionId) {
       return cmdHelp(args);
 
     default:
-      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, migrate, leaf, milestone, event, drift, heartbeat, segment, audit, nudge, tree, help. Call mcp__tree__tree_help('full_guide') for usage.`);
+      throw new TreeStateError(E_UNKNOWN, `unknown command "${cmd}". Available: init, backup, restore, validate, migrate, leaf, milestone, event, drift, heartbeat, segment, communication, audit, nudge, tree, help. Call mcp__tree__tree_help('full_guide') for usage.`);
   }
 }
 
@@ -5285,6 +5359,20 @@ async function dispatchEvent(args, callerSessionId) {
     case 'list': return await cmdEventList(rest);
     default:
       throw new TreeStateError(E_UNKNOWN, `unknown event subcommand "${sub}"`);
+  }
+}
+
+// P1-2 (2026-07-24): communication log/list —— send_message 外部通信可观测性。
+async function dispatchCommunication(args, callerSessionId) {
+  if (args.length === 0) {
+    throw new TreeStateError(E_SCHEMA_INVALID, 'communication requires a subcommand: log | list');
+  }
+  const [sub, ...rest] = args;
+  switch (sub) {
+    case 'log': return await cmdCommunicationLog(rest, callerSessionId);
+    case 'list': return await cmdCommunicationList(rest);
+    default:
+      throw new TreeStateError(E_UNKNOWN, `unknown communication subcommand "${sub}"`);
   }
 }
 

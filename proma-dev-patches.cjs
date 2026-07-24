@@ -523,6 +523,19 @@ function buildTreeTable(ctx) {
         description: "List events.",
         schema: { tree_id: z.string(), leaf_id: z.string().optional(), type: z.string().optional() }, readOnly: true,
         handler: async (a) => call(["event", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.type ? ["--type", a.type] : [])]) },
+      // P1-2 (2026-07-24 macp 实战后): send_message 外部通信可观测性 —— root 主动记录，不截内容。
+      //   macp 实战 root 用 send_message 驱动 worker 但 tree call-log 看不到 → 心跳误判 worker 冻结。
+      { name: "tree_log_communication",
+        description: "Log an external communication (send_message etc.) for tree observability. Records caller→target activity WITHOUT capturing message content. Call after send_message to a tree participant so heartbeats see the activity (auto-updates target leaf last_event).",
+        schema: { tree_id: z.string(),
+                  target_session_id: z.string().describe("Target session_id (the receiver of send_message)"),
+                  direction: z.string().optional().describe("'out' (caller→target, default) or 'in'"),
+                  note: z.string().optional().describe("Short summary of what was sent (NOT full message content)") },
+        handler: async (a) => call(["communication", "log", a.tree_id, "--target", a.target_session_id, "--direction", a.direction || "out", ...(a.note ? ["--note", a.note] : [])]) },
+      { name: "tree_communication_list",
+        description: "List communication log entries (external send_message activity recorded via tree_log_communication). Filter by leaf_id / target / since.",
+        schema: { tree_id: z.string(), leaf_id: z.string().optional(), target: z.string().optional(), since: z.string().optional() }, readOnly: true,
+        handler: async (a) => call(["communication", "list", a.tree_id, ...(a.leaf_id ? ["--leaf", a.leaf_id] : []), ...(a.target ? ["--target", a.target] : []), ...(a.since ? ["--since", a.since] : [])]) },
     ],
   };
 }
