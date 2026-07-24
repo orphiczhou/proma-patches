@@ -857,6 +857,8 @@ async function cmdInit(args) {
 }
 
 // V10-helper (D4 Layer 2): tree_init tips 构造器。集中维护，便于未来调整。
+// P0-2 (2026-07-24 macp 实战): 新增 naming_examples 字段——init 返回里直接给代码级示例，
+//   降低 24.3% naming 失败率。macp 暴露三类错误：path 含 prefix、milestone 字段名错、expect_outputs 绝对路径。
 function buildInitTips() {
   return {
     next_steps: [
@@ -867,6 +869,45 @@ function buildInitTips() {
     ],
     skill_reference: "skills/tree-commander/SKILL.md",
     pro_tip: "调用任何 mcp__tree__* 工具前如果不确定用法，先调 mcp__tree__tree_help 拿对应 topic。错误返回也会自动附 help_topic 引用。fork 真实 session 注册 leaf，不要用占位 UUID（V10-uuid-format-strict 会拦）。",
+    naming_examples: {
+      leaf_add: {
+        description: "正确格式：leaf_id = <prefix>-<path>-<role>，path 只含树路径（不含 prefix）",
+        correct: {
+          leaf_id: "macp-A-commander",
+          parent: "macp-root",
+          path: "A",
+          role: "commander",
+          model: "glm-5.2",
+          channel: "anthropic",
+          session_id: "<forked-session-uuid>",
+          added_by: "<your-session-id>"
+        },
+        correct_worker: {
+          leaf_id: "macp-A1-worker",
+          parent: "macp-A-commander",
+          path: "A1",
+          role: "worker",
+          model: "deepseek-v4-pro",
+          channel: "pi",
+          session_id: "<forked-session-uuid>",
+          added_by: "<commander-session-id>"
+        }
+      },
+      milestone_add: {
+        description: "正确格式：字段名是 'id'（不是 milestone_id/name），expect_outputs 用相对路径",
+        correct: {
+          id: "m1",
+          desc: "完成代码审查报告",
+          expect_outputs: ["reports/audit-A1.md"]
+        }
+      },
+      common_pitfalls: [
+        "path 错误: path='macp/A' → 正确: path='A' (path 不含 prefix，只是树路径段)",
+        "leaf_id 错误: 'A1-worker' → 正确: 'macp-A1-worker' (必须含 prefix，符合 ^<prefix>-<path>-<role>$ 正则)",
+        "milestone 字段名错误: {milestone_id:'m1'} → 正确: {id:'m1'} (字段名是 'id'，不是 milestone_id 或 name)",
+        "expect_outputs 错误: ['/abs/path/report.md'] → 正确: ['reports/report.md'] (必须相对路径，绝对路径会被安全校验拦截)"
+      ]
+    }
   };
 }
 

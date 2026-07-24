@@ -1,0 +1,167 @@
+============================================
+ 打补丁到 D:/Proma-dev  (target=all, rebuild=1)
+ 源商业版: D:/Proma
+============================================
+  --rebuild: 删除现有 D:/Proma-dev 重建...
+============================================
+ Proma 会话管理补丁 — 一键安装 (v0.16.6)
+ 源: D:/Proma
+ 目标: D:/Proma-dev
+============================================
+
+[1/6] 创建 Dev 版...
+  已复制到 D:/Proma-dev
+  解包 app.asar...
+  解包完成
+  原生模块已合并
+  同步认证数据...
+
+[2/6] 提取 main.cjs...
+  已提取到 /tmp/proma-patch-1324/main-patched.cjs
+
+[3/6] 打 sed 补丁...
+  补丁 A: MCP 钩子...
+  补丁 B: API 桥接...
+  补丁 C: 跳过（上游 v0.15.7 渲染层已 sessionMeta 优先，废弃）
+  补丁 D: 跳过（幽灵常量，sed 会改坏频道注册表，废弃）
+  补丁 E: userData 隔离...
+  补丁 F: 跳过（上游 v0.15.7 已实现 sdkSessionId 跨内核/频道清理，废弃）
+  补丁 G: 跳过（上游 v0.15.7 已无条件覆盖 CLAUDE_CONFIG_DIR，废弃）
+  补丁 H: 跳过（上游 v0.15.7 已实现，废弃）
+  补丁 I: 禁用更新检查（单行注入 return）...
+    (补丁 I 已打)
+  补丁 J: AppUserModelId 动态隔离（修复 1324 → $）...
+    (补丁 J 已打)
+  补丁 K: userData 路径动态化...
+    (补丁 K 已打)
+  补丁 A-K 处理完成（保留 A/B/E/I/J/K；C/D/F/G/H/补丁3 已废弃）
+  补丁 3: 跳过（上游改 iconTemplate.png Template 机制，彩色映射不可行，废弃）
+
+[4/6] 部署文件...
+  文件已部署到 D:/Proma-dev/resources/app/dist/
+  同步 renderer...
+  对齐版本号...
+
+[4.5/6] 复制 exe 副本 + rcedit 染色图标...
+  首次安装 rcedit@5.0.2 + jimp@0.22.10 + png-to-ico...
+
+added 107 packages in 39s
+(node:12748) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+OK D:/Codes/tree-harness/assets/ico/dev.ico 408142 bytes, sizes: 256,128,96,64,48,32,16
+(node:14920) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+OK D:/Codes/tree-harness/assets/ico/pro.ico 408142 bytes, sizes: 256,128,96,64,48,32,16
+(node:17708) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+OK D:/Codes/tree-harness/assets/ico/release.ico 408142 bytes, sizes: 256,128,96,64,48,32,16
+OK icon set on D:/Proma-dev/Proma-white.exe
+OK icon set on D:/Proma-dev/Proma-green.exe
+OK icon set on D:/Proma-dev/Proma-blue.exe
+  exe 副本染色完成: Proma-white.exe(白) / Proma-green.exe(绿) / Proma-blue.exe(蓝)
+
+[5/6] 创建启动脚本...
+  已创建 D:/Proma-dev/start-dev.bat
+  已创建 D:/Proma-dev/start-pro.bat
+  已创建 D:/Proma-dev/start-release.bat
+
+[6/6] 清理临时文件...
+
+============================================
+ 安装完成！(v0.17, 保留 6 补丁 A/B/E/I/J/K + 插件, 上游已实现项 C/D/G/补丁3 已废弃)
+
+ 启动方式（单目录多实例，每个实例独立 exe + 颜色图标）:
+   Dev:     双击 start-dev.bat     → Proma-white.exe  (白)
+   Pro:     双击 start-pro.bat     → Proma-green.exe  (绿)
+   Release: 双击 start-release.bat → Proma-blue.exe   (蓝)
+
+ 实例隔离: PROMA_INSTANCE_NAME + PROMA_INSTANCE_ISOLATED + userData 动态路径（补丁 E/K）
+ 图标: rcedit 嵌多尺寸 .ico（窗口+任务栏+状态栏小图标）到各 exe 副本
+
+ 验证方式:
+   1. 确认 D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs 存在
+   2. 确认 D:\Proma-dev\resources\app\dist\proma-mcp-server.cjs 存在
+   3. 启动后打开 Proma Agent 会话
+   4. 输入: 用 list_channels 列出可用的 AI 渠道
+   5. 外部 MCP: node proma-mcp-server.cjs --dev 测试自动发现
+============================================
+
+============================================
+ 打补丁到 D:/Proma-release  (target=all, rebuild=1)
+ 源商业版: D:/Proma
+============================================
+  --rebuild: 删除现有 D:/Proma-release 重建...
+============================================
+ Proma 会话管理补丁 — 一键安装 (v0.16.6)
+ 源: D:/Proma
+ 目标: D:/Proma-release
+============================================
+
+[1/6] 创建 Dev 版...
+  已复制到 D:/Proma-release
+  解包 app.asar...
+  解包完成
+  原生模块已合并
+  同步认证数据...
+
+[2/6] 提取 main.cjs...
+  已提取到 /tmp/proma-patch-1407/main-patched.cjs
+
+[3/6] 打 sed 补丁...
+  补丁 A: MCP 钩子...
+  补丁 B: API 桥接...
+  补丁 C: 跳过（上游 v0.15.7 渲染层已 sessionMeta 优先，废弃）
+  补丁 D: 跳过（幽灵常量，sed 会改坏频道注册表，废弃）
+  补丁 E: userData 隔离...
+  补丁 F: 跳过（上游 v0.15.7 已实现 sdkSessionId 跨内核/频道清理，废弃）
+  补丁 G: 跳过（上游 v0.15.7 已无条件覆盖 CLAUDE_CONFIG_DIR，废弃）
+  补丁 H: 跳过（上游 v0.15.7 已实现，废弃）
+  补丁 I: 禁用更新检查（单行注入 return）...
+    (补丁 I 已打)
+  补丁 J: AppUserModelId 动态隔离（修复 1407 → $）...
+    (补丁 J 已打)
+  补丁 K: userData 路径动态化...
+    (补丁 K 已打)
+  补丁 A-K 处理完成（保留 A/B/E/I/J/K；C/D/F/G/H/补丁3 已废弃）
+  补丁 3: 跳过（上游改 iconTemplate.png Template 机制，彩色映射不可行，废弃）
+
+[4/6] 部署文件...
+  文件已部署到 D:/Proma-release/resources/app/dist/
+  同步 renderer...
+  对齐版本号...
+
+[4.5/6] 复制 exe 副本 + rcedit 染色图标...
+OK icon set on D:/Proma-release/Proma-white.exe
+OK icon set on D:/Proma-release/Proma-green.exe
+OK icon set on D:/Proma-release/Proma-blue.exe
+  exe 副本染色完成: Proma-white.exe(白) / Proma-green.exe(绿) / Proma-blue.exe(蓝)
+
+[5/6] 创建启动脚本...
+  已创建 D:/Proma-release/start-dev.bat
+  已创建 D:/Proma-release/start-pro.bat
+  已创建 D:/Proma-release/start-release.bat
+
+[6/6] 清理临时文件...
+
+============================================
+ 安装完成！(v0.17, 保留 6 补丁 A/B/E/I/J/K + 插件, 上游已实现项 C/D/G/补丁3 已废弃)
+
+ 启动方式（单目录多实例，每个实例独立 exe + 颜色图标）:
+   Dev:     双击 start-dev.bat     → Proma-white.exe  (白)
+   Pro:     双击 start-pro.bat     → Proma-green.exe  (绿)
+   Release: 双击 start-release.bat → Proma-blue.exe   (蓝)
+
+ 实例隔离: PROMA_INSTANCE_NAME + PROMA_INSTANCE_ISOLATED + userData 动态路径（补丁 E/K）
+ 图标: rcedit 嵌多尺寸 .ico（窗口+任务栏+状态栏小图标）到各 exe 副本
+
+ 验证方式:
+   1. 确认 D:\Proma-dev\resources\app\dist\proma-dev-patches.cjs 存在
+   2. 确认 D:\Proma-dev\resources\app\dist\proma-mcp-server.cjs 存在
+   3. 启动后打开 Proma Agent 会话
+   4. 输入: 用 list_channels 列出可用的 AI 渠道
+   5. 外部 MCP: node proma-mcp-server.cjs --dev 测试自动发现
+============================================
+
+============================================
+✅ 多目标部署完成: D:/Proma-dev D:/Proma-release
+============================================
