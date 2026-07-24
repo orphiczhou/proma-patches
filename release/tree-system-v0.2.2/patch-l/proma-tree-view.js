@@ -728,8 +728,11 @@
     }, '复制 ID'));
     detailEl.appendChild(actions);
 
-    // 违规列表（nudge_log）
-    if (leaf.nudge_log && leaf.nudge_log.length > 0) {
+    // 违规记录（nudge_log）+ 偏移记录（drift_history）
+    const hasNudge = leaf.nudge_log && leaf.nudge_log.length > 0;
+    const hasDrift = leaf.drift_history && leaf.drift_history.length > 0;
+
+    if (hasNudge) {
       detailEl.appendChild(h('div', { className: 'ptv-detail-section-title' }, '⚠ 违规记录 (' + leaf.nudge_log.length + ')'));
       const logWrap = h('div', { className: 'ptv-violation-list' });
       const sorted = leaf.nudge_log.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
@@ -746,7 +749,28 @@
         logWrap.appendChild(entry);
       }
       detailEl.appendChild(logWrap);
-    } else {
+    }
+
+    if (hasDrift) {
+      detailEl.appendChild(h('div', { className: 'ptv-detail-section-title' }, '↕ 偏移记录 (' + leaf.drift_history.length + ')'));
+      const driftWrap = h('div', { className: 'ptv-violation-list' });
+      const dsorted = leaf.drift_history.slice().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+      for (const d of dsorted) {
+        const sev = d.severity || 'low';
+        const entry = h('div', { className: 'ptv-violation-entry ptv-severity-' + sev });
+        entry.appendChild(h('div', { className: 'ptv-violation-header' }, [
+          h('span', { className: 'ptv-violation-rule' }, (d.kind || 'drift') + ' · ' + (d.action || '-')),
+          h('span', { className: 'ptv-violation-sev ptv-severity-' + sev }, sev),
+          h('span', { className: 'ptv-violation-ts' }, formatRelative(d.ts))
+        ]));
+        if (d.reason) entry.appendChild(h('div', { className: 'ptv-violation-evidence' }, d.reason));
+        if (d.fork_to) entry.appendChild(h('div', { className: 'ptv-violation-suggest' }, '→ fork 到 ' + d.fork_to));
+        driftWrap.appendChild(entry);
+      }
+      detailEl.appendChild(driftWrap);
+    }
+
+    if (!hasNudge && !hasDrift) {
       detailEl.appendChild(h('div', { className: 'ptv-detail-section-title' }, '✓ 无违规记录'));
     }
   }

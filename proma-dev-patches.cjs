@@ -2151,6 +2151,10 @@ log("Agent session management MCP tools loaded (12 tools: get_my_session_id, lis
                   evidence: e.evidence, suggest: e.suggest,
                   nudge_count: e.nudge_count, send_message: e.send_message
                 })) : [],
+                drift_history: Array.isArray(leaf.drift_history) ? leaf.drift_history.slice(-10).map(d => ({
+                  ts: d.ts, kind: d.kind, severity: d.severity, action: d.action,
+                  fork_to: d.fork_to, reason: d.reason
+                })) : [],
                 audit_log: Array.isArray(leaf.audit_log) ? leaf.audit_log.slice(-10).map(e => ({
                   ts: e.ts, auditor: e.auditor, rule_id: e.rule_id,
                   pass: e.pass, evidence: e.evidence, degraded: e.degraded
