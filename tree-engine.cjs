@@ -86,6 +86,16 @@ const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare',
 //   其 audit_gate=pass 由 root 信任锚背书（resolveAuditorIndep 行 2432-2446 天然放行）或上级 auditor 背书（通用路径 2467-2490）。
 const ROLE_ENUM = ['root', 'commander', 'worker', 'auditor'];
 
+// P1-3 (2026-07-24 macp 实战): 可恢复错误码白名单 — run() catch 块 auto-drift 用。
+//   macp 实战 24 次失败零 drift——试错未被体系捕获。这些错误属"agent 试错"(改了能继续)，
+//   自动 append drift(severity=low, action=self_correct)。环境/系统/预算错误不记(非试错)。
+const RECOVERABLE_ERROR_CODES = new Set([
+  'E_NAME_INVALID', 'E_SCHEMA_INVALID', 'E_SELFCHECK_INVALID',
+  'E_DELIVERABLE_MISSING', 'E_ALIGNMENT_NOT_VERIFIED', 'E_BORROWED_IDENTITY',
+  'E_AUDIT_PREMATURE', 'E_GATEKEEPER_REQUIRED', 'E_PARENT_MISSING',
+  'E_DUPLICATE_LEAF', 'E_DUPLICATE_SESSION_ID',
+]);
+
 // Sprint 3 D2 (2026-07-14): schema 版本管理 —— 单一信源 + ladder 逐级分发。
 //   旧实现：cmdInit 硬编码 version:'1.1' + cmdMigrate 规则 12 硬编码升 '1.1'，两处易失同步。
 //   D2：SCHEMA_VERSION 单一信源（init/migrate 共用）+ SCHEMA_LADDER 有序版本表 +
@@ -5545,6 +5555,37 @@ async function run(cmd, args, treesRoot, callerSessionId) {
     const msg = e && e.message ? e.message : String(e);
     if (!isTestCtx) {
       appendCallLog({ ts: new Date().toISOString(), cmd, sub: ids.sub, tree_id: ids.tree_id, leaf_id: ids.leaf_id, caller_session_id: callerSid, ok: false, error_code: code, elapsed_ms: Date.now() - t0, args_digest: makeArgsDigest(cmd, args, ids), read_only: readOnly, error_msg: msg.length > 200 ? msg.slice(0, 200) + '…' : msg });
+    }
+    // P1-3 (2026-07-24 macp 实战): 可恢复错误自动记 drift —— macp 实战 24 次失败零 drift，
+    //   试错未被体系捕获。这里在错误返回路径自动补记(production/low/self_correct)。
+    //   条件:错误码在 RECOVERABLE_ERROR_CODES 白名单 + tree 存在 + 能定位挂载 leaf。
+    //   挂载点:优先 ids.leaf_id 对应 leaf(已存在);否则 caller session 对应 leaf(leaf_add 失败时 leaf 没建)。
+    //   限频:同 leaf + 同 code 30s 内只记一次(reason 含 [code] 标记)。silent fail:不吞主错误。
+    if (ids.tree_id && RECOVERABLE_ERROR_CODES.has(code)) {
+      try {
+        const _state = readState(ids.tree_id);
+        if (_state && _state.leaves) {
+          let _targetLeafId = null;
+          if (ids.leaf_id && _state.leaves[ids.leaf_id]) {
+            _targetLeafId = ids.leaf_id;
+          } else if (callerSid) {
+            const _callerLeaf = Object.values(_state.leaves).find((l) => l && l.session_id === callerSid);
+            if (_callerLeaf) _targetLeafId = _callerLeaf.leaf_id;
+          }
+          if (_targetLeafId) {
+            const _leaf = _state.leaves[_targetLeafId];
+            const _dh = Array.isArray(_leaf.drift_history) ? _leaf.drift_history : [];
+            const _nowMs = Date.now();
+            const _tag = `[${code}]`;
+            const _recent = _dh.some((d) => d && d.reason && d.reason.includes(_tag) && d.ts && (_nowMs - new Date(d.ts).getTime() < 30000));
+            if (!_recent) {
+              await dispatch('drift', ['append', ids.tree_id, _targetLeafId,
+                '--kind', 'production', '--severity', 'low', '--action', 'self_correct',
+                '--reason', `auto-logged recoverable error ${_tag}: ${msg.slice(0, 120)}`]);
+            }
+          }
+        }
+      } catch (_) { /* auto-drift 失败不影响主错误返回 */ }
     }
     // V10-helper (D4 Layer 3): 错误返回附 help 引用。TreeStateError 构造时已挂 help_topic。
     //   自解释错误（E_TREE_NOT_FOUND 等）help_topic=null，不附引用。
