@@ -1219,12 +1219,38 @@ async function cmdLeafAdd(args, callerSessionId) {
       audit_gate: { verdict: (role === 'worker' || role === 'auditor') ? 'required' : 'skip', auditor_session_id: null, ts: null },
       nudge_count: 0,
       nudge_log: [],
-      audit_log: []
+      audit_log: [],
+      // P0-1 (2026-07-24 macp 实战): 星形退化标记。root 在已有 active commander 时直接 add worker
+      //   置 'star_degradation_warned'；null=未触发（单层树 / 正常层级委派）。详见 SKILL §4.1 / §11#14。
+      delegation_hint: null
     };
+    // P0-1: 星形退化软约束 — root 越级 leaf_add worker（parent=root + 已有 active commander）时，
+    //   返回 W_STAR_DEGRADATION warning（不拦死）。单层树（无 commander）不触发。详见 SKILL §4.1。
+    const _parentLeaf = parent !== null ? state.leaves[parent] : null;
+    const _isParentRoot = _parentLeaf && _parentLeaf.role === 'root';
+    const _activeCommanders = (_isParentRoot && role === 'worker')
+      ? Object.values(state.leaves)
+          .filter((l) => l.role === 'commander'
+            && l.status !== 'archived'
+            && l.status !== 'pruned'
+            && l.leaf_id !== leaf_id)
+          .map((l) => l.leaf_id)
+      : [];
+    if (_activeCommanders.length > 0) {
+      leaf.delegation_hint = 'star_degradation_warned';
+    }
     state.leaves[leaf_id] = leaf;
 
     writeState(tree_id, state);
     result = { leaf, startup_notice: TREE_STARTUP_NOTICE };  // 2026-07-08 macp2 事故后：worker 入树也返回启动须知
+    if (_activeCommanders.length > 0) {
+      result.warnings = [{
+        code: 'W_STAR_DEGRADATION',
+        message: `root directly adding worker "${leaf_id}" while ${_activeCommanders.length} active commander(s) exist — tree degrades to star shape. commanders: [${_activeCommanders.join(', ')}]`,
+        suggestion: '通过 commander 下发 worker（parent=<commander_leaf_id>，由 commander 自主 leaf_add + 发 5 件套 brief）。若确属 root 直辖单层树（无 commander 需求），忽略此提示。',
+        active_commanders: _activeCommanders,
+      }];
+    }
   });
   return result;
 }
