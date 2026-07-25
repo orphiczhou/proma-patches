@@ -736,7 +736,7 @@ function doBackup(tree_id, label) {
 // 命令: init
 // ============================================================
 
-async function cmdInit(args) {
+async function cmdInit(args, callerSessionId) {
   // init <tree_id> --root-brief '<json>' --root-dod '<json>' [--audit-meta '<json>']
   //        [--session-id <uuid>] [--model <m>] [--channel <c>]
   // v0.2.2: 自动创建 root leaf，堵住 ROOT_PLACEHOLDER 漏洞
@@ -756,6 +756,12 @@ async function cmdInit(args) {
   const PREFIX_RE = /^[a-z][a-z0-9_]{3,7}$/;
   if (root_brief.prefix !== undefined && !PREFIX_RE.test(root_brief.prefix)) {
     throw new TreeStateError(E_NAME_INVALID, 'root_brief.prefix "' + root_brief.prefix + '": prefix must match [a-z][a-z0-9_]{3,7} (4-8 chars, lowercase, no hyphen). 超长(如 nanju04api 10字符)会潜伏到 leaf_add 才炸——前置到 init 即拦。');
+  }
+  // P2-A (macp2 改进): tree_id 本身必须符合 prefix 规则——root leaf_id = `${tree_id}-root`，
+  //   prefix 从 tree_id 派生。若 tree_id 含连字符/超长，tree_init 接受但 leaf_add 才 E_NAME_INVALID
+  //   （macp2 观察 oeval-macp2 含连字符 → 命名断裂）。前置到 init 即拦，前后校验一致。
+  if (!PREFIX_RE.test(tree_id)) {
+    throw new TreeStateError(E_NAME_INVALID, `tree_id "${tree_id}" must match prefix rule [a-z][a-z0-9_]{3,7} (4-8 chars, lowercase, no hyphen) — root leaf_id derives prefix from tree_id. e.g. "macp2" ok, "oeval-macp2" (hyphen) rejected.`);
   }
   // v0.7 批次5 (V8+): node_budget 必须是非负有限数（堵字符串/布尔/NaN/负数静默回退默认，审计[2]）
   if (root_dod.node_budget !== undefined && root_dod.node_budget !== null) {
@@ -812,7 +818,11 @@ async function cmdInit(args) {
 
   // v0.2.2: 自动创建 root leaf
   // session_id 来源优先级: --session-id → PROMA_SESSION_ID → PENDING_ROOT（过渡标记）
-  const rootSessionId = opts['session-id'] || process.env.PROMA_SESSION_ID || PENDING_ROOT;
+  // P0-B (macp2 改进): 优先 callerSessionId（MCP 透传），消 PENDING_ROOT 死锁。
+  //   macp2 观察：tree_init 未绑 caller → root session=PENDING_ROOT → set-session 撞
+  //   E_BORROWED_IDENTITY(creator=null) → 冷启动死锁。优先级：--session-id → caller → PROMA_SESSION_ID → PENDING_ROOT。
+  //   CLI/金标准不传 caller → undefined → 自然退化原三级降级逻辑（零破坏）。
+  const rootSessionId = opts['session-id'] || callerSessionId || process.env.PROMA_SESSION_ID || PENDING_ROOT;
   const rootLeafId = `${tree_id}-root`;
   const rootPath = parsePathFromLeafId(rootLeafId);
   state.leaves[rootLeafId] = {
@@ -5259,7 +5269,8 @@ async function dispatch(cmd, args, callerSessionId) {
   switch (cmd) {
     // Maintain
     case 'init':
-      return await cmdInit(args);
+      // P0-B (macp2 改进): 透传 callerSessionId 给 cmdInit（绑 root leaf session，消 PENDING_ROOT 死锁）
+      return await cmdInit(args, callerSessionId);
     case 'backup':
       return await cmdBackup(args);
     case 'restore':
