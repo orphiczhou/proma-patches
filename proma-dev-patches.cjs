@@ -1154,7 +1154,7 @@ function createToolHandlers(sourceSessionId) {
         const _srcDepth = (_srcMeta && typeof _srcMeta.delegationDepth === 'number') ? _srcMeta.delegationDepth : 0;
         _newDepth = _srcDepth + 1;
         if (_newDepth > MAX_DELEGATION_DEPTH) {
-          return { ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `create denied: delegation depth ${_newDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${sourceSessionId.slice(0, 8)} already at depth ${_srcDepth}.` } };
+          return { ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `create denied: delegation depth ${_newDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${sourceSessionId.slice(0, 8)} already at depth ${_srcDepth}. 当前会话 delegationDepth=${_srcDepth}（协作子会话），P0 后 collaboration 工具已不可见，不能继续委派。替代方案：(1) 请父会话用 mcp__collaboration__delegate_agent 委派；(2) 启用 proma-dev-session MCP 后用 mcp__session__create_session；(3) 用户手动开新会话。` } };
         }
       }
       // v0.18 补丁 (2026-07-23): create_session 运行时推断 —— 对 claude 兼容 provider 默认建 claude
@@ -1241,7 +1241,7 @@ function createToolHandlers(sourceSessionId) {
       const _forkSrcDepth = (typeof source.delegationDepth === 'number') ? source.delegationDepth : 0;
       const _forkNewDepth = _forkSrcDepth + 1;
       if (_forkNewDepth > MAX_DELEGATION_DEPTH) {
-        return { ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `fork denied: delegation depth ${_forkNewDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${args.source_session_id.slice(0, 8)} already at depth ${_forkSrcDepth}.` } };
+        return { ok: false, error: { code: 'E_DELEGATION_TOO_DEEP', msg: `fork denied: delegation depth ${_forkNewDepth} > MAX_DELEGATION_DEPTH(${MAX_DELEGATION_DEPTH}). Source ${args.source_session_id.slice(0, 8)} already at depth ${_forkSrcDepth}. 当前会话 delegationDepth=${_forkSrcDepth}（协作子会话），P0 后 collaboration 工具已不可见，不能继续委派。替代方案：(1) 请父会话用 mcp__collaboration__delegate_agent 委派；(2) 启用 proma-dev-session MCP 后用 mcp__session__create_session；(3) 用户手动开新会话。` } };
       }
 
       if (!source.sdkSessionId) {
@@ -1347,7 +1347,7 @@ function createToolHandlers(sourceSessionId) {
         //   审计员 P0 反馈：超时路径需要 stop 后台 agent，防止 send_message 被静默丢弃。
         const forkChannelId = effectiveChannelId || source.channelId;
         const forkModelId = effectiveModelId || source.modelId;
-        const identityPrompt = [
+        let identityPrompt = [
           '【FORK 身份提示 - V9+ Phase 4 / R2 P1 修复】',
           '',
           `你是从源会话 ${args.source_session_id.slice(0, 8)}... fork 出来的副本（不是源会话本身）。`,
@@ -1367,6 +1367,20 @@ function createToolHandlers(sourceSessionId) {
           '',
           '请回复："我已确认 fork 身份，新 session_id=' + forked.id.slice(0, 8) + '..., 等待父会话指令。" 以确认。'
         ].join('\n');
+        // P1+ (2026-07-25 子会话机制改进): depth>0 的 fork 子会话加 collaboration 限制提示。
+        //   design.md §4 P1：depth>0 看不到 collaboration 工具（P0 对齐 Pi/Claude 注入），需告知替代方案。
+        //   审计 §3 发现 E_DELEGATION_TOO_DEEP 只在 depth≥MAX 触发，不覆盖 depth>0 常规场景；
+        //   此处借 fork identityPrompt 载体（fork 是 tree 派生主路径），让子会话自己知道限制 + 替代方案。
+        if (_forkNewDepth > 0) {
+          identityPrompt += [
+            '',
+            `**协作子会话限制（delegationDepth=${_forkNewDepth}）**：`,
+            `你看不到 mcp__collaboration__delegate_agent 工具（P0 对齐 Pi/Claude 注入：depth>0 不注入 collaboration）。如需进一步委派子会话：`,
+            `1. 用 mcp__session__create_session / fork_session（depth<${MAX_DELEGATION_DEPTH} 可用，更深触发 E_DELEGATION_TOO_DEEP）`,
+            `2. 或请父会话用 mcp__collaboration__delegate_agent 委派`,
+            `3. 或请用户手动开新会话`
+          ].join('\n');
+        }
 
         let identityStatus = 'failed';  // 默认失败，仅注入流程走完且 onComplete 才置 injected
         try {

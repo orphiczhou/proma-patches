@@ -3,7 +3,8 @@
 # 用法: bash apply-patches.sh  （多目标用 apply-patches-multi.sh --target=dev|release|all --rebuild）
 # 在 Proma 商业版 v0.15.7 上创建 Dev/Release 版并打补丁（v0.17 适配 minified main.cjs + 上游已实现项废弃）
 #
-# v0.17 补丁清单（A-K + 补丁3 + 补丁L）：保留 A/B/E/I/J/K/补丁3/补丁L；废弃 C/D/F/G/H（上游 v0.15.7 已实现）
+# v0.17 补丁清单（A-K + 补丁3 + 补丁L + 补丁Q）：保留 A/B/E/I/J/K/补丁3/补丁L/补丁Q；废弃 C/D/F/G/H（上游 v0.15.7 已实现）
+# 补丁 Q (v0.20): Pi 运行时 collaboration 注入条件对齐 Claude（修复 delegationDepth 伪可用陷阱）
 # v0.16.6 单目录多实例: 同一份 D:\Proma-dev\ 代码，不同 BAT 文件 → 不同实例
 # 两变量体系:
 #   PROMA_INSTANCE_NAME     — 实例身份标识（remote-session 发现、AppUserModelId、托盘图标）
@@ -82,6 +83,14 @@ echo "  补丁 P: pi customTools 注入..."
 sed -i 's|            piBuiltinTools = result2.tools;|            piBuiltinTools = result2.tools;\n            if(typeof global.__proma_getPiCustomTools__==="function"){try{piBuiltinTools.push(...await global.__proma_getPiCustomTools__(piSdk,{sessionId,workspaceSlug,channelId,modelId,workspaceId,agentRuntime,agentCwd,sessionMeta}));}catch(e){console.warn("[Proma] pi custom tools load failed:",e);}}|' "$TMPDIR/main-patched.cjs"
 grep -q '__proma_getPiCustomTools__' "$TMPDIR/main-patched.cjs" && echo "    (补丁 P 已打)" || { echo "    (补丁 P 未匹配!!! pi MCP 兼容)"; }
 
+# 补丁 Q (v0.20): Pi 运行时 collaboration 注入条件对齐 Claude（修复 delegationDepth 伪可用陷阱）
+#   Pi 路径缺 delegationDepth 检查 → depth>0 的 pi 子会话看到 collaboration 工具但调用即 throw
+#   锚点 triggeredBy !== "delegation";（带分号，Pi 独有特征），sed 对齐 Claude 的完整条件
+#   效果：depth>0 的 pi 子会话不再看到 collaboration 工具，与 Claude 行为一致
+echo "  补丁 Q: Pi collaboration 注入条件对齐 Claude（delegationDepth 检查）..."
+sed -i 's|triggeredBy !== "delegation";|triggeredBy !== "delegation" \&\& (ctx.sessionMeta?.delegationDepth ?? 0) === 0;|' "$TMPDIR/main-patched.cjs"
+grep -q '(ctx.sessionMeta?.delegationDepth ?? 0) === 0' "$TMPDIR/main-patched.cjs" && echo "    (补丁 Q 已打)" || { echo "    (补丁 Q 未匹配!!! P0 delegationDepth)"; }
+
 # 补丁 B: API 桥接 + 插件加载
 echo "  补丁 B: API 桥接..."
 sed -i 's|^init_index();$|init_index();\ntry{global.__proma__={createAgentSession,forkAgentSession,listAgentSessions,getAgentSessionMeta,updateAgentSessionMeta,deleteAgentSession,listChannels,getChannelById,getAgentWorkspace,listAgentWorkspaces,getAgentSessionSDKMessages,runAgentHeadless};require("./proma-dev-patches.cjs");}catch(e){console.error("[Plugin] load failed:",e);}|' "$TMPDIR/main-patched.cjs"
@@ -139,7 +148,7 @@ echo "  补丁 L: 独立 profile 标识（PROMA_INDEPENDENT_PROFILE=1 → .proma
 sed -i 's/function getConfigDirName() {/function getConfigDirName() {if(process.env.PROMA_INDEPENDENT_PROFILE==="1"\&\&process.env.PROMA_INSTANCE_NAME)return ".proma-"+process.env.PROMA_INSTANCE_NAME;/' "$TMPDIR/main-patched.cjs"
 grep -q 'PROMA_INDEPENDENT_PROFILE' "$TMPDIR/main-patched.cjs" && echo "    (补丁 L 已打)" || echo "    (补丁 L 未匹配!!!)"
 
-echo "  补丁 A-K + 补丁3 + 补丁L 处理完成（保留 A/B/E/I/J/K/补丁3/补丁L；C/D/F/G/H 已废弃）"
+echo "  补丁 A-K + 补丁3 + 补丁L + 补丁Q 处理完成（保留 A/B/E/I/J/K/补丁3/补丁L/补丁Q；C/D/F/G/H 已废弃）"
 
 # 补丁 3: 托盘图标颜色化（v0.17 重新实现 — 用户要实例颜色对应；上游 iconTemplate.png 是 macOS Template 单色，Windows 渲染黑）
 #   按 PROMA_INSTANCE_NAME 映射 proma-logos 彩色 png（dev=白/pro=绿/release=蓝），Electron Tray 自动缩放
@@ -275,7 +284,7 @@ rm -rf "$TMPDIR"
 # ---- 完成 ----
 echo ""
 echo "============================================"
-echo " 安装完成！(v0.17, 保留 8 补丁 A/B/E/I/J/K/补丁3/补丁L + 插件, 废弃 C/D/F/G/H（上游 v0.15.7 已实现）)"
+echo " 安装完成！(v0.17, 保留 9 补丁 A/B/E/I/J/K/补丁3/补丁L/补丁Q + 插件, 废弃 C/D/F/G/H（上游 v0.15.7 已实现）)"
 echo ""
 echo " 启动方式（单目录多实例，每个实例独立 exe + 颜色图标）:"
 echo "   Dev:     双击 start-dev.bat     → Proma-white.exe  (白)"
