@@ -1035,15 +1035,22 @@ function createToolHandlers(sourceSessionId) {
                 cache_tokens: (m.usage.cache_read_input_tokens || 0) + (m.usage.cache_creation_input_tokens || 0),
               };
             }
-            if (m.result) entry.result_text = String(m.result).slice(0, 500);
+            if (m.result) {
+              const _fullResult = String(m.result);
+              entry.result_text = _fullResult.slice(0, 500);          // 截断，向后兼容
+              entry.result_text_full_length = _fullResult.length;      // 全文长度（对称 text_full_length）
+              entry.result_full_text = _fullResult;                    // 全文（与 full_text 一致）
+            }
           }
           if (m.message && m.message.content) {
             const texts = m.message.content.filter(c => c.type === "text").map(c => c.text);
             // DeepSeek 的 thinking block 不走 text，跳过
             const realTexts = m.message.content.filter(c => c.type === "text" && c.text).map(c => c.text);
             if (realTexts.length > 0) {
-              entry.text = realTexts.join("\n").slice(0, 500);
-              entry.text_full_length = realTexts.join("\n").length;
+              const _fullText = realTexts.join("\n");
+              entry.text = _fullText.slice(0, 500);          // 向后兼容（截断）
+              entry.text_full_length = _fullText.length;       // 全文长度（原有）
+              entry.full_text = _fullText;                     // 新增：全文（不截断）
             }
           }
           if (m._errorCode) entry.error_code = m._errorCode;
