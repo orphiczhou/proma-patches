@@ -1959,7 +1959,11 @@ function findTreesDirForWorkspace(workspaceSlug) {
   const isIsolated = process.env.PROMA_INSTANCE_ISOLATED === "1" || process.env.PROMA_INSTANCE_NAME === "dev";
   // v0.19 修复分离 bug：base 跟 PROMA_INSTANCE_NAME（对齐 Proma app）
   const _treeInst = process.env.PROMA_INSTANCE_NAME;
-  const base = _treeInst
+  // macp4 release 路径 bug 修复（2026-07-25 检测发现）：release 宿主 PROMA_INSTANCE_NAME=release，
+  //   但数据在 ~/.proma/（宿主默认，不隔离）。之前查 ~/.proma-release/（错位）→ E_NO_TREES_DIR
+  //   阻断 release tree 系统。dev/pro 不受影响（数据确实在 ~/.proma-{dev,pro}/）。
+  //   修复：release 宿主 fallback 到 ~/.proma/（区别于 dev/pro 隔离实例）。
+  const base = (_treeInst && _treeInst !== 'release')
     ? path.join(home, `.proma-${_treeInst}`, "agent-workspaces")
     : (isIsolated ? path.join(home, ".proma-dev", "agent-workspaces") : path.join(home, ".proma", "agent-workspaces"));
   const wsRoot = path.join(base, workspaceSlug);
