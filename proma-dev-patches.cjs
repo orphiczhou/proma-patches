@@ -798,6 +798,15 @@ function assertOwnership(sourceSid, targetSid, action) {
     return { allow: false, rule: 'DENY-legacy-no-lineage', audit: true,
       reason: `both sessions pre-hardening (no lineage): ${action} denied (D5 P1 tightened: only send_message allowed for legacy sessions without lineage; use create_session/fork_session with real parentSessionId to restore full delegation)` };
   }
+  // R7 兄弟 send (macp4 P1-B): 同 parent 的兄弟 leaf 间 send 放行（commander→auditor 审查通知等）
+  //   macp3 暴露：commander 与 auditor 同 parent=root 是兄弟，send 撞 E_NO_OWNERSHIP → audit 中转开销大
+  //   （auditor 空闲 26+ 分钟 + C2 遗漏异厂商审）。放行 send（消息注入危害低 + 审计留痕），
+  //   fork/archive 仍 DENY（窃取/破坏危害高）。简化版不查 treeRole（避免跨 tree-engine 反查），所有兄弟 send 放行。
+  if (action === 'send' && srcMeta.parentSessionId && tgtMeta.parentSessionId
+      && srcMeta.parentSessionId === tgtMeta.parentSessionId) {
+    return { allow: true, rule: 'R7-sibling-send', audit: true,
+      reason: 'sibling send (same parent): macp4 P1-B, commander↔auditor / commander↔commander 等' };
+  }
   return { allow: false, rule: 'E_NO_OWNERSHIP', audit: true,
     reason: `no ownership: ${action} from ${sourceSid.slice(0, 8)} to ${targetSid.slice(0, 8)}` };
 }
@@ -1389,6 +1398,8 @@ function createToolHandlers(sourceSessionId) {
           ].join('\n');
         }
 
+        // macp4 P0-D: fork identity 注入前 2s 延迟，降低 MCP 工具注入竞态（macp3 auditor fork 后误读工具 + root 重连误报）
+        await new Promise(r => setTimeout(r, 2000));
         let identityStatus = 'failed';  // 默认失败，仅注入流程走完且 onComplete 才置 injected
         try {
           await new Promise((resolve) => {

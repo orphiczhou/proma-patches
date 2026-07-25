@@ -1759,7 +1759,10 @@ async function cmdLeafSetStatus(args, callerSessionId) {
       //   macp4-A4 用 commander 假装 auditor 时被迫走完整 milestone 协议（无交付物 → 卡死），auditor role 后此矛盾消除。
       //   注：if(!isAuditor) 闭合在 deliverables 段末（"v0.2.2-修复#5 Worker done 前置 events" 注释前）。
       const isAuditor = leaf.role === 'auditor';
-      if (!isAuditor) {
+      const isRoot = leaf.role === 'root';
+      // macp4 P0-E: root 也跳过 milestone 门禁（auto_upgrade §13.3a 只改 audit_gate 不改 milestone，
+      //   root 0 milestones 撞 E_SCHEMA_INVALID）。root 仍过 done event + children 门（独立于本块）。
+      if (!isAuditor && !isRoot) {
       const ms = Array.isArray(leaf.milestones) ? leaf.milestones : [];
       if (ms.length === 0) {
         throw new TreeStateError(
