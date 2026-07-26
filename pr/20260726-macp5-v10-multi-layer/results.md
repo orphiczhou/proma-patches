@@ -68,13 +68,42 @@ commander 派生的所有 leaf（worker + auditor），commander 都不能配门
 | pro SKILL（cp 同步） | v2.9.4，diff SAME，旧版 backup `SKILL.md.bak-v2.9.3` |
 | 引擎 | 0 改动（纯 SKILL 文档） |
 
-## 5. 后续（macp5 实战验证）
+## 5. macp5 实战验证（2026-07-26 20:46-21:03+，pro，3 层树 macp5）✅ §13.3b 验证成功
 
-- 派 macp5 实战指挥官（pro，3 层树）验证 §13.3b：L2 commander 用 root 代调协议走通 done + root idle 3 道防线（防线 1 活性探测 + 防线 3a 转 2 层树应急）
-- macp5 实战要点：root 指挥官用 **wait=true 派遣**（防线 2）防 root idle gap；auditor 挂 root 子节点（非 commander 子树）
-- 项目层 4 缺陷（交测试指挥官，不变）
+派 root 指挥官（d3c56ae2）+ A-commander（a61b4e09）+ A1-worker（d6b6fc5a）+ auditor MiniMax（296a9c12），验证 §13.3b（L2 commander 多层级 done 路径）。
 
-## 6. 交付物
+**5 验收点：全 PASS**（A-commander 最终报告 + 父会话 tree-state 核验）
+
+| # | 验收点 | 状态 | 关键证据 |
+|---|--------|------|---------|
+| 1 | auditor parent=macp5-root（正确结构） | ✅ PASS | tree-state: macp5-auditor.parent=macp5-root（commander 兄弟，非 commander 子树）；added_by=d3c56ae2(root)。macp4 结构错误规避 |
+| 2 | commander send 请 root 代调 | ✅ PASS | comm_log 2 次代调记录（worker 门禁 @20:50 + commander 门禁 @20:55），走 root 代调协议 |
+| 3 | root 代调成功 | ✅ PASS | worker milestone M1+audit_gate pass @20:52:47 + commander milestone M-self audit_pass=true @20:57:29，caller=root===audit_session_id=root，L3061 放行，**零 E_BORROWED_IDENTITY/E_AUDITOR_NOT_INDEPENDENT** |
+| 4 | commander done 走通 | ✅ PASS | milestone M-self（root 代调）+ done event（自调 @20:58:14）+ set-status done（active→done）。**未撞 V10 三路径墙**（macp4 撞墙规避）|
+| 5 | root 活 | ✅ PASS | 响应延迟 < 3 分钟（20:50→20:52 + 20:55→20:57），macp4 root idle 规避 |
+
+**重大发现（A-commander 报告 + 父会话 tree-state 核验）**：
+1. **commander done 不需要 audit_gate pass**：实战 commander audit_gate.verdict="skip"（未升级 pass），但 set-status done 放行。引擎对 commander done 只校验 milestone（audit_pass=true root 代调）+ done event，audit_gate="skip" 即可（类似 root P0-E）。A-commander 报告的"auto_upgrade skip→pass"不准确（tree-state 核验 audit_gate 仍 "skip"），实际是引擎对 commander done 不校验 audit_gate。**§13.3b 可简化**：commander done 只需 root 代调 milestone_set_result + done event（audit_gate 不需要）。
+2. **L3061 信任锚优先于 L3091**：root 能给 added_by=root 的 commander 配 milestone_set_result（未撞 L3091 `auditor=added_by`）。L3061 root-as-auditor 分支优先。
+
+**收尾完成 ✅（21:05 全树闭环）**：auditor 第5次提醒 @21:04:12 → root 代调 audit_gate pass @21:04:39 → auditor set-status done @21:04:55 → root 自己 done @21:05:01。**全树 4 leaves 全 done**（root:pass + commander:skip + auditor:pass + worker:pass），macp4 root idle gap 规避（root 活到最后，响应 auditor 第5次提醒）。
+
+**§13.3b 实战验证结论（全链路闭环 ✅）**：
+- ✅ 正确树结构（auditor 挂 root 子节点）是 macp4 结构错误的正解
+- ✅ root 代调协议（caller=root===audit_session_id=root，L3061）让 L2 commander 走通 done
+- ✅ macp4 root idle 规避（root 活，响应 < 3 分钟，全程零 idle）
+- 📝 §13.3b 可简化（audit_gate 不需要，只要 milestone_set_result root 代调 + done event）—— macp6 候选 SKILL 优化
+- 🎯 **macp4 撞墙的 V10 三路径（E_BORROWED_IDENTITY/E_AUDITOR_NOT_INDEPENDENT/auditor 不 active）在 macp5 全部规避，零撞击**
+
+**产出**：add.js + add.test.js + add.note.md（落 .context/macp5-verify/）+ worker 12/12 测试 EXIT 0
+
+## 6. 后续
+
+- 项目层 4 缺陷（交测试指挥官，父会话不改）：judge LLM 接线 / coder 路径穿越 / runGwt 假修复 / evaluateCode 假通过
+- §13.3b 简化（macp6 候选）：commander done 不需 audit_gate pass，SKILL 可删 audit_gate 步骤（实战发现 audit_gate="skip" 也 done）
+- root idle gap 长期需平台修（tree_init 强制启动 root agent）
+
+## 7. 交付物
 
 - `C:/Users/sir_c/.proma/agent-workspaces/proma/skills/tree-commander/SKILL.md`（v2.9.4）
 - `D:/Codes/tree-harness/pr/20260726-macp5-v10-multi-layer/`（design + results）
