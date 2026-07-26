@@ -12,21 +12,13 @@ description: |
 
 树形会话执行体系 — 指挥官（根会话）操作手册。
 
-> ### 📍 任务启动第一件事（2026-07-08 调用形式事故后强制）
->
-> 建树（tree_init）和每次 leaf_add 的返回结果都带 `startup_notice`（引擎强制注入）——**必读**：
-> 1. **先加载本 SKILL**（尤其 §13.5「调用形式红线」），再开始编排。
-> 2. SubAgent 只能用内置 **`Agent` 工具**（进程内）；🚫 禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度；既往调用形式事故短时炸百级会话、某模型额度耗尽）。
-> 3. 撞错修根因，禁换名（v2/b/x）重试新建会话。
-> 4. 预算护栏（引擎硬拦）：active leaf ≤ `root_dod.node_budget`（默认 20）；每 leaf subagent_spawn ≤ `audit_meta.max_subagent_spawn_per_leaf`（默认 15）。
-
 ---
 
 ## §0 元数据
 
 ```yaml
 skill_name: tree-commander
-version: 2.8
+version: 2.9.4
 target: 根会话（指挥官）
 requires:
   - tree-state.js (v0.7+ 已内联进 mcp__tree__* MCP，工作区不再有源码)
@@ -67,6 +59,12 @@ task_tools: TaskCreate / TaskUpdate / Agent
 1. 检查 mcp__tree__* 工具可用:
    任调一个 mcp__tree__* 工具（如 tree_tree_dump）确认返回 {ok:true,...}
    → 返回 {ok:false, error} 则报错，不能继续
+   → 若报 "Tool mcp__tree__* not found"（工具根本不在你的工具列表，而非运行报错）:
+     ⚠️ 这**不是 bug，是会话运行时不匹配**。tree/session/remote-session 三组 MCP 仅
+     **claude 运行时**会话才有；**pi 运行时**会话只有 automation/collaboration/proma_cloud 三组。
+     诊断：枚举自己的 mcp__* 工具，若无 session/remote-session/tree → 你是 pi 运行时。
+     正解：从 claude 母会话用 **fork_session** 重新派生（fork 继承母会话运行时）。
+     根因详见 memory: tree-mcp-pi-runtime-incompat（2026-07-22 定案）。
 
 2. 列出已存在的 tree:
    ls .context/trees/*/    （仍可用文件系统定位 <tree_id>）
@@ -152,6 +150,7 @@ autonomy:
     - "<必须上报但可继续执行的事项>"
   must_ask:
     - "<必须请示后才能做的事项>"
+  final_step: "完成所有产出 + 收到 audit_gate pass 后，**你（worker）自己调 tree_leaf_set_status(status=done)**。commander 不代调（代调被引擎 E_BORROWED_IDENTITY 拦截）"
 ```
 
 ### §3.5 自审契约（Self-Audit）
@@ -186,36 +185,86 @@ self_audit:
 
 ```text
 对每个子任务:
-  1. create_session(channel_id=..., model_id=..., title=<命名规范的标题>)
-     ⚠️ Sprint 2（design-commander-spawn）：正常派生**强制 create_session**（不 fork）。
-        理由：fork 继承父会话历史 → 上下文污染 + token 重；create_session 干净 + 契约驱动。
-        fork 仅用于 §7 纠偏重档 / F1 崩溃恢复（需继承到 milestone 历史，是「从某点重试」语义）。
-  2. 调 mcp__tree__tree_leaf_add(tree_id=<tree_id>, leaf=<leaf 对象，含 5 件套持久化>)
-     leaf 对象必填字段 + 5 件套（缺必填 → E_SCHEMA_INVALID）：
+  1. **派生 tree 参与者（worker/commander 子节点）的运行时**:
+     - **v0.18+ 补丁后（2026-07-23，dev/pro 已部署）**：`create_session` / `remote_create_session` 对 claude 兼容 provider（ZLM/proma/anthropic 等 AGENT_COMPATIBLE_PROVIDERS）自动推断 `agentRuntime="claude"` → 直接产出有 mcp__tree__* 的会话（dev 实证：ZLM/GLM-5.2 → 30 个 tree 工具全有）。`create_session(channel_id=..., model_id=..., title=...)` 即可。
+     - **未打 v0.18 补丁的构建**：create_session 默认 pi（无 tree 工具）→ 必须用 `fork_session(from=<parent_session>, new_channel_id=..., new_model_id=...)` 继承母会话 claude 运行时。
+     - fork_session 仍是**跨版本的安全默认**（继承运行时，不依赖补丁）。
+     - **v0.20+ 补丁后（2026-07-23，dev/pro 已部署）**：pi 运行时（deepseek 等 openai-responses 模型）**也支持 tree**——pi 会话经 `__proma_getPiCustomTools__` customTools 钩子拿到 mcp__tree__*（dev 实证：deepseek-v4-pro 三组工具全有、tree_help 正常）。所以 v0.20+ 上 pi 模型也能直接做 tree 参与者。
+     - **未打 v0.20 补丁的构建**：pi 会话无 tree 工具——用 fork_session 从 claude 母会话派生（继承运行时）绕开。
+  2. 首条消息 = §3 的 5 件套完整 YAML（直接复制粘贴模板）
+  3. 调 mcp__tree__tree_leaf_add(tree_id=<tree_id>, leaf=<leaf 对象>)
+     leaf 对象必填字段（缺任一 → E_SCHEMA_INVALID）：
      ```yaml
      leaf:
        leaf_id: "<prefix>-<A1>-worker"        # 命名见 §12；prefix = tree init 时 root_brief.prefix，与 tree_id 解耦
-       session_id: "<worker 的 Proma session_id，create_session 后获得>"
+       session_id: "<worker 的 Proma session_id，fork_session/create_session 后获得>"
        parent: "<root 或父 commander 的 leaf_id>"
        path: "A1"   # 仅本层路径段（worker 在 root 下 = "A1"；嵌套在 commander 下 = "A1/B1"）。⚠️ 不是完整 leaf_id（"vpro1-A1-worker" ✗），不是 "root → leaf" 路径链。由 leaf_id 按引擎 parsePathFromLeafId 派生 = leaf_id 去 prefix 和 role 后缀的段（不符 → E_SCHEMA_INVALID）
-       role: "worker"                          # 枚举 root|commander|worker|auditor（leaf_add 拒绝 role=root，root 只由 init 创建）
+       role: "worker"                          # 枚举 root|commander|worker（leaf_add 拒绝 role=root，root 只由 init 创建）
        model: "GLM-5.2"
        channel: "<渠道 id>"
        added_by: "<commander/root 的 session_id>"   # 非 root 必填（操作者追溯链）
-       # Sprint 2 约束 4：5 件套持久化进 leaf（下游启动后 tree_leaf_get 读，混合任务书机制）
-       brief: <§3.1 brief 对象>
-       dod: <§3.2 dod 对象>
-       report_protocol: <§3.3 report 对象>
-       autonomy: <§3.4 autonomy 对象>
-       self_audit: <§3.5 self_audit 对象>
      ```
      （命名强制校验在工具内置，失败返回 error.code 如 E_NAME_INVALID）
-  3. 首条消息（混合任务书）= send_message(session_id=<新会话>, message="你的任务书在 leaf <leaf_id>，启动后调 mcp__tree__tree_leaf_get(tree_id=<tree_id>, leaf_id=<leaf_id>) 读 5 件套，然后 brief_echo 对齐")
-     ⚠️ 不再把完整 5 件套 YAML 塞进首条消息（已持久化进 leaf，避免冗余 + 依赖父会话传递）。
-  4. 下游会话（commander/worker）启动首步：tree_leaf_get(自己的 leaf_id) 读 5 件套 → brief_echo 对齐（§6）
-  5. 对 self_audit 的每个 milestone 调:
+  4. 对 self_audit 的每个 milestone 调:
      mcp__tree__tree_milestone_add(tree_id=<tree_id>, leaf_id=<leaf_id>, milestone=<milestone 对象>)
 ```
+
+### Step 2.1：层级委派协议（v2.7 新增，P0-1）
+
+> 依据：macp 实战（tests/002）暴露的星形退化——root 建 commander 后从不发 brief，转而越级直连 worker，树形退化为扁平星形，多级协调优势落空。
+
+**核心规则三分**：
+
+| 委派路径 | 谁建会话 | 谁发 5 件套 brief | 引擎行为 |
+|---------|---------|------------------|---------|
+| **root → commander** | root（create_session/fork_session） | **root**（leaf_add 后首条 send_message） | 正常，无 warning |
+| **commander → worker** | **commander 自己** | **commander 自己** | 正常，无 warning |
+| **root → worker（越级）** | root | root | ⚠️ 树中有 active commander 时返回 `W_STAR_DEGRADATION` warning（不拦死） |
+| **root → worker（单层树）** | root | root | 正常，无 warning（无 commander，root 直辖合法） |
+
+**关键认知**：建 commander leaf ≠ 委派完成。commander leaf 必须收到 5 件套 brief 才能自主履职（leaf_add 后紧接 send_message 发 brief）。**只建 leaf 不发 brief = commander 沦为孤儿占位，树退化为星形**。
+
+**root 越级 worker 反模式**（macp 实战复现）：
+
+```text
+❌ 退化路径（星形）:
+   root: leaf_add(commander-A, parent=root)           ← 建了 commander
+   root: leaf_add(worker-W1, parent=root)             ← 越级！引擎返回 W_STAR_DEGRADATION
+   root: send_message(worker-W1, brief)               ← 绕过 commander-A
+   → commander-A events 永远为空（孤儿），3 个 commander 沦为占位
+
+✅ 正确路径（树形）:
+   root: leaf_add(commander-A, parent=root)
+   root: send_message(commander-A, 5件套brief)        ← commander-A 拿到任务书
+   commander-A 自主履职:
+     commander-A: leaf_add(worker-W1, parent=commander-A)
+     commander-A: send_message(worker-W1, brief)
+```
+
+**例外（root 直辖 worker 合法场景）**：
+- **单层树**（无 commander，root 直辖 1-3 个 worker）——引擎判定"树中无 active commander"自动放行。
+- **应急接管**（commander 全部宕机，root 直接补位）——引擎返回 warning 但不拦死，事后可追溯（leaf.delegation_hint='star_degradation_warned'）。
+
+> 引擎软约束实现：tree-engine.cjs cmdLeafAdd，触发条件 `parent.role=root + role=worker + 树中有 active commander`。详见 §11 禁止行为 #14。
+
+#### §4 Step2.1a 层级选择指导（macp4 新增）
+
+> macp3 从 macp2 的 4 层（root→cmd→sub-cmd→worker）扁平化为 3 层（root→cmd→worker），减少一级中转延迟。下为条件表：
+
+| 条件 | 推荐层数 | 结构 |
+|------|---------|------|
+| worker ≤ 6，任务同质、不需要子域分隔 | **3 层** | root→cmd→worker（macp3 模式） |
+| worker 7-12，任务可分组 | 3 层 + 多 commander | root→cmd-A→workers-A + cmd-B→workers-B |
+| worker > 12，跨子域、需要独立审计子树 | **4 层** | root→cmd→sub-cmd→worker（macp2 模式） |
+| 极简任务（≤ 3 worker） | **2 层** | root→worker（单层树，§4 Step2.1 例外） |
+
+**3 层 vs 4 层选择权衡**：
+- **3 层（commander 直管 worker）**：链条短、中转延迟低，但 commander 负载更高（同时跟踪更多 worker 的 brief_echo/alignment/纠偏）。适合任务同质、worker ≤ 10 的中小规模项目。
+- **4 层（嵌套 sub-commander）**：多一层中转增加延迟，但 sub-cmd 缓冲了 commander 的直接压力，子域间天然隔离。适合跨子域、大规模项目（worker > 12）。
+- macp3 选择 3 层的原因：12 leaf 中 7 worker 任务同质（coder/judge 相关），不需要 sub-cmd 子域分隔，扁平化减少一级中转延迟。注意 macp3 C2 遗漏提示 3 层中 commander 负载更高（需维护待审清单防遗漏，见 §13.4.0a）。
+
+> ⚠️ **多层级树（≥3 层）root 信任锚警示（macp5 新增）**：选 3 层（root→cmd→worker）或多 commander 时，**只有树根 leaf（role=root）是 V10 信任锚**。L2 commander（role=commander）**无法自己 done**——`caller===audit_session_id` 硬约束 + L3091 `added_by` 自审禁令三路径全撞墙（macp4 实证）。L2 commander 想 done 须走 §13.3b（root 代调协议 + root idle 3 道防线）。auditor leaf 必须挂 root 子节点（commander 的兄弟），不能在 commander 子树下（added_by 关系，见 §13.4.0 多层级说明）。
 
 ### Step 3：事件路由
 
@@ -223,6 +272,8 @@ self_audit:
 子会话通过 send_message(notify) 上行事件。
 根会话收到后按 §6 事件路由表派发处理。
 所有事件先登记: mcp__tree__tree_event_append(tree_id=<tree_id>, leaf_id=<leaf_id>, type=<type>, meta=<meta 对象>)
+
+**【必须】每次 `send_message` 给树内 leaf 后，紧接 `tree_log_communication(tree_id, target_session_id=<session>, direction='out', note='…')`——漏记一次即违规（§11 #15）。**
 ```
 
 ### Step 4：质量门
@@ -233,24 +284,10 @@ self_audit:
   2. [ISS-003] 若 brief.audit_meta.review_required=true (worker 应跑 G1-G5 多子Agent 自审):
      a. tree_event_list 查 worker events, 确认含 ≥1 条 review_round 事件 (末轮 red_count=0)
         - 无 review_round → 退回, 要 worker 补跑 tree-worker §4.6 (引擎也会 E_REVIEW_NOT_CONVERGED 拦 set-status done)
-     b. 区分 review_round 的 independence (双重保险原则):
-        - independence=self_delegated (worker 自派的 SubAgent 自审): 只是第一道筛, 初筛。
-          worker 可能自写格式合法但内容敷衍的 findings (全 green 废话 / reviewer 无实质劳动),
-          commander 他审时【必须更警惕】——按下方 c 步重点抽查。
-        - independence=independent (他审, 真 session): 第二道闸, 可信度更高, 仍按 c 步抽查。
-     c. 抽查 findings 真实性 (引擎只防格式, commander 抽查是内容真实性的真实防线):
-        - reviewer_kind=session: 随机抽 1-2 个 reviewer_session_id, 用 mcp__session__list_messages
-          看是否真有审查对话 (防 worker 自写全 green 蒙混)
-        - reviewer_kind=subagent: 查 worker events 是否有匹配的 subagent_spawn 事件 (引擎已 E_REVIEW_FORGERY
-          拦过溯源, 但 commander 仍要确认 output_ref 文件内容非空话)
+     b. 抽查 findings 真实性 (引擎只防格式, commander 抽查是内容真实性的真实防线):
+        - 随机抽 1-2 个 reviewer_session_id, 用 mcp__session__list_messages 看是否真有审查对话 (防 worker 自写全 green 蒙混)
         - 抽 1 条历史 red finding 看是否真在后续 round 修复
-        - 对 self_delegated 的 review: 提高警惕, 必看 1-2 个 SubAgent 产出原文 (subagent-outputs/*.md),
-          防 worker 自写"格式合法内容敷衍"的 findings 蒙混
-        - 抽查通过 → 继续; 发现伪造 → 退回 + tree_drift_append(severity=high)
-     d. 高风险任务 commander 可派自己的 SubAgent 独立复核 (记 commander leaf, 见 §13.5.2):
-        - 在 commander 自己的 leaf 上 append subagent_spawn (subagent_id 父段=commander leaf_id)
-        - 产出落 deliverables/subagent-outputs/, 作为 commander 他审证据链
-        - 这条 review_round 用 reviewer_kind=subagent + independence=independent (commander 自身劳动记录)
+        - 抽查通过 → 继续; 发现伪造 (reviewer session 无实质内容/全 green 废话) → 退回 + tree_drift_append(severity=high)
   3. 派验收 Agent（见 §9 模板）→ 拿到 verdict
   4. verdict.pass → 先调 audit_gate 给 worker 背书 pass（V5b 硬前置，详见 §13 冷启动信任锚流程）:
      mcp__tree__tree_audit_gate(tree_id, leaf_id=<worker>, verdict='pass',
@@ -288,7 +325,8 @@ self_audit:
 | `mcp__tree__tree_tree_dump(tree_id)` | 全树 JSON dump（调试/恢复用） |
 | `mcp__tree__tree_drift_list(tree_id, leaf_id?, since?)` | 查询 drift 历史，可按 leaf / 时间过滤 |
 | `mcp__tree__tree_heartbeat_tail(tree_id, leaf_id?, n?)` | 查询最近 N 条心跳记录 |
-| `mcp__tree__tree_event_list(tree_id, leaf_id?, type?)` | 查询事件历史（共 9 种类型：done/blocked/plan/brief_echo/heartbeat_reply/nudge/limit/status_check/subagent_spawn。subagent_spawn 详见 §13.5） |
+| `mcp__tree__tree_event_list(tree_id, leaf_id?, type?)` | 查询事件历史（共 11 种类型：done/blocked/plan/brief_echo/heartbeat_reply/nudge/limit/status_check/review_round/subagent_spawn/progress） |
+| `mcp__tree__tree_communication_list(tree_id, leaf_id?, target?, since?)` (v2.9) | 查询外部通信记录（tree_log_communication 记的 send_message 活动，按 leaf/target/since 过滤） |
 
 ### Add（新增）
 
@@ -315,6 +353,7 @@ self_audit:
 | `mcp__tree__tree_drift_append(tree_id, leaf_id, kind, severity, action, fork_to?, reason?)` | kind ∈ `production\|direction\|rhythm`，severity ∈ `low\|mid\|high`，action ∈ `nudge\|limit\|prune\|self_correct\|declare\|handoff`。双写 drift_history + drift_log |
 | `mcp__tree__tree_heartbeat_append(tree_id, heartbeat=<obj>)` | heartbeat 对象含 `{verdicts:[...], ts, next_heartbeat}`，追加并更新 last_heartbeat |
 | `mcp__tree__tree_segment_append(tree_id, leaf_id, new_session_id)` | 竹节交接：追加 segment_chain + 改状态 segment_pending |
+| `mcp__tree__tree_log_communication(tree_id, target_session_id, direction?, note?)` (v2.9) | 记录外部通信（send_message 等），**不截内容**；自动定位 target leaf + 更新 last_event（心跳巡检据此感知通信活动，不误判冻结） |
 
 ### Audit（v2.1 审计专用）
 
@@ -340,27 +379,6 @@ self_audit:
 
 > 依据：设计文档 §4.2 事件通道 + §4.3 心跳通道 + §6.1 brief_echo。
 
-### 🔴 监督判活红线（2026-07-16 v0.17.0 验证教训；长轮误判 3 次强制）
-
-**长轮监督 worker / auditor 进度时，ground truth = events，不是 `leaf.status` / `tree.write_count`。** 这两者是"假信号"：
-
-| 假信号 | 为什么不可靠 |
-|---|---|
-| `leaf.status` | worker 发了 `done` event 后 status 可能仍是 `active`（要等 commander 派 auditor 调 audit_gate 才闭环）；status ≠ leaf 真正完成 |
-| `tree.write_count` | worker 发 done/blocked/brief_echo 都是 write，count 涨不代表 leaf 推进；commander 自己长轮处理（派 auditor / 回填 alignment / 调 milestone）也在写 tree，count 涨可能是 commander 在动而非 worker |
-
-**正确姿势（长轮判活三步）**：
-1. `mcp__tree__tree_event_list(tree_id, leaf_id=<目标>)` 拉该 leaf 的 events 数组（**不传 `type` 参数**，留空拉所有类型，只看末尾即可）
-2. 看 **events 数组末尾事件**（类型 + meta）；该末尾类型应与 `leaf.last_event_type` 字段一致（tree-engine 每次 event append 自动 `set_last_event` 同步，二者是同一事实的两面，即"双确认"）：
-   - `done`（self_check 全过）→ worker 自审完，**在等** commander 派 auditor / 调 audit_gate
-   - `blocked`（如 `E_BORROWED_IDENTITY`）→ worker 卡在门禁，**在等** commander 调 audit_gate
-   - `brief_echo`（meta 含 alignment）→ commander 已回填对齐评估
-3. 末尾事件 + `last_event_type` **双确认**都停滞才算真卡死：**两次轮询间隔 ≥15 分钟**（对齐 GLM-5.2 单轮思考时长下限）都不变 → 卡死；任一推进就继续等（GLM-5.2 单个长未提交轮内可完成多步 tree write，10-15 分钟不写 tree 仍可能在读/分析/思考，非卡）
-
-**反例（v0.17.0 验证 4.1/4.2）**：nanju05 worker 17:47:40 已发 `done`，但 status 仍 `active`、write_count 继续涨（commander 在派 auditor / 回填 alignment）——只看 status/write_count 会误判"worker 卡住"，实际 worker 早 done 在等闭环。
-
-> 与 tree-engine 每次 tool call 原子落盘一致；与 CLAUDE.md pro 测试要点（监督读 tree-state events，禁用 API `list_messages` 消息数判进度）一致；哨兵心跳（§8）同样以 `last_event_type` 为判活输入。**判活（§6，事件是否停滞）→ 路由（§4 Step3，事件如何处理）是上下游两步，勿混**。
-
 | 事件 | 触发 | 指挥官动作 | mcp__tree__* 工具 |
 |------|------|-----------|------------------|
 | **done** | 子会话完成上报 | ① 登记事件 ② 派验收 Agent（§9）③ 按 verdict 执行：pass → set-status done；不通过 → 走 §7 纠偏 | `tree_event_append(type=done)` → `tree_leaf_set_status(status=done)` 或 `tree_drift_append` |
@@ -368,6 +386,38 @@ self_audit:
 | **plan** | 子会话拆解计划上报 | ① 登记事件 + 登记 plan_id + ts ② 派路线图 Agent（researcher）评估 ③ 5 分钟内收到 verdict → 按 verdict 行事 ④ 5 分钟未收到 → **默认放行**（plan_ack_seconds 到期）⑤ 若 verdict=nack 在放行后才到 → 走中档纠偏 | `tree_event_append(type=plan)` → nack 时 `tree_drift_append(action=limit)` |
 | **brief_echo** | 子会话首条上行（复述理解） | ① 登记事件 ② 评估对齐度（路线图 Agent 仅做评估，auditor 选择见 §13）③ **回填 alignment event（V5b 必须，见 §6 回填机制 / §13.3 步骤4）** ④ ≥85% → 放行 ⑤ <85% → 发回重 brief_echo | `tree_event_append(type=brief_echo)` → 回填 alignment event → <85% 时 `tree_drift_append(severity=low, action=nudge)` |
 | **heartbeat_reply** | 子会话回应 status_check | ① 登记事件 ② 解析回应内容 ③ 正常 → 仅记录 ④ 异常 → 喂给 §7 纠偏 | `tree_event_append(type=heartbeat_reply)` → `tree_leaf_set_context` |
+| **progress** (v2.8) | worker 主动报中间进度 | ① 登记事件 ② 若 meta.percent 提供 → 更新 context_usage 估算 ③ 正常仅记录，不触发纠偏 | `tree_event_append(type=progress, meta={step, outputs_so_far?, eta?, percent?})` |
+
+### brief_echo 状态联动（v2.8 引擎自动）
+
+worker 写首条 brief_echo（复述理解）时，引擎自动把 `leaf.status: pending_brief → active`（cmdEventAppend 内置，无需手动调 set-status）。解决 macp 实战"worker 已回应 brief 但 tree 仍显示 pending_brief"的状态滞后——commander 心跳不再误判 worker 没动。commander/auditor 初始即 active 不受影响；只在 pending_brief 触发保证幂等。
+
+### progress event 用法（v2.8）
+
+worker 长任务（>10 分钟）中途可主动报进度，让 tree 可见（避免 commander 误判"冻结"）：
+
+```yaml
+# worker 端
+mcp__tree__tree_event_append(tree_id, leaf_id=<self>, type='progress',
+  meta={step: "正在写第 3 节", outputs_so_far: ["reports/draft-sec3.md"], percent: 60, eta: "15min"})
+```
+
+progress 不触发状态转换、不强制 schema（轻量）；commander 在心跳巡检时可读最近 progress 判断进度。
+
+### 外部通信记录协议（v2.9）
+
+root 通过 `send_message` 驱动 worker/commander（发 brief、nudge、追问、指令）时，这些**外部 IPC 通信 tree 默认看不到**——心跳巡检只看 tree events/call-log，会误判 target leaf "冻结"。v2.9 协议：root 每次 `send_message` 给树内 leaf 后，调一条 `tree_log_communication` 记录：
+
+```yaml
+# root send_message 后立即调
+mcp__session__send_message(session_id=<worker_session>, message="<brief/nudge/追问>")
+mcp__tree__tree_log_communication(tree_id, target_session_id=<worker_session>,
+  direction='out', note='发送 5 件套 brief')
+```
+
+**引擎自动处理**：定位 target leaf（按 session_id）→ 更新其 `last_event_type='communication_out'` + `last_event_ts`（心跳据此感知）+ 追加 `communication_log`。**不截 message 内容**（隐私 + 体积；note 是 agent 自主的简短摘要）。用 `tree_communication_list` 查询历史。
+
+**硬要求**（macp2 实战再证 ~10% 漏记后升级）：每次 send_message 后必须紧接 tree_log_communication。漏记 = 协议违规，属 §11 禁止行为 #15。
 
 ### plan 默认放行机制（详细）
 
@@ -415,13 +465,30 @@ self_audit:
 
 > **为什么 alignment 在回填 event 里，不在 worker 首条 brief_echo 里**：alignment 是 commander/路线图 Agent 的**对齐评估产物**（worker 自己无法自评对齐度）。worker 首条 brief_echo 只含 `my_understanding + milestones_preview`（见 tree-worker SKILL §3.4）。评估由独立 Agent 完成后，结果以第二条 brief_echo event 形式回填到 worker leaf——这同时满足 V5b 的"events 留痕"和 A3 的"独立 auditor 背书"。
 
+### brief_echo 回填完成确认清单（macp4 新增，防并发遗漏）
+
+> macp3 C-commander 并发处理 C1/C2 brief_echo 时漏回填其中一个 alignment event——"教了"不等于"能做到"。以下硬 checklist 逐条确认后才能继续：
+
+```text
+commander 收到 worker brief_echo 后，必须在下发下一个 worker 前完成以下确认：
+
+回填完成确认清单（逐条 ✅ 后才能继续）:
+  [ ] worker 的 brief_echo event 已写入（worker 自写，含 my_understanding/milestones_preview）
+  [ ] alignment 评估已执行（≥85% 或 <85% 走纠偏）
+  [ ] alignment 回填 event 已 append 到 worker leaf（tree_event_append type=brief_echo, meta={alignment,auditor_session_id}）
+  [ ] tree_log_communication 已记录（send_message 后紧接，§11 #15）
+  [ ] 下一个 worker 的 brief_echo 才能开始评估
+
+并发场景特殊规则:
+  - 同时收到 ≥2 worker brief_echo → 按 leaf_id 字典序排队，一个完成回填再处理下一个
+  - 禁止并发评估 + 并发回填（context switching 导致遗漏，macp3 实证）
+```
+
 ---
 
 ## §7 三档纠偏决策树（v0.2 启用）
 
 > 依据：设计文档 §5.2 三档纠偏表 + §5.3 纠偏决策树 + §10.5 纠偏执行流程。
-
-> 📍 **fork 使用边界（2026-07-14 Sprint 2 约束 4）**：本节**重档剪枝**用 `fork_session`（需继承到 milestone 历史，是"从某点重试"语义）。**正常派生**（root→commander→worker 建人）**用 `create_session`**，见 §4 Step 2。fork 仅用于"重试/恢复"语义，不是正常建人手段。
 
 ### 决策树（if-else）
 
@@ -469,8 +536,6 @@ self_audit:
 全部动作调 tree_drift_append 记录。
 ```
 
-> ⚠️ **中档限权工具失同步（2026-07-14）**：`tree_leaf_autonomy_override` 已于 Sprint 1 删除（autonomy_overrides 死字段清理，见 CLAUDE.md / note 2026-07-14 Sprint 1 收尾）。中档限权当前**无可用工具**——中档档位暂**降级为加强版 nudge**（send_message 明确"权限限制 + 必须先纠正方向"，severity 标 mid），不调不存在的 autonomy_override。轻档 / 重档不受影响。替代限权机制（如 milestone 门禁加严）待后续 Sprint 补。
-
 ### 三档递进原则
 
 | 档位 | 触发 | 动作 | 执行者 |
@@ -499,12 +564,7 @@ prompt: |
   步骤:
   1. 调用 mcp__tree__tree_leaf_list_active(tree_id=<tree_id>)
      返回: {ok:true, leaves:[{leaf_id, session_id, last_event_ts, context_usage_pct},...]}
-  2. 对每个 active 叶子（约束 6 ctx 集成，2026-07-14）:
-     a. mcp__session__get_session_context(session_id=leaf.session_id) → 拿真实 token 用量 + context_window
-        → ctx_pct = round(usage_tokens / context_window * 100)（治"ctx 永远 0"：心跳主动查真实 ctx）
-     b. mcp__session__list_messages(session_id, limit=3) 获取最近活动
-     c. mcp__tree__tree_leaf_set_context(tree_id, leaf_id, ctx_pct) 写真实 ctx
-        → ctx>=85% 时引擎自动 set leaf.status=segment_pending（竹节刚性触发，见 §8.3）
+  2. 对每个 active 叶子调用 mcp__session__list_messages(session_id, limit=3) 获取最近活动
   3. 组装数据后，调用哨兵 Agent（subagent_type=explorer），prompt 见下方判定矩阵
   4. 对哨兵判定为 stale/silent 的叶子:
      mcp__session__send_message(session_id, "status_check: 请报告当前步骤、已产出文件、预计完成时间、是否有阻塞")
@@ -556,12 +616,8 @@ prompt: |
       → 仅记录，不动作
     
     elif verdict.verdict == "sweet_spot_risk":
-      → 引擎已在步骤 2c 写入真实 ctx；ctx>=85% 时引擎自动 set leaf.status=segment_pending（约束 6 刚性，2026-07-14，替代 v0.3 未实现）
-      → commander 检测到 segment_pending → 执行竹节交接（bamboo-joint handoff）:
-        1) mcp__session__create_session(...) 建 new session（干净会话接续，非 fork）
-        2) mcp__tree__tree_segment_append(tree_id, leaf_id, new_session_id)（segment_chain 留痕）
-        3) mcp__tree__tree_leaf_set_session(tree_id, leaf_id, new_session_id)
-        4) mcp__tree__tree_leaf_set_status(tree_id, leaf_id, "active")（恢复 active，新竹节干活）
+      → 在 heartbeat 日志中标记预警
+      → 下次心跳仍 >=85% 则触发竹节交接（v0.3 实现）
     
     elif verdict.verdict == "stale":
       → 已发 status_check（步骤 4 完成）
@@ -624,8 +680,6 @@ prompt: |
 
 > 依据：设计文档 §8.3 灾难恢复（4 类故障 F1-F4）。
 
-> 📍 **F1/F4 的 fork 语义（2026-07-14 Sprint 2 约束 4）**：F1 子会话崩溃、F4 配额恢复后的重 Fork 都用 `fork_session`——它们是"从某 milestone 点重试"语义，**需要继承到该点的历史**，故保留 fork（与 §7 重档一致）。**正常派生建人用 create_session（§4 Step 2）**，勿混用。
-
 | 故障 | 现象 | 恢复动作 | mcp__tree__* 工具 |
 |------|------|---------|------------------|
 | **F1. 子会话崩溃** | send_message 无响应，心跳发现 🔴 | ① 从该 leaf 最后通过的 milestone uuid 重 Fork ② archive 旧会话 ③ 新 leaf 加 i2 后缀 | `tree_leaf_set_status(status=pruned)` → `tree_leaf_add` 新叶 → `tree_drift_append(action=prune, fork_to=<新 leaf_id>)` |
@@ -658,6 +712,11 @@ prompt: |
 | 10 | plan 审批阻塞子会话等待 | 子会话空等浪费 | 默认放行机制：5 分钟无 NACK 自动放行 |
 | 11 | 重档剪枝后删旧会话 | 丢失可追溯历史 | archive 不删，drift_log 永存 |
 | 12 | 不沉淀文档 | 跨会话失忆 | 重要产出落盘到 .context/ |
+| 13 | 用 create_session 派生 tree 参与者（**未打 v0.18 补丁的构建**） | 子会话默认 pi、无 mcp__tree__*，§13.3 caller=worker 步骤全卡 | v0.18+ 补丁后 create_session 自动推断 claude（dev/pro 已验证）；未打补丁的构建必须用 fork_session。详见 §4 Step2 |
+| 14 | root 在已有 active commander 时直接 leaf_add worker（越级） | commander 沦为孤儿占位，树退化为扁平星形，多级协调优势落空 | 把 worker 挂到对应 commander 下（parent=<commander_leaf_id>，由 commander 自主 leaf_add + 发 5 件套 brief）。引擎返回 W_STAR_DEGRADATION warning（不拦死）。详见 §4 Step2.1 |
+| 15 | send_message 给树内 leaf 后漏记 tree_log_communication | 心跳巡检看不到通信活动，误判 target leaf 冻结（macp2 实战 ~10% 漏记触发升级） | 每次 send_message 后紧接 tree_log_communication（§6 硬要求）。commander 心跳读 communication_log 感知 IPC 活动 |
+| 16 | root 中转链上不维护待审 worker 清单 | worker done 但待审清单未划掉 → 遗漏异厂商审（macp3 C2 教训） | 按 §13.4.0a 6 步流程维护待审清单，全清单空 = 审查闭环完成 |
+| 17 | commander 派 worker 后漏回填 alignment event | worker 永远拿不到 audit_gate pass（E_ALIGNMENT_NOT_VERIFIED），卡死无法 done | 执行 §6 回填完成确认清单逐条确认，并发场景按 leaf_id 字典序排队，禁止并发评估+并发回填 |
 
 ---
 
@@ -729,6 +788,7 @@ prompt: |
 - **root.session_id 怎么拿**：`mcp__session__get_my_session_id()` 的返回值就是 root.session_id（commander 自己的 session_id）。
 - **caller=worker 的步骤怎么执行**：commander 用 `send_message` 给 worker 发指令（如"请调 mcp__tree__tree_event_append(type=done, meta={...})"），worker 收到后按 tree-worker SKILL 自己调（caller=worker 自动满足）。⚠️ commander 绝不能代调 caller=worker 的工具（→ `E_BORROWED_IDENTITY`）。
 - **V10-auditor-active**：引擎判定一个 leaf 可当独立 auditor 的三条件——`status=done` + `events` 非空 + `audit_gate.verdict=pass`。冷启动期没有任何 leaf 满足它（所以才需要 root 信任锚）。
+- **多层级树（≥3 层）下的 'root' = 树根 leaf（macp5 新增）**：`leaf_id` 形如 `<tree_id>-root`，`role=root`，**≠ 当前 L2 commander**。L2 commander 读 §13.3 凡见 `caller=root` / `audit_session_id=root.session_id`，都指**树根 leaf 的 session_id**，不是 L2 commander 自己的 session_id。L2 commander 用 `get_my_session_id()` 拿到的是 `commander.session_id`，不能用来填 `root.session_id`（→ `E_BORROWED_IDENTITY`，caller=commander≠root）。L2 commander 自己想 done 须走 §13.3b。
 
 ### §13.1 冷启动期判定
 
@@ -738,7 +798,7 @@ prompt: |
 
 冷启动期所有 worker 的 milestone audit_pass + alignment 回填 + audit_gate pass，`auditor_session_id` 一律填 `root.session_id`，由 commander 自己调用（`caller=root.session_id === audit_session_id`）。
 
-🔴 **冷启动期绝不要让 auditor leaf 自审**（auditor 自己给自己 audit_gate pass）——闸门3 V10-auditor-active 三连对冷启动 leaf 是循环依赖（自己 done 需 audit_pass → 需独立 auditor → 自己，无法自启动），这是 nanju-iter2 死锁根因。**P0a 解法**：auditor leaf 的 audit_gate=pass 由 root 信任锚背书（§13.4.1 步骤5，root 当 auditor 调 audit_gate），不是 auditor 自审。冷启动期定义见 §13.1；何时转正常期见 §13.4。
+🔴 **冷启动期绝不要 fork "独立 auditor leaf" 并让它自审**——闸门3 V10-auditor-active 三连对冷启动 leaf 是循环依赖（自己 done 需 audit_pass → 需独立 auditor → 自己，无法自启动），这是 nanju-iter2 死锁根因。冷启动期定义见 §13.1；何时转正常期（可派独立 auditor leaf）见 §13.4。
 
 ### §13.3 root 给 worker 配齐 done 前置（严格顺序，repro 场景 B 实证 10/10）
 
@@ -756,7 +816,7 @@ prompt: |
 | 4. brief_echo alignment 回填 | root（auditor_session_id=root.session_id） | 步骤 3 | worker.events 多一条带 alignment 的 brief_echo（V5b 硬前置） | 步骤 6 `E_ALIGNMENT_NOT_VERIFIED` |
 | 5. done event（带 self_check） | worker | 步骤 4 + 干活完成 + deliverables 落盘 | worker.events done 留痕 | — （worker 漏做则永远到不了步骤 6） |
 | 6. audit_gate pass | root（caller===audit_session_id） | 步骤 4 + 验收 Agent verdict.pass | worker.audit_gate.verdict=pass | 步骤 7 `E_GATEKEEPER_REQUIRED` |
-| 7. set-status done | worker | 步骤 0-6 全过 + deliverables 落盘 + 每个产物 size > 0 | worker.status=done | `E_DELIVERABLE_MISSING` / `E_DELIVERABLE_EMPTY` / `E_GATEKEEPER_REQUIRED` / `E_SCHEMA_INVALID（milestone未pass）` / `E_REVIEW_NOT_CONVERGED（review_required=true时）` |
+| 7. set-status done | worker | 步骤 0-6 全过 + deliverables 落盘 | worker.status=done | `E_DELIVERABLE_MISSING` / `E_GATEKEEPER_REQUIRED` / `E_SCHEMA_INVALID（milestone未pass）` / `E_REVIEW_NOT_CONVERGED（review_required=true时）` |
 
 > **caller 标注说明**：`root` = commander 自己调（caller=root.session_id）；`worker` = commander 用 `send_message` 让 worker 自己调（caller=worker.session_id）。commander 绝不能代调 caller=worker 的步骤（→ `E_BORROWED_IDENTITY`）。
 > **review_required 提示**：若 `audit_meta.review_required=true`，步骤 5 的 done event 之前 worker 必须先产 ≥1 条 `review_round` event（末轮 `red_count=0`，总轮数 ≤3），否则步骤 7 被 `E_REVIEW_NOT_CONVERGED` 拦（见 §4 Step4 / tree-worker §4.6）。
@@ -784,194 +844,163 @@ prompt: |
 - **步骤 1**：expect_outputs 声明的每个文件必须在步骤 7 前真实落盘到 `<treeDir>/deliverables/<outPath>`，否则步骤 7 `E_DELIVERABLE_MISSING`
 - **步骤 5**：done event 必须 worker 自己写（caller=worker），commander 代写被 `E_BORROWED_IDENTITY` 拦
 - **步骤 6**：audit_session_id 必须 = 调用者（root）的 session_id，否则 `E_BORROWED_IDENTITY`；worker 不能自己调步骤 6；步骤 4 的 alignment event 是步骤 6 的硬前置（V5b），缺则 `E_ALIGNMENT_NOT_VERIFIED`
+- **步骤 7**：set-status done 必须 worker 自己调（caller=worker）。commander 做完步骤 6（audit_gate pass）后 send_message 通知 worker “audit_gate pass，你可以 set-status done”——但执行者是 worker。commander 代调步骤 7 → `E_BORROWED_IDENTITY`
 
-### §13.3a root 自身 done（auto_upgrade 简化路径，不走 §13.3 八步）
+### §13.3a root 自身 done（三路径，不走 §13.3 八步）
 
-root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 八步。引擎 auto_upgrade 机制（tree-engine.cjs L1961-1972）：root 写自己的 done event（caller=root，带 self_check）→ audit_gate 自动从 skip 升为 pass（auto_upgrade=true）。即 root 只需：
+> **本节 'root' 指树根 leaf（role=root）**。单 commander 树（macp2/macp3，root===commander 自己）下本节直接适用；**多层级树（≥3 层）下 root 是独立的树根 leaf，L2 commander 不能用本节路径给自己 done**（L2 commander 自己调 milestone_set_result(audit_session_id=commander) 撞 L3107 `auditor is the leaf itself`（L3061 找 rootLeaf 失败后落到 L3107；L3091 不触发，因 commander.added_by=root≠commander）；填 audit_session_id=root 撞 L2341 `E_BORROWED_IDENTITY`）。L2 commander done 须走 §13.3b。
+
+root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 八步。但引擎 L1767（milestone 非空 + audit_pass=true）对 role=root **无豁免**（macp3 实测撞墙），auto_upgrade 只处理 audit_gate（skip→pass），不豁免 milestone 检查。分三种路径：
+
+#### §13.3a.1 正常路径（引擎已修 L1767 豁免时）
+
+条件：引擎 L1767 对 role=root 有豁免（`!isAuditor && !isRoot`），或 root 已有 milestone。
+操作：引擎 auto_upgrade 机制（tree-engine.cjs L1961-1972）——root 写自己的 done event（caller=root，带 self_check）→ audit_gate 自动从 skip 升为 pass（auto_upgrade=true）→ set-status done 引擎全部门禁通过。
 
 ```text
 [caller=root]  tree_event_append(tree_id, leaf_id=<root>, type=done, meta={self_check})  →  tree_leaf_set_status(tree_id, leaf_id=<root>, status=done)
 ```
 
+#### §13.3a.2 备选路径（引擎未修时，milestone_add 绕过 L1767）
+
+条件：引擎 L1767 无 role=root 豁免（当前状态，macp3 实证）。操作：root 先给自己 milestone_add（1 条，expect_outputs 可空数组）→ milestone_set_result → done event（触发 auto_upgrade）→ set-status done。L1767 查 milestones 非空且 audit_pass=true → 放行。
+
+```text
+[caller=root]  tree_milestone_add(tree_id, leaf_id=<root>, milestone={id:"M-root-done", desc:"全树实现层 done", expect_outputs:[]})
+[caller=root]  tree_milestone_set_result(tree_id, leaf_id=<root>, milestone_id="M-root-done", audit_pass=true, audit_session_id=<root.session_id>)
+[caller=root]  tree_event_append(tree_id, leaf_id=<root>, type=done, meta={self_check})
+[caller=root]  tree_leaf_set_status(tree_id, leaf_id=<root>, status=done)
+```
+
+⚠️ expect_outputs=[] 空数组若引擎拒绝（要求 ≥1），填一个占位 `["root-done-placeholder.md"]` 并在 deliverables/ 下创建空文件。
+
+#### §13.3a.3 诊断（set-status done 撞墙时）
+
+root 调 set-status done 返回错误时：
+- `E_SCHEMA_INVALID` → 大概率 milestone 检查未过（L1767 无 root 豁免）。先 `tree_leaf_get(root)` 查 milestones 数组是否非空且全部 audit_pass=true；若空 → 走 §13.3a.2 备选路径 milestone_add。若 milestones 有值但某条 audit_pass=false → milestone_set_result 补过。
+- `E_GATEKEEPER_REQUIRED` → 检查是否写了 done event（auto_upgrade 依赖 done event 触发）。
+- 非以上错误码 → 翻 §13.7 速查表或 `tree_help(topic=<error.code>)`。
+
 这也解释了 root 两种 event 的不同作用：① 写 plan/status_check → root.events 非空（满足闸门2 对 rootLeaf 的 events 要求，即 §13.3 步骤0 的前置）；② 写 done → 触发 auto_upgrade，root 自身 audit_gate 升 pass（满足 root 自己 set-status done 的门禁 L1399）。注意：闸门2 对 rootLeaf（L2247-2252）只校验 status + events，**不校验 root 自己的 audit_gate**——所以步骤0 只需写 plan 让 events 非空即可，不必先 done。
 
-### §13.4 转正常期 + auditor role（P0a, 2026-07-08）
+### §13.3b L2 commander 多层级 done 路径（macp5 新增，macp4 V10 张力实证）
 
-首个 worker done 后，若需长期独立 auditor（复杂树多 worker 并行审查），**用 role='auditor' 创建独立审计 leaf**。
+> macp4 实证：多层级树（≥3 层）L2 commander 想给自己或自己子树 worker 配 done 门禁时，撞 V10 三路径墙：①`audit_session_id=root` → `E_BORROWED_IDENTITY`（caller=commander≠root，L2341 拦）②`audit_session_id=commander 自己` → `E_AUDITOR_NOT_INDEPENDENT`（L3061 找 rootLeaf 失败 + L3091 `auditor=added_by`，因 worker.added_by=commander）③`audit_session_id=auditor` → `E_BORROWED_IDENTITY`（caller≠auditor）。唯一解 = root 代调（caller=root===audit_session_id=root，L3061 root-as-auditor 放行），但依赖 root 活。
 
-> **P0a 背景**：2026-07-08 前，auditor 用 commander/worker role 假装（既往假阳性事故 A4 场景用 commander → C-13/R-03 假阳性 24-38 条；既往假阳性事故 A3 场景用 worker → W-AUDIT-WORKER 违规；既往假收敛事故 W3 场景 §3.5 "需要独立 auditor role 而非复用 worker 靠打补丁"）。P0a 引入 role='auditor'：独立审计 leaf，走简化协议，规则按 role 适配，不再误套 worker/commander 规则。
+**适用场景**：多层级树（≥3 层），L2 commander 要给自己子树 worker（或自己）配 milestone_set_result/audit_gate。
 
-#### §13.4.1 auditor leaf 创建流程（leaf_add role=auditor）
+**正确树结构（关键，避免 macp4 结构错误）**：
+- ✅ **auditor 挂 root 子节点**（commander 的兄弟）：`parent=root`。root 给 auditor 配门禁走 L3061 root-as-auditor 分支；auditor done 后给 commander 子树 worker 配门禁（auditor≠worker.added_by=commander，L3091 不拦）。
+- ❌ **auditor 挂 commander 子树**（macp4 错误）：`added_by=commander`。commander 永远无法给 auditor 配门禁（L3091 `auditor=added_by`），auditor 永远 done 不了。
 
+**root 代调协议**：
 ```text
-[caller=root]   1. mcp__session__create_session(channel_id=<不同 channel>, model_id=<与 commander 不同模型>, workspace_id=<本工作区>) → auditor 独立 session
-                   # ⚠️ v0.20（v20t 教训）：独立 auditor 用 create_session **显式选不同模型**（如 GLM commander → DeepSeek auditor），避免 fork 继承同模型导致同款推理偏差（v20t: GLM auditor 同 GLM commander → mid 安全偏松 pass）。详见 tree-auditor SKILL §7 多模型交叉。
-                   # 🚫仍禁 create_session/delegate_agent 当 SubAgent（调用形式红线 §13.5）；建 auditor 真 session 用 create_session 合法（§13.4.5 L859 同义）
-[caller=root]   2. tree_leaf_add(role='auditor', session_id=<auditor session>, parent=<commander leaf>,
-                   added_by=<root.session_id>, path=<大写字母开头段>)
-                   # auditor leaf 初始 status='active', audit_gate.verdict='required'（不能自审）
-[caller=auditor]3. tree_event_append(type=brief_echo, meta={my_understanding, milestones_preview:[]})  # 简化协议，无 milestone
-[caller=auditor]4. tree_event_append(type=done, meta={self_check})              # 简化协议，无 deliverables/review_round
-[caller=root]   5. tree_audit_gate(leaf_id=<auditor>, verdict=pass, audit_session_id=<root.session_id>)
-                   # root 信任锚背书（resolveAuditorIndep 行 2432-2446 放行）；caller===audit_session_id
-[caller=auditor]6. tree_leaf_set_status(leaf_id=<auditor>, status=done)         # 简化门禁通过
+L2 commander 给自己子树 worker 配门禁:
+  1. commander send_message(root, "请代调：
+       tree_milestone_set_result(tree_id, leaf_id=<我的 worker>, milestone_id,
+         audit_pass=true, audit_session_id=<root.session_id>) +
+       tree_audit_gate(tree_id, leaf_id=<我的 worker>, verdict=pass,
+         audit_session_id=<root.session_id>)")
+  2. root 代调（caller=root === audit_session_id=root，L3061 root-as-auditor 放行）
+  3. commander 收 ack → send_message(worker, "audit_gate pass，你可以 set-status done")
+  4. worker 自己 set-status done（caller=worker）
 ```
 
-auditor leaf done 后即满足 V10-auditor-active（status=done + events 非空 + audit_gate=pass），可担任后续 worker 的 auditor。
+**root idle 3 道防线**（macp4 实证 root idle gap：fire-and-forget 派 root 后 root 处理首条 brief 即 idle，后续 send 撞 SDK 队列死锁"上一条消息仍在处理中"，但 `get_session_context` 返回"No usage data yet"——SDK 误判 idle 为"处理中"）：
+- **防线 1（活性探测前置，必做）**：commander 请 root 代调前，先 ping `mcp__session__send_message(root.session_id, "<ping>", wait=true)`，3-5s 超时。wait=true 在 SDK 正常时秒回；root idle 时撞"上一条消息仍在处理中"或超时 → 探测失败，转防线 3。
+- **防线 2（派遣期预防，写进 tree-iterative-development SOP §2.2）**：父会话派 root 指挥官用 `wait=true`（强制持续 turn），或 fire-and-forget 派后立即发 1 条 ping 确认活。这是父会话职责，不是 L2 commander。
+- **防线 3（root idle 应急）**：
+  - 3a **转 2 层树（推荐）**：prune 中间 commander 层 → root 直管 worker → 绕开"L2 commander done"问题。适用 commander 主要做中转、自身无重产出的场景。
+  - 3b **§13.6 极端应急**：done event + archived 形式闭环（非首选，最后兜底）。
 
-#### §13.4.2 auditor 简化协议（区别于 worker §13.3 八步）
+**三路径撞墙诊断**（撞 E_BORROWED_IDENTITY/E_AUDITOR_NOT_INDEPENDENT 时）：
+- 查是否走了"commander 自己配门禁（audit_session_id=commander 或 audit_session_id=root 但 caller=commander）"错误路径 → 改走 root 代调协议。
+- 查 auditor 是否挂错位置（commander 子树而非 root 子节点）→ 重建 auditor leaf（parent=root）。
 
-auditor leaf 不产出交付物（其"产物"是 audit_gate verdict + audit_log），故 done 门禁跳过 milestone/expect_outputs/deliverables/review_round，仅保留：
-- ✅ 保留：brief_echo + done 双事件 / audit_gate verdict=pass / done event 存在 / 状态机流转白名单
-- ⏭ 跳过：milestones 非空 / expect_outputs / deliverables 文件存在 / ISS-003 review_round / commander children done
+### §13.4 转正常期
 
-> auditor 的 self_check 仍需符合 schema（非空 `[{item,pass,evidence}]` 数组，至少 1 项 pass=true，evidence ≥10 字）——这是 done event 通用校验，不因简化协议免除。
+首个 worker done 后，若需长期独立 auditor（复杂树多 worker 并行审查）:
+- commander 用 §13.3 流程把一个 auditor leaf 喂到 V10-auditor-active（repro 场景 A 实证：root 先给 auditor leaf 配齐，auditor leaf 自己 done 后即合格）
+- 之后该 auditor 走闸门3 审后续 worker（auditor 自己调 audit_gate，`caller=auditor.session_id`）
 
-#### §13.4.3 auditor 担任他人 auditor
+#### §13.4.0 建 auditor leaf 协议（P0-A，macp2 改进）
 
-auditor leaf done 后，可给 worker / 下级 auditor 背书：
+macp2 暴露 audit 门禁全回流 root 的问题——不是引擎禁止独立 auditor，而是 commander 不知道建 auditor leaf。引擎 `resolveAuditorIndep` 闸门2→闸门3 已完全支持（零引擎改动）。按以下四步流程，commander 可建独立 auditor leaf 给全树配门禁：
+
+> ⚠️ **多层级树（≥3 层）auditor 挂载位置（macp5 新增）**：auditor leaf **必须挂 root 子节点**（`parent=root`，是 commander 的兄弟 leaf），由 root 建（`added_by=root`）或 commander 建（`added_by=commander` 但 `parent=root`）。**绝不能挂 commander 子树下**（`parent=commander`）——若 auditor.added_by=commander 且 commander 想给它配门禁，撞 L3091 `auditor=added_by` 自审禁令；auditor 永远 done 不了（macp4 结构错误实证）。正确做法见 §13.3b"正确树结构"。
+
 ```text
-[caller=auditor] tree_audit_gate(leaf_id=<worker>, verdict=pass, audit_session_id=<auditor.session_id>)
-```
-- caller=auditor.session_id === audit_session_id → caller 校验通过（cmdAuditGate 行 2926）
-- resolveAuditorIndep 通用路径（行 2467-2490）校验 auditor leaf：status=done + events 非空 + 自己 audit_gate=pass → 放行
-- 🔴 auditor 不能自审：audit_session_id=auditor 自己 → `E_AUDITOR_NOT_INDEPENDENT`（"auditor is the leaf itself"，行 2478）
+步骤 A: commander fork 一个 role=auditor leaf
+  mcp__tree__tree_leaf_add(tree_id, leaf={role='auditor', parent=<commander/root>, ...})
+  → 引擎不禁止（只禁 worker/auditor 担任 added_by，root/commander 可建 auditor leaf）
 
-#### §13.4.4 root 信任锚保留作冷启动兜底
+步骤 B: auditor leaf 完成自身工作
+  auditor leaf 走简化协议（brief_echo + done event，无 milestone/review_round/deliverables）
+  → auditor leaf status=done + events 非空 + audit_gate 初始 ='required'
 
-auditor role 引入后，root 信任锚（§13.2）**仍保留**：冷启动期（无任何 auditor leaf done 时）root 当所有 leaf 的 auditor。转正常期后逐步交给 auditor leaf 链式背书（上级 auditor 背书下级 auditor，§13.4.3）。root 永远是最后兜底的信任锚——auditor leaf 的 audit_gate=pass 在冷启动期由 root 背书（§13.4.1 步骤5）。
+步骤 C: root 用闸门2 背书 auditor leaf
+  mcp__tree__tree_audit_gate(tree_id, leaf_id=<auditor>, verdict='pass', audit_session_id=<root.session_id>)
+  → 闸门2（root 信任锚）放行 → auditor.audit_gate.verdict=pass
+  → auditor leaf 满足 V10-auditor-active 三连（done + events 非空 + audit_gate=pass）
 
-#### §13.4.5 auditor session 卡死 fallback（P1-S04 单边缓解，2026-07-14 Sprint 5）
-
-> **场景**：auditor leaf 创建流程（§13.4.1）中，步骤1 `fork_session` 产出的 auditor session 因 **Proma fork identity timeout（BUG-A 跨仓）** 卡死——session identity 未就绪，auditor 无法调 `mcp__tree__*`（caller 校验失败）或 session 长时间无响应。导致 auditor role done 路径不可用（P1-S04，audtest 端到端失败根因）。
->
-> **根因跨仓**：fork identity timeout 是 Proma app 层 bug（fork 后 session identity 异步就绪，偶发超时），tree-harness 单边无法根治。本节是**单边缓解**（SKILL fallback），让 auditor 流程在 fork 卡死时仍可恢复。真正根治需 Proma 修 fork identity（跨仓，标记汇报，不在 tree-harness 范围）。
-
-**判定 auditor session 卡死**（满足任一，区别于 pro 正常冷启动慢）：
-- fork 后 `list_messages` / `send_message` 长时间无响应（>3 分钟，远超 pro 冷启动预期）
-- auditor 调 `mcp__tree__*` 反复报 caller 校验失败（session identity 未注入）
-- `get_session_info` 返回异常或 session 状态长期异常
-
-**fallback 流程**（root 执行，单边缓解）：
-```text
-[caller=root] 1. mcp__session__archive_session(session_id=<卡死的 auditor session>)
-                 # Proma 层归档卡死 session（释放侧边栏；session_registry 记录不删——Sprint 5 max_sessions 仍计它）
-[caller=root] 2. mcp__session__fork_session（或 create_session）→ 新 auditor session
-                 # 🚫仍禁 create_session/delegate_agent 当 SubAgent（调用形式红线 §13.5）；这里是建 auditor 真 session，合法
-[caller=root] 3. tree_leaf_set_session(leaf_id=<auditor leaf>, new_session_id=<新 session>)
-                 # caller=root.session_id === leaf.added_by（root 创建了该 auditor leaf，§13.4.1 步骤2 set-session caller-binding 放行）
-                 # 把 auditor leaf 的 session 换成新的（保留 leaf_id + 已有 events；新 session 登记 session_registry，Sprint 5 max_sessions）
-[caller=新session] 4. 继续 §13.4.1 步骤3（brief_echo/done/audit_gate/set-status done），caller 用新 session
+步骤 D: auditor leaf 自主给全树任意 leaf 配门禁
+  auditor 自己调 audit_gate / milestone_set_result（caller=auditor.session_id，走闸门3）
+  → 闸门3 查 auditor status=done ✅ + events 非空 ✅ + audit_gate=pass ✅ → 放行
+  → auditor 可以给任意 worker leaf 配门禁，不限子树范围
 ```
 
-**约束（红线）**：
-- 🔴 fallback 是**异常恢复**，不是常规路径。同一 auditor leaf 重 fork **≤2 次**；超过 → 停下排查 fork identity 根因（跨仓），勿无限重试（每次重 fork 新增 session_registry 记录，会撞 max_sessions）。
-- 🔴 归档卡死 session **不释放** max_sessions 额度（session_registry 记历史 session 总数防调用形式型爆炸——归档≠没创建过）。频繁 fallback 本身就是反指标。
-- 🔴 若 auditor leaf **已 done**（§13.4.1 步骤6 后才卡死，罕见），**不要 fallback**——leaf 状态已完成，session 卡死不影响 leaf。
-- **替代方案**：若 fork 反复卡死（>2 次），回退 §13.4.4 root 信任锚（root 当 auditor），不强制走独立 auditor leaf。root 信任锚不依赖 fork，无 identity timeout 风险。
+#### §13.4.0a 待审 worker 清单维护流程（macp4 新增，防 C2 遗漏）
 
-#### §13.4.6 fix leaf 反馈闭环（Gap B, v0.22）
+> macp3 C2 遗漏异厂商审查的根因：中转链（commander→root→auditor）中 root 没有"待审队列"视角，最后一个 done 的 worker 从指间滑落。以下 6 步流程教 root 维护待审清单：
 
-> **场景**：auditor 完成 audit_append（leaf.audit_log 含 findings）后，severity≠green 的 findings 需要修复闭环——worker "非 red 不修" + auditor findings 无 fixer 回修 = nanjuS1 实战暴露的系统 gap（9 yellow 进"已知但未修复"真空）。
+```text
+root 在中转链上的待审清单操作（6 步）:
+  1. 【记】每当 commander 派 worker → root 在待审清单记一行
+     {leaf_id, commander, auditor, status='pending_done'}
+  2. 【更】worker done → 更新 status='pending_audit'，准备中转给 auditor
+  3. 【转】root 中转审查请求给 auditor（macp4 P1-B R7-sibling-send 已让兄弟直发，可省中转；
+     未启用直发时仍走 root 中转）→ 更新 status='in_audit'
+  4. 【划】auditor 审完（audit_gate pass）→ 更新 status='audited'，划掉
+  5. 【催】定期核对清单：status='pending_audit' 超过 N 分钟未进入 'in_audit' → 主动催 auditor
+  6. 【验】全树 done 前做最终遍历：清单中 status!='audited' 的按条排查。清单非空但 worker 全部 done
+     → 遗漏异厂商审（macp3 C2 教训），必须补审
+
+清单格式建议: .context/pending-audit.md（markdown 表格，每行一个 worker）
+全清单空 = 审查闭环完成。
+```
+
+**关键认知**：
+- macp2 中 audit 全回流 root 是 SKILL/流程层问题，引擎闸门2→闸门3 已天然支持（见 engine-evaluation.md P0-A 论证）
+- 冷启动期仍需 root 走闸门2（§13.2），auditor leaf done+pass 后立即转入正常期
+- auditor done 后 set-status 同样要 auditor 自己调（P1-C 规则）
+- 引擎 `resolveAuditorIndep` 闸门3 要求 auditor 自己 status=done + events 非空 + audit_gate=pass——这就是"V10 冷启动约束":冷启动期无任何 leaf 满足它，必须 root 通过闸门2 打破死锁，步骤 C 正是此意
+- 即：**root 只在冷启动期当 auditor，正常期交给独立 auditor leaf**
+
+#### §13.4.6 fix leaf 反馈闭环（Gap B，v2.9.1 合并自 Pro v0.22）
+
+> **场景**：auditor 完成 audit_append（leaf.audit_log 含 findings）后，severity≠green 的 findings 需要修复闭环——worker "非 red 不修" + auditor findings 无 fixer 回修 = 实战暴露的系统 gap（non-green findings 进"已知但未修复"真空）。
 
 **闭环流程**（commander 编排）：
 1. auditor 完成 audit_append → leaf.audit_log 含 findings（severity red/yellow/green + item/evidence）
 2. commander 读 audit_log → 过滤 severity≠green 的 findings → 生成 fix_brief
 3. **派 fix leaf**（create_session，role=worker，brief 含 audit_log findings + 原始 worker deliverables 路径）：
-   - fix leaf 修每项 finding → edit_file（改产物）/ downgrade（降级附理由）/ deferred（推迟到 S2）
+   - fix leaf 修每项 finding → edit_file（改产物）/ downgrade（降级附理由）/ deferred（推迟）
    - fix leaf done event meta 含 `fixes_resolved`：`[{finding_ref, fix_method: edit_file|downgrade|deferred, fix_evidence ≥20字}]`
 4. **auditor 复审 fix leaf**（audit_gate + audit_append，确认修复有效）
 5. fix leaf done（auditor 复审 pass）
 
 **关键约束**：
-- fix leaf 是 role=worker（不是 auditor），走完整 worker 协议
+- fix leaf 是 role=worker（不是 auditor），走完整 worker 协议（brief_echo + milestone + done + audit_gate）
 - fixes_resolved 必须覆盖 audit_log 中所有 severity≠green 的 findings
 - 与 §14.2 fix 区别：§14.2 fix 是审计任务批量修正（审被审文档）；§13.4.6 fix 是独立审 worker 产物的反馈闭环
-- 🔴 **v0.26 G1：fix leaf 派出后立即回填 alignment=1.0**（njs1 实证：C1 原版 brief_echo 后等 commander 回填 alignment，但 commander 没回填 → 2.5h V5b 死锁；C1-i2 靠预设 milestone + 即时 alignment 成功）。**fix leaf 是修正任务（edit/downgrade/defer），不需要重评对齐度——commander 派 fix leaf 后立即 `tree_event_append(type=brief_echo, meta={alignment:"1.0", auditor_session_id=root.session_id})` 到 fix leaf**，不等 fix leaf 自己 brief_echo。
-- 🔴 **v0.26 G4：状态机 gap 应急——上行 blocked，不直改 JSON**（njs1 实证：commander 被迫直改 tree-state.json 绕过门禁 → 违规被叫停回滚）。如果 root done 被引擎拦（archived 子 / audit_gate 问题 / 其他状态机 gap），**commander 上行 `blocked` 请示编排方**（send_message 给编排方 + tree_event_append type=blocked），由编排方判断（引擎升级 / prune 子 / force 命令 v0.27）。**绝对不要直改 tree-state.json 文件**——那是引擎独管的状态，绕过门禁=破坏审计链。
+- 🔴 **fix leaf 派出后立即回填 alignment=1.0**：fix leaf 是修正任务（edit/downgrade/defer），不需要重评对齐度——commander 派 fix leaf 后立即 `tree_event_append(type=brief_echo, meta={alignment:"1.0", auditor_session_id=root.session_id})` 到 fix leaf，不等 fix leaf 自己 brief_echo（避免 V5b 死锁）
+- 🔴 **状态机 gap 应急——上行 blocked，不直改 JSON**：如果 root done 被引擎拦，commander 上行 `blocked` 请示编排方（send_message + tree_event_append type=blocked）。**绝对不要直改 tree-state.json 文件**——绕过门禁=破坏审计链
 
-**与 Gap A（yellow_findings_resolved）协同**：worker 自己 review_round 的 yellow → yellow_findings_resolved（worker done event）；auditor 发现的 yellow/red → fix leaf 闭环（§13.4.6）。两层闭环。
+**与 yellow_findings_resolved（P1b）协同**：worker 自己 review_round 的 yellow → yellow_findings_resolved（worker done event）；auditor 发现的 yellow/red → fix leaf 闭环（§13.4.6）。两层闭环。
 
-### §13.5 SDK SubAgent 的位置（2026-07-07 重写：SubAgent 入树）
+### §13.5 SDK SubAgent 的位置
 
-SDK SubAgent（researcher / code-reviewer / implementer / 任意自定义 role）是**父 leaf 上 `subagent_spawn` 事件溯源的一等劳动单元**。commander / commander-下任意级 leaf 都鼓励用 SubAgent 放大产能：调研、审查（G1-G5 维度）、实现、审计维度，均可派 SubAgent 干活，再把劳动记录挂在自己 leaf 上。
-
-🔴 **caller-binding 不变**：SubAgent **永不当 caller / auditor-of-record**（它不是 Proma session）。`audit_gate` / `milestone_set_result` / `audit_append` 的 `audit_session_id` 仍填 `root.session_id`（冷启动，见 §13.2）或独立 auditor leaf session（正常期，见 §13.4）。SubAgent 的劳动通过 `subagent_spawn` 事件归因，不改变 done / audit_gate / milestone 的 caller 校验。
-
-> ### ⚠️ 调用形式红线（2026-07-08 调用形式事故强制；违者＝成本爆炸）
->
-> **SubAgent 必须用内置 `Agent` 工具**（进程内 SDK subagent，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启 → 不建独立 Proma 会话、不进侧边栏、只花 token、有专用 subagent 模型路由）：
->
-> ```
-> Agent(description:"G1 完整性审查", prompt:"<视角专属指令：读 <交付物>，按 G1 标准只提 findings，每条 {item,severity,evidence≥10字}>", subagent_type:"Explore")
-> ```
->
-> **🚫 严禁**用 `mcp__session__create_session` / `mcp__session__fork_session` / `mcp__collaboration__delegate_agent`(或 delegate_agents) 当 reviewer / SubAgent —— 它们**建真实 Proma 会话**，每个烧独立 API 额度（既往调用形式事故：某模型误用，短时炸百级会话、额度耗尽）。
->
-> **撞错（`E_DUPLICATE_SESSION_ID` 等）修根因，禁止换名（v2/b/x）重试新建会话**（换名重试循环放大器）。
->
-> **收敛条件（成本有界，2026-07-08 调用形式事故强制；细则）**：
-> - **角色数按交付物分档**：2/3/5（**上限 5**）。最小档 ≥2（禁单角色=禁自审自批）。分档对齐 worker SKILL §4.6 字数/复杂度阈值——简单交付物小档、跨文件/架构级交付物大档。
-> - **轮数 ≤3**：末轮 `red_count=0` 即收敛停；3 轮未收敛则**升级（blocked 上行 / commander 接管）而非无限重试**。
-> - **🚫 禁止靠新建会话重试**：未收敛时新建 reviewer session 是换名重试循环放大器。`total = 角色数 × 轮数`，有界可预算。
->
-> **预算护栏（硬上限，建 tree / brief 时设置）**：
-> - **tree 级**：`audit_meta.max_sessions` —— 单棵 tree 全程 session 总数硬上限（init/add/set-session/register 四路径登记 + patches 旁路登记，超 → `E_MAX_SESSIONS`）。
-> - **worker 级**：`max_subagent_spawn` —— 单 worker 派 SubAgent 次数硬上限。
-> - 撞 `E_MAX_SESSIONS` / `E_DUPLICATE_SESSION_ID` 等预算错 → **修根因（任务范围/分档/未释放的旧 session），禁换名（v2/b/x）重试新建**。
->
-> **Proma 心智模型**：Proma 原生 spawn（`create_session` / `fork_session` / `delegate_agent`）= 真实会话 = 钱。"廉价 SubAgent" 只存在于进程内 Agent 工具，必须本节红线显式指定。
->
-> **前置验证（任何 SubAgent 设计前）**：确认目标会话工具集**是否含进程内 Agent 工具**（看 SKILL/工具清单）。若无（如某些第三方模型 runtime 无 SDK subagent）→ 设计降维：单 reviewer 或 commander 自审，**不**假设可无限派 SubAgent。
-
-#### §13.5.1 怎么记：父 leaf 上 append subagent_spawn 事件
-
-commander（或任意级 leaf）派 SubAgent 干活后，**在自己 leaf 上** append 一条 `subagent_spawn` 事件，把 SubAgent 产出落到 `<treeDir>/deliverables/subagent-outputs/`。引擎在 append 时校验：`subagent_id` 父段必须 = 本 leaf_id；`status=done` 时 `output_ref` 文件必须存在且 size > 0（治 BUG-1 假 UUID + BUG-3 0 字节产物）。
-
-**写法示例（可直接复制，仅替换 `<>` 占位符）**：
-
-```yaml
-# 前置：SubAgent 真实产出到 <treeDir>/deliverables/subagent-outputs/sub-<本leaf>-<序号>.md
-#       文件必须非空（0 字节 → E_DELIVERABLE_EMPTY）
-
-mcp__tree__tree_event_append(
-  tree_id=<tree_id>,
-  leaf_id=<父 leaf_id,如 rvreq1-A1-worker 或 root>,   # subagent_id 父段必须 === 这个 leaf_id
-  type="subagent_spawn",
-  meta={
-    subagent_id: "sub:<父 leaf_id>:01",               # 格式 sub:<leaf_id>:<序号>,父段必须=本 leaf
-    role: "review",                                    # review | research | implement | audit
-    perspective: "G1",                                 # role=review 时必填(G1-G5);其余可省
-    purpose: "<非空:这个 SubAgent 干什么的一句话>",
-    output_ref: "subagent-outputs/sub-<父 leaf>-01.md", # 相对 deliverables 根;status=done 时必须存在且 size>0
-    status: "done"                                     # done | failed,缺省 done;failed 时 output_ref 可省
-  }
-)
-# 引擎校验:
-#   - subagent_id 父段(split(':')[1]) === leaf_id,否则 E_SCHEMA_INVALID(禁借别 leaf 的 SubAgent)
-#   - status=done 时 output_ref 文件必须存在(否则 E_DELIVERABLE_MISSING)且 size>0(否则 E_DELIVERABLE_EMPTY)
-```
-
-> **路径语义（治 BUG-2，与 expect_outputs 区分）**：
-> - `expect_outputs`（milestone / DoD）相对 **deliverables 根**，如 `design.md`（不带 `deliverables/` 前缀）。
-> - `subagent_spawn.meta.output_ref` 同样相对 **deliverables 根**，约定放 `subagent-outputs/` 子目录，如 `subagent-outputs/sub-rvreq1-A1-worker-01.md`。
-> - 两者解析时都拼到 `<treeDir>/deliverables/<outPath>`；禁绝对路径 / 禁 `..` 遍历。
-> - **symlink 校验范围（A2 审计修正）**：`expect_outputs` 在 done 门禁路径会查 symlink（防软链绕过）；但 `subagent_spawn.meta.output_ref` 当前**只**走 path-safe 校验（非空 / 非绝对 / 无 `..` 遍历），**不查 symlink**。即 output_ref 经 path-safe 校验后即放行——其内容真实性靠 commander 他审（§4 Step4）+ 阶段二 Layer2 兜底，不靠 symlink 拦截。
-
-#### §13.5.2 与 review_round 的关系（reviewer_kind:subagent）
-
-SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `reviewer_kind: subagent` 登记（而非 `reviewer_kind: session`）：
-
-- `reviewer_kind: session`（缺省）：真实 UUID 路径——`reviewer_session_id` 是独立 session 的真实 UUID，引擎校验 `≠ leaf.session_id`、`≠ leaf.added_by`。**仅 commander/auditor 他审可用；worker role 禁（v0.18 → `E_REVIEW_SESSION_FORBIDDEN`，worker 自审走 subagent 分支）**。
-- `reviewer_kind: subagent`：用 `reviewer_ref = sub:<本 leaf_id>:<序号>`，**禁止** 给 `reviewer_session_id`；引擎溯源同 leaf 必须有匹配的 `subagent_spawn` 事件（`meta.subagent_id === reviewer_ref`），否则 `E_REVIEW_FORGERY`（防伪 SubAgent）。
-
-`review_round.meta.independence`（可选，引擎只记录不强制）：
-- `self_delegated`：worker / leaf 自己派的 SubAgent 自审（第一道筛，初筛）。
-- `independent`：auditor leaf / commander fork 真 session 他审（第二道闸，真闸）。
-
-> **commander 自己的审计 SubAgent**：commander 派 SubAgent 做某维度的独立复核，是 commander **自身** 的劳动记录——commander 不是被审 leaf，所以这条 `subagent_spawn` + 对应 `review_round`（`reviewer_kind: subagent` + `independence: independent`）记在 **commander leaf** 上，作为 commander 抽查产物的证据链，不污染被审 worker 的 events。
-
-> **review_round 校验时机（A2 审计 P2-1）**：`review_round` 的 schema 校验在 **set-status done 门禁**时一次性触发（非 `event_append` 时即时拦）。即格式错的 review_round 能成功 `tree_event_append`，但会在 `tree_leaf_set_status(done)` 门禁被 `E_SCHEMA_INVALID` / `E_REVIEW_FORGERY` / `E_REVIEW_NOT_CONVERGED` 拦下。所以"append 成功 ≠ 过审"，最终拦截点在 done 门禁。
+对齐度评估、验收等"智力活"可用 SDK SubAgent（researcher / code-reviewer），但 SDK SubAgent 无 Proma session_id，**不能当引擎 auditor**。`auditor_session_id` 永远填 `root.session_id`（冷启动）或独立 auditor leaf session（正常期）。
 
 ### §13.6 极端应急（引擎/协议彻底失效时）
 
@@ -986,16 +1015,14 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 | 错误码 | 哪步触发 | 含义 | 修复方法 |
 |--------|---------|------|---------|
 | `E_DUPLICATE_SESSION_ID` | `leaf_add` | 该 `session_id` 已被别的 leaf 注册（一 session 不能挂多 leaf） | worker 重新 `fork_session` 拿一个新 `session_id`，再用新 id 重新 `leaf_add` |
-| `E_BORROWED_IDENTITY` | `leaf_add` / `leaf set-session` / `milestone set-result` / `done` event / `audit_gate` / `audit_append`（多处 caller≠audit_session_id 校验） | caller（调工具的 session）≠ `audit_session_id`（冒名背书） | commander 把"该 worker 调的工具"通过 `send_message` 让 worker 自己调；冷启动期 `audit_session_id` 永远填 `root.session_id`（详见 §13.2/§13.0） |
+| `E_BORROWED_IDENTITY` | `leaf_add` / `leaf set-session` / `milestone set-result` / `done` event / `audit_gate` / `audit_append`（多处 caller≠audit_session_id 校验） | caller（调工具的 session）≠ `audit_session_id`（冒名背书） | commander 把"该 worker 调的工具"通过 `send_message` 让 worker 自己调；冷启动期 `audit_session_id` 永远填 `root.session_id`（详见 §13.2/§13.0）。**多层级树（≥3 层）**：L2 commander 给自己子树 worker 配门禁时填 `audit_session_id=root.session_id` 但 caller=commander≠root → 撞此错；改走 §13.3b root 代调协议 |
+| `E_AUDITOR_NOT_INDEPENDENT` | `milestone set-result` / `audit_gate`（`resolveAuditorIndep` 闸门，L3061/L3091） | auditor 不独立：`audit_session_id` 填了自己（caller===audit_session_id 但被审 leaf.added_by=auditor）或 auditor 不满足 V10-auditor-active | **单 commander 树**：冷启动期 `audit_session_id` 填 `root.session_id`，由 root（commander 自己）调。**多层级树（≥3 层）**：L2 commander 填 `audit_session_id=commander 自己` → L3091 `auditor=added_by`（worker.added_by=commander）→ 撞此错；改走 §13.3b root 代调协议。auditor leaf 须 V10-active（done+events+gate=pass）才能审别人 |
 | `E_AUDIT_PREMATURE` | `audit_gate pass` | 步骤6 audit_gate pass 时，被审 leaf 的 events 里还没有 done event（步骤5 done event 漏做，或步骤顺序反了：6 跑在 5 之前） | 先让 worker 写 done event（步骤5），再调 `tree_audit_gate(verdict=pass)`（步骤6） |
 | `E_SELFCHECK_INVALID` | `done` event | `self_check` 不是 `[{item,pass,evidence}]` 数组（缺字段/格式错） | 改 schema 见 tree-worker SKILL §3.1（每项必须有 `evidence` ≥10 字证据；至少 1 项 `pass=true`（全 false 与 done 矛盾，V6 拦截）） |
 | `E_DELIVERABLE_MISSING` | `set-status done` | `expect_outputs` 声明的文件未落盘到 `deliverables/` | 让 worker 把产出写到 `<treeDir>/deliverables/<outPath>`（相对路径，禁绝对路径/symlink）后重试 |
 | `E_ALIGNMENT_NOT_VERIFIED` | `audit_gate pass` | worker 的 events 缺 alignment 回填（§13.3 步骤4 漏做） | commander 回填一条 `brief_echo` event（`meta={alignment, auditor_session_id=root.session_id}`），见 §6 回填机制 / §13.3 步骤4 |
 | `E_GATEKEEPER_REQUIRED` | `set-status done` | 没先 `audit_gate pass` 就直接 set done（缺门禁背书） | 先调 `tree_audit_gate(verdict=pass, audit_session_id=root.session_id)`（§13.3 步骤6）通过后再 set-status done |
-| `E_DELIVERABLE_EMPTY` | `set-status done` / `subagent_spawn` event | 产物文件存在但 **0 字节**（治 BUG-3：worker / SubAgent 写了空文件冒充交付） | 让 worker / SubAgent 写**真实非空内容**后重试。引擎把 0 字节视为未交付（与 `E_DELIVERABLE_MISSING` 同等拦截） |
-| `E_REVIEW_FORGERY` | `review_round` event_append（`reviewer_kind=subagent`） | `reviewer_ref`（如 `sub:<本leaf>:01`）在本 leaf 找不到匹配的 `subagent_spawn` 事件，或同时给了 `reviewer_session_id`（互斥） | 先 append 对应 `subagent_spawn` 事件（含合法 `output_ref`，见 §13.5.1），再写 `review_round`；`reviewer_kind=subagent` 时**禁止**给 `reviewer_session_id` |
-
-> **触发点覆盖度注（A2 审计 P1-2/P1-3）**：上表每行只列**高频/代表性**触发点（如 `E_REVIEW_FORGERY` 引擎实际有 ~17 处 caller，`E_DELIVERABLE_MISSING` 多处）。完整触发点以引擎返回的 `error.message` + `help_topic` 为准——撞错后先看返回里的 `help_topic`，本表只用于快速定位高频场景，不展开穷举。
+| `E_SCHEMA_INVALID` | `set-status done`（root 自身 done） | root 调 set-status done 撞 L1767 milestone 门禁（引擎无 role=root 豁免，macp3 实证） | 走 §13.3a.2 备选路径：root 先 milestone_add 给自己（1 条）→ milestone_set_result → 写 done event → set-status done。若引擎已修 L1767 豁免，直接走 §13.3a.1 正常路径即可 |
 
 > **通用排查注**：所有 `mcp__tree__*` 工具失败时返回 `{ok:false, error:{code, message, help_topic}}`。若返回里带 `help_topic` 字段，**立即** `mcp__tree__tree_help(topic=<help_topic>)` 拿该主题详细用法——多数错误根因是参数 schema 或调用顺序错，help_topic 给的就是正解。
 
@@ -1011,28 +1038,6 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 - 任务 brief 中含 "审计/审查/验证/验收/终局/converge/audit/verify/review" 等关键词
 - 需要对一份已完成文档进行可信度评估
 - 子会话 done 上报后进入 §4 Step 4 质量门
-- 🔴 **重要产出类文档任务**（设计文档 / API 规格 / 架构文档 / PRD / 数据模型等正式交付物）：产出后**必须**按 §14.2 派 auditor 复核一致性 / 完整性，**不能仅靠 worker 自报 done + §4 Step4 单验收 Agent**。此类任务即便 brief 不含"审计"关键词、也不属于"评估已有文档"，**仍属 §14 审计范围**。
-
-#### §14.1a 自审事故教训：brief 审计义务不可标"可选"（2026-07-15）
-
-**事故摘要**：commander 派 4 worker 产细分文档（agent-comm / 前后端 API / 数据模型 / events），4 worker 全 done、产物落盘，但**全程无独立 auditor leaf、worker 无 review_round 自审**。对照同 SKILL 同 commander 的另一组任务（派了完整 auditor），根因是 **brief 配置释放了审计义务**，不是 SKILL 逻辑问题。
-
-**根因链（三条独立，任一即足以击穿质量防线）**：
-- **链 A — worker 无自审**：`audit_meta.review_required=false` → done 门禁不要求 review_round → worker 不跑自审（worker SKILL §4.6 触发条件 = `review_required=true` **或** 自检"设计文档/架构级/跨文件≥1000字"主动开；worker 没主动开）。
-- **链 B — commander 无 auditor**：`root_dod.self_check` 写 `auditor role审查(可选)一致性pass`——**"（可选）"直接释放了 commander 派 auditor 的义务**。对照组写 `1 auditor status=done 且 audit_log 含 passed/failed 统计`（硬 DoD）→ commander 派了 auditor leaf。
-- **SKILL 盲区（放大器）**：§14 触发词是"文档**审计**/验证/终局审查"+"对**已完成**文档可信度评估"——产出新文档（非审计已有）时 commander 判定 §14 不触发。本节 §14.1 第 4 条即此盲区的修复（强制"产出类文档"也触发）。
-
-**铁律（写 brief / 建 tree 必须遵守）**：
-1. **产出类文档任务（≥1 份设计文档/API 规格/架构文档/PRD 等正式交付物）默认 `review_required=true`** —— 让引擎 done 门禁强制 worker 跑自审，不靠 worker 自觉。
-2. **auditor 写成硬 DoD，禁止"（可选）"措辞** —— `self_check` 写 `1 auditor status=done 且 audit_log 含 N 条 findings`（参照对照组），不能写"（可选）"。brief 一旦标可选，commander 会自主跳过整条 auditor 链。
-3. **prefix 命名 ≤8 字符**：`root_brief.prefix` 必须匹配 `[a-z][a-z0-9_]{3,7}`（4-8 字符，小写开头，无连字符）。超长名（如 10 字符）会潜伏到 leaf_add 才 `E_NAME_INVALID` 全卡死（worker 靠 create_session+send 产了文件但 leaf 没入树）。引擎 init 已前置校验（建 tree 即拦），命名时仍自查。
-
-**brief checklist（建 tree 前过一遍）**：
-- [ ] 产出含正式文档/架构级/跨文件交付物？→ `audit_meta.review_required=true`
-- [ ] DoD 里 auditor 是硬条件（非"可选"）？
-- [ ] `root_brief.prefix` ≤8 字符且匹配 `[a-z][a-z0-9_]{3,7}$`？
-
-> **与 §13.5 互补（两类典型事故对照）**：§13.5 = SubAgent **调用形式**必须钉死（防成本爆炸，建真实会话烧独立 API 额度）；本节 = brief **审计义务**不可标可选（防质量防线被一句话释放，worker 无自审 + commander 无 auditor）。两者都是"SKILL/brief 没钉死 → commander/worker 自主简化 → 事故"，发布版用通用术语描述，发布后读者只需理解两类风险模式。
 
 ### §14.2 最小审计树结构（强制执行）
 
@@ -1052,9 +1057,6 @@ SubAgent 当 reviewer 时，在**父 leaf 上**的 `review_round` 事件里用 `
 - C1-C4 和 A1-A2 必须并行启动（相互独立）
 - 修正员（fix）在所有审查员返回后启动
 - 禁止指挥官亲自充当审查员（"自己画靶自己打分"）
-- 🔴 **审查 leaf 用 role=auditor**（P0a，见 §13.4）：C1-C4/A1-A2 用 `leaf_add(role='auditor')` 创建，走简化协议（brief_echo+done+audit_gate，无 milestone）。**禁止用 role=worker/commander 假装 auditor**（既往假阳性事故 A4 场景用 commander → C-13/R-03 假阳性 24-38 条；既往假阳性事故 A3 场景用 worker → W-AUDIT-WORKER 违规）
-
-**SubAgent 放大审查产能（2026-07-07 新增）**：commander 的审计维度 leaf（C1-C4 / A1-A2）可派 SDK SubAgent 做深度审查（如某维度需要逐行核对大量证据 / 多视角交叉验证）。每个 SubAgent 在**它所属的审计 leaf** 上 append 一条 `subagent_spawn` 事件（`subagent_id` 父段 = 该审计 leaf_id），产出落 `deliverables/subagent-outputs/`。SubAgent 永不当该审计 leaf 的 caller / auditor-of-record（caller-binding 不变，见 §13.5）。
 
 ### §14.3 审计 5 件套模板
 
@@ -1184,10 +1186,15 @@ declare done 前逐项确认：
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
-| 2026-07-17 | v2.7 | **Gap B（auditor→worker 反馈闭环）**：§13.4.6 新增 fix leaf 反馈闭环——auditor audit_append 含 severity≠green findings 后，commander 派 role=worker fix leaf（fix_brief 含 audit_log findings + 原始 worker deliverables），fix leaf done meta 含 `fixes_resolved`（覆盖所有 severity≠green findings，fix_method=edit_file/downgrade/deferred + fix_evidence≥20字），auditor 复审 fix leaf（audit_gate+audit_append）闭环；nanjuS1 实战 9 yellow 进"已知但未修复"真空根因；与 Gap A（yellow_findings_resolved）两层闭环协同；engine 校验 v0.23 再加 |
-| 2026-07-16 | v2.6 | **v0.17.0 验证教训**：§6 加【监督判活红线】——长轮监督 worker/auditor 的 ground truth = events，不是 `leaf.status`/`tree.write_count`（假信号：worker done 后 status 仍 active / commander 自己写 tree 也涨 write_count）；判活三步（tree_event_list 拉 events → 看末尾 last_event_type + meta → 双确认停滞才算卡死）；nanju05 worker done 后 status=active 误判反例 |
-| 2026-07-08 | v2.5 | **调用形式事故修复**：§13.5 加【调用形式红线】——SubAgent 必须用内置 `Agent` 工具（进程内，`CLAUDE_CODE_ENABLE_TASKS=true` 已开启）；🚫禁 `create_session`/`fork_session`/`delegate_agent` 当 reviewer（建真实会话＝烧独立 API 额度，既往调用形式事故短时炸百级会话、某模型额度耗尽）；撞错修根因禁换名(v2/b/x)重试；收敛条件（角色 2/3/5 上限 5 + 轮≤3 + red_count=0 停/未收敛升级） |
-| 2026-07-07 | v2.4 | SubAgent 入树：§13.5 重写（SubAgent = 父 leaf 上 subagent_spawn 事件溯源的一等劳动单元；caller-binding 不变；新增 §13.5.1 写法示例 + §13.5.2 reviewer_kind:subagent / independence）；§4 Step4 加 independence 双重保险意识（self_delegated 第一道筛 / independent 第二道闸 / commander 抽查重点 + 可派自己 SubAgent 独立复核）；§14 加审计维度 leaf 可派 SubAgent 深度审查；§13.7 错误码速查表加 E_DELIVERABLE_EMPTY + E_REVIEW_FORGERY |
+| 2026-07-25 | v2.9.3 | **macp4 harness 改进（5 项）**：① **P1-F** §13.3a root done 路径扩展为三子节（正常/备选/诊断）——教 root 用 milestone_add 绕过 L1767 milestone 门禁 ② **P1-G** §13.4.0a 待审 worker 清单维护流程——6 步防 C2 类异厂商审遗漏 ③ **P1-H** §6 brief_echo 回填完成确认清单——5 项硬 checklist 防并发遗漏 alignment 回填 ④ **P2-C** §4 Step2.1a 层级选择指导——3 层 vs 4 层条件表 ⑤ §13.7 加 E_SCHEMA_INVALID root done 门禁说明 + §11 加 #16（漏待审清单）/ #17（漏回填 alignment） |
+| 2026-07-25 | v2.9.2 | **macp2 改进（3 项）**：① **P1-C** set-status caller=owner 讲透——§3.4 autonomy 预置 `final_step` 字段 + §13.3 八步末尾加警示（步骤7 worker 自己调，commander 代调→E_BORROWED_IDENTITY）② **P1-A** comm_log 硬 checklist——§4 Step3 必须紧接 tree_log_communication + §11 新增 #15 禁止漏记 + §6 措辞从 advisory 升级为硬要求 ③ **P0-A** 建 auditor 流程——§13.4.0 四步协议教 commander 建独立 auditor leaf（引擎闸门2→闸门3 零改动已支持），auditor done 后可给全树配门禁 |
+| 2026-07-25 | v2.9.1 | **合并 Gap B（fix leaf 反馈闭环）自 Pro v0.22**：Pro tree-commander 在 2026-07-17 Gap B 后停止同步，独有 §13.4.6 fix leaf 闭环（auditor 发现 non-green findings → commander 派 fix leaf 修复 → auditor 复审）。本次合并到 release（§13.4.6），保留 release 的 P0-1/P1-1/P1-2（v2.7-v2.9）+ Pro 的 Gap B。修复 nanjuS1 实战暴露的"non-green findings 进已知但未修复真空"系统 gap。 |
+| 2026-07-24 | v2.9 | **P1-2 send_message 可观测性**（macp 实战后改进）：macp 实战 root 用 send_message 驱动 worker 但 tree call-log 看不到 → 心跳误判 worker 冻结。新增 `tree_log_communication` / `tree_communication_list` 工具（tree-engine `communication log/list` 命令 + patches.cjs 注册，双渲染器共用 buildTreeTable）。记录 caller→target 活动（**不截内容**），自动定位 target leaf + 更新 last_event_ts（心跳可感知）。方案：tree 工具 + SKILL 协议教化（不自动 hook 核心 IPC，留作观察点）。§5 加 2 工具、§6 加外部通信记录协议、§15 v2.9。 |
+| 2026-07-24 | v2.8 | **P1-1 Worker progress 实时反映**（macp 实战后改进）：① 引擎 cmdEventAppend 在 worker 写首条 brief_echo 时自动 `status: pending_brief → active`（解决状态滞后，commander 心跳不再误判 worker 没动；幂等，只在 pending_brief 触发）；② EVENT_TYPE_ENUM 新增 `progress`（11 种），worker 长任务可主动报中间进度 meta={step,outputs_so_far?,eta?,percent?}，不强制 schema 轻量；③ §6 事件路由表加 progress 行 + brief_echo 状态联动说明 + progress 用法；§5 event_list 类型数 8→11。 |
+| 2026-07-24 | v2.7 | **P0-1 星形退化软约束**（macp 实战后改进）：新增 §4 Step2.1 层级委派协议（root→commander→worker 三分规则 + 越级反模式 + 单层树例外）；§11 加禁止行为 #14（root 越级 leaf_add worker）；tree-engine.cjs cmdLeafAdd 加 W_STAR_DEGRADATION 软约束（parent=root + role=worker + 已有 active commander 时返回 warning + leaf.delegation_hint 标记，不拦死）。解决 macp 实战中 3 commander 沦为孤儿、6 worker 越级直连 root 的星形退化。 |
+| 2026-07-23 | v2.6 | **v0.20 补丁**（pi 运行时彻底兼容）：patches.cjs 抽象"工具数据表+双渲染器"（renderClaude/renderPi），新增 `__proma_getPiCustomTools__` 钩子 + main.cjs 补丁P 在 pi IIFE 注入 customTools。pi 运行时（deepseek 等）现在也能拿到 mcp__tree__/session__/remote-session__（dev 实证 deepseek-v4-pro 三组工具全有、tree_help 正常，claude 零回归）。§4 Step2 更新——v0.20+ 上 pi 模型也可做 tree 参与者。用 zod 原生 toJSONSchema（zod-to-json-schema 包与 zod v4 不兼容）。 |
+| 2026-07-23 | v2.5 | **v0.18 补丁**（create_session 推断 agentRuntime）：remote_create_session 对 claude 兼容 provider 直接产出 claude 会话（dev 实证：ZLM/GLM-5.2 → 30 个 tree 工具）。§4 Step2 / §11 规则13 更新——v0.18+ 上 create_session 派生 tree 参与者也可行，fork_session 仍是跨版本安全默认。实例隔离 env 更正为 `PROMA_INSTANCE_ISOLATED=1`（非 PROMA_INDEPENDENT_PROFILE）。 |
+| 2026-07-22 | v2.4 | **运行时约束**：tree/session/remote-session MCP 仅 claude 运行时会话可用（pi 运行时只有 automation/collaboration/proma_cloud）。§2 前置检查加 pi 诊断（"Tool not found" 非 bug）；§4 Step2 强制 fork_session 派生 tree 参与者（继承运行时）、禁 create_session（默认 pi）；§11 加规则 13。根因见 memory tree-mcp-pi-runtime-incompat。 |
 | 2026-07-04 | v2.3 | ISS-003：§4 Step4 加 review_required=true 验收核查（核 review_round event + 抽查 findings 真实性，引擎只防格式，commander 抽查是内容真实性的真实防线） |
 | 2026-06-19 | v2.2 | 审计驱动修订：requires 中 commander-methodology.md 版本引用从 v1.0 更新为 v1.2 |
 | 2026-06-19 | v2.1 | 新增 §14 审计工作流（铁律 5、最小 7 leaf 结构、审计 5 件套模板、迭代收敛流程、完成检查表）；§0 引用 tree-audit-methodology.md；铁律从 4 条扩展到 5 条 |

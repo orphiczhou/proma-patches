@@ -74,6 +74,37 @@ fork identity 注入前 `await new Promise(r => setTimeout(r, 2000))`。
 ### 引擎语法
 - tree-engine.cjs + proma-dev-patches.cjs node --check OK + dist identical
 
+### P0-E 真实场景即时验证（2026-07-26 10:05，macp3 root 收尾）✅
+pro 09:58 重启（macp4 dist 加载）后，触发 macp3 root（c7494c62-c41e-4840-b687-af3867f37485）收尾 done：
+- **昨晚 20:39**（旧引擎内存）：root set-status done → `E_SCHEMA_INVALID "milestones must be non-empty"`（0 milestones + role=root 无豁免）
+- **今早 10:05**（P0-E 生效）：root done event（self_check 6 项 + 3 已知弱点）→ set-status done → `done (from=active)` ✅
+- root 独立核验：读 L1765 确认 `!isRoot` 豁免 + 核 C1=68 来源（a91c573e MiniMax 212 turns 真跑）+ 修正父模板数字（4 e2e→4 .test.ts 含 1 e2e+3 unit；7:2:1→5+2+1）+ 记 3 项已知弱点（judge 占位 16>5 / C2 root 自审非异厂商 / E_NO_OWNERSHIP 中转延迟）
+- macp3 整树闭环（父会话独立核验 tree-state.json）：12 leaves = done 9（root + X-auditor + 7 worker）+ archived 3（A/B/C commander）+ active 0 + validate 0 issues
+- 结论：**P0-E 在真实 macp3 root 场景即时生效，非纸面补丁**（单测 5/5 + 真实场景双证）
+
+### macp4 实战验证（2026-07-26 10:10-10:42，pro，3 层树 macp4）✅ 4/5 + 2 新工程问题
+
+派 root 指挥官（059ed80c）+ A-commander（50039c1f）+ A1-worker（c36bd3fe）+ auditor MiniMax（7bb30ebd），验证 4 项 macp4 改进 + P0-E 实战再确认。
+
+**5 验收点：4 PASS / 1 BLOCKED**
+
+| # | 验收点 | 状态 | 关键证据 |
+|---|--------|------|---------|
+| 1 | **P1-B 兄弟直发（头号）** | ✅ PASS | auditor leaf_add 10:17:26 → send 完成 + auditor 响应 **≈46s**，**无 E_NO_OWNERSHIP**；二次直发 10:34:10 同样无错。对比 macp3 中转 26+ 分钟。**R7-sibling-send 改进生效** |
+| 2 | **P1-H alignment 回填** | ✅ PASS | brief_echo 10:22:05 → alignment 0.95 回填 10:23:51，5 项 checklist 全 ✅ |
+| 3 | **P1-G 待审清单** | ✅ PASS | pending-audit.md 6 步状态机闭环，A1-worker status=audited |
+| 4 | **P0-E root done** | 🔴 BLOCKED | macp4-root session agent 从未启动（context="No usage data yet"），无法实战再确认。**但 P0-E 已在 macp3 即时验证 PASS**（10:05 root done），引擎改动相同（L1765 `!isRoot`），结论稳固 |
+| 5 | **多源 auditor** | ✅ PASS | MiniMax-M3 审 GLM worker，10 项 findings（9 green + 1 yellow 建议），**verdict=pass**（10:39:17 落 A1-worker），破 macp2 全 GLM 同质化 |
+
+**产出**：add.js（954B 双重类型保护）+ add.test.js（1527B，12/12 测试 EXIT 0）+ auditor verdict=pass（落 `.context/trees/macp4/`）
+
+**macp4 harness 改进验证总结**：**5/5 全部生效**（P0-E macp3 间接 + P1-B/H/G/多源 macp4 直接验证）
+
+**🔴 新发现工程问题（macp4 最高价值教训，非 harness 改进问题，记 memory `macp4-root-idle-v10-tension.md`）**：
+1. **root idle gap**（平台层 / SDK 死锁）：父会话 fire-and-forget 派遣 root → root 处理第一条 brief（tree_init + 派 commander）后 idle；后续上行（commander send × 4 + 父会话 wait=true × 1）全部撞 `"上一条消息仍在处理中"`，但 `get_session_context` 返回 `"No usage data yet"`——**SDK 误判 idle session 为"处理中"**。与 P0-D MCP 注入竞态同类 session 生命周期问题。
+2. **V10 多层级张力**（引擎层）：L2 commander 自己 done 三路径全撞墙：①audit_session_id=root → **E_BORROWED_IDENTITY**（caller≠root）②audit_session_id=自己 → **E_AUDITOR_NOT_INDEPENDENT** ③audit_session_id=auditor → caller≠auditor + auditor 不 V10-active。唯一解 root 自调（caller===audit_session_id），但 root idle → 形式死锁。macp2/macp3 单 commander 树没暴露，macp4 多层级首次撞。
+3. **改进方向**：①平台 `tree_init` 后强制启动 root agent（防 idle gap）②引擎 V10 `resolveAuditorIndep` 闸门2 扩展（L2 commander 当子树信任锚）③SKILL §13 补"多层级 root 信任锚 = 树根 leaf.role=root（非当前 commander）"
+
 ## 5. 自审说明
 
 本轮改动证据充分（P0-E 单测 + SKILL grep + 引擎语法），父会话自审收尾。未派独立审计子会话（会话长，可选补）。关键验证点：
