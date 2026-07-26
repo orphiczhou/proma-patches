@@ -78,12 +78,12 @@ commander 派生的所有 leaf（worker + auditor），commander 都不能配门
 |---|--------|------|---------|
 | 1 | auditor parent=macp5-root（正确结构） | ✅ PASS | tree-state: macp5-auditor.parent=macp5-root（commander 兄弟，非 commander 子树）；added_by=d3c56ae2(root)。macp4 结构错误规避 |
 | 2 | commander send 请 root 代调 | ✅ PASS | comm_log 2 次代调记录（worker 门禁 @20:50 + commander 门禁 @20:55），走 root 代调协议 |
-| 3 | root 代调成功 | ✅ PASS | worker milestone M1+audit_gate pass @20:52:47 + commander milestone M-self audit_pass=true @20:57:29，caller=root===audit_session_id=root，L3061 放行，**零 E_BORROWED_IDENTITY/E_AUDITOR_NOT_INDEPENDENT** |
+| 3 | root 代调成功 | ✅ PASS（观察员精确化）| worker milestone M1+audit_gate pass @20:52:47 + commander milestone M-self audit_pass=true @20:57:29（commander audit_gate 始终 skip，用 done event 直接 done，详见发现 1）+ auditor audit_gate pass @21:04:39，caller=root===audit_session_id=root，L3061 放行，**零 E_BORROWED_IDENTITY/E_AUDITOR_NOT_INDEPENDENT**（仅 1 次 E_AUDIT_PREMATURE drift auto-corrected）|
 | 4 | commander done 走通 | ✅ PASS | milestone M-self（root 代调）+ done event（自调 @20:58:14）+ set-status done（active→done）。**未撞 V10 三路径墙**（macp4 撞墙规避）|
 | 5 | root 活 | ✅ PASS | 响应延迟 < 3 分钟（20:50→20:52 + 20:55→20:57），macp4 root idle 规避 |
 
 **重大发现（A-commander 报告 + 父会话 tree-state 核验）**：
-1. **commander done 不需要 audit_gate pass**：实战 commander audit_gate.verdict="skip"（未升级 pass），但 set-status done 放行。引擎对 commander done 只校验 milestone（audit_pass=true root 代调）+ done event，audit_gate="skip" 即可（类似 root P0-E）。A-commander 报告的"auto_upgrade skip→pass"不准确（tree-state 核验 audit_gate 仍 "skip"），实际是引擎对 commander done 不校验 audit_gate。**§13.3b 可简化**：commander done 只需 root 代调 milestone_set_result + done event（audit_gate 不需要）。
+1. **commander done 不需 audit_gate pass（commander 角色 audit_gate 初始="skip"，设计如此）**：实战 commander audit_gate.verdict="skip"（始终，无 auto_upgrade 标志），set-status done 直接放行。**真正机制（观察员 MiniMax-M3 异厂商独立核验修正）**：commander 角色 audit_gate 初始状态被引擎设为 "skip"（设计如此，非临时状态），done event + set-status done 即可，无需 audit_gate 升级路径——**区别于 root P0-E 的 auto_upgrade=true**（root 有 auto_upgrade 标志，commander 没有；A-commander 报告的"auto_upgrade skip→pass"不准确，观察员异厂商核验修正）。drift E_AUDIT_PREMATURE（20:57:31）= root 试图显式调 audit_gate for commander 撞 "no done event"，commander 写 done event @20:58:14 后直接 set-status done（无需重试 audit_gate）。**§13.3b 可简化**（macp6 候选）：删 commander audit_gate 代调步骤，只保留 root 代调 milestone_set_result + done event。
 2. **L3061 信任锚优先于 L3091**：root 能给 added_by=root 的 commander 配 milestone_set_result（未撞 L3091 `auditor=added_by`）。L3061 root-as-auditor 分支优先。
 
 **收尾完成 ✅（21:05 全树闭环）**：auditor 第5次提醒 @21:04:12 → root 代调 audit_gate pass @21:04:39 → auditor set-status done @21:04:55 → root 自己 done @21:05:01。**全树 4 leaves 全 done**（root:pass + commander:skip + auditor:pass + worker:pass），macp4 root idle gap 规避（root 活到最后，响应 auditor 第5次提醒）。
@@ -96,6 +96,10 @@ commander 派生的所有 leaf（worker + auditor），commander 都不能配门
 - 🎯 **macp4 撞墙的 V10 三路径（E_BORROWED_IDENTITY/E_AUDITOR_NOT_INDEPENDENT/auditor 不 active）在 macp5 全部规避，零撞击**
 
 **产出**：add.js + add.test.js + add.note.md（落 .context/macp5-verify/）+ worker 12/12 测试 EXIT 0
+
+**观察员独立核验（MiniMax-M3 异厂商，session=4d3aea3d）**：verdict 认同主体结论（5 验收点 PASS + 2 重大发现认同），差异 3 项已采纳（发现 1 机制修正 + 验收点 3 精确化 + auditor 占位说明）。异厂商视角发现父会话采纳 A-commander 不准确报告（"auto_upgrade"），修正为"commander 初始 skip"。
+
+**⚠️ auditor 占位提醒（观察员差异 3）**：本次 auditor 是"结构验证占位"（brief_echo 明示 mission=结构验证 auditor 占位，未实际审查工作）。§13.3b 验证的是**树结构 + 代调协议**，**不是实际审计质量**——不可推论为"独立异厂商 auditor 审查通过 worker 工作"。
 
 ## 6. 后续
 

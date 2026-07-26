@@ -906,6 +906,8 @@ L2 commander 给自己子树 worker 配门禁:
   4. worker 自己 set-status done（caller=worker）
 ```
 
+> 📝 **macp5 实战发现：commander 自己 done 不需 audit_gate 代调**（macp5 实证 + 观察员 MiniMax-M3 异厂商核验）：commander 角色 audit_gate.verdict 初始="skip"（引擎设计如此，非临时状态），写 done event + set-status done 直接放行，**无需 root 代调 audit_gate**（区别于 root 的 P0-E auto_upgrade=true —— root 有 auto_upgrade 标志，commander 没有）。commander 自己 done 实际只需：① `tree_milestone_add` 给自己（caller=commander）② send 请 root 代调 `milestone_set_result`（audit_pass=true, auditor_session_id=root）③ 写 done event（self_check 3+ items）④ `tree_leaf_set_status(done)`（caller=commander）。**可省 audit_gate 代调步骤**（macp6 候选简化；实战发现 root 代调 audit_gate 反撞 E_AUDIT_PREMATURE "no done event"，commander 写 done event 后直接 set-status done 即可）。
+
 **root idle 3 道防线**（macp4 实证 root idle gap：fire-and-forget 派 root 后 root 处理首条 brief 即 idle，后续 send 撞 SDK 队列死锁"上一条消息仍在处理中"，但 `get_session_context` 返回"No usage data yet"——SDK 误判 idle 为"处理中"）：
 - **防线 1（活性探测前置，必做）**：commander 请 root 代调前，先 ping `mcp__session__send_message(root.session_id, "<ping>", wait=true)`，3-5s 超时。wait=true 在 SDK 正常时秒回；root idle 时撞"上一条消息仍在处理中"或超时 → 探测失败，转防线 3。
 - **防线 2（派遣期预防，写进 tree-iterative-development SOP §2.2）**：父会话派 root 指挥官用 `wait=true`（强制持续 turn），或 fire-and-forget 派后立即发 1 条 ping 确认活。这是父会话职责，不是 L2 commander。
