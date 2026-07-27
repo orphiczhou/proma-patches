@@ -18,7 +18,7 @@ description: |
 
 ```yaml
 skill_name: tree-commander
-version: 2.9.5
+version: 2.9.7
 target: 根会话（指挥官）
 requires:
   - tree-state.js (v0.7+ 已内联进 mcp__tree__* MCP，工作区不再有源码)
@@ -360,7 +360,7 @@ self_audit:
 | 工具 | 说明 |
 |------|------|
 | `mcp__tree__tree_audit_gate(tree_id, leaf_id, verdict, audit_session_id, reason?)` | 审计门禁裁决（`audit_session_id` 必填且须 = caller session_id，否则 `E_BORROWED_IDENTITY`；冷启动填 `root.session_id` 走闸门2，见 §13.3 步骤6） |
-| `mcp__tree__tree_audit_append(tree_id, leaf_id, report=<obj>)` | 追加审计报告。report 必填字段：`auditor_session_id`(UUID)、`total`(int)、`passed`(int)、`failed`(int)、`results[]`(每项含 `{item, pass, evidence}`)。缺字段抛 `E_SCHEMA_INVALID` |
+| `mcp__tree__tree_audit_append(tree_id, leaf_id, report=<obj>)` | 追加审计报告。report 必填字段：`auditor_session_id`(UUID)、`total`(int)、`passed`(int)、`failed`(int)、`results[]`(每项含 `{item, severity, pass, evidence}`，🔴 **severity ∈ `red`\|`yellow`\|`green` v0.21 强制**，缺/错值抛 `E_SCHEMA_INVALID`；macp6 实战 C/auditor 撞此错自纠正) |
 | `mcp__tree__tree_nudge_append(tree_id, leaf_id, nudge=<obj>)` | 追加 nudge 记录 |
 
 ### Maintain（维护）
@@ -927,17 +927,31 @@ L2 commander 给自己子树 worker 配门禁:
 
 | 工具 | v2 可自调？ | 原因 |
 |------|------------|------|
-| `tree_event_append` / `tree_leaf_get` / `tree_milestone_add` | ✅ | 无 caller===audit_session_id 校验 |
+| `tree_event_append` / `tree_leaf_get` | ✅ v2 可自调 | 无 owner/creator 校验 |
+| `tree_milestone_add` | ❌ 需**旧 root** 代调（macp9 论证修正）| cmdMilestoneAdd L2248 `_isOwner/_isCreator/_isRootSelf` 三重校验，v2 接力后三项全 false 撞 E_BORROWED_IDENTITY（macp7 原标"可自调"错）|
+| `tree_audit_append` | ❌ 需 auditor 自调（V10-active）或旧 root 代调 | dispatchAudit L3974 caller 校验（macp9 补）|
 | `tree_milestone_set_result(audit_pass=true)` | ❌ 需**旧 root** 代调（caller=旧 root===audit_session_id=旧 root）| V10 caller===audit_session_id 硬约束，audit_session_id 仍指向旧 root |
 | `tree_audit_gate(verdict=pass)` | ❌ 需**旧 root** 代调（同上）| 同上 |
 | `tree_leaf_set_status(done)` | ❌ 需**旧 root** 代调或先 `leaf_set_session` 转所有权 | cmdLeafSetStatus L1733 双重校验：`_isOwner=caller===leaf.session_id(旧root)` + milestone；v2 非 owner 撞 E_BORROWED_IDENTITY |
 | `tree_leaf_set_session`（转所有权）| ❌ 需**旧 root** 代调（caller=旧 root）或 CLI 应急 | cmdLeafSetSession L2158+ creator 校验；v2 调撞 E_BORROWED_IDENTITY。**旧 root 代调后 session_id=v2，v2 成 owner 可自调 set-status** |
 | `tree_segment_add` | ✅（v2 可调，接力用）| 接力机制本身（只追加 segment_chain）|
 
-**emergent v2 + 旧 root 协作模式**（macp6 涌现有效，建议主动采用）：
-- **旧 root 担当"权限锚"**：代调 milestone_set_result + audit_gate（caller=旧 root 满足 V10）；代发 send_message 激活 auditor（若 v2 send 撞 E_NO_OWNERSHIP）
-- **v2 担当"上下文接力"**：读旧 root 的 comm_log 通知 + 自己做 event_append + milestone_add + set-status + 写报告
-- **协作约定**：旧 root 接力后主动 `send_message(v2, "接力交你。约束：milestone_set_result + audit_gate 需我代调（caller=我），其余你自调。我 segment_pending 待命")`
+**emergent v2 + 旧 root 协作模式**（macp6 涌现有效，macp9 论证精化）：
+- **旧 root 担当"权限锚"**：代调 milestone_add + milestone_set_result + audit_gate + set-status + set-session（caller=旧 root 满足 owner/creator/V10 校验）；代发 send_message 激活 auditor
+- **v2 担当"上下文接力"**：**只能** event_append + leaf_get + 写报告 + 读 comm_log（macp9 修正：macp7 说"v2 做 milestone_add/set-status"错，**全需旧 root 代调**——v2 接力后 leaf.session_id 仍=旧 root、added_by=null，v2 既非 owner 也非 creator）
+- **协作约定**：旧 root 接力后主动 `send_message(v2, "接力交你。约束：除 event_append/leaf_get 外，全需我代调（milestone_add/set_result/audit_gate/set-status/set-session）。我 segment_pending 待命")`
+
+**旧 root 失联预案**（macp9 补，macp6 实战 Stream closed 教训）：
+- v2 接力后先 `send_message(旧root, "<ping>", wait=true)` 短超时（10s）探测旧 root 活性
+- 旧 root 活 → 走 emergent 协作（旧 root 代调）
+- 旧 root 失联（ping 超时/撞"消息处理中"）→ v2 走 CLI 应急（下述）+ `tree_drift_append(severity=high, reason='旧 root 失联，v2 走 CLI 应急')` 留痕
+- 失联超 10 分钟 → v2 上行父会话请求干预（或转 §13.6 极端应急）
+
+**多级接力权限锚归属**（macp9 补）：
+- v1→v2 接力：权限锚=v1（旧 root）
+- v2→v3 接力：权限锚仍=**v1**（added_by 链源头，不是 v2）；v3 调工具 caller=v3，仍需 v1 代调
+- 多级接力时，所有 v_n 的权限锚都是 v1（树根 root.session_id）
+- 🔴 **建议避免多级接力**：context 溢出优先用 `leaf_set_session` 一次性转所有权给新 session（旧 root 代调一次，v2 成 owner 后自调），而非 segment_add 链（每级都需 v1 代调）
 
 **CLI 应急通道**（v2 撞 E_BORROWED_IDENTITY 卡死时的兜底，macp6 v2 实战用过）：
 ```bash
@@ -966,9 +980,11 @@ macp2 暴露 audit 门禁全回流 root 的问题——不是引擎禁止独立 
   mcp__tree__tree_leaf_add(tree_id, leaf={role='auditor', parent=<commander/root>, ...})
   → 引擎不禁止（只禁 worker/auditor 担任 added_by，root/commander 可建 auditor leaf）
 
-步骤 B: auditor leaf 完成自身工作
-  auditor leaf 走简化协议（brief_echo + done event，无 milestone/review_round/deliverables）
-  → auditor leaf status=done + events 非空 + audit_gate 初始 ='required'
+步骤 B: auditor leaf 完成自身工作（≥2 events 强制 + schema 提示，macp8 补充）
+  auditor leaf 走简化协议：① `tree_event_append(type=brief_echo)` 复述审查任务理解 ② `tree_event_append(type=done)` 含 verdict
+  🔴 **set-status done 前必须 ≥2 events**（brief_echo + done），满足 V10-auditor-active 的 "events 非空" 条件（macp6 实证 auditor 需 events 非空）
+  → auditor leaf status=done + events ≥2 + audit_gate 初始='required'
+  🔴 **audit_append 时 `report.results[]` 每项必须含 `severity ∈ red|yellow|green`**（v0.21 强制，缺抛 `E_SCHEMA_INVALID`；macp6 C/auditor 撞此错自纠正，浪费轮次）
 
 步骤 C: root 用闸门2 背书 auditor leaf
   mcp__tree__tree_audit_gate(tree_id, leaf_id=<auditor>, verdict='pass', audit_session_id=<root.session_id>)
