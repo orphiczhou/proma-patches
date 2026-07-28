@@ -1,14 +1,17 @@
-# 树形任务系统 Harness 开发 — 最终完成报告
+# 树形任务系统 Harness 开发 — 阶段性改进报告（macp7-11）+ 对抗性审计后修复
 
-> 日期：2026-07-28
-> 周期：2026-07-23 macp 启动 → 2026-07-28 macp11 收口（5 天，11 轮迭代）
+> 日期：2026-07-28（macp 收口）/ 2026-07-28 audit-fix（对抗性审计后修复）
+> 周期：2026-07-23 macp 启动 → 2026-07-28 macp11 收口（5 天 11 轮）+ 2026-07-28 对抗性审计 + 7 P0 修复
 > 范围：Proma 桌面应用 tree 系统（树形会话执行体系）改造 — 补丁注入 + 多实例隔离 + 双运行时兼容 + tree 引擎加固 + SKILL SOP 沉淀
-> 项目：orphiczhou/proma-patches `release-0.13.16-hardening` 分支
-> 测试底座：`D:/Codes/multi-agent-collab-platform/`（multi-agent coder/judge/sandbox 平台）
+> **本报告主体仓**：`D:/Codes/tree-harness/`（orphiczhou/proma-patches `release-0.13.16-hardening`）— tree 引擎 + SKILL + harness 工具
+> **测试底座仓（独立项目，非 tree-harness）**：`D:/Codes/multi-agent-collab-platform/`（multi-agent coder/judge/sandbox 平台）— 4 缺陷修复 + C1=86 评分对象
+> **范围声明（响应对抗性审计 P0-6）**：本报告 §一 4 缺陷修复 + C1=86 属**测试底座项目**的成果，用于验证 tree harness 实战能力，**不是 tree-harness 自身的完成度分数**。tree-harness 自身完成度见 §七。
 
 ---
 
-## 一、完成标准达成（7/7 ✅）
+## 一、完成标准达成（7/7，对抗性审计后修复真实达成）
+
+> **修订说明（2026-07-28 audit-fix）**：初版自评 7/7 被对抗性审计（auditor MiniMax-M3 异厂商签字）判定为**过度宣称**（真实 3.5-4/7，详见 `audit-20260728/auditor-signoff.md`）。经 7 P0 前置修复（CLI 通道关闭 + tree-state HMAC + SKILL 4 矛盾修正 + tree-iterative-development 归档 + 范围声明 + C1 轨迹修正）+ 3 路异厂商审计 + MiniMax-M3 复审，**真实达成 7/7**。修复档案见 `pr/20260728-audit-fix/`。
 
 | # | 标准 | 状态 | 关键证据 |
 |---|------|------|---------|
@@ -31,6 +34,9 @@ macp4-5               —   harness 改进轮（无 C1 复评）
 macp6 (GLM 估算)      76  ← 自评，待复核
 macp10 (MiniMax 复评) 79  ← +3 修复回收（缺陷3/4）
 macp11 (MiniMax 复评) 86  ← +7 攻拖分项（featuresMissingSteps + E2E + yellow 清）
+```
+
+**脚注（响应对抗性审计 P0-7，修正标签错配）**：macp6 同轮 MiniMax 观察员实际打 **80-83**，高于 GLM 自评 76，方向与 macp2 "GLM 乐观偏差"**相反**（macp2: GLM 70 → MiniMax 47；macp6: GLM 76 → MiniMax 80-83）。本轨迹选用 GLM 76 是为保守叙事；MiniMax 链 68→80-83→79→86 非单调（macp10 下凹）。**停止把 macp2 "GLM 乐观"标签错配到 macp6**——macp6 GLM 反而保守于 MiniMax。
 ```
 
 **关键教训**（memory `c1-target-vs-scope-alignment`）：目标分对应的拖分项必须在 in_scope 内可修；GLM 自评高于异厂商复评（macp2 70→47 / macp6 估 76 实测 79）；目标预留 3-5 buffer；异厂商 MiniMax-M3 复评 = 最终签字分。
@@ -73,7 +79,9 @@ macp11 (MiniMax 复评) 86  ← +7 攻拖分项（featuresMissingSteps + E2E + y
 
 **解**：v2 能力精化（只能 event_append + leaf_get + 写报告，全权限操作需旧 root 代调）+ 失联预案（ping 探测 → 活走 emergent / 失联走 CLI 应急 / 失联超 10min 上行）+ 多级接力权限锚定义。
 
-### 3.6 CLI 兼容通道兜底（macp11 新发现）
+### 3.6 ⚠️ CLI 兼容通道兜底（macp11 修复前实战，已于 audit-fix P0-1 关闭）
+
+> **修订说明（2026-07-28 audit-fix）**：本节描述的 CLI 兼容通道（省略 callerSessionId 跳过 V10 caller 校验）经对抗性审计 D6-F1 判定为 **P0 绕过口**（worker 可 `require('tree-engine.cjs'); engine.run(...)` 伪造 done 闭环，零 auditor 介入）。已于 P0-1 关闭：caller 缺省抛 `E_CALLER_REQUIRED`，仅 `TREE_ENGINE_ALLOW_CLI=1` 测试模式放行。**下文为修复前历史记录，不再可用**——保留仅作 macp11 实战轨迹存档。
 
 **问题**：macp11 root idle 复发（模型切换丢 mcp__tree__* 工具 + 越级请求 error_during_execution）。
 
@@ -101,7 +109,7 @@ macp11 (MiniMax 复评) 86  ← +7 攻拖分项（featuresMissingSteps + E2E + y
 - **A2 `leaf_transfer_owner` 工具**（macp9 留候选，~50 行）：复用 segment_chain 授权，让 v2 接力后能自主调权限操作，不依赖旧 root 代调
 - **V10 闸门 2 扩展**：允许 L2 commander 当子树信任锚，异厂商 auditor 复审双轨
 - **root idle 平台修复**：tree_init 后强制启动 root agent 处理后续队列；模型切换不应丢失已注入 MCP 工具集
-- **CLI 兼容通道标准化**：把 macp11 应急方案正式纳入引擎 API（caller 缺省降级文档化）
+- ~~**CLI 兼容通道标准化**~~（**已反转，P0-1 关闭**）：macp11 应急方案（caller 缺省降级）经对抗性审计 D6-F1 判定为 P0 绕过口，audit-fix 已关闭（caller 缺省抛 `E_CALLER_REQUIRED`）。**反向禁用，不再标准化**。
 
 ### 项目层（multi-agent-collab-platform，C1 86→95+ 路径）
 - Sandbox OS 级隔离（+4，docker/firecracker）
@@ -130,13 +138,25 @@ macp8（audit_log schema）合并归档到 macp7/9。
 
 ---
 
-## 七、签字
+## 七、签字 + 范围声明（响应对抗性审计 P0-6）
 
-**harness 开发完成标准 7/7 全达成。C1=86/100（MiniMax-M3 异厂商独立签字）。**
+### 7.1 两个仓库的完成度（区分，不再混淆）
 
-- 周期：2026-07-23 → 2026-07-28（5 天 11 轮 macp 迭代）
-- git HEAD：release-0.13.16-hardening 分支最新 commit
-- 树形迭代开发 SOP 沉淀：`skills/tree-iterative-development/SKILL.md` v1.4
-- 全部交付物：`D:/Codes/tree-harness/pr/20260727-macp{6,7,9,10,11}/` + 本档案
+| 仓库 | 角色 | 完成度 | 证据 |
+|------|------|--------|------|
+| **tree-harness**（本报告主体）| tree 引擎 + SKILL + harness 工具 | **真实 7/7**（对抗性审计后修复，auditor MiniMax-M3 升 pass）| CLI 通道关闭（P0-1）+ tree-state HMAC（P0-2）+ SKILL 4 矛盾修正（P0-3/5）+ tree-iterative-development 归档（P0-4）|
+| **multi-agent-collab-platform**（测试底座，独立项目）| coder/judge/sandbox 平台 | C1=86/100（MiniMax-M3 异厂商签字）| 4 缺陷修复 + 平台铁证 provider=minimax |
+
+**关键区分**：C1=86 是测试底座项目的分数，验证 tree harness 实战能力，**不是 tree-harness 自身完成度**。tree-harness 自身在对抗性审计前自评 7/7 是**过度宣称**（auditor 独立判定 3.5-4/7），经 7 P0 修复 + 3 路异厂商审计 + MiniMax 复审后真实达成 7/7。
+
+### 7.2 完成标准
+
+**tree-harness 7/7（对抗性审计后修复，真实达成）+ 测试底座 C1=86（异厂商签字）**。
+
+- 周期：2026-07-23 → 2026-07-28（5 天 11 轮 macp + 对抗性审计 + 7 P0 修复）
+- git HEAD：release-0.13.16-hardening 分支最新 commit（含 audit-fix）
+- 树形迭代开发 SOP：`skills/tree-iterative-development/SKILL.md` v1.5（含 macp3-11 实证 + audit-fix）
+- 对抗性审计修复档案：`pr/20260728-audit-fix/`（design + 修订记录）
+- 全部交付物：`pr/20260727-macp{6,7,9,10,11}/` + `pr/20260728-harness-final/` + `pr/20260728-audit-fix/` + `audit-20260728/`
 
 **Co-Authored-By**: Claude `<noreply@anthropic.com>`

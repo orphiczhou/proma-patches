@@ -31,3 +31,4 @@ tree-engine.cjs.bak-*-pre-*
 .DS_Store
 Thumbs.db
 assets/node_modules/
+.tree-engine-secret

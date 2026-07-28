@@ -18,7 +18,7 @@ description: |
 
 ```yaml
 skill_name: tree-commander
-version: 2.9.7
+version: 2.9.8-audit-fix
 target: 根会话（指挥官）
 requires:
   - tree-state.js (v0.7+ 已内联进 mcp__tree__* MCP，工作区不再有源码)
@@ -694,7 +694,7 @@ prompt: |
 
 ---
 
-## §11 禁止行为清单（12 条）
+## §11 禁止行为清单（17 条）
 
 > 依据：方法论 §6 反模式表 + 设计文档 §1 补丁约束 + §8.2 写入铁律。
 
@@ -846,38 +846,25 @@ prompt: |
 - **步骤 6**：audit_session_id 必须 = 调用者（root）的 session_id，否则 `E_BORROWED_IDENTITY`；worker 不能自己调步骤 6；步骤 4 的 alignment event 是步骤 6 的硬前置（V5b），缺则 `E_ALIGNMENT_NOT_VERIFIED`
 - **步骤 7**：set-status done 必须 worker 自己调（caller=worker）。commander 做完步骤 6（audit_gate pass）后 send_message 通知 worker “audit_gate pass，你可以 set-status done”——但执行者是 worker。commander 代调步骤 7 → `E_BORROWED_IDENTITY`
 
-### §13.3a root 自身 done（三路径，不走 §13.3 八步）
+### §13.3a root 自身 done（不走 §13.3 八步）
 
 > **本节 'root' 指树根 leaf（role=root）**。单 commander 树（macp2/macp3，root===commander 自己）下本节直接适用；**多层级树（≥3 层）下 root 是独立的树根 leaf，L2 commander 不能用本节路径给自己 done**（L2 commander 自己调 milestone_set_result(audit_session_id=commander) 撞 L3107 `auditor is the leaf itself`（L3061 找 rootLeaf 失败后落到 L3107；L3091 不触发，因 commander.added_by=root≠commander）；填 audit_session_id=root 撞 L2341 `E_BORROWED_IDENTITY`）。L2 commander done 须走 §13.3b。
 
-root（commander 自己）的 leaf 要 done 时，**不需要**走 §13.3 八步。但引擎 L1767（milestone 非空 + audit_pass=true）对 role=root **无豁免**（macp3 实测撞墙），auto_upgrade 只处理 audit_gate（skip→pass），不豁免 milestone 检查。分三种路径：
+引擎 L1765 已豁免 root milestone 非空门禁（macp4 P0-E 修复，`if(!isAuditor&&!isRoot)` + L1763 注释自证），root done 走 §13.3a.1 正常路径即可，无需备选分支。auto_upgrade 机制处理 audit_gate（skip→pass），milestone 非空门禁对 role=root 不生效。
 
-#### §13.3a.1 正常路径（引擎已修 L1767 豁免时）
+#### §13.3a.1 正常路径（引擎 L1765 已豁免）
 
-条件：引擎 L1767 对 role=root 有豁免（`!isAuditor && !isRoot`），或 root 已有 milestone。
-操作：引擎 auto_upgrade 机制（tree-engine.cjs L1961-1972）——root 写自己的 done event（caller=root，带 self_check）→ audit_gate 自动从 skip 升为 pass（auto_upgrade=true）→ set-status done 引擎全部门禁通过。
+条件：引擎 L1765 对 role=root 有豁免（`!isAuditor && !isRoot`，macp4 P0-E 已修），或 root 已有 milestone。
+操作：引擎 auto_upgrade 机制（tree-engine.cjs L1961-1972）——root 写自己的 done event（caller=root，带 self_check）→ audit_gate 自动从 skip 升为 pass（auto_upgrade=true）→ set-status done 引擎全部门禁通过（milestone 非空门禁对 root 豁免，不查）。
 
 ```text
 [caller=root]  tree_event_append(tree_id, leaf_id=<root>, type=done, meta={self_check})  →  tree_leaf_set_status(tree_id, leaf_id=<root>, status=done)
 ```
 
-#### §13.3a.2 备选路径（引擎未修时，milestone_add 绕过 L1767）
-
-条件：引擎 L1767 无 role=root 豁免（当前状态，macp3 实证）。操作：root 先给自己 milestone_add（1 条，expect_outputs 可空数组）→ milestone_set_result → done event（触发 auto_upgrade）→ set-status done。L1767 查 milestones 非空且 audit_pass=true → 放行。
-
-```text
-[caller=root]  tree_milestone_add(tree_id, leaf_id=<root>, milestone={id:"M-root-done", desc:"全树实现层 done", expect_outputs:[]})
-[caller=root]  tree_milestone_set_result(tree_id, leaf_id=<root>, milestone_id="M-root-done", audit_pass=true, audit_session_id=<root.session_id>)
-[caller=root]  tree_event_append(tree_id, leaf_id=<root>, type=done, meta={self_check})
-[caller=root]  tree_leaf_set_status(tree_id, leaf_id=<root>, status=done)
-```
-
-⚠️ expect_outputs=[] 空数组若引擎拒绝（要求 ≥1），填一个占位 `["root-done-placeholder.md"]` 并在 deliverables/ 下创建空文件。
-
 #### §13.3a.3 诊断（set-status done 撞墙时）
 
 root 调 set-status done 返回错误时：
-- `E_SCHEMA_INVALID` → 大概率 milestone 检查未过（L1767 无 root 豁免）。先 `tree_leaf_get(root)` 查 milestones 数组是否非空且全部 audit_pass=true；若空 → 走 §13.3a.2 备选路径 milestone_add。若 milestones 有值但某条 audit_pass=false → milestone_set_result 补过。
+- `E_SCHEMA_INVALID` → 引擎 L1765 已豁免 root milestone 非空门禁（macp4 P0-E），正常不撞此错。若仍撞，先确认引擎版本/补丁已部署（旧构建无 P0-E 豁免）；若 milestones 有值但某条 audit_pass=false → milestone_set_result 补过（audit_pass 不在 root 豁免范围，仍需补）。
 - `E_GATEKEEPER_REQUIRED` → 检查是否写了 done event（auto_upgrade 依赖 done event 触发）。
 - 非以上错误码 → 翻 §13.7 速查表或 `tree_help(topic=<error.code>)`。
 
@@ -933,7 +920,7 @@ L2 commander 给自己子树 worker 配门禁:
 | `tree_milestone_set_result(audit_pass=true)` | ❌ 需**旧 root** 代调（caller=旧 root===audit_session_id=旧 root）| V10 caller===audit_session_id 硬约束，audit_session_id 仍指向旧 root |
 | `tree_audit_gate(verdict=pass)` | ❌ 需**旧 root** 代调（同上）| 同上 |
 | `tree_leaf_set_status(done)` | ❌ 需**旧 root** 代调或先 `leaf_set_session` 转所有权 | cmdLeafSetStatus L1733 双重校验：`_isOwner=caller===leaf.session_id(旧root)` + milestone；v2 非 owner 撞 E_BORROWED_IDENTITY |
-| `tree_leaf_set_session`（转所有权）| ❌ 需**旧 root** 代调（caller=旧 root）或 CLI 应急 | cmdLeafSetSession L2158+ creator 校验；v2 调撞 E_BORROWED_IDENTITY。**旧 root 代调后 session_id=v2，v2 成 owner 可自调 set-status** |
+| `tree_leaf_set_session`（转所有权）| ❌ 需**旧 root** 代调（caller=旧 root） | cmdLeafSetSession L2158+ creator 校验；v2 调撞 E_BORROWED_IDENTITY。**旧 root 代调后 session_id=v2，v2 成 owner 可自调 set-status**。无 CLI 应急通道（生产构建已禁用，见下方"CLI 应急通道已禁用"） |
 | `tree_segment_add` | ✅（v2 可调，接力用）| 接力机制本身（只追加 segment_chain）|
 
 **emergent v2 + 旧 root 协作模式**（macp6 涌现有效，macp9 论证精化）：
@@ -944,7 +931,7 @@ L2 commander 给自己子树 worker 配门禁:
 **旧 root 失联预案**（macp9 补，macp6 实战 Stream closed 教训）：
 - v2 接力后先 `send_message(旧root, "<ping>", wait=true)` 短超时（10s）探测旧 root 活性
 - 旧 root 活 → 走 emergent 协作（旧 root 代调）
-- 旧 root 失联（ping 超时/撞"消息处理中"）→ v2 走 CLI 应急（下述）+ `tree_drift_append(severity=high, reason='旧 root 失联，v2 走 CLI 应急')` 留痕
+- 旧 root 失联（ping 超时/撞"消息处理中"）→ v2 上行父会话请求补发 brief / 干预 + `tree_drift_append(severity=high, reason='旧 root 失联，v2 上行父会话请求干预')` 留痕（生产构建无 CLI 应急通道，已禁用）
 - 失联超 10 分钟 → v2 上行父会话请求干预（或转 §13.6 极端应急）
 
 **多级接力权限锚归属**（macp9 补）：
@@ -953,15 +940,7 @@ L2 commander 给自己子树 worker 配门禁:
 - 多级接力时，所有 v_n 的权限锚都是 v1（树根 root.session_id）
 - 🔴 **建议避免多级接力**：context 溢出优先用 `leaf_set_session` 一次性转所有权给新 session（旧 root 代调一次，v2 成 owner 后自调），而非 segment_add 链（每级都需 v1 代调）
 
-**CLI 应急通道**（v2 撞 E_BORROWED_IDENTITY 卡死时的兜底，macp6 v2 实战用过）：
-```bash
-# v2 直接 require tree-engine 跑（省略 callerSessionId = CLI 兼容模式，绕过 caller 校验）
-node -e "const E=require('D:/Codes/tree-harness/tree-engine.cjs'); E.setTreesRoot('<treeDir>'); E.run(['leaf-set-status','--tree-id=<id>','--leaf-id=<root>','--status=done'])"
-```
-⚠️ **CLI 应急绕过整个 P1 防借身份防线**（set-status/set-session/milestone_set_result/milestone_add/event_append 全部 caller 校验，不只 segment_add gap）——引擎设计 `if (callerSessionId)` CLI 不传即跳过（向后兼容金标准测试）。
-⚠️ **命令按实际卡点选**：`leaf-set-session` 改所有权（v2 接管 leaf）/ `leaf-set-status` 改状态 / `milestone-set-result` 配门禁（macp6 v2 真正卡的是 set-session 接管所有权，不是 set-status）。
-🔴 **用后必须留痕**：`tree_drift_append(severity=high, action=declare, reason='CLI 应急绕过 caller 校验：<卡点>')`——绕过门禁破坏审计链，强制 drift 记录追溯。
-正常走 emergent 协作（旧 root 代调）优先，CLI 应急是最后兜底。
+**CLI 应急通道已禁用**（配合引擎 P0-1 关闭 CLI 兼容通道）：CLI 直接调用引擎入口（省略 callerSessionId 的兼容写法）已在生产构建禁用——caller 缺省抛 `E_CALLER_REQUIRED`，仅 `TREE_ENGINE_ALLOW_CLI=1` 测试模式放行。v2 撞 E_BORROWED_IDENTITY 卡死时**不再有 CLI 兜底**，应对走：① 父会话补发 brief（本节"旧 root 失联预案"现有协议，上行父会话请求干预）+ ② 平台修复（tree_init 强制启动 root agent / 模型切换不应丢 MCP 工具集，从源头消除 root idle）。
 
 ### §13.4 转正常期
 
@@ -1063,8 +1042,9 @@ root 在中转链上的待审清单操作（6 步）:
 2. **tool calls 计数**：`mcp__session__list_messages(leaf.session_id, limit=5)` 看最近是否有 assistant 消息（有 = 近期活跃）
 3. **send ping**：`send_message(leaf.session_id, "<ping>", wait=true)` 短超时（5-10s），秒回 = 活；撞"上一条处理中"或超时 = 可能 idle（但需结合 1+2 确认）
 4. **heartbeat / last_event**：`tree_leaf_get` 看 last_event_ts + drift_history（最近有 event = 活）
+5. **communication_log**：`tree_communication_list(tree_id, leaf_id=<leaf>)` 看该 leaf 最后一条 comm_log 出站时间 + 对方是否回应（§6 强制记 comm_log 的核心目的就是防误判 idle——外部 send_message 活动 tree events 看不到，comm_log 是唯一留痕，比 usage_pct 更可靠）。近期有出站 comm_log + 对方有回应 = 活，非 idle
 
-**判定规则**：4 项中 ≥2 项指向 idle 才 prune；仅"No usage data"或单次 send 撞锁 ≠ idle（可能是队列锁或假信号）。
+**判定规则**：5 项中 ≥2 项指向 idle 才 prune；仅"No usage data"或单次 send 撞锁 ≠ idle（可能是队列锁或假信号）。
 
 **避坑**：GLM-5.2 的 `get_session_context.usage_pct` 虚高（如 661% 实际未溢出）不可信；判断 session 卡死必须主动 ping 核实，不能轻信遥测（用户纠正，macp6 实证）。
 
@@ -1088,7 +1068,13 @@ root 在中转链上的待审清单操作（6 步）:
 | `E_DELIVERABLE_MISSING` | `set-status done` | `expect_outputs` 声明的文件未落盘到 `deliverables/` | 让 worker 把产出写到 `<treeDir>/deliverables/<outPath>`（相对路径，禁绝对路径/symlink）后重试 |
 | `E_ALIGNMENT_NOT_VERIFIED` | `audit_gate pass` | worker 的 events 缺 alignment 回填（§13.3 步骤4 漏做） | commander 回填一条 `brief_echo` event（`meta={alignment, auditor_session_id=root.session_id}`），见 §6 回填机制 / §13.3 步骤4 |
 | `E_GATEKEEPER_REQUIRED` | `set-status done` | 没先 `audit_gate pass` 就直接 set done（缺门禁背书） | 先调 `tree_audit_gate(verdict=pass, audit_session_id=root.session_id)`（§13.3 步骤6）通过后再 set-status done |
-| `E_SCHEMA_INVALID` | `set-status done`（root 自身 done） | root 调 set-status done 撞 L1767 milestone 门禁（引擎无 role=root 豁免，macp3 实证） | 走 §13.3a.2 备选路径：root 先 milestone_add 给自己（1 条）→ milestone_set_result → 写 done event → set-status done。若引擎已修 L1767 豁免，直接走 §13.3a.1 正常路径即可 |
+| `E_SCHEMA_INVALID` | `set-status done`（root 自身 done） | root 调 set-status done 撞 milestone 门禁（仅旧引擎；macp4 P0-E 后 L1765 已豁免 root） | 引擎 L1765 已豁免 root milestone 非空门禁（macp4 P0-E），走 §13.3a.1 正常路径即可（写 done event → set-status done）。若仍撞此错，确认引擎版本/补丁已部署；milestones 有值但某条 audit_pass=false → milestone_set_result 补过（audit_pass 不在 root 豁免范围） |
+| `E_CHILDREN_NOT_DONE` | `set-status done`（commander / 中间层 done） | commander 自己 done 前，子树有未 done 的 leaf（引擎 V10 闸门：父 done 前子须全 done） | 先让所有子 leaf done（或 prune 不再需要的子 leaf），再重试 commander set-status done |
+| `E_AUDITOR_NOT_DONE` | `audit_gate pass`（auditor 背书别人时） | auditor leaf 自己还没 done 就去给别人配门禁（V10-auditor-active 要求 status=done） | 先把 auditor leaf 喂到 done（§13.4.0 四步），满足 V10-auditor-active 三连后再背书别人 |
+| `E_AUDITOR_NO_EVENTS` | `set-status done`（auditor 自身 done） | auditor leaf events < 2（V10-auditor-active 要求 events 非空，macp6 实证需 ≥2：brief_echo + done） | auditor 先写 ≥2 events（brief_echo 复述审查任务 + done 含 verdict），再 set-status done |
+| `E_MAX_SESSIONS` | `leaf_add` / `register_session` / `leaf_set_session` | tree session 数超过 `audit_meta.max_sessions` 上限（防失控蔓延） | 提高 `audit_meta.max_sessions`（tree_init 时设），或 prune/archived 不用的 leaf 释放配额后重试 |
+| `E_CALLER_REQUIRED` | 任一 `mcp__tree__*` 工具（caller 缺省） | **P0-1 新增**：caller session_id 缺省即拒绝（生产构建禁用 CLI 兼容通道，省略 callerSessionId 不再跳过校验） | 工具必须从 MCP context 提取 caller（会话内调用自动满足）；CLI 直调引擎入口需带 `TREE_ENGINE_ALLOW_CLI=1` 测试模式 |
+| `E_STATE_INTEGRITY` | 任一写操作（tree-state 落盘时） | **P0-2 新增**：tree-state HMAC 校验失败（文件被外部篡改 / 手工编辑破坏完整性签名） | 从最近 backup 恢复（`tree_restore`），或 `tree_validate` 诊断；禁止手工编辑 tree-state.json（§11 #3） |
 
 > **通用排查注**：所有 `mcp__tree__*` 工具失败时返回 `{ok:false, error:{code, message, help_topic}}`。若返回里带 `help_topic` 字段，**立即** `mcp__tree__tree_help(topic=<help_topic>)` 拿该主题详细用法——多数错误根因是参数 schema 或调用顺序错，help_topic 给的就是正解。
 
@@ -1126,7 +1112,7 @@ root 在中转链上的待审清单操作（6 步）:
 
 ### §14.3 审计 5 件套模板
 
-下发审查子会话时，在标准 §3 模板基础上，`brief.in_scope` 必须包含**该维度的具体审查问题**。以下为 6 个角色的 in_scope 模板：
+下发审查子会话时，在标准 §3 模板基础上，`brief.in_scope` 必须包含**该维度的具体审查问题**。以下为 7 个角色的 in_scope 模板（C1-C4 审查 + A1-A2 攻击 + fix 修正执行员）：
 
 **C1 一致性审查员**：
 ```yaml
@@ -1186,6 +1172,16 @@ in_scope:
   - "至少 5 个具体攻击场景，每个标注：报告能否兜住/失守/部分失守"
 ```
 
+**fix 修正执行员**（等审查完成后统一修改，§14.2 强制第 7 leaf，必须存在）：
+```yaml
+in_scope:
+  - "汇总 C1-C4 + A1-A2 全部审查员的问题列表，去重后按严重程度排序（blocker / severe / suggestion）"
+  - "逐项修复：edit_file（改产物）/ downgrade（降级附理由）/ deferred（推迟附理由），每项 fix_evidence ≥20 字"
+  - "fixes_resolved 必须覆盖 audit_log 中所有 severity≠green 的 findings，无遗漏（§13.4.6 闭环要求）"
+  - "修复后跑回归测试（typecheck / build / auto_test），确认未引入新问题"
+  - "downgrade / deferred 必须附明确理由 + 后续处理计划（不能悄悄降级或无限推迟）"
+```
+
 ### §14.4 迭代收敛流程
 
 ```
@@ -1236,7 +1232,7 @@ Round 2:
 declare done 前逐项确认：
 
 ```
-[ ] leaves ≥ 7（1 root + 4 审查 + 2 攻击 + 可选 fix/走查）
+[ ] leaves ≥ 7（1 root + 4 审查 + 2 攻击 + 1 fix 修正员，**强制必须**，与 §14.2 一致）
 [ ] 阶段一：4 个审查子会话全部 done，产出结构化问题列表
 [ ] 阶段二：2 个攻击子会话全部 done，产出漏洞列表
 [ ] ≥ 2 轮迭代，audit_rounds 记录完整
@@ -1252,6 +1248,7 @@ declare done 前逐项确认：
 
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
+| 2026-07-28 | v2.9.8-audit-fix | **审计驱动修订（7 项，auditor MiniMax-M3 要求前置）**：① **P0-3** §13.3a 删除冗余的 root done 备用分支（引擎 L1765 已豁免 root milestone 非空门禁，macp4 P0-E），§13.3a.3 诊断保留原编号 + §13.7 E_SCHEMA_INVALID 行同步更新 ② **P1-1** §11 标题计数 12→17（实际条目数） ③ **P0-5** §14.6 删除修正员 leaf 的 optional 标注，与 §14.2 强制统一 ④ **P1-3** §14.3 补第 7 个 fix 修正执行员 in_scope 模板（序言 6→7 角色） ⑤ **P1-4** §13.7 补 6 个错误码（E_CHILDREN_NOT_DONE / E_AUDITOR_NOT_DONE / E_AUDITOR_NO_EVENTS / E_MAX_SESSIONS / E_CALLER_REQUIRED[P0-1 新增] / E_STATE_INTEGRITY[P0-2 新增]） ⑥ **P1-5** §13.6 idle 多维核验补第 5 项 communication_log 检查（4 项→5 项，判定规则同步） ⑦ 配合引擎 P0-1 关闭 CLI 兼容通道：删 §13.3b CLI 应急通道段（含 CLI 直调引擎的可执行 bash 代码块），改为"生产构建已禁用 / caller 缺省抛 E_CALLER_REQUIRED / 仅 TREE_ENGINE_ALLOW_CLI=1 测试模式放行"，清理身份继承矩阵表格 + 旧 root 失联预案中的 CLI 应急引用 |
 | 2026-07-25 | v2.9.3 | **macp4 harness 改进（5 项）**：① **P1-F** §13.3a root done 路径扩展为三子节（正常/备选/诊断）——教 root 用 milestone_add 绕过 L1767 milestone 门禁 ② **P1-G** §13.4.0a 待审 worker 清单维护流程——6 步防 C2 类异厂商审遗漏 ③ **P1-H** §6 brief_echo 回填完成确认清单——5 项硬 checklist 防并发遗漏 alignment 回填 ④ **P2-C** §4 Step2.1a 层级选择指导——3 层 vs 4 层条件表 ⑤ §13.7 加 E_SCHEMA_INVALID root done 门禁说明 + §11 加 #16（漏待审清单）/ #17（漏回填 alignment） |
 | 2026-07-25 | v2.9.2 | **macp2 改进（3 项）**：① **P1-C** set-status caller=owner 讲透——§3.4 autonomy 预置 `final_step` 字段 + §13.3 八步末尾加警示（步骤7 worker 自己调，commander 代调→E_BORROWED_IDENTITY）② **P1-A** comm_log 硬 checklist——§4 Step3 必须紧接 tree_log_communication + §11 新增 #15 禁止漏记 + §6 措辞从 advisory 升级为硬要求 ③ **P0-A** 建 auditor 流程——§13.4.0 四步协议教 commander 建独立 auditor leaf（引擎闸门2→闸门3 零改动已支持），auditor done 后可给全树配门禁 |
 | 2026-07-25 | v2.9.1 | **合并 Gap B（fix leaf 反馈闭环）自 Pro v0.22**：Pro tree-commander 在 2026-07-17 Gap B 后停止同步，独有 §13.4.6 fix leaf 闭环（auditor 发现 non-green findings → commander 派 fix leaf 修复 → auditor 复审）。本次合并到 release（§13.4.6），保留 release 的 P0-1/P1-1/P1-2（v2.7-v2.9）+ Pro 的 Gap B。修复 nanjuS1 实战暴露的"non-green findings 进已知但未修复真空"系统 gap。 |

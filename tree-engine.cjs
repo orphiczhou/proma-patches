@@ -44,6 +44,7 @@
 const fs = require('fs');
 const path = require('path');
 const process = require('process');
+const crypto = require('crypto');  // P0-2 (2026-07-28): tree-state.json HMAC 完整性校验
 
 // ============================================================
 // 常量与枚举
@@ -77,8 +78,8 @@ const STATUS_TRANSITIONS = {
   segment_pending:  ['active', 'segment_pending'],
 };
 const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round', 'subagent_spawn', 'progress'];
-const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm'];
-const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high'];
+const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm', 'security'];  // P0-2: +security
+const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high', 'red'];  // P0-2: +red (安全事件)
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
 // P0a (2026-07-08): 引入 'auditor' role —— 独立审计 leaf 专属角色。
 //   根因：macp4-A4 用 commander 假装 auditor → C-13/R-03/R-06 假阳性 24-38 条；macp4-W3 §3.5 "需要独立 auditor role，
@@ -222,6 +223,10 @@ const E_SUBAGENT_BUDGET_EXCEEDED = 'E_SUBAGENT_BUDGET_EXCEEDED';
 //   "多 caller 累积 + SDK 原生 create_session 旁路（不入树）" 的总量爆炸（macp2 4 分钟 207 session）。
 //   E_MAX_SESSIONS 在 session_registry 层统计 distinct session 总数（含 leaf + patches 登记的旁路）硬拦。
 const E_MAX_SESSIONS = 'E_MAX_SESSIONS';
+const E_CALLER_REQUIRED = 'E_CALLER_REQUIRED';  // P0-1 (2026-07-28): write ops require callerSessionId; CLI backward compat closed
+// P0-2 (2026-07-28): tree-state.json HMAC 完整性校验失败 —— 字段被直接编辑篡改（status/audit_gate.verdict/milestones.audit_pass 等），
+//   或关键状态（done/audit pass）leaf 无签名。auditor D6-F2 要求。
+const E_STATE_INTEGRITY = 'E_STATE_INTEGRITY';
 
 // v0.2.2: 真实 MCP session_id 格式校验（UUID v1-v5 不区分版本）
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -589,6 +594,171 @@ async function withLock(tree_id, fn) {
   throw new TreeStateError(E_LOCK_TIMEOUT, `could not acquire lock within ${LOCK_TIMEOUT_MS}ms`);
 }
 
+// P0-1 (2026-07-28): CLI backward compat closed.
+// Write operations require callerSessionId in production builds.
+// TREE_ENGINE_ALLOW_CLI=1 preserves a golden-path test channel only.
+function isCliAllowed() {
+  return process.env.TREE_ENGINE_ALLOW_CLI === '1';
+}
+
+// ============================================================
+// P0-2 (2026-07-28): tree-state.json HMAC 完整性校验
+//   auditor D6-F2 要求：直接编辑 tree-state.json 改 status=done / audit_gate.verdict=pass
+//   能绕过 validate。引入 per-leaf HMAC-SHA256 签名，readState 校验，writeState 落签。
+//   secret 落盘 <engine-dir>/.tree-engine-secret（首次 randomBytes(32) 生成，0600）。
+// ============================================================
+
+// 签名 scope：每 leaf 提取这些字段规范化后算 mac（drift_history / events / 非安全字段不计入）
+const INTEGRITY_FIELD_SCOPE = [
+  'id', 'role', 'status', 'added_by', 'session_id',
+  'audit_gate.verdict', 'milestones[].audit_pass', 'audit_log'
+];
+
+// engine secret 模块级缓存（只读一次盘）
+let _engineSecretCache = null;
+const ENGINE_SECRET_PATH = path.join(__dirname, '.tree-engine-secret');
+
+// 获取 engine 签名 secret：读已有 / 首次生成落盘。失败抛 E_STATE_INTEGRITY（不降级为无签名）。
+function getEngineSecret() {
+  if (_engineSecretCache) return _engineSecretCache;
+  try {
+    const hex = fs.readFileSync(ENGINE_SECRET_PATH, 'utf8').trim();
+    if (/^[0-9a-f]{64}$/i.test(hex)) {
+      _engineSecretCache = Buffer.from(hex, 'hex');
+      return _engineSecretCache;
+    }
+  } catch (_) { /* 文件不存在或不可读，继续生成 */ }
+  const newSecret = crypto.randomBytes(32);
+  try {
+    fs.writeFileSync(ENGINE_SECRET_PATH, newSecret.toString('hex'), { encoding: 'utf8', mode: 0o600 });
+  } catch (e) {
+    throw new TreeStateError(E_STATE_INTEGRITY,
+      `engine secret unavailable — cannot read or write ${ENGINE_SECRET_PATH}: ${e.message}. HMAC integrity check cannot proceed.`);
+  }
+  _engineSecretCache = newSecret;
+  return _engineSecretCache;
+}
+
+// 稳定排序的 canonical JSON（key 排序，递归）—— 保证同样字段值产出同样 mac，不受插入顺序影响
+function stableStringify(obj) {
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(stableStringify).join(',') + ']';
+  const keys = Object.keys(obj).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}';
+}
+
+// 从 leaf 提取参与签名的字段（规范化为稳定结构）
+function leafIntegrityFields(leaf) {
+  if (!leaf || typeof leaf !== 'object') return null;
+  return {
+    id: leaf.id || null,
+    role: leaf.role || null,
+    status: leaf.status || null,
+    added_by: leaf.added_by || null,
+    session_id: leaf.session_id || null,
+    audit_gate_verdict: (leaf.audit_gate && leaf.audit_gate.verdict) || null,
+    milestones_audit_pass: Array.isArray(leaf.milestones)
+      ? leaf.milestones.map(m => ({
+          id: (m && m.id) || null,
+          audit_pass: (m && typeof m.audit_pass === 'boolean') ? m.audit_pass : null
+        }))
+      : [],
+    audit_log: leaf.audit_log || null
+  };
+}
+
+function computeLeafHmac(leaf, secret) {
+  const canonical = stableStringify(leafIntegrityFields(leaf));
+  return crypto.createHmac('sha256', secret).update(canonical).digest('hex');
+}
+
+// 关键状态检测：done / audit_gate.verdict=pass / 任一 milestone.audit_pass=true
+function leafHasCriticalState(leaf) {
+  if (!leaf) return false;
+  if (leaf.status === 'done') return true;
+  if (leaf.audit_gate && leaf.audit_gate.verdict === 'pass') return true;
+  if (Array.isArray(leaf.milestones) && leaf.milestones.some(m => m && m.audit_pass === true)) return true;
+  return false;
+}
+
+// 对 state 落签：遍历 leaves 算 per-leaf mac，写入 _meta.integrity（mac 计算不含 integrity 字段本身，无循环）
+function signState(state, secret) {
+  if (!state._meta || typeof state._meta !== 'object') state._meta = {};
+  const leaves = (state.leaves && typeof state.leaves === 'object') ? state.leaves : {};
+  const macs = {};
+  for (const id of Object.keys(leaves)) {
+    macs[id] = computeLeafHmac(leaves[id], secret);
+  }
+  state._meta.integrity = {
+    algo: 'hmac-sha256',
+    key_id: secret.toString('hex').slice(0, 8),
+    fields: INTEGRITY_FIELD_SCOPE,
+    ts: Date.now(),
+    leaves: macs
+  };
+  return state;
+}
+
+// 绕过 readState 的 raw security drift 写入（篡改场景下 readState 会抛错，cmdDriftAppend 不可用）。
+// drift 记录字段（drift_history / drift_log）不在 leaf mac scope，追加不破坏其他 leaf 的 mac，无需重签。
+// best-effort：失败静默（只抛 E_STATE_INTEGRITY）。
+function appendSecurityDriftRaw(tree_id, leaf_id, reason) {
+  try {
+    const sp = statePath(tree_id);
+    const state = JSON.parse(fs.readFileSync(sp, 'utf8'));
+    const entry = { ts: nowIso(), leaf_id, kind: 'security', severity: 'red', action: 'declare', reason };
+    if (state.leaves && state.leaves[leaf_id]) {
+      const hist = Array.isArray(state.leaves[leaf_id].drift_history) ? state.leaves[leaf_id].drift_history : [];
+      const dup = hist.some(d => d && d.kind === 'security' && d.reason === reason);
+      if (!dup) { hist.push(entry); state.leaves[leaf_id].drift_history = hist; }
+    }
+    if (!Array.isArray(state.drift_log)) state.drift_log = [];
+    const dupLog = state.drift_log.some(d => d && d.kind === 'security' && d.reason === reason && d.leaf_id === leaf_id);
+    if (!dupLog) state.drift_log.push(entry);
+    fs.writeFileSync(sp, JSON.stringify(state), 'utf8');
+  } catch (_) {
+    // drift 不可用则只抛错（调用方负责）
+  }
+}
+
+// readState 主校验：parse 后调用。
+//   - 无签名 + 无关键状态 → warn 兼容（首次 writeState 补签）
+//   - 无签名 + 有关键状态 → 拒绝（关键状态必须签名）
+//   - 有签名 → 逐 leaf 重算比对，不符抛 E_STATE_INTEGRITY（含定位）+ best-effort security drift
+function verifyStateIntegrity(tree_id, state) {
+  const secret = getEngineSecret();  // 失败抛 E_STATE_INTEGRITY
+  const leaves = (state && state.leaves && typeof state.leaves === 'object') ? state.leaves : {};
+  const leafIds = Object.keys(leaves);
+  const integrity = state && state._meta && state._meta.integrity;
+
+  if (!integrity || typeof integrity.leaves !== 'object') {
+    const critical = leafIds.filter(id => leafHasCriticalState(leaves[id]));
+    if (critical.length > 0) {
+      throw new TreeStateError(E_STATE_INTEGRITY,
+        `tree-state.json has critical state (status=done / audit_gate.verdict=pass / milestone.audit_pass=true) on leaf(es) [${critical.join(', ')}] but no integrity signature — possible tampering or unsafe migration. tree=${tree_id}`);
+    }
+    console.warn(`[tree-engine] tree "${tree_id}" has no integrity signature (legacy data); will be auto-signed on next write.`);
+    return;
+  }
+
+  const tampered = [];
+  for (const id of leafIds) {
+    const expected = integrity.leaves[id];
+    const actual = computeLeafHmac(leaves[id], secret);
+    if (typeof expected !== 'string' || expected !== actual) {
+      tampered.push(id);
+    }
+  }
+  if (tampered.length > 0) {
+    const detail = tampered.map(id => `leaf "${id}" (scope: ${INTEGRITY_FIELD_SCOPE.join('|')})`).join('; ');
+    const reason = `tree-state integrity violation: ${detail}`;
+    appendSecurityDriftRaw(tree_id, tampered[0], reason);
+    console.error(`[tree-engine] SECURITY: ${reason}`);
+    throw new TreeStateError(E_STATE_INTEGRITY,
+      `tree-state.json integrity violation — tampered: ${detail}. Restore from backup or re-init.`);
+  }
+}
+
 function readState(tree_id) {
   const sp = statePath(tree_id);
   let raw;
@@ -603,6 +773,8 @@ function readState(tree_id) {
   } catch (e) {
     throw new TreeStateError(E_SCHEMA_INVALID, `tree-state.json is corrupt: ${e.message}`);
   }
+  // P0-2 (2026-07-28): HMAC 完整性校验 —— 字段被直接编辑篡改 / 关键状态无签名 → 抛 E_STATE_INTEGRITY
+  verifyStateIntegrity(tree_id, state);
   return state;
 }
 
@@ -631,6 +803,12 @@ function writeState(tree_id, state) {
   if (Object.prototype.hasOwnProperty.call(state, '__write_counter')) {
     delete state.__write_counter;
   }
+
+  // P0-2 (2026-07-28): 序列化前对 state 落 HMAC 签名。
+  //   signState 遍历 leaves 算 per-leaf mac，写入 _meta.integrity。
+  //   mac 计算不含 _meta.integrity 字段本身（无循环）。secret 不可用抛 E_STATE_INTEGRITY（不降级）。
+  const _secret = getEngineSecret();
+  signState(state, _secret);
 
   let serialized;
   try {
@@ -1028,11 +1206,14 @@ async function cmdLeafAdd(args, callerSessionId) {
   //   commander 的 session_id(cmd-1) 后，可声明 added_by=cmd-1 注册 leaf → 身份借用，污染溯源链，
   //   且后续 cmdLeafSetSession 的 isCreator 判断被绕过（leaf 显示成 cmd-1 创建的）。
   //   修复：与 cmdLeafSetSession L1743 / cmdEventAppend L2022 / cmdAuditGate L2997 同范式 ——
-  //   callerSessionId 必须 === added_by。CLI 不传 caller（undefined）跳过，向后兼容金标准测试。
-  if (callerSessionId && added_by && callerSessionId !== added_by) {
+  //   callerSessionId 必须 === added_by。P0-1: CLI 兼容通道关闭，caller 缺省时生产抛错，测试 TREE_ENGINE_ALLOW_CLI=1 放行。
+  if (!callerSessionId) {
+    if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'leaf_add rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+    // CLI test mode: skip caller validation
+  } else if (added_by && callerSessionId !== added_by) {
     throw new TreeStateError(
       E_BORROWED_IDENTITY,
-      `leaf_add rejected: caller "${callerSessionId}" != added_by "${added_by}" (borrowed identity forbidden; caller must be the operator it declares as added_by — only the session that owns added_by can register this leaf). CLI omits caller for backward compat. [P1-cmdLeafAdd-caller-binding]`
+      `leaf_add rejected: caller "${callerSessionId}" != added_by "${added_by}" (borrowed identity forbidden; caller must be the operator it declares as added_by — only the session that owns added_by can register this leaf). [P1-cmdLeafAdd-caller-binding]`
     );
   }
 
@@ -1728,15 +1909,18 @@ async function cmdLeafSetStatus(args, callerSessionId) {
     //   失守根因：cmdLeafSetStatus 无 caller 校验，任意 session 可把别人 active leaf → pruned/archived
     //   （跨身份杀 leaf，STATUS_TRANSITIONS 允许）。修复：对齐 cmdLeafSetSession L1743 范式。
     //   允许: caller===leaf.session_id(owner 改自己,如 worker mark done) || caller===leaf.added_by
-    //   (creator/commander 改子) || (role=root && caller===session_id). CLI 不传 caller 跳过, 向后兼容。
-    if (callerSessionId) {
+    //   (creator/commander 改子) || (role=root && caller===session_id). P0-1: CLI 兼容通道关闭。
+    if (!callerSessionId) {
+      if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'leaf set-status rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+      // CLI test mode: skip caller validation
+    } else {
       const _isOwner = callerSessionId === leaf.session_id;
       const _isCreator = leaf.added_by != null && callerSessionId === leaf.added_by;
       const _isRootSelf = leaf.role === 'root' && callerSessionId === leaf.session_id;
       if (!_isOwner && !_isCreator && !_isRootSelf) {
         throw new TreeStateError(
           E_BORROWED_IDENTITY,
-          `set-status rejected: caller "${callerSessionId}" is not owner(session=${leaf.session_id})/creator(added_by=${leaf.added_by || 'null'})/root-self of leaf "${leaf_id}". Cannot change another leaf's status (P1: prevent cross-identity status tampering — e.g. worker pruning others' leaves). CLI omits caller for backward compat. [P1-cmdLeafSetStatus-caller-binding]`
+          `set-status rejected: caller "${callerSessionId}" is not owner(session=${leaf.session_id})/creator(added_by=${leaf.added_by || 'null'})/root-self of leaf "${leaf_id}". Cannot change another leaf's status (P1: prevent cross-identity status tampering — e.g. worker pruning others' leaves). [P1-cmdLeafSetStatus-caller-binding]`
         );
       }
     }
@@ -2133,7 +2317,7 @@ async function cmdLeafSetSession(args, callerSessionId) {
   //   X 把任意 leaf.session_id 改成自己的真实 session → 夺取所有权 → 绕过"只有 owner 能 mark done"。
   //   修复: callerSessionId 必须 === leaf.added_by（仅创建该 leaf 的 commander/root 能改其 session_id）。
   //   root leaf 的 added_by=null（cmdInit 自创建），允许 root 自己（caller===leaf.session_id）改（修正 PENDING_ROOT / 恢复），
-  //   与 cmdEventAppend L1798 callerIsRootSelf 同语义。CLI 调用（dbc-spec 等测试）不传 callerSessionId，跳过此校验（向后兼容）。
+  //   与 cmdEventAppend callerIsRootSelf 同语义。P0-1: CLI 兼容通道关闭，caller 缺省抛 E_CALLER_REQUIRED，TREE_ENGINE_ALLOW_CLI=1 测试放行。
   const { positional } = parseArgs(args);
   const [tree_id, leaf_id, new_session_id] = positional;
   assertTreeExists(tree_id);
@@ -2154,8 +2338,11 @@ async function cmdLeafSetSession(args, callerSessionId) {
     //   放在 session_id 唯一性校验之前（身份校验优先，fail-fast on attacker）。
     //   - isCreator: caller === leaf.added_by（创建者）。workers 不能当 added_by（cmdLeafAdd L874 已禁），故 worker 无法借此夺权。
     //   - isRootSelf: root leaf（added_by=null）允许 root 自己改（caller===leaf.session_id），覆盖 PENDING_ROOT 修正 / 恢复场景。
-    //   - CLI（无 callerSessionId）跳过，向后兼容全部金标准测试（均走 engine.run(cmd,args) 不传 caller）。
-    if (callerSessionId) {
+    //   - CLI（无 callerSessionId）拒绝；P0-1: CLI 兼容通道关闭，TREE_ENGINE_ALLOW_CLI=1 测试放行。
+    if (!callerSessionId) {
+      if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'leaf set-session rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+      // CLI test mode: skip caller validation
+    } else {
       const isCreator = leaf.added_by != null && callerSessionId === leaf.added_by;
       const isRootSelf = leaf.role === 'root' && callerSessionId === leaf.session_id;
       if (!isCreator && !isRootSelf) {
@@ -2247,15 +2434,18 @@ async function cmdMilestoneAdd(args, callerSessionId) {
     const leaf = state.leaves[leaf_id];
     // P1 防借身份 (cmdMilestoneAdd caller-binding): 校验 caller 是 owner/creator/root-self。
     //   失守：无 caller 校验，任意 session 可给别人的 leaf 注入 milestone（污染 + 干扰 done 门禁）。
-    //   对齐 cmdLeafSetStatus 同范式。CLI 不传 caller 跳过。
-    if (callerSessionId) {
+    //   对齐 cmdLeafSetStatus 同范式。P0-1: CLI 兼容通道关闭。
+    if (!callerSessionId) {
+      if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'milestone_add rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+      // CLI test mode: skip caller validation
+    } else {
       const _isOwner = callerSessionId === leaf.session_id;
       const _isCreator = leaf.added_by != null && callerSessionId === leaf.added_by;
       const _isRootSelf = leaf.role === 'root' && callerSessionId === leaf.session_id;
       if (!_isOwner && !_isCreator && !_isRootSelf) {
         throw new TreeStateError(
           E_BORROWED_IDENTITY,
-          `milestone_add rejected: caller "${callerSessionId}" is not owner/creator/root-self of leaf "${leaf_id}". Cannot inject milestone into another's leaf. CLI omits caller for backward compat. [P1-cmdMilestoneAdd-caller-binding]`
+          `milestone_add rejected: caller "${callerSessionId}" is not owner/creator/root-self of leaf "${leaf_id}". Cannot inject milestone into another's leaf. [P1-cmdMilestoneAdd-caller-binding]`
         );
       }
     }
@@ -2337,11 +2527,14 @@ async function cmdMilestoneSetResult(args, callerSessionId) {
       // P0-3+ (2026-07-07, 场景D 攻击面堵): audit_pass=true 必须由 auditor 自己调（caller===audit_session_id），
       //   与 cmdAuditGate L2732 一致。原 cmdMilestoneSetResult 不接收 callerSessionId（dispatchMilestone 未透传），
       //   导致 worker 借 root session_id 可伪造 milestone audit_pass（虽 audit_gate 兜底无法 done，但污染数据完整性）。
-      //   CLI 不传 caller（callerSessionId=undefined）跳过校验，向后兼容测试。
-      if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId) {
+      //   P0-1: CLI 兼容通道关闭，caller 缺省时生产抛错，TREE_ENGINE_ALLOW_CLI=1 测试放行。
+      if (!callerSessionId) {
+        if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'milestone set-result rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+        // CLI test mode: skip caller validation
+      } else if (audit_session_id && audit_session_id !== callerSessionId) {
         throw new TreeStateError(
           E_BORROWED_IDENTITY,
-          `milestone set-result rejected: caller "${callerSessionId}" != audit_session_id "${audit_session_id}" (borrowed identity forbidden; auditor must call set-result itself). CLI omits caller for backward compat.`
+          `milestone set-result rejected: caller "${callerSessionId}" != audit_session_id "${audit_session_id}" (borrowed identity forbidden; auditor must call set-result itself).`
         );
       }
       const indepProblem = resolveAuditorIndep(state, leaf, audit_session_id);
@@ -2412,15 +2605,18 @@ async function cmdMilestoneUpdate(args, callerSessionId) {
     }
     const leaf = state.leaves[leaf_id];
     // P1 防借身份 (cmdMilestoneUpdate caller-binding): 校验 caller 是 owner/creator/root-self。
-    //   与 cmdMilestoneAdd 同范式。CLI 不传 caller 跳过。
-    if (callerSessionId) {
+    //   与 cmdMilestoneAdd 同范式。P0-1: CLI 兼容通道关闭。
+    if (!callerSessionId) {
+      if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'milestone_update rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+      // CLI test mode: skip caller validation
+    } else {
       const _isOwner = callerSessionId === leaf.session_id;
       const _isCreator = leaf.added_by != null && callerSessionId === leaf.added_by;
       const _isRootSelf = leaf.role === 'root' && callerSessionId === leaf.session_id;
       if (!_isOwner && !_isCreator && !_isRootSelf) {
         throw new TreeStateError(
           E_BORROWED_IDENTITY,
-          `milestone_update rejected: caller "${callerSessionId}" is not owner/creator/root-self of leaf "${leaf_id}". Cannot modify another's milestone. CLI omits caller for backward compat. [P1-cmdMilestoneUpdate-caller-binding]`
+          `milestone_update rejected: caller "${callerSessionId}" is not owner/creator/root-self of leaf "${leaf_id}". Cannot modify another's milestone. [P1-cmdMilestoneUpdate-caller-binding]`
         );
       }
     }
@@ -2518,12 +2714,17 @@ async function cmdEventAppend(args, callerSessionId) {
     // V10-trust-anchor-fix (C5/A3 P0 攻击 2) + Bug A 修复：写 done event 必须是 leaf 拥有者（session_id）。
     //   失守根因：原 V10-trust-anchor-fix 允许 added_by 代写，导致 commander 可谎报 worker done。
     //   修复：只允许 leaf.session_id 自己写自己的 done event，禁止任何代写（包括 commander）。
-    //   CLI 调用（dbc-spec 等测试）不传 callerSessionId,跳过此校验（向后兼容）。
-    if (opts.type === 'done' && callerSessionId && callerSessionId !== leaf.session_id) {
-      throw new TreeStateError(
-        E_BORROWED_IDENTITY,
-        `event_append rejected: caller "${callerSessionId}" cannot write done event to leaf "${leaf_id}" (session=${leaf.session_id}). Only the leaf owner itself can mark done.`
-      );
+    //   P0-1: CLI 兼容通道关闭，caller 缺省时生产抛错，TREE_ENGINE_ALLOW_CLI=1 测试放行。
+    if (opts.type === 'done') {
+      if (!callerSessionId) {
+        if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'event_append(done) rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+        // CLI test mode: skip caller validation
+      } else if (callerSessionId !== leaf.session_id) {
+        throw new TreeStateError(
+          E_BORROWED_IDENTITY,
+          `event_append rejected: caller "${callerSessionId}" cannot write done event to leaf "${leaf_id}" (session=${leaf.session_id}). Only the leaf owner itself can mark done.`
+        );
+      }
     }
 
     // SubAgent 入树 (2026-07-07): subagent_spawn 事件 schema 校验。
@@ -2763,10 +2964,10 @@ async function cmdEventAppend(args, callerSessionId) {
     //   原条件只看 type==='done' && role==='root',worker 给 root 写 done event 也会触发 auto_upgrade,
     //   一键把 root.audit_gate 从 skip 升级为 pass。修复：必须 callerSessionId === leaf.session_id
     //   （即 root 自己写自己的 done event）才触发；上面已加 caller 校验拒绝 worker 给 root 写 done,
-    //   此处再加一道 defense-in-depth,即便 caller 校验被绕过（如新增 caller 不传的路径）也不会触发。
+    //   此处再加一道 defense-in-depth。P0-1: CLI 兼容通道关闭，仅测试模式无 caller 时放行。
     if (opts.type === 'done' && leaf.role === 'root') {
       const curGate = leaf.audit_gate;
-      const callerIsRootSelf = !callerSessionId || callerSessionId === leaf.session_id;
+      const callerIsRootSelf = (!callerSessionId && isCliAllowed()) || (callerSessionId === leaf.session_id);
       if ((!curGate || curGate.verdict === 'skip') && callerIsRootSelf) {
         leaf.audit_gate = {
           verdict: 'pass',
@@ -3551,13 +3752,16 @@ async function cmdAuditGate(args, callerSessionId) {
   //   失守案例: worker 528b0925 拿 auditor 404c724f 的 session_id 调 mcp__tree__tree_audit_gate，
   //   引擎层完全无感知（cmdAuditGate 不知道 caller 是谁），4 道 V4-V9 校验全过。
   //   修复：MCP wrapper 从 __proma_getMcpServers__(sessionId, ...) 提取 sessionId，透传给 engine。
-  //   CLI 调用（dbc-spec 等）不传 caller，跳过此校验（向后兼容）。
+  //   P0-1: CLI 兼容通道关闭，caller 缺省时生产抛错，TREE_ENGINE_ALLOW_CLI=1 测试放行。
   //
   // V10-trust-anchor: root leaf 自审例外。root 调 audit_gate 时 audit_session_id=root.session_id，
   //   caller 也是 root.session_id，自然满足 caller===audit_session_id（原校验放行）。
   //   leaf.role==='root' 的"自审 vs 借身份"区分由 withLock 内 resolveAuditorIndep 的 root 分支兜底（root 放行）。
   //   worker 借 root session_id 调用时，caller=worker.session_id ≠ audit_session_id=root.session_id，仍被此校验拦。
-  if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId) {
+  if (!callerSessionId) {
+    if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'audit-gate rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+    // CLI test mode: skip caller validation
+  } else if (audit_session_id && audit_session_id !== callerSessionId) {
     throw new TreeStateError(
       E_BORROWED_IDENTITY,
       `audit-gate rejected: caller "${callerSessionId}" != audit_session_id "${audit_session_id}" (borrowed identity forbidden; caller must be the auditor itself)`
@@ -3697,8 +3901,11 @@ async function cmdAuditAppend(args, callerSessionId) {
 
   // P2 防借身份: 调用方 session_id 必须等于 entry.auditor_session_id（与 cmdAuditGate L2572 caller===audit_session_id 对齐）。
   //   堵攻击：X 用他人真实 session_id（如 auditor 404c724f）当 auditor 写 audit_log，伪造审计背书。
-  //   CLI 调用（dbc-spec 等测试）不传 callerSessionId，跳过此校验（向后兼容）。
-  if (callerSessionId && callerSessionId !== entry.auditor_session_id) {
+  //   P0-1: CLI 兼容通道关闭，caller 缺省时生产抛错，TREE_ENGINE_ALLOW_CLI=1 测试放行。
+  if (!callerSessionId) {
+    if (!isCliAllowed()) throw new TreeStateError(E_CALLER_REQUIRED, 'audit_append rejected: callerSessionId is required for write operations. Set TREE_ENGINE_ALLOW_CLI=1 for test bypass.');
+    // CLI test mode: skip caller validation
+  } else if (callerSessionId !== entry.auditor_session_id) {
     throw new TreeStateError(
       E_BORROWED_IDENTITY,
       `audit_append rejected: caller "${callerSessionId}" != auditor_session_id "${entry.auditor_session_id}" (borrowed identity forbidden; caller must be the auditor itself — align with audit_gate caller binding)`
@@ -4627,7 +4834,7 @@ if (audit_session_id && callerSessionId && audit_session_id !== callerSessionId)
 }
 \`\`\`
 
-CLI 调用（dbc-spec 等）不传 callerSessionId，跳过此校验（向后兼容）。
+P0-1 (2026-07-28): CLI 兼容通道关闭 — caller 缺省时生产构建抛 E_CALLER_REQUIRED；仅 TREE_ENGINE_ALLOW_CLI=1 测试通道放行。
 
 ## 正确流程
 1. commander 用 fork_session / create_session 派 auditor session
@@ -5739,6 +5946,10 @@ module.exports = {
     E_SESSION_NOT_ALIVE,
     // Sprint 5 (聚类 A/E, 2026-07-14): tree 级总会话数硬护栏（防 macp2 型会话爆炸）
     E_MAX_SESSIONS,
+    // P0-1 (2026-07-28): CLI 兼容通道关闭 — 写操作 caller 缺省抛此错误码
+    E_CALLER_REQUIRED,
+    // P0-2 (2026-07-28): tree-state.json HMAC 完整性校验失败
+    E_STATE_INTEGRITY,
   },
   setSessionVerifier,
   // Sprint 5 (聚类 A): session→tree 反查（供 patches create_session handler 定位 caller 所属 tree）
