@@ -1001,6 +1001,18 @@ async function cmdInit(args, callerSessionId) {
   //   E_BORROWED_IDENTITY(creator=null) → 冷启动死锁。优先级：--session-id → caller → PROMA_SESSION_ID → PENDING_ROOT。
   //   CLI/金标准不传 caller → undefined → 自然退化原三级降级逻辑（零破坏）。
   const rootSessionId = opts['session-id'] || callerSessionId || process.env.PROMA_SESSION_ID || PENDING_ROOT;
+  // macpaf (2026-07-29): session_id UUID strict 校验 —— 对齐 leaf_add（assertMcpEntrySessionId 内部用 UUID_RE）。
+  //   失守根因: tree_init 接受任意字符串做 session_id（macpaf pro 实战 GLM root 用 cwd 目录名缩写前缀
+  //   `a9221192` 被存为 root.session_id），与 MCP wrapper 提取的真实完整 UUID caller 不等 → 后续 leaf_add
+  //   撞 E_BORROWED_IDENTITY + set_session 防劫持双锁死锁，root 无法自救（删空树重 init 才解）。
+  //   leaf_add 已严格 UUID 校验，tree_init 入口对齐。
+  //   复用 leaf_add 同源的纯格式校验 isValidStrictUuidV4（UUID_RE + 拒全 0/全 f）—— 不调 verifier：
+  //   root session 是冷启动产物，CLI/未注入 verifier 时 liveness 会误杀合规 init（assertMcpEntrySessionId 不适用）。
+  //   PENDING_ROOT（无任何 session_id 时的过渡标记）跳过——它由 leaf set-session 后续修正，非真实 session。
+  if (rootSessionId !== PENDING_ROOT && !isValidStrictUuidV4(rootSessionId)) {
+    throw new TreeStateError(E_NAME_INVALID,
+      `session_id "${rootSessionId}" must be a full UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx, 36 hex chars). session_id 必须是完整 UUID 格式，不可用 cwd 目录名缩写前缀（如 a9221192）—— 会与 MCP wrapper 提取的真实 caller 不等，导致 leaf_add E_BORROWED_IDENTITY + set_session 防劫持双锁死锁。用 create_session/fork_session 返回的完整 UUID。`);
+  }
   const rootLeafId = `${tree_id}-root`;
   const rootPath = parsePathFromLeafId(rootLeafId);
   state.leaves[rootLeafId] = {
