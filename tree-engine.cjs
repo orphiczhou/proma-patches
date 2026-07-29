@@ -77,7 +77,7 @@ const STATUS_TRANSITIONS = {
   archived:         ['archived'],
   segment_pending:  ['active', 'segment_pending'],
 };
-const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round', 'subagent_spawn', 'progress'];
+const EVENT_TYPE_ENUM = ['done', 'blocked', 'plan', 'brief_echo', 'heartbeat_reply', 'nudge', 'limit', 'status_check', 'review_round', 'subagent_spawn', 'progress', 'child_done'];
 const DRIFT_KIND_ENUM = ['production', 'direction', 'rhythm', 'security'];  // P0-2: +security
 const DRIFT_SEVERITY_ENUM = ['low', 'mid', 'high', 'red'];  // P0-2: +red (安全事件)
 const DRIFT_ACTION_ENUM = ['nudge', 'limit', 'prune', 'self_correct', 'declare', 'handoff'];
@@ -1887,6 +1887,34 @@ function validateReviewRoundSchema(meta, leaf, leafId) {
   }
 }
 
+// child_done 事件机制（轮 1, 2026-07-29）：leaf done 成功后通知 parent，解决 leaf auto-closeout gap。
+//   macpaf pro 实战：root 子 leaf 全 done 后 root idle，不知道依赖满足，需用户手工提示。
+//   本函数在 cmdLeafSetStatus done 成功后由引擎内部调用（绕过 cmdEventAppend 的 caller 校验）。
+//   best-effort：parent 不存在/已归档 → 跳过不报错（不阻断 done）。child_done 不触发 parent done 门禁。
+//   边缘：root 无 parent 跳过；parent 已 done 仍写（无害，记录历史依赖链）。
+//   HMAC：event 不在签名 scope（和 plan/brief_echo/done event 一致）。
+function _notifyParentChildDone(state, leaf) {
+  if (leaf.role === 'root' || !leaf.parent) return;
+  const parentLeaf = state.leaves[leaf.parent];
+  if (!parentLeaf) return;
+  // parent 已 pruned/archived → 跳过（无活跃 session 监听，写 child_done 无意义）
+  if (parentLeaf.status === 'pruned' || parentLeaf.status === 'archived') return;
+  const event = {
+    type: 'child_done',
+    ts: nowIso(),
+    meta: {
+      child_leaf_id: leaf.leaf_id || leaf.id,
+      child_role: leaf.role,
+      child_path: leaf.path,
+      status: 'done'
+    }
+  };
+  if (!Array.isArray(parentLeaf.events)) parentLeaf.events = [];
+  parentLeaf.events.push(event);
+  parentLeaf.last_event_type = 'child_done';
+  parentLeaf.last_event_ts = event.ts;
+}
+
 async function cmdLeafSetStatus(args, callerSessionId) {
   const { positional } = parseArgs(args);
   const [tree_id, leaf_id, new_status] = positional;
@@ -2153,6 +2181,11 @@ async function cmdLeafSetStatus(args, callerSessionId) {
     }
 
     leaf.status = new_status;
+
+    // child_done 事件（轮 1, 2026-07-29）：done 成功后通知 parent（解决 leaf auto-closeout gap）
+    if (new_status === 'done') {
+      _notifyParentChildDone(state, leaf);
+    }
 
     // 切到 pruned/archived 时追加 drift_history
     if (new_status === 'pruned' || new_status === 'archived') {
