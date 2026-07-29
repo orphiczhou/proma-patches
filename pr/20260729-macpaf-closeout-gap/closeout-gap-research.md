@@ -63,8 +63,37 @@ root 在子 leaf（commander @21:36 / auditor @21:32）全 done 后，自己 @21
 
 ---
 
-## 五、执行记录
+## 五、执行记录（2026-07-29 完成）
 
-（3 轮逐个执行，结果回填）
+### 轮 1：child_done 事件机制（引擎 P2）✅ commit 55f7367
+- **实施**（DeepSeek）：`_notifyParentChildDone(state, leaf)` L1902，cmdLeafSetStatus done 后触发 L2197。root/无parent/不存在/pruned/archived 跳过。EVENT_TYPE_ENUM L80 加 child_done。
+- **审计**（GLM pass）：独立 PoC 29/29 + HMAC 算法复现 4 项对照（证明 events 不在签名 scope）。
+- **单测**：59/59（实施）+ 29/29（PoC）。
+- **部署**：md5 三方一致（source=dev/pro=release）。
+
+### 轮 2：tree_init session_id 校验对齐（引擎）✅ commit 88fdf37
+- **实施**（GLM）：cmdInit L1012 加 UUID strict 校验，复用 `isValidStrictUuidV4`（纯格式，不调 verifier liveness，避免误杀冷启动 root）。PENDING_ROOT 跳过。
+- **审计**（DeepSeek pass）：PoC 缩写 sid 被拒（E_NAME_INVALID）+ 完整 UUID 通过 + 7 边界变体。
+- **单测**：15/15 + 回归 child-done 59/59 + caller-required 18/18 零破坏。
+
+### 轮 3：root activity guard + leaf 主动性 SKILL 教化 ✅ commit 196ddb2
+- **实施**（父会话）：§13.4 步骤 C 补 root minimum activity guard（冷启动先发 plan event）+ 新增 §13.8 leaf 主动性收尾（对照 DoD + 查 child_done + 主动 done）+ L2 commander carve-out（§13.3b）。SKILL v2.9.8→v2.9.9。
+- **审计**（GLM pass_with_minor → MINOR 已修）：engine claim 逐字核实 L3307-3320 + child_done 衔接真实可运行 + md5 一致。
+
+### 异厂商分工（破锯齿智能）
+| 轮 | 实施 | 审计 |
+|---|------|------|
+| 轮1 child_done | DeepSeek | GLM（独立 PoC + HMAC 复现）|
+| 轮2 tree_init | GLM | DeepSeek（PoC + 7 边界）|
+| 轮3 SKILL | 父会话 | GLM（engine claim 核实）|
+
+3 轮均 design → 实施 → 异厂商审计 → commit + push 闭环。
+
+---
+
+## 六、后续
+
+- **平台层（未做，P3）**：引擎 child_done 事件是"被动标记"（写 parent.events），实时唤醒 parent session 需 Proma 平台层 hook（引擎写事件 → 平台触发 parent send_message）。当前靠 parent 被 send_message 触发时查 child_done 收尾（§13.8 教化）。
+- **实例实战验证（可选）**：3 轮改动部署后，可跑 macpaf2 实战验证 child_done 事件 + tree_init 校验 + root activity guard 在实例运行时生效。
 
 **Co-Authored-By**: Claude `<noreply@anthropic.com>`
