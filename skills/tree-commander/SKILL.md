@@ -18,7 +18,7 @@ description: |
 
 ```yaml
 skill_name: tree-commander
-version: 2.9.8-audit-fix
+version: 2.9.9-macpaf-closeout
 target: 根会话（指挥官）
 requires:
   - tree-state.js (v0.7+ 已内联进 mcp__tree__* MCP，工作区不再有源码)
@@ -966,6 +966,8 @@ macp2 暴露 audit 门禁全回流 root 的问题——不是引擎禁止独立 
   🔴 **audit_append 时 `report.results[]` 每项必须含 `severity ∈ red|yellow|green`**（v0.21 强制，缺抛 `E_SCHEMA_INVALID`；macp6 C/auditor 撞此错自纠正，浪费轮次）
 
 步骤 C: root 用闸门2 背书 auditor leaf
+  🔴 **前置（macpaf 2026-07-29 实证）**：root 背书前需 `root.events ≥ 1`（引擎 minimum activity guard：root leaf events 空时背书撞 `E_AUDITOR_NOT_INDEPENDENT`）。**冷启动 root 首次背书前先发 1 条 plan event**：
+    mcp__tree__tree_event_append(tree_id, leaf_id=<root>, type='plan', meta={plan:'冷启动 root 调度，准备背书 auditor'})  // 仅首次需要，后续 root.events 已非空
   mcp__tree__tree_audit_gate(tree_id, leaf_id=<auditor>, verdict='pass', audit_session_id=<root.session_id>)
   → 闸门2（root 信任锚）放行 → auditor.audit_gate.verdict=pass
   → auditor leaf 满足 V10-auditor-active 三连（done + events 非空 + audit_gate=pass）
@@ -1077,6 +1079,21 @@ root 在中转链上的待审清单操作（6 步）:
 | `E_STATE_INTEGRITY` | 任一写操作（tree-state 落盘时） | **P0-2 新增**：tree-state HMAC 校验失败（文件被外部篡改 / 手工编辑破坏完整性签名） | 从最近 backup 恢复（`tree_restore`），或 `tree_validate` 诊断；禁止手工编辑 tree-state.json（§11 #3） |
 
 > **通用排查注**：所有 `mcp__tree__*` 工具失败时返回 `{ok:false, error:{code, message, help_topic}}`。若返回里带 `help_topic` 字段，**立即** `mcp__tree__tree_help(topic=<help_topic>)` 拿该主题详细用法——多数错误根因是参数 schema 或调用顺序错，help_topic 给的就是正解。
+
+---
+
+### §13.8 leaf 主动性收尾（macpaf 2026-07-29 实证）
+
+> macpaf pro 实战发现：leaf（root/commander）做完自己轮次工作后 idle，**没主动对照 `leaf_dod.accept_criteria` 收尾**，需父会话/用户手工提示才 done。根本解是引擎 `child_done` 事件（轮 1 已实施，leaf done → parent 收 child_done 标记），但 **leaf 主动性**仍是必要补充（事件标记 + 主动收尾 = 完整闭环）。
+
+**每个 leaf 每轮结束前必做**：
+1. **对照 `leaf_dod.accept_criteria`**：自己的 DoD 是否全满足（不依赖父会话提示）
+2. **查 `child_done` 事件**（轮 1 引擎新增）：子 leaf done 后引擎自动给 parent 写 `child_done` event。parent 被 send_message 唤醒时，先查 events 里的 `child_done` 确认依赖是否全满足
+3. **自己能闭环的立即 done**：DoD 全满足 + 依赖（子 leaf）全 done → 主动走 done 流程（event done self_check + set-status done），**不等外部触发**。注：worker/root 走此简单路径；**L2 commander（多层级树）done 走 §13.3b root 代调路径**（milestone_set_result + audit_gate 由旧 root 代调），非此 event+set-status 简单路径
+
+**root 主动性**（macpaf 实证 root 易遗漏）：root 是 tree 最终负责人，做完核心调度任务后，主动核 `root_dod.accept_criteria`（如"三 leaf done"），自己能闭环的立即走 §13.3a done，**不因单轮任务边界推后自己的收尾**。
+
+**识别信号**：leaf 做完轮次工作后长期 active、需手工提示才 done → 撞此 gap。查该 leaf 的 DoD + `child_done` 事件 + 主动性。
 
 ---
 
@@ -1249,6 +1266,7 @@ declare done 前逐项确认：
 | 日期 | 版本 | 主要变更 |
 |------|------|---------|
 | 2026-07-28 | v2.9.8-audit-fix | **审计驱动修订（7 项，auditor MiniMax-M3 要求前置）**：① **P0-3** §13.3a 删除冗余的 root done 备用分支（引擎 L1765 已豁免 root milestone 非空门禁，macp4 P0-E），§13.3a.3 诊断保留原编号 + §13.7 E_SCHEMA_INVALID 行同步更新 ② **P1-1** §11 标题计数 12→17（实际条目数） ③ **P0-5** §14.6 删除修正员 leaf 的 optional 标注，与 §14.2 强制统一 ④ **P1-3** §14.3 补第 7 个 fix 修正执行员 in_scope 模板（序言 6→7 角色） ⑤ **P1-4** §13.7 补 6 个错误码（E_CHILDREN_NOT_DONE / E_AUDITOR_NOT_DONE / E_AUDITOR_NO_EVENTS / E_MAX_SESSIONS / E_CALLER_REQUIRED[P0-1 新增] / E_STATE_INTEGRITY[P0-2 新增]） ⑥ **P1-5** §13.6 idle 多维核验补第 5 项 communication_log 检查（4 项→5 项，判定规则同步） ⑦ 配合引擎 P0-1 关闭 CLI 兼容通道：删 §13.3b CLI 应急通道段（含 CLI 直调引擎的可执行 bash 代码块），改为"生产构建已禁用 / caller 缺省抛 E_CALLER_REQUIRED / 仅 TREE_ENGINE_ALLOW_CLI=1 测试模式放行"，清理身份继承矩阵表格 + 旧 root 失联预案中的 CLI 应急引用 |
+| 2026-07-29 | v2.9.9-macpaf-closeout | **macpaf 实战后续（3 轮迭代，配合引擎轮1-2）**：① §13.4 步骤 C 补 **root minimum activity guard**（冷启动 root 背书 auditor 前先发 plan event，macpaf 实证 root.events 空撞 `E_AUDITOR_NOT_INDEPENDENT`）② 新增 **§13.8 leaf 主动性收尾**（每 leaf 每轮对照 `leaf_dod.accept_criteria` + 查 `child_done` 事件[轮1引擎新增] + 自己能闭环的立即 done，不等外部触发；root 不因单轮边界推后收尾）|
 | 2026-07-25 | v2.9.3 | **macp4 harness 改进（5 项）**：① **P1-F** §13.3a root done 路径扩展为三子节（正常/备选/诊断）——教 root 用 milestone_add 绕过 L1767 milestone 门禁 ② **P1-G** §13.4.0a 待审 worker 清单维护流程——6 步防 C2 类异厂商审遗漏 ③ **P1-H** §6 brief_echo 回填完成确认清单——5 项硬 checklist 防并发遗漏 alignment 回填 ④ **P2-C** §4 Step2.1a 层级选择指导——3 层 vs 4 层条件表 ⑤ §13.7 加 E_SCHEMA_INVALID root done 门禁说明 + §11 加 #16（漏待审清单）/ #17（漏回填 alignment） |
 | 2026-07-25 | v2.9.2 | **macp2 改进（3 项）**：① **P1-C** set-status caller=owner 讲透——§3.4 autonomy 预置 `final_step` 字段 + §13.3 八步末尾加警示（步骤7 worker 自己调，commander 代调→E_BORROWED_IDENTITY）② **P1-A** comm_log 硬 checklist——§4 Step3 必须紧接 tree_log_communication + §11 新增 #15 禁止漏记 + §6 措辞从 advisory 升级为硬要求 ③ **P0-A** 建 auditor 流程——§13.4.0 四步协议教 commander 建独立 auditor leaf（引擎闸门2→闸门3 零改动已支持），auditor done 后可给全树配门禁 |
 | 2026-07-25 | v2.9.1 | **合并 Gap B（fix leaf 反馈闭环）自 Pro v0.22**：Pro tree-commander 在 2026-07-17 Gap B 后停止同步，独有 §13.4.6 fix leaf 闭环（auditor 发现 non-green findings → commander 派 fix leaf 修复 → auditor 复审）。本次合并到 release（§13.4.6），保留 release 的 P0-1/P1-1/P1-2（v2.7-v2.9）+ Pro 的 Gap B。修复 nanjuS1 实战暴露的"non-green findings 进已知但未修复真空"系统 gap。 |
