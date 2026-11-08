@@ -5,6 +5,15 @@
 
 ---
 
+## 谱系与最新进展（先读这段）
+
+本项目是 Proma 定制补丁的**早期形态**（0.12–0.15 期，插件式）。Proma 把主进程逻辑全部打进 `dist/main.cjs` bundle 后，插件注入不再适用，活跃开发已迁到 **[`orphiczhou/Proma-fix-patch`](https://github.com/orphiczhou/Proma-fix-patch)**（Proma-Pro 四块改造：跨渠道子会话 / 1M 上下文 / Pro 数据隔离 / 绿图标+禁更新）。
+
+- **2026-11-09**：Proma-Pro 已重打到官方最新的 **0.21.92**（跨渠道子会话端到端实测通过）。谱系、版本事实、锚点变化、新踩的坑与下次升级的操作顺序见 [`.context/proma-pro-repatch-progress.md`](./.context/proma-pro-repatch-progress.md)。
+- 下面 README 正文（v0.12 的 7 个模块）保留作为历史参考：`proma-dev-patches.cjs` 的 11 个 session MCP 工具、双开隔离、图标改色这些思路都已演化进 Proma-fix-patch，**但不要照搬到 0.19+**。
+
+---
+
 ## 给 Agent 读的（先看这里）
 
 如果用户让你"给 Proma 打补丁"或"安装 Proma 增强功能"，请按以下流程操作：
