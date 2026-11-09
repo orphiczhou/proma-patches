@@ -19,7 +19,7 @@
 
 - 官方更新器通道最新：`https://api.proma.cool/api/v1/updates/latest.yml` → **0.21.92**（releaseDate 2026-11-04）
 - GitHub `proma-ai/Proma` releases 停在 **0.19.58**，不能用来判断最新版（本项目 0.12 期的"看 releases"经验已经失效）
-- 本机部署：`D:\Proma-Pro-0.21.92`（`start-pro.bat`，`PROMA_DEV=1`）；回滚保留 `D:\Proma-Pro-0.19.53`、`D:\Proma-Pro`（0.14.23）
+- 本机部署：`D:\Proma-Pro`（即 0.21.92，`start-pro.bat` + `PROMA_DEV=1`，桌面「Proma Pro」快捷方式指这里）；回滚保留 `D:\Proma-Pro-0.19.53`、`D:\Proma-Pro-0.14.23`（原 `D:\Proma-Pro` 的 0.14.23，已改名）。三者共用 `~/.proma-pro` 与 `@proma/electron-pro`，同一单实例锁只能开一个
 
 ### 与 0.19.53 相比的补丁面变化
 
