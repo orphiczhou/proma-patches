@@ -73,3 +73,11 @@
 - 上游反馈：0.19.53 期的 GLM-5.3 opencode-go 400 已提 issue `proma-ai/Proma#2065`；0.21.92 官方停用该渠道，issue 可按"已被替代方案解决"收尾。
 - 跨渠道子会话的**官方内建**仍未出现（工具 schema 只有 `modelId`、无 `channelId`），所以补丁需长期跟。
 - 1M 上下文规则若官方继续扩表（新增 glm/qwen/claude 型号），E1/E2 范围应收窄到"官方未覆盖的家族"，避免把官方有意限定的模型放大。
+
+## 5. 踩坑与误判（2026-11-09，来自“glm-5.3 还是 200k”这次排查）
+
+1. **症状不等于补丁失效**：用户看到 glm-5.3 上下文 200k，实际是桌面快捷方式仍指向旧的 `D:\Proma-Pro`（0.14.23，规则表只有 `glm: ["glm-5.2"]`）。诊断顺序：进程 `Path` → 快捷方式 `TargetPath` → 该目录 `package.json` 版本 → 该版本 main.cjs 的 `glm:`/`deepseek:` 规则。
+2. **多版本 Pro 共用数据目录**：`D:\Proma-Pro*` 各版本都用 `~/.proma-pro` + `@proma/electron-pro`（同一个单实例锁），会话、渠道、登录态看起来完全一样，只有进程路径能区分；旧实例开着时启动新版会因锁直接退出。
+3. **规范化路径**：把最新版放 `D:\Proma-Pro`、旧版改名 `D:\Proma-Pro-<旧版本>`，快捷方式固定指 `D:\Proma-Pro\start-pro.bat`；改名前先关应用，并关掉 cwd 在该目录的终端（否则 `Device or resource busy`——本轮就踩到了，终端 Tab 握着目录句柄）。
+4. **上下文窗口在 UI 里看不到**：0.21.92 没有常驻分母，模型 chip tooltip 只有「渠道：X」；`window.electronAPI` 429 个 IPC 没有 agent 流订阅，`listChannels`/`listAgentSessions` 也不返回 contextWindow（只有 `usage_update` 流事件带）。验证要靠：pi catalog 的 `contextWindow`、渠道/会话无覆盖、`verify-context-window.cjs` 行为断言。
+5. **RDP 断连时截图失效**：PowerShell `CopyFromScreen` 报 `The handle is invalid`，改用 CDP `Page.captureScreenshot`（可带 clip/scale），进程路径 + 文件校验同样能作为证据。
